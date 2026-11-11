@@ -5,17 +5,46 @@ Gebrauchtwagen kaufen, Mängel finden, selbst schrauben, probefahren, mit Gewinn
 
 ## Spielablauf
 
-1. **Markt** – Start mit 6.000 €. Auto untersuchen (Motor anhören, Haube, Bremsen), verhandeln, kaufen.
-2. **Werkstatt** – Kamera mit einem Finger drehen, mit zwei Fingern zoomen. Werkzeug unten wählen, Teile antippen.
-   - OBD-Gerät liest Fehlercodes (Zündaussetzer, Bremsbelagverschleiß).
-   - Prüflampe zeigt den Zustand einzelner Teile. Bekannte Defekte leuchten rot.
-   - Haube mit der Hand öffnen, Schrauben mit der Ratsche lösen, Teile mit der Hand ausbauen.
-   - Grüne Platzhalter antippen = Teil einbauen. Neuteile gibt es im Teileshop.
-   - Für die Bremsen: Auto anheben, Radschrauben mit dem Radkreuz lösen, Rad, Bremssattel, Beläge.
-3. **Probefahrt** – eine Runde durch alle Pylonen-Tore. Defekte sind beim Fahren spürbar.
-4. **Verkauf** – Bewertung mit Abzügen für offene Mängel, einmal nachverhandeln, dann nächstes Auto.
+Garage Kings ist eine kleine offene Wirtschaftssimulation: Es gibt keine feste Reihenfolge.
+Du läufst in der Ego-Perspektive durch deine Werkstatt und entscheidest selbst, wann du kaufst, schraubst, fährst und verkaufst.
 
-Der Spielstand wird automatisch lokal auf dem Gerät gespeichert. Das fertige Spiel braucht kein Internet und keine KI-Dienste.
+**Steuerung:** Joystick links unten zum Laufen, überall sonst wischen zum Umsehen. 🔍 zoomt für Feinarbeit.
+Was du ansiehst, wird gelb hervorgehoben – antippen oder „Benutzen“ drücken.
+
+**Stationen in der Werkstatt**
+
+- **Computer am Schreibtisch** – Gebrauchtwagenmarkt (besichtigen, verhandeln, kaufen), eigene Autos jederzeit verkaufen,
+  Teile bestellen, „Feierabend“ (nächster Tag: neue Angebote, neue Marktlage).
+- **Zwei Hebebühnen** – je ein Auto, unabhängig per Bedienkasten an der Säule. Räder, Bremsen und Ölwanne gehen nur angehoben,
+  der Motorraum nur abgelassen.
+- **Werkzeugschrank** – du trägst höchstens drei Werkzeuge. Ratsche und Drehmomentschlüssel brauchen die passende Stecknuss.
+- **Ersatzteilregal / Werkbank** – Lagerbestand, Bestellung, Übersicht der Befunde beider Autos.
+- **Garagentor** – Probefahrt mit einem fahrbereiten Auto.
+
+**Diagnose:** Nicht jeder Defekt ist sofort bekannt. Die Prüflampe zeigt sichtbare Schäden (Lecks, Riemen, Bremsen),
+das OBD-Gerät elektronische Fehler (Zündung, Lichtmaschine, Thermostat, Belagverschleiß). Flecken unter dem Auto und
+Symptome bei der Probefahrt geben weitere Hinweise.
+
+**Defekte und Reparaturen**
+
+| Defekt | Finden | Arbeitsschritte | Werkzeug |
+| --- | --- | --- | --- |
+| Zündspule | OBD, Probefahrt | Schraube lösen, Spule ziehen, neue einsetzen | Ratsche + 10er Nuss |
+| Zündkerzen | OBD, Ausbau | Spule ab, Kerze heraus, neue hinein, Spule drauf | Ratsche + Kerzennuss 16 |
+| Ventildeckeldichtung | Prüflampe | 4 Spulen, 6 Schrauben, Deckel, Dichtung | Ratsche + 10er Nuss |
+| Keilrippenriemen | Prüflampe | Spanner entlasten, Riemen tauschen | Schraubenschlüssel |
+| Lichtmaschine | OBD | Riemen ab, 2 Schrauben, tauschen | Ratsche + 13er Nuss |
+| Wasserpumpe | Prüflampe, Kühlmittelfleck | Riemen ab, 4 Schrauben, tauschen | Ratsche + 10er Nuss |
+| Thermostat | OBD | Schlauchschelle, Schlauch ab, 2 Schrauben | Schraubendreher, Ratsche + 10er Nuss |
+| Bremsbeläge | OBD, Prüflampe | Rad ab, Sattel ab, Beläge tauschen | Ratsche + 17er Nuss, Drehmomentschlüssel |
+| Bremsscheiben | Prüflampe | wie Beläge, dazu Halteschraube und Scheibe | zusätzlich Schraubendreher |
+| Ölwannendichtung | Ölfleck, Prüflampe von unten | Bühne hoch, 4 Schrauben, Wanne, Dichtung | Ratsche + 10er Nuss |
+
+Radschrauben werden mit der Ratsche gelöst, aber nur mit dem Drehmomentschlüssel angezogen.
+
+**Preise** hängen von Modell, Baujahr, Laufleistung, offenen Schäden, Probefahrt und der täglichen Marktlage ab.
+Der Spielstand (beide Autos, Reparaturfortschritt, Werkzeuge, Lager, Markt) wird automatisch lokal gespeichert.
+Das fertige Spiel braucht kein Internet und keine KI-Dienste.
 
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
@@ -49,7 +78,7 @@ src/game/         reine Spiellogik, ohne React/Three.js – serialisierbar und t
   repair.ts       Regeln für Schrauben, Aus-/Einbau, Diagnose
   market.ts       Angebote, Verhandlung, Bewertung
   store.ts        Spielstand (zustand + localStorage)
-src/three/        3D-Szenen: Fahrzeugmodell, Markt, Werkstatt, Teststrecke
+src/three/        3D: Karosserie-Generator, Fahrzeugmodell, begehbare Werkstatt, Händlerhof, Teststrecke
 src/ui/           Touch-Oberfläche
 ```
 
@@ -60,4 +89,5 @@ Erweitern:
 - **Online-Multiplayer**: Die Logik in `src/game` arbeitet auf reinen Daten und kann unverändert auf einem
   Server laufen; der Store müsste Aktionen dann an den Server senden statt lokal auszuführen.
 
-Alle 3D-Modelle sind selbst aus Grundkörpern gebaut. „Bavaria“ ist eine erfundene Marke ohne fremde Logos.
+Alle 3D-Modelle und Texturen werden im Code erzeugt (`three/carGeometry.ts`, `three/textures.ts`) – es werden keine
+fremden Modelle oder Bilddateien verwendet. „Bavaria“ ist eine erfundene Marke ohne fremde Logos.

@@ -128,3 +128,31 @@ h4 { margin-top: 12px; margin-bottom: 4px; font-size: 12px; text-transform: uppe
   .tool small { display: none; } .tool { width: 96px; }
   .panel.left { width: 180px; } .panel { max-height: calc(100% - 150px); }
 }
+
+/* --- Begehbare Werkstatt --- */
+.daychip { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.crosshair { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45); pointer-events: none !important; }
+.focus-label { position: absolute; left: 50%; top: calc(50% + 18px); transform: translateX(-50%); background: var(--bg); border: 1px solid #ffd23f; border-radius: 10px; padding: 5px 12px; font-weight: 700; font-size: 14px; white-space: nowrap; pointer-events: none !important; }
+.joystick { position: absolute; left: calc(26px + var(--sal)); bottom: calc(26px + var(--sab)); width: 150px; height: 150px; border-radius: 50%; background: rgba(20, 22, 26, 0.45); border: 2px solid rgba(255, 255, 255, 0.4); touch-action: none; display: flex; align-items: center; justify-content: center; }
+.joystick .knob { width: 64px; height: 64px; border-radius: 50%; background: rgba(255, 255, 255, 0.75); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); pointer-events: none; }
+.fp-buttons { position: absolute; right: calc(22px + var(--sar)); bottom: calc(30px + var(--sab)); display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.btn.round { width: 64px; height: 64px; border-radius: 50%; font-size: 26px; padding: 0; background: var(--bg); }
+.btn.use { min-width: 130px; min-height: 64px; font-size: 19px; border-radius: 20px; }
+.tool { width: 96px; }
+.tool.socket { opacity: 0.85; border-style: dashed; }
+.tool.socket:disabled { opacity: 0.85; }
+.tool.empty { min-height: 44px; border: 1px dashed var(--line); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 12px; }
+.panel.left { max-height: calc(100% - 290px - var(--sat)); }
+h3.small { font-size: 15px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tool-card { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; }
+.tool-card.has { border-color: var(--accent); background: rgba(255, 122, 26, 0.1); }
+.tool-card .ico { font-size: 24px; width: 30px; text-align: center; }
+.grow { flex: 1; min-width: 0; }
+.seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.price { font-weight: 800; color: #ffd23f; white-space: nowrap; margin-left: auto; }
+.sell-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+.modal.wide { width: min(720px, 94%); }
+.lamps { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+.lamps span { background: rgba(255, 107, 94, 0.25); border: 1px solid var(--bad); border-radius: 8px; padding: 2px 8px; font-size: 13px; }
+@media (max-height: 560px) { .joystick { width: 120px; height: 120px; } .tool { width: 80px; } }

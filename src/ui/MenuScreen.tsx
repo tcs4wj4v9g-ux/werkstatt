@@ -11,7 +11,7 @@ export function MenuScreen() {
         <div className="logo">GARAGE <span>KINGS</span></div>
         <p className="sub">Kaufen · Schrauben · Probefahren · Verkaufen</p>
         {s.started && (
-          <button className="btn primary big" onClick={() => s.goto(s.car ? 'garage' : 'market')}>
+          <button className="btn primary big" onClick={() => s.goto('garage')}>
             Weiterspielen
           </button>
         )}

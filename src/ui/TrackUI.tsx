@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { driveInput, useDriveHud } from '../game/drive';
+import { DEFECTS } from '../game/data/defects';
+import { activeDefects } from '../game/repair';
 import { startEngine } from '../game/sfx';
 import { useGame } from '../game/store';
 
@@ -25,6 +27,8 @@ function Hold({ on, off, className, children }: { on(): void; off(): void; class
 export function TrackUI() {
   const hud = useDriveHud();
   const finishDrive = useGame((s) => s.finishDrive);
+  const car = useGame((s) => s.cars[s.driveBay]);
+  const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
   return (
     <>
       <div className="topbar">
@@ -34,6 +38,7 @@ export function TrackUI() {
       </div>
       <div className="speedo">
         <b>{Math.round(hud.speed)}</b> km/h
+        {lamps.length > 0 && <div className="lamps">{lamps.map((l) => <span key={l}>{l}</span>)}</div>}
         {hud.offTrack && <div className="bad">Zurück auf die Strecke!</div>}
         {hud.checkpoint >= hud.total && <div className="good">Runde geschafft!</div>}
       </div>

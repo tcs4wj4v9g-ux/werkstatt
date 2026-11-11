@@ -18,16 +18,15 @@ function TestHook() {
 
 export function App() {
   const stored = useGame((s) => s.screen);
-  const car = useGame((s) => s.car);
   const hasListings = useGame((s) => s.listings.length > 0);
   const panel = useGame((s) => s.panel);
   // Ungültige Kombinationen (z. B. nach Update eines alten Spielstands) abfangen.
-  const screen =
-    (stored === 'garage' || stored === 'track') && !car ? 'menu' : stored === 'market' && !hasListings ? 'menu' : stored;
+  const hasDriveCar = useGame((s) => !!s.cars[s.driveBay]);
+  const screen = stored === 'track' && !hasDriveCar ? 'garage' : stored === 'market' && !hasListings ? 'garage' : stored;
 
   return (
     <div className="app">
-      <Canvas key={screen} dpr={[1, 2]} camera={{ fov: 45, near: 0.1, far: 400, position: [5, 2.5, 5] }}>
+      <Canvas shadows dpr={[1, 1.6]} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
         <TestHook />
         {screen === 'menu' && <MarketScene showroom />}
         {screen === 'market' && <MarketScene />}

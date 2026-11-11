@@ -21,3 +21,5 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 // Für automatisierte Tests und Fehlersuche.
 import { useGame } from './game/store';
 (window as any).__gk = useGame;
+import { player } from './three/player';
+(window as any).__gkPlayer = player;
