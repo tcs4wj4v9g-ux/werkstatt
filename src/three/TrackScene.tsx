@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { driveInput, useDriveHud } from '../game/drive';
 import { activeDefects } from '../game/repair';
-import { setEngine, startEngine, stopEngine } from '../game/sfx';
+import { engineAudio } from '../game/audio';
+import { soundProfile } from '../game/diagnosis';
 import { useGame } from '../game/store';
 import { CarModel } from './CarModel';
 import { Env } from './Env';
@@ -67,10 +68,10 @@ export function TrackScene() {
   const perf = useMemo(() => {
     const d = activeDefects(car);
     return {
-      misfire: d.includes('coil') || d.includes('plugs'),
+      misfire: d.includes('coil') || d.includes('plugs') || d.includes('vacuum'),
       weakBrakes: d.includes('brakes'),
       judder: d.includes('discs'),
-      smoke: d.includes('gasket') || d.includes('water_pump'),
+      smoke: d.includes('gasket') || d.includes('water_pump') || d.includes('coolant_hose'),
     };
   }, [car]);
 
@@ -91,11 +92,12 @@ export function TrackScene() {
     };
     const down = (e: KeyboardEvent) => ((keys[e.key] = true), apply());
     const up = (e: KeyboardEvent) => ((keys[e.key] = false), apply());
-    startEngine();
+    engineAudio.start(soundProfile(car));
+    engineAudio.setWarm(true);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
-      stopEngine();
+      engineAudio.stop();
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
@@ -136,7 +138,7 @@ export function TrackScene() {
     else if (off && s.v > vmax) s.v -= 12 * dt;
 
     const steerAngle = (steer * 0.5) / (1 + Math.abs(s.v) / 14);
-    setEngine(s.v, throttle, perf.misfire);
+    engineAudio.set(820 + Math.abs(s.v) * 150, throttle);
     steerVis.current += (steer - steerVis.current) * Math.min(1, dt * 10);
     s.heading += (s.v / 2.76) * Math.tan(steerAngle) * dt;
     s.x += Math.cos(s.heading) * s.v * dt;

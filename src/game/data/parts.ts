@@ -20,6 +20,11 @@ export const PARTS: Record<PartId, PartDef> = {
   thermostat: { id: 'thermostat', name: 'Thermostat', price: 45, units: 1, desc: 'mit Gehäuse' },
   alternator: { id: 'alternator', name: 'Lichtmaschine', price: 240, units: 1, desc: 'generalüberholt' },
   oil_pan_gasket: { id: 'oil_pan_gasket', name: 'Ölwannendichtung', price: 34, units: 1, desc: 'Dichtung Ölwanne' },
+  intake_hose: { id: 'intake_hose', name: 'Ansaugschlauch', price: 28, units: 1, desc: 'Gummibalg zwischen Luftfilter und Drosselklappe' },
+  coolant_hose: { id: 'coolant_hose', name: 'Kühlmittelschlauch', price: 24, units: 1, desc: 'Schlauch zum Thermostat' },
+  rod_bearing: { id: 'rod_bearing', name: 'Pleuellager-Satz', price: 380, units: 1, desc: 'Lagerschalen inkl. Schrauben – teure Motorreparatur' },
+  lifters: { id: 'lifters', name: 'Hydrostößel-Satz', price: 160, units: 1, desc: 'Ventilspielausgleich, kompletter Satz' },
+  chain_tensioner: { id: 'chain_tensioner', name: 'Steuerkettenspanner', price: 95, units: 1, desc: 'hydraulischer Kettenspanner' },
 };
 
 export const PART_LIST = Object.values(PARTS);

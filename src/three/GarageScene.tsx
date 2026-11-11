@@ -34,9 +34,12 @@ function FirstPerson() {
     };
     const move = (e: PointerEvent) => {
       if (e.pointerId !== lookId) return;
-      const k = (player.zoom ? 0.0022 : 0.0052) * (900 / Math.max(600, el.clientHeight));
-      player.yaw -= (e.clientX - lx) * k;
-      player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch - (e.clientY - ly) * k));
+      const w = player.work;
+      const k = (w ? 0.003 : player.zoom ? 0.0022 : 0.0052) * (900 / Math.max(600, el.clientHeight));
+      // In der Arbeitsansicht dreht das Wischen nur den Blick, nicht den Spieler.
+      const view = w ?? player;
+      view.yaw -= (e.clientX - lx) * k;
+      view.pitch = Math.max(-1.45, Math.min(1.45, view.pitch - (e.clientY - ly) * k));
       lx = e.clientX;
       ly = e.clientY;
     };
@@ -66,6 +69,7 @@ function FirstPerson() {
       window.removeEventListener('keydown', kd);
       window.removeEventListener('keyup', ku);
       moveInput.x = moveInput.y = 0;
+      player.work = null;
       camera.rotation.set(0, 0, 0);
       camera.rotation.order = 'XYZ';
       useFocus.getState().set({ id: null, label: null, nearBay: -1 });
@@ -77,7 +81,7 @@ function FirstPerson() {
     const s = useGame.getState();
     const paused = s.panel !== null || s.partPrompt !== null;
 
-    if (!paused) {
+    if (!paused && !player.work) {
       const len = Math.hypot(moveInput.x, moveInput.y);
       if (len > 0.05) {
         const k = (SPEED * dt * Math.min(1, len)) / len;
@@ -92,9 +96,16 @@ function FirstPerson() {
     }
 
     const cam = camera as THREE.PerspectiveCamera;
-    cam.position.set(player.x, EYE, player.z);
-    cam.rotation.set(player.pitch, player.yaw, 0);
-    const fov = player.zoom ? FOV_ZOOM : FOV;
+    const w = player.work;
+    if (w) {
+      // Sanft an das Bauteil heranfahren.
+      cam.position.lerp(new THREE.Vector3(...w.pos), Math.min(1, dt * 8));
+      cam.rotation.set(w.pitch, w.yaw, 0);
+    } else {
+      cam.position.set(player.x, EYE, player.z);
+      cam.rotation.set(player.pitch, player.yaw, 0);
+    }
+    const fov = w ? 52 : player.zoom ? FOV_ZOOM : FOV;
     if (Math.abs(cam.fov - fov) > 0.1) {
       cam.fov += (fov - cam.fov) * Math.min(1, dt * 12);
       cam.updateProjectionMatrix();
@@ -155,6 +166,7 @@ function Bay({ index }: { index: number }) {
       onBody: () => g().tapBody(index),
       onComponent: (id: string) => g().tapComponent(index, id),
       onBolt: (id: string, i: number) => g().tapBolt(index, id, i),
+      onConnector: (id: string) => g().tapConnector(index, id),
     };
   }, [index]);
   const useLift = useMemo(() => () => useGame.getState().tapLift(index), [index]);
@@ -170,7 +182,7 @@ function Bay({ index }: { index: number }) {
   });
 
   const leak = car && car.components.oil_pan_gasket.condition === 'defect';
-  const coolant = car && car.components.water_pump.condition === 'defect';
+  const coolant = car && (car.components.water_pump.condition === 'defect' || car.components.hose.condition === 'defect');
   const label = textTexture(`BÜHNE ${index + 1}`, { bg: '#e3a81c', fg: '#16181d', w: 256, h: 64, font: 44 });
 
   return (

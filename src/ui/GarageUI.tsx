@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { engineAudio } from '../game/audio';
 import { CAR_MODELS } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { DEFECTS } from '../game/data/defects';
@@ -8,7 +9,9 @@ import { marketLabel, valuate } from '../game/market';
 import { driveBlocker, isAssembled, knownDefects } from '../game/repair';
 import { useGame } from '../game/store';
 import type { CarInstance, PartId, ToolId } from '../game/types';
-import { player, stationActions, useFocus } from '../three/player';
+import { player, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
+import { FileModal } from './FileModal';
+import { JobsTab } from './JobsTab';
 import { eur, Modal, TopBar } from './common';
 import { Joystick } from './Joystick';
 
@@ -18,7 +21,28 @@ export function GarageUI() {
   const s = useGame();
   const focus = useFocus();
   const [zoom, setZoom] = useState(player.zoom);
-  const near = focus.nearBay >= 0 ? s.cars[focus.nearBay] : null;
+  const [work, setWork] = useState<string | null>(player.work?.id ?? null);
+  const leave = () => {
+    player.work = null;
+    setWork(null);
+  };
+  const enter = (view: WorkView, bay: number) => {
+    player.work = workPose(view, bay);
+    setWork(player.work.id);
+  };
+  // Motor wird warm; die Arbeitsansicht endet, wenn das Auto dafür nicht mehr passt.
+  useEffect(() => {
+    const t = setInterval(() => useGame.getState().engineTick(), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const workBay = work ? Number(work.split(':')[1]) : -1;
+  const nearBay = workBay >= 0 ? workBay : focus.nearBay;
+  const near = nearBay >= 0 ? s.cars[nearBay] : null;
+  const running = nearBay >= 0 && s.engineBay === nearBay;
+  const views: WorkView[] = !near ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
+  useEffect(() => {
+    if (work && !views.includes(work.split(':')[0] as WorkView)) leave();
+  });
   const open = s.panel !== null || s.partPrompt !== null || s.lastSale !== null;
   const belt: ToolId[] = ['hand', 'lamp', ...s.carried];
 
@@ -30,17 +54,49 @@ export function GarageUI() {
         <>
           <div className="crosshair" />
           {focus.label && <div className="focus-label">{focus.label}</div>}
-          <Joystick />
+          {!work && <Joystick />}
+          {near && (
+            <div className="car-actions">
+              <button className="btn" data-testid="file" onClick={() => s.setPanel('file', nearBay)}>📋 Akte</button>
+              <button className={`btn ${running ? 'active' : ''}`} data-testid="engine" onClick={() => s.toggleEngine(nearBay)}>
+                {running ? '⏹ Motor aus' : '🔑 Motor starten'}
+              </button>
+              {running && (
+                <button
+                  className="btn gas"
+                  data-testid="gas"
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    engineAudio.throttle(0.85);
+                    s.revEngine();
+                  }}
+                  onPointerUp={() => engineAudio.throttle(0)}
+                  onPointerCancel={() => engineAudio.throttle(0)}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  Gas geben
+                </button>
+              )}
+              {views.map((v) => (
+                <button key={v} className={`btn ${work === `${v}:${nearBay}` ? 'active' : ''}`} onClick={() => enter(v, nearBay)}>
+                  🎯 {WORK_LABELS[v]}
+                </button>
+              ))}
+              {work && <button className="btn primary" data-testid="leave" onClick={leave}>✕ Ansicht verlassen</button>}
+            </div>
+          )}
           <div className="fp-buttons">
-            <button
-              className={`btn round ${zoom ? 'active' : ''}`}
-              onClick={() => {
-                player.zoom = !player.zoom;
-                setZoom(player.zoom);
-              }}
-            >
-              🔍
-            </button>
+            {!work && (
+              <button
+                className={`btn round ${zoom ? 'active' : ''}`}
+                onClick={() => {
+                  player.zoom = !player.zoom;
+                  setZoom(player.zoom);
+                }}
+              >
+                🔍
+              </button>
+            )}
             {focus.id && (
               <button className="btn primary use" data-testid="use" onClick={() => stationActions.get(focus.id!)?.()}>
                 Benutzen
@@ -52,9 +108,11 @@ export function GarageUI() {
 
       {near && !open && (
         <div className="panel left">
-          <h3 className="small">Bühne {focus.nearBay + 1}: {CAR_MODELS[near.modelId].name}</h3>
-          <h4>Befunde</h4>
-          {knownDefects(near).length === 0 && <p className="meta">Keine offenen Mängel bekannt.</p>}
+          <h3 className="small">Bühne {nearBay + 1}: {CAR_MODELS[near.modelId].name}</h3>
+          <div className="meta">{near.job ? `Kundenfahrzeug von ${near.job.customer}` : 'Dein Fahrzeug'}</div>
+          <h4>Bisher bekannt</h4>
+          <div className="meta">{near.observed.length} Symptom(e) beobachtet – Details in der Akte</div>
+          {knownDefects(near).length === 0 && <p className="meta">Noch kein Schaden am Bauteil bestätigt.</p>}
           {knownDefects(near).map((d) => (
             <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>
           ))}
@@ -97,17 +155,18 @@ export function GarageUI() {
       {s.panel === 'bench' && <BenchModal />}
       {s.panel === 'drive' && <DriveModal />}
       {s.panel === 'obd' && <ObdModal />}
+      {s.panel === 'file' && <FileModal />}
 
       {s.panel === 'report' && (
         <Modal title="Probefahrt-Bericht" onClose={() => s.setPanel(null)}>
           {s.driveReport?.length ? (
             <>
-              <p>Runde geschafft, aber dir ist etwas aufgefallen:</p>
+              <p>Runde geschafft. Dabei ist dir aufgefallen:</p>
               {s.driveReport.map((r) => <div key={r} className="finding">⚠ {r}</div>)}
-              <p className="meta">Symptome sind Hinweise – die Ursache findest du mit Prüflampe und OBD.</p>
+              <p className="meta">Das sind Symptome, keine Diagnose – die möglichen Ursachen stehen in der Fahrzeugakte.</p>
             </>
           ) : (
-            <p className="bigline good">Der Wagen läuft einwandfrei! Bereit für den Verkauf.</p>
+            <p className="bigline good">Bei der Probefahrt ist dir nichts Auffälliges begegnet.</p>
           )}
           <button className="btn primary big" onClick={() => s.setPanel(null)}>Zur Werkstatt</button>
         </Modal>
@@ -124,8 +183,9 @@ export function GarageUI() {
       )}
 
       {s.lastSale && (
-        <Modal title="Verkauft!" onClose={s.dismissSale}>
-          <p className="bigline">Verkaufspreis: {eur(s.lastSale.price)}</p>
+        <Modal title={s.lastSale.title} onClose={s.dismissSale}>
+          {s.lastSale.lines?.map((l) => <div key={l.label} className="meta">{l.label}: {eur(l.amount)}</div>)}
+          <p className="bigline">Einnahme: {eur(s.lastSale.price)}</p>
           <p className={`bigline ${s.lastSale.profit >= 0 ? 'good' : 'bad'}`}>
             {s.lastSale.profit >= 0 ? 'Gewinn' : 'Verlust'}: {eur(Math.abs(s.lastSale.profit))}
           </p>
@@ -193,11 +253,14 @@ function BenchModal() {
       {s.cars.map((car, i) =>
         car ? (
           <div key={i}>
-            <h4>Bühne {i + 1}: {carName(car)}</h4>
-            {knownDefects(car).length === 0 && <p className="meta">Keine offenen Mängel bekannt.</p>}
+            <h4>Bühne {i + 1}: {carName(car)}{car.job ? ` – Kunde ${car.job.customer}` : ''}</h4>
+            {knownDefects(car).length === 0 && <p className="meta">Noch kein Schaden am Bauteil bestätigt.</p>}
             {knownDefects(car).map((d) => <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>)}
             {Object.keys(car.components).filter((c) => !car.components[c].installed).map((c) => (
-              <div key={c} className="meta">ausgebaut: {COMPONENT_MAP[c].name}</div>
+              <div key={c} className="meta">
+                ausgebaut: {COMPONENT_MAP[c].name}
+                {COMPONENT_MAP[c].partId ? (car.components[c].condition === 'defect' ? ' – defekt' : ' – in Ordnung') : ''}
+              </div>
             ))}
           </div>
         ) : null,
@@ -240,7 +303,7 @@ function ObdModal() {
         {car.obdCodes?.length === 0 && <div>KEINE FEHLER GESPEICHERT</div>}
         {car.obdCodes?.map((c) => <div key={c}>▶ {c}</div>)}
       </div>
-      <p className="meta">Das Gerät erkennt nur elektronisch überwachte Fehler. Lecks, Riemen und Bremsscheiben findest du nur mit der Prüflampe.</p>
+      <p className="meta">Das Gerät meldet nur elektronisch überwachte Fehler – und nur als Code. Ein Zündaussetzer-Code nennt den Zylinder, nicht das schuldige Bauteil. Mechanische Schäden erkennt es gar nicht.</p>
       <button className="btn primary big" onClick={() => s.scanObd(s.panelBay)}>Fehlerspeicher auslesen</button>
     </Modal>
   );
@@ -248,13 +311,14 @@ function ObdModal() {
 
 function ComputerModal() {
   const s = useGame();
-  const [tab, setTab] = useState<'market' | 'mine' | 'parts'>('market');
+  const [tab, setTab] = useState<'market' | 'mine' | 'jobs' | 'parts'>('market');
   const free = s.cars.filter((c) => !c).length;
   return (
     <Modal title="Werkstatt-Computer" onClose={() => s.setPanel(null)} wide>
-      <div className="seg3">
+      <div className="seg4">
         <button className={`btn ${tab === 'market' ? 'active' : ''}`} onClick={() => setTab('market')}>Gebrauchtwagen</button>
         <button className={`btn ${tab === 'mine' ? 'active' : ''}`} onClick={() => setTab('mine')}>Meine Autos</button>
+        <button className={`btn ${tab === 'jobs' ? 'active' : ''}`} onClick={() => setTab('jobs')}>Aufträge</button>
         <button className={`btn ${tab === 'parts' ? 'active' : ''}`} onClick={() => setTab('parts')}>Teile bestellen</button>
       </div>
 
@@ -269,11 +333,12 @@ function ComputerModal() {
                 <b>{CAR_MODELS[l.car.modelId].name}</b>
                 <div className="meta">
                   Bj. {l.car.year} · {l.car.km.toLocaleString('de-DE')} km · {l.seller}
-                  {l.hints.length > 0 && ` · ${l.hints.length} Mangel entdeckt`}
+                  {l.hints.length > 0 && ` · ${l.hints.length} Auffälligkeit(en) notiert`}
+                  {l.gone && ' · Verkäufer hat abgebrochen'}
                 </div>
               </div>
               <div className="price">{eur(l.current)}</div>
-              <button className="btn primary" onClick={() => s.viewListing(i)}>Besichtigen</button>
+              <button className="btn primary" disabled={l.gone} onClick={() => s.viewListing(i)}>Besichtigen</button>
             </div>
           ))}
           <button className="btn big" onClick={s.nextDay}>🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)</button>
@@ -282,12 +347,13 @@ function ComputerModal() {
 
       {tab === 'mine' && (
         <>
-          {s.cars.every((c) => !c) && <p className="meta">Du besitzt noch kein Auto.</p>}
-          {s.cars.map((car, i) => (car ? <SellCard key={car.uid} bay={i} car={car} /> : null))}
+          {s.cars.every((c) => !c || c.job) && <p className="meta">Du besitzt gerade kein eigenes Auto. Kundenfahrzeuge stehen unter „Aufträge“ und können nicht verkauft werden.</p>}
+          {s.cars.map((car, i) => (car && !car.job ? <SellCard key={car.uid} bay={i} car={car} /> : null))}
           <p className="meta">Verkaufte Autos: {s.carsSold} · Gesamtgewinn: {eur(s.totalProfit)}</p>
         </>
       )}
 
+      {tab === 'jobs' && <JobsTab />}
       {tab === 'parts' && <ShopList />}
     </Modal>
   );

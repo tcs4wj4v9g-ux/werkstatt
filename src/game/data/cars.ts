@@ -10,6 +10,20 @@ export interface CarModelDef {
 
 // Frei erfundene Marke, optisch an eine Mittelklasse-Limousine der 2000er angelehnt.
 export const CAR_MODELS: Record<string, CarModelDef> = {
+  bavaria_318: {
+    id: 'bavaria_318',
+    name: 'Bavaria 318 Limousine',
+    body: 'sedan',
+    baseValue: 7000,
+    colors: ['#8c9299', '#2f4f3a', '#1b1c1f', '#6e2a2a'],
+  },
+  bavaria_325: {
+    id: 'bavaria_325',
+    name: 'Bavaria 325 Limousine',
+    body: 'sedan',
+    baseValue: 10600,
+    colors: ['#1f2a44', '#c9ccd1', '#101114', '#3b3f45'],
+  },
   bavaria_320: {
     id: 'bavaria_320',
     name: 'Bavaria 320 Limousine',

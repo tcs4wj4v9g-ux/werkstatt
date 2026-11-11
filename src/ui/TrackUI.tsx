@@ -2,8 +2,19 @@ import type { ReactNode } from 'react';
 import { driveInput, useDriveHud } from '../game/drive';
 import { DEFECTS } from '../game/data/defects';
 import { activeDefects } from '../game/repair';
-import { startEngine } from '../game/sfx';
+import { engineAudio } from '../game/audio';
+import { soundProfile } from '../game/diagnosis';
 import { useGame } from '../game/store';
+
+/** Startet den Motorklang neu, falls er beim Betreten der Strecke noch nicht freigeschaltet war. */
+function restart() {
+  const s = useGame.getState();
+  const car = s.cars[s.driveBay];
+  if (car && !engineAudio.running()) {
+    engineAudio.start(soundProfile(car));
+    engineAudio.setWarm(true);
+  }
+}
 
 function Hold({ on, off, className, children }: { on(): void; off(): void; className: string; children: ReactNode }) {
   return (
@@ -11,7 +22,7 @@ function Hold({ on, off, className, children }: { on(): void; off(): void; class
       className={`pedal ${className}`}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
-        startEngine(); // falls der Ton erst jetzt freigeschaltet wurde
+        restart(); // falls der Ton erst jetzt freigeschaltet wurde
         on();
       }}
       onPointerUp={off}

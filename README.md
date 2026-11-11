@@ -21,30 +21,45 @@ Was du ansiehst, wird gelb hervorgehoben – antippen oder „Benutzen“ drück
 - **Ersatzteilregal / Werkbank** – Lagerbestand, Bestellung, Übersicht der Befunde beider Autos.
 - **Garagentor** – Probefahrt mit einem fahrbereiten Auto.
 
-**Diagnose:** Nicht jeder Defekt ist sofort bekannt. Die Prüflampe zeigt sichtbare Schäden (Lecks, Riemen, Bremsen),
-das OBD-Gerät elektronische Fehler (Zündung, Lichtmaschine, Thermostat, Belagverschleiß). Flecken unter dem Auto und
-Symptome bei der Probefahrt geben weitere Hinweise.
+**Fehlersuche:** Das Spiel verrät keine Ursache. Jedes Auto hat gespeicherte Defekte, von denen du zunächst nichts weißt.
+Du sammelst Symptome und grenzt ein:
 
-**Defekte und Reparaturen**
+- 🔑 Motor starten, warm laufen lassen, Gas geben – und hinhören (unrunder Lauf, Klackern, Tickern, Rasseln, Quietschen, Zischen).
+- 🔦 Prüflampe: Auto antippen für die Sichtprüfung (Motorraum, Unterboden, Bremsen), einzelne Bauteile antippen für den Zustand.
+- OBD-Gerät: nur elektronisch erfassbare Fehler, nur als Code. Ein Zündaussetzer-Code nennt den Zylinder, nicht ob Spule oder Kerze schuld ist. Mechanische Schäden erzeugen keinen Code.
+- Probefahrt: Leistung, Bremsen, Temperatur.
+- 📋 Fahrzeugakte: beobachtete Symptome, alle denkbaren Ursachen und was du davon schon geprüft, bestätigt oder ausgeschlossen hast.
 
-| Defekt | Finden | Arbeitsschritte | Werkzeug |
-| --- | --- | --- | --- |
-| Zündspule | OBD, Probefahrt | Schraube lösen, Spule ziehen, neue einsetzen | Ratsche + 10er Nuss |
-| Zündkerzen | OBD, Ausbau | Spule ab, Kerze heraus, neue hinein, Spule drauf | Ratsche + Kerzennuss 16 |
-| Ventildeckeldichtung | Prüflampe | 4 Spulen, 6 Schrauben, Deckel, Dichtung | Ratsche + 10er Nuss |
-| Keilrippenriemen | Prüflampe | Spanner entlasten, Riemen tauschen | Schraubenschlüssel |
-| Lichtmaschine | OBD | Riemen ab, 2 Schrauben, tauschen | Ratsche + 13er Nuss |
-| Wasserpumpe | Prüflampe, Kühlmittelfleck | Riemen ab, 4 Schrauben, tauschen | Ratsche + 10er Nuss |
-| Thermostat | OBD | Schlauchschelle, Schlauch ab, 2 Schrauben | Schraubendreher, Ratsche + 10er Nuss |
-| Bremsbeläge | OBD, Prüflampe | Rad ab, Sattel ab, Beläge tauschen | Ratsche + 17er Nuss, Drehmomentschlüssel |
-| Bremsscheiben | Prüflampe | wie Beläge, dazu Halteschraube und Scheibe | zusätzlich Schraubendreher |
-| Ölwannendichtung | Ölfleck, Prüflampe von unten | Bühne hoch, 4 Schrauben, Wanne, Dichtung | Ratsche + 10er Nuss |
+**Fehlerbilder**
 
-Radschrauben werden mit der Ratsche gelöst, aber nur mit dem Drehmomentschlüssel angezogen.
+| Symptome | Mögliche Ursachen |
+| --- | --- |
+| Unrunder Leerlauf, Fehlzündungen, Ruckeln | Zündspule, Zündkerze, Falschluft (Ansaugschlauch) |
+| Metallisches Motorgeräusch | Pleuellager (klackert unter Last), Hydrostößel (tickert), Kettenspanner (rasselt beim Start) |
+| Kühlmittelverlust, zu heiß | Wasserpumpe, Kühlmittelschlauch |
+| Motor wird nicht warm | Thermostat |
+| Ölfeuchter Motor, Öltropfen | Ventildeckeldichtung, Ölwannendichtung |
+| Batterieleuchte, Quietschen | Lichtmaschine, Keilrippenriemen |
+| Bremse schleift, rubbelt | Bremsbeläge, Bremsscheiben |
+
+**Schrauben und Stecker:** Jede Schraube ist ein eigener Tipp-Punkt mit drei Zuständen: fest → mit Werkzeug gelöst (steht gelb heraus) →
+mit der Hand herausgedreht. Beim Einbau umgekehrt: mit der Hand ansetzen, mit Werkzeug festziehen. Radschrauben werden nur mit dem
+Drehmomentschlüssel fest. Zündspulen und Lichtmaschine haben einen Stecker; über den Zündspulen sitzt eine Motorabdeckung.
+Bauteile kommen erst heraus, wenn alles davor gelöst ist. 🎯-Knöpfe fahren die Kamera nah an Motor, Rad oder Unterboden.
+
+**Verhandeln:** Jeder Verkäufer hat einen Typ (Privatverkäufer, Schrauber, Händler, Eiliger, Rentner) mit eigenem Spielraum, eigener Geduld
+und eigenem Wissen über den Wagen. Nur Auffälligkeiten, die du bei der Besichtigung selbst bemerkt hast, zählen als Argument – jedes
+einmal, und nur soweit der Verkäufer den Mangel nicht schon eingepreist hat. Wer zu frech bietet, steht ohne Auto da.
+
+**Kundenaufträge:** Am Computer unter „Aufträge". Der Kunde beschreibt nur, was ihm auffällt. Bezahlt wird (Arbeitslohn, Teile mit Aufschlag,
+Zusatzarbeiten), wenn die tatsächliche Ursache behoben und das Auto komplett ist. Kundenfahrzeuge können nicht verkauft werden.
+
+**Ton:** Alle Geräusche werden im Browser synthetisch erzeugt – es sind keine Aufnahmen echter Fahrzeuge. Der Motorklang hängt am
+technischen Zustand. 🔊 in der Kopfzeile schaltet den Ton ein oder aus.
 
 **Preise** hängen von Modell, Baujahr, Laufleistung, offenen Schäden, Probefahrt und der täglichen Marktlage ab.
-Der Spielstand (beide Autos, Reparaturfortschritt, Werkzeuge, Lager, Markt) wird automatisch lokal gespeichert.
-Das fertige Spiel braucht kein Internet und keine KI-Dienste.
+Der Spielstand (beide Autos mit jeder einzelnen Schraube, Werkzeuge, Lager, Markt, Aufträge) wird automatisch lokal gespeichert;
+ältere Spielstände werden beim Laden übernommen. Das fertige Spiel braucht kein Internet und keine KI-Dienste.
 
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
@@ -75,8 +90,11 @@ npm run build    # Typprüfung + Produktionsbuild nach dist/
 ```
 src/game/         reine Spiellogik, ohne React/Three.js – serialisierbar und testbar
   data/           Autos, Bauteile, Defekte, Ersatzteile, Werkzeuge (nur Daten)
-  repair.ts       Regeln für Schrauben, Aus-/Einbau, Diagnose
-  market.ts       Angebote, Verhandlung, Bewertung
+  repair.ts       Regeln für Schrauben, Stecker, Aus-/Einbau
+  diagnosis.ts    Symptome, mögliche Ursachen, OBD, Klangbild
+  market.ts       Angebote, Verkäuferprofile, Verhandlung, Bewertung
+  jobs.ts         Kundenaufträge und Abrechnung
+  audio.ts        synthetischer Motor und Effekte
   store.ts        Spielstand (zustand + localStorage)
 src/three/        3D: Karosserie-Generator, Fahrzeugmodell, begehbare Werkstatt, Händlerhof, Teststrecke
 src/ui/           Touch-Oberfläche
@@ -84,7 +102,7 @@ src/ui/           Touch-Oberfläche
 
 Erweitern:
 - **Neues Auto**: Eintrag in `data/cars.ts`.
-- **Neue Reparatur**: Bauteil in `data/components.ts`, Defekt in `data/defects.ts`, Ersatzteil in `data/parts.ts`,
+- **Neuer Defekt**: Bauteil in `data/components.ts`, Defekt samt Symptomen in `data/defects.ts` / `data/symptoms.ts`, Ersatzteil in `data/parts.ts`,
   3D-Darstellung in `three/CarModel.tsx`.
 - **Online-Multiplayer**: Die Logik in `src/game` arbeitet auf reinen Daten und kann unverändert auf einem
   Server laufen; der Store müsste Aktionen dann an den Server senden statt lokal auszuführen.

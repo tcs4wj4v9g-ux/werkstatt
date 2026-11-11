@@ -26,7 +26,12 @@ export type PartId =
   | 'water_pump'
   | 'thermostat'
   | 'alternator'
-  | 'oil_pan_gasket';
+  | 'oil_pan_gasket'
+  | 'intake_hose'
+  | 'coolant_hose'
+  | 'rod_bearing'
+  | 'lifters'
+  | 'chain_tensioner';
 
 export type DefectId =
   | 'coil'
@@ -38,7 +43,12 @@ export type DefectId =
   | 'water_pump'
   | 'thermostat'
   | 'alternator'
-  | 'oil_pan';
+  | 'oil_pan'
+  | 'vacuum'
+  | 'coolant_hose'
+  | 'bearing'
+  | 'lifters'
+  | 'chain';
 
 export type Access = 'hood' | 'lifted';
 export type BodyStyle = 'sedan' | 'wagon';
@@ -67,15 +77,23 @@ export interface ComponentDef {
   partId?: PartId;
   okText: string;
   defectText: string;
+  /** Elektrischer Stecker, der vor dem Ausbau gelöst und danach wieder verbunden werden muss. */
+  connector?: boolean;
   /** Defekt ist von außen nicht zu sehen (nur Diagnose oder Ausbau). */
   hidden?: boolean;
   /** Beim Prüfen dieses Bauteils wird (zusätzlich) der Zustand anderer sichtbar. */
   inspectReveals?: string[];
 }
 
+/** Schraubenzustand: 0 = entfernt, 1 = gelöst/angesetzt, 2 = fest. */
+export type BoltState = 0 | 1 | 2;
+export const TIGHT: BoltState = 2;
+
 export interface ComponentState {
   installed: boolean;
-  bolts: boolean[];
+  bolts: BoltState[];
+  /** Stecker verbunden (nur relevant bei Bauteilen mit Stecker). */
+  connected: boolean;
   condition: 'ok' | 'defect';
   /** Hat der Spieler den Zustand bereits festgestellt? */
   known: boolean;
@@ -97,6 +115,28 @@ export interface CarInstance {
   testDriven: boolean;
   haggled: boolean;
   obdCodes: string[] | null;
+  /** Symptome, die der Spieler an diesem Auto bisher wahrgenommen hat. */
+  observed: string[];
+  /** Kundenauftrag, falls das Auto einem Kunden gehört. */
+  job?: JobInfo;
+}
+
+export interface JobInfo {
+  id: string;
+  customer: string;
+  complaint: string;
+  category: string;
+  /** Vereinbarter Arbeitslohn für die Behebung der Beanstandung. */
+  fee: number;
+  /** Ursache(n) der Beanstandung – müssen behoben sein, damit der Auftrag erledigt ist. */
+  required: DefectId[];
+  /** Alle Defekte bei Annahme (für die Abrechnung von Zusatzarbeiten). */
+  initial: DefectId[];
+}
+
+export interface JobOffer {
+  id: string;
+  car: CarInstance;
 }
 
 export interface Listing {
@@ -108,10 +148,17 @@ export interface Listing {
   patience: number;
   /** Aktueller Preis, zu dem der Verkäufer sofort verkauft. */
   current: number;
-  /** Beim Untersuchen entdeckte Mängel (Verhandlungsargumente). */
-  hints: DefectId[];
+  /** Bei der Besichtigung wahrgenommene Symptome (mögliche Verhandlungsargumente). */
+  hints: string[];
   checks: string[];
+  /** Verkäufertyp – bestimmt Spielraum, Geduld und Reaktion. */
+  profile: string;
+  /** Bereits vorgebrachte Argumente (wirken nur einmal). */
+  usedArgs: string[];
+  /** Verkäufer nennt nur noch seinen letzten Preis. */
   closed: boolean;
+  /** Verkäufer hat die Verhandlung abgebrochen – kein Kauf mehr möglich. */
+  gone: boolean;
   sellerLine: string;
 }
 

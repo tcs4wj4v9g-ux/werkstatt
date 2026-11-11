@@ -156,3 +156,21 @@ h3.small { font-size: 15px; }
 .lamps { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
 .lamps span { background: rgba(255, 107, 94, 0.25); border: 1px solid var(--bad); border-radius: 8px; padding: 2px 8px; font-size: 13px; }
 @media (max-height: 560px) { .joystick { width: 120px; height: 120px; } .tool { width: 80px; } }
+
+/* --- Diagnose, Verhandlung, Aufträge --- */
+.car-actions { position: absolute; right: calc(22px + var(--sar)); top: calc(70px + var(--sat)); display: flex; flex-direction: column; gap: 8px; width: 190px; }
+.car-actions .btn { background: var(--bg); min-height: 48px; text-align: left; }
+.car-actions .btn.primary { background: var(--accent); }
+.car-actions .btn.gas { background: rgba(34, 139, 70, 0.75); text-align: center; touch-action: none; }
+.seg4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+.seg4 .btn { padding: 8px 4px; font-size: 14px; }
+.symptom { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 6px 0; }
+.causes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cause { font-size: 12.5px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; color: var(--dim); }
+.cause.bad { border-color: var(--bad); color: var(--bad); }
+.cause.good { border-color: var(--good); color: var(--good); text-decoration: line-through; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.chip { font: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; min-height: 40px; touch-action: manipulation; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #1a0d00; }
+.chip.used { opacity: 0.5; }
+.panel.market { width: 350px; }

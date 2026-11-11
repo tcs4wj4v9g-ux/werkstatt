@@ -41,6 +41,8 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
   const index = useGame((s) => s.marketIndex);
   const goto = useGame((s) => s.goto);
   const setPanel = useGame((s) => s.setPanel);
+  const sound = useGame((s) => s.sound);
+  const setSound = useGame((s) => s.setSound);
   return (
     <div className="topbar">
       <button className="btn ghost" onClick={() => goto('menu')}>☰ Menü</button>
@@ -49,6 +51,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <div className="daychip" title={marketLabel(index)}>
         Tag {day} · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
+      <button className="btn ghost" data-testid="sound" aria-label="Ton ein/aus" onClick={() => setSound(!sound)}>{sound ? '🔊' : '🔇'}</button>
       <button className="btn ghost" onClick={() => setPanel('help')}>? Hilfe</button>
       <div className="money" data-testid="money">{eur(money)}</div>
     </div>
@@ -60,14 +63,14 @@ export function HelpModal() {
   return (
     <Modal title="So wird gespielt" onClose={() => setPanel(null)} wide>
       <ol className="help">
-        <li><b>Laufen & Umsehen:</b> Links unten der Joystick zum Laufen, überall sonst wischen zum Umsehen. 🔍 zoomt für Feinarbeit heran.</li>
-        <li><b>Stationen:</b> Schau etwas an – es leuchtet gelb. Antippen oder „Benutzen“ drücken.</li>
-        <li><b>Computer (Schreibtisch):</b> Gebrauchtwagen besichtigen und kaufen, eigene Autos jederzeit verkaufen, Teile bestellen, Tag beenden.</li>
-        <li><b>Werkzeugschrank:</b> Du trägst höchstens drei Werkzeuge. Die Ratsche braucht die passende Stecknuss.</li>
-        <li><b>Diagnose:</b> 🔦 Prüflampe wählen und Teile antippen; OBD-Gerät wählen und das Auto antippen. Manche Defekte zeigen sich erst bei der Probefahrt.</li>
-        <li><b>Reparatur:</b> Haube mit ✋ öffnen, Schrauben mit dem richtigen Werkzeug lösen, Teil mit ✋ herausnehmen. Grüne Platzhalter antippen = einbauen.</li>
-        <li><b>Hebebühne:</b> Bedienkasten an der Säule. Räder, Bremsen und Ölwanne gehen nur angehoben, der Motorraum nur abgelassen.</li>
-        <li><b>Probefahrt:</b> am Garagentor. Zwei Autos passen gleichzeitig in die Werkstatt.</li>
+        <li><b>Laufen & Umsehen:</b> Joystick links, überall sonst wischen. 🔍 zoomt. Stationen leuchten gelb – antippen oder „Benutzen“.</li>
+        <li><b>Computer:</b> Gebrauchtwagen besichtigen und verhandeln, eigene Autos verkaufen, Kundenaufträge annehmen und abrechnen, Teile bestellen.</li>
+        <li><b>Fehlersuche:</b> Das Spiel verrät keine Ursache. Am Auto: 🔑 Motor starten, warm laufen lassen, Gas geben und hinhören. Mit der 🔦 Lampe das Auto antippen (Sichtprüfung) oder einzelne Teile prüfen. OBD zeigt nur elektronische Fehlercodes. 📋 Akte sammelt Symptome und mögliche Ursachen.</li>
+        <li><b>Schrauben:</b> Mit dem richtigen Werkzeug lösen (Schraube steht gelb heraus), mit der ✋ Hand herausdrehen. Beim Einbau: mit der Hand ansetzen, mit Werkzeug festziehen. Radschrauben brauchen zum Festziehen den Drehmomentschlüssel.</li>
+        <li><b>Stecker & Abdeckung:</b> Erst die Motorabdeckung abnehmen. Zündspulen und Lichtmaschine haben einen Stecker, der mit der Hand abgezogen wird.</li>
+        <li><b>Arbeitsansicht:</b> 🎯-Knöpfe fahren die Kamera nah an Motor, Rad oder Unterboden. „Ansicht verlassen“ bringt dich zurück.</li>
+        <li><b>Hebebühne:</b> Räder, Bremsen, Ölwanne nur angehoben; Motorraum nur abgelassen. Am laufenden Motor wird nicht geschraubt.</li>
+        <li><b>Ton:</b> 🔊 oben schaltet alle Geräusche ein oder aus.</li>
       </ol>
       <button className="btn primary big" onClick={() => setPanel(null)}>Los geht's</button>
     </Modal>

@@ -1,7 +1,5 @@
 import type { DefectId } from '../types';
 
-export type MarketCheck = 'listen' | 'hood' | 'brakes' | 'under' | 'dash';
-
 export interface DefectDef {
   id: DefectId;
   name: string;
@@ -10,120 +8,77 @@ export interface DefectDef {
   pick: 'one' | 'all';
   /** Wertminderung beim Verkauf, solange der Defekt besteht. */
   penalty: number;
-  /** Welche Untersuchung auf dem Markt den Mangel aufdeckt. */
-  marketCheck: MarketCheck;
-  marketHint: string;
-  driveSymptom: string;
+  /** Was man von diesem Defekt mitbekommt (siehe symptoms.ts). */
+  symptoms: string[];
+  /** Arbeitslohn, den ein Kunde für die Behebung zahlt. */
+  labor: number;
+  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung';
   /** Kontrollleuchte während der Probefahrt. */
   lamp?: string;
 }
 
+// Neue Defekte: hier eintragen, Bauteil in components.ts, Teil in parts.ts,
+// OBD-Regel (falls elektronisch erfassbar) in diagnosis.ts.
 export const DEFECTS: Record<DefectId, DefectDef> = {
   coil: {
-    id: 'coil',
-    name: 'Defekte Zündspule',
-    components: ['coil1', 'coil2', 'coil3', 'coil4'],
-    pick: 'one',
-    penalty: 800,
-    marketCheck: 'listen',
-    marketHint: 'Der Motor läuft unrund und schüttelt sich – Zündaussetzer!',
-    driveSymptom: 'Motor ruckelt und zieht schlecht – Zündaussetzer.',
-    lamp: '⚙️ Motor',
+    id: 'coil', name: 'Defekte Zündspule', components: ['coil1', 'coil2', 'coil3', 'coil4'], pick: 'one',
+    penalty: 800, symptoms: ['rough_idle', 'misfire', 'power_loss'], labor: 90, category: 'Motor', lamp: '⚙️ Motor',
   },
   plugs: {
-    id: 'plugs',
-    name: 'Verschlissene Zündkerzen',
-    components: ['plug1', 'plug2', 'plug3', 'plug4'],
-    pick: 'all',
-    penalty: 350,
-    marketCheck: 'listen',
-    marketHint: 'Der Motor springt schlecht an und stottert im Leerlauf.',
-    driveSymptom: 'Motor nimmt schlecht Gas an und stottert beim Beschleunigen.',
+    id: 'plugs', name: 'Verschlissene Zündkerze', components: ['plug1', 'plug2', 'plug3', 'plug4'], pick: 'one',
+    penalty: 400, symptoms: ['rough_idle', 'misfire', 'power_loss'], labor: 80, category: 'Wartung', lamp: '⚙️ Motor',
   },
-  brakes: {
-    id: 'brakes',
-    name: 'Verschlissene Bremsbeläge vorne',
-    components: ['pads_fl', 'pads_fr'],
-    pick: 'all',
-    penalty: 600,
-    marketCheck: 'brakes',
-    marketHint: 'Durch die Felgen sieht man: Die Beläge vorne sind fast runter.',
-    driveSymptom: 'Bremsen schleifen und verzögern schwach.',
-    lamp: '🛑 Bremse',
+  vacuum: {
+    id: 'vacuum', name: 'Falschluft (Ansaugschlauch gerissen)', components: ['intake_hose'], pick: 'all',
+    penalty: 450, symptoms: ['rough_idle', 'hiss', 'power_loss'], labor: 70, category: 'Motor', lamp: '⚙️ Motor',
   },
-  discs: {
-    id: 'discs',
-    name: 'Verschlissene Bremsscheiben vorne',
-    components: ['disc_fl', 'disc_fr'],
-    pick: 'all',
-    penalty: 700,
-    marketCheck: 'brakes',
-    marketHint: 'Die Bremsscheiben vorne haben tiefe Riefen und einen dicken Grat.',
-    driveSymptom: 'Beim Bremsen rubbelt und vibriert das Lenkrad.',
+  bearing: {
+    id: 'bearing', name: 'Pleuellagerschaden', components: ['bearing'], pick: 'all',
+    penalty: 2600, symptoms: ['metal_noise', 'knock_load'], labor: 520, category: 'Motor',
+  },
+  lifters: {
+    id: 'lifters', name: 'Verschlissene Hydrostößel', components: ['rocker'], pick: 'all',
+    penalty: 900, symptoms: ['metal_noise', 'tick_top'], labor: 260, category: 'Motor',
+  },
+  chain: {
+    id: 'chain', name: 'Defekter Steuerkettenspanner', components: ['chain_tensioner'], pick: 'all',
+    penalty: 1200, symptoms: ['metal_noise', 'rattle_start'], labor: 140, category: 'Motor',
   },
   gasket: {
-    id: 'gasket',
-    name: 'Undichte Ventildeckeldichtung',
-    components: ['gasket'],
-    pick: 'all',
-    penalty: 900,
-    marketCheck: 'hood',
-    marketHint: 'Ölfeuchter Motor – am Ventildeckel schwitzt es deutlich.',
-    driveSymptom: 'Es riecht nach verbranntem Öl und qualmt leicht aus dem Motorraum.',
-  },
-  belt: {
-    id: 'belt',
-    name: 'Defekter Keilrippenriemen',
-    components: ['belt'],
-    pick: 'all',
-    penalty: 400,
-    marketCheck: 'listen',
-    marketHint: 'Beim Starten quietscht es laut aus dem Riementrieb.',
-    driveSymptom: 'Lautes Quietschen aus dem Motorraum beim Gasgeben.',
-  },
-  water_pump: {
-    id: 'water_pump',
-    name: 'Undichte Wasserpumpe',
-    components: ['water_pump'],
-    pick: 'all',
-    penalty: 900,
-    marketCheck: 'hood',
-    marketHint: 'Eingetrocknete Kühlmittelspuren vorne am Motor – die Wasserpumpe leckt.',
-    driveSymptom: 'Die Kühlmitteltemperatur steigt bedenklich an.',
-    lamp: '🌡️ heiß',
-  },
-  thermostat: {
-    id: 'thermostat',
-    name: 'Defekter Thermostat',
-    components: ['thermostat'],
-    pick: 'all',
-    penalty: 500,
-    marketCheck: 'dash',
-    marketHint: 'Die Temperaturanzeige bleibt auch nach langem Laufen im Keller.',
-    driveSymptom: 'Der Motor wird nicht warm, die Heizung bleibt kalt.',
-    lamp: '🌡️ kalt',
-  },
-  alternator: {
-    id: 'alternator',
-    name: 'Defekte Lichtmaschine',
-    components: ['alternator'],
-    pick: 'all',
-    penalty: 1100,
-    marketCheck: 'dash',
-    marketHint: 'Die Batteriekontrollleuchte geht nach dem Start nicht aus.',
-    driveSymptom: 'Batterieleuchte brennt, die Bordspannung fällt ab.',
-    lamp: '🔋 Batterie',
+    id: 'gasket', name: 'Undichte Ventildeckeldichtung', components: ['gasket'], pick: 'all',
+    penalty: 900, symptoms: ['oil_top', 'oil_drip'], labor: 180, category: 'Motor',
   },
   oil_pan: {
-    id: 'oil_pan',
-    name: 'Ölverlust an der Ölwanne',
-    components: ['oil_pan_gasket'],
-    pick: 'all',
-    penalty: 800,
-    marketCheck: 'under',
-    marketHint: 'Unter dem Motor hängt ein Öltropfen, der Unterboden ist ölverschmiert.',
-    driveSymptom: 'Die Öldruckleuchte flackert in Kurven – der Ölstand ist zu niedrig.',
-    lamp: '🛢️ Öl',
+    id: 'oil_pan', name: 'Undichte Ölwannendichtung', components: ['oil_pan_gasket'], pick: 'all',
+    penalty: 800, symptoms: ['oil_drip'], labor: 160, category: 'Motor', lamp: '🛢️ Öl',
+  },
+  belt: {
+    id: 'belt', name: 'Verschlissener Keilrippenriemen', components: ['belt'], pick: 'all',
+    penalty: 400, symptoms: ['squeal', 'battery_lamp'], labor: 60, category: 'Wartung',
+  },
+  alternator: {
+    id: 'alternator', name: 'Defekte Lichtmaschine', components: ['alternator'], pick: 'all',
+    penalty: 1100, symptoms: ['battery_lamp'], labor: 150, category: 'Elektrik', lamp: '🔋 Batterie',
+  },
+  water_pump: {
+    id: 'water_pump', name: 'Undichte Wasserpumpe', components: ['water_pump'], pick: 'all',
+    penalty: 900, symptoms: ['coolant_wet', 'temp_high'], labor: 190, category: 'Kühlung', lamp: '🌡️ heiß',
+  },
+  coolant_hose: {
+    id: 'coolant_hose', name: 'Undichter Kühlmittelschlauch', components: ['hose'], pick: 'all',
+    penalty: 400, symptoms: ['coolant_wet', 'temp_high'], labor: 70, category: 'Kühlung', lamp: '🌡️ heiß',
+  },
+  thermostat: {
+    id: 'thermostat', name: 'Defekter Thermostat', components: ['thermostat'], pick: 'all',
+    penalty: 500, symptoms: ['temp_low'], labor: 120, category: 'Kühlung', lamp: '🌡️ kalt',
+  },
+  brakes: {
+    id: 'brakes', name: 'Verschlissene Bremsbeläge vorne', components: ['pads_fl', 'pads_fr'], pick: 'all',
+    penalty: 600, symptoms: ['brake_look', 'brake_grind'], labor: 110, category: 'Bremsen', lamp: '🛑 Bremse',
+  },
+  discs: {
+    id: 'discs', name: 'Verschlissene Bremsscheiben vorne', components: ['disc_fl', 'disc_fr'], pick: 'all',
+    penalty: 700, symptoms: ['brake_look', 'brake_judder'], labor: 150, category: 'Bremsen',
   },
 };
 
