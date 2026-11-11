@@ -2,18 +2,64 @@
 // Daten (kein Three.js, kein React) – dadurch lässt sie sich später 1:1 auf
 // einem Server für Online-Multiplayer ausführen.
 
-export type ToolId = 'hand' | 'ratchet' | 'wheelWrench' | 'inspect';
-export type PartId = 'ignition_coil' | 'brake_pads' | 'valve_cover_gasket';
-export type DefectId = 'coil' | 'brakes' | 'gasket';
+/** Immer dabei: Hand und Prüflampe. Alles andere liegt im Werkzeugschrank. */
+export type ToolId =
+  | 'hand'
+  | 'lamp'
+  | 'ratchet'
+  | 'torque'
+  | 'wrench'
+  | 'screwdriver'
+  | 'obd'
+  | 'socket10'
+  | 'socket13'
+  | 'socket16'
+  | 'socket17';
+
+export type PartId =
+  | 'ignition_coil'
+  | 'spark_plug'
+  | 'brake_pads'
+  | 'brake_disc'
+  | 'valve_cover_gasket'
+  | 'belt'
+  | 'water_pump'
+  | 'thermostat'
+  | 'alternator'
+  | 'oil_pan_gasket';
+
+export type DefectId =
+  | 'coil'
+  | 'plugs'
+  | 'brakes'
+  | 'discs'
+  | 'gasket'
+  | 'belt'
+  | 'water_pump'
+  | 'thermostat'
+  | 'alternator'
+  | 'oil_pan';
+
 export type Access = 'hood' | 'lifted';
 export type BodyStyle = 'sedan' | 'wagon';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
+
+/** Welches Werkzeug eine Schraube bzw. ein Bauteil verlangt. */
+export interface ToolNeed {
+  driver: 'ratchet' | 'wrench' | 'screwdriver';
+  socket?: ToolId;
+  /** Muss mit dem Drehmomentschlüssel angezogen werden (z. B. Radschrauben). */
+  torque?: boolean;
+}
 
 export interface ComponentDef {
   id: string;
   name: string;
   bolts: number;
-  boltTool: ToolId;
+  /** Werkzeug für die Schrauben dieses Bauteils. */
+  fastener?: ToolNeed;
+  /** Werkzeug zum Herausnehmen/Einsetzen (Standard: Hand). */
+  removeWith?: ToolNeed;
   /** Diese Bauteile müssen ausgebaut sein, bevor dieses gelöst/ausgebaut werden kann. */
   blockedBy: string[];
   access: Access;
@@ -21,8 +67,10 @@ export interface ComponentDef {
   partId?: PartId;
   okText: string;
   defectText: string;
-  /** Beim Prüfen dieses Bauteils wird (zusätzlich) der Zustand eines anderen sichtbar. */
-  inspectReveals?: string;
+  /** Defekt ist von außen nicht zu sehen (nur Diagnose oder Ausbau). */
+  hidden?: boolean;
+  /** Beim Prüfen dieses Bauteils wird (zusätzlich) der Zustand anderer sichtbar. */
+  inspectReveals?: string[];
 }
 
 export interface ComponentState {
@@ -39,7 +87,7 @@ export interface CarInstance {
   color: string;
   year: number;
   km: number;
-  /** Marktwert in einwandfreiem Zustand. */
+  /** Marktwert in einwandfreiem Zustand bei neutraler Marktlage. */
   cleanValue: number;
   components: Record<string, ComponentState>;
   hoodOpen: boolean;
@@ -68,6 +116,12 @@ export interface Listing {
 }
 
 export type Inventory = Record<PartId, number>;
+
+/** Was der Spieler gerade benutzt und bei sich trägt. */
+export interface Toolset {
+  active: ToolId;
+  carried: ToolId[];
+}
 
 export interface ActionResult {
   ok: boolean;

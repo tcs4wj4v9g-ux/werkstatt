@@ -7,6 +7,7 @@ import { activeDefects } from '../game/repair';
 import { setEngine, startEngine, stopEngine } from '../game/sfx';
 import { useGame } from '../game/store';
 import { CarModel } from './CarModel';
+import { Env } from './Env';
 
 const N = 240;
 const WIDTH = 10;
@@ -33,7 +34,7 @@ function ribbon(samples: THREE.Vector3[], normals: THREE.Vector3[], width: numbe
 }
 
 export function TrackScene() {
-  const car = useGame((s) => s.car)!;
+  const car = useGame((s) => s.cars[s.driveBay])!;
   const finishDrive = useGame((s) => s.finishDrive);
   const { camera } = useThree();
   const group = useRef<THREE.Group>(null);
@@ -65,12 +66,20 @@ export function TrackScene() {
 
   const perf = useMemo(() => {
     const d = activeDefects(car);
-    return { misfire: d.includes('coil'), weakBrakes: d.includes('brakes'), smoke: d.includes('gasket') };
+    return {
+      misfire: d.includes('coil') || d.includes('plugs'),
+      weakBrakes: d.includes('brakes'),
+      judder: d.includes('discs'),
+      smoke: d.includes('gasket') || d.includes('water_pump'),
+    };
   }, [car]);
 
   const sim = useRef({ x: track.samples[0].x, z: track.samples[0].z, heading: track.heading, v: 0, t: 0, cp: 0, hud: 0, done: false });
 
   useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    cam.fov = 55;
+    cam.updateProjectionMatrix();
     (window as any).__gkDrive = { sim: sim.current, samples: track.samples, input: driveInput };
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     useDriveHud.getState().set({ speed: 0, checkpoint: 0, total: CHECKPOINTS, offTrack: false });
@@ -142,7 +151,8 @@ export function TrackScene() {
     const fx = Math.cos(s.heading);
     const fz = -Math.sin(s.heading);
     const k = Math.min(1, dt * 4);
-    camera.position.lerp(new THREE.Vector3(s.x - fx * 7.5, 3.4, s.z - fz * 7.5), k);
+    const shake = perf.judder && brake && s.v > 2 ? Math.sin(s.t * 55) * 0.06 : 0;
+    camera.position.lerp(new THREE.Vector3(s.x - fx * 7.5, 3.4 + shake, s.z - fz * 7.5), k);
     camera.lookAt(s.x + fx * 4, 0.8, s.z + fz * 4);
 
     // Kontrollpunkte der Reihe nach
@@ -167,6 +177,7 @@ export function TrackScene() {
     <>
       <color attach="background" args={['#9fc4e8']} />
       <fog attach="fog" args={['#9fc4e8', 60, 220]} />
+      <Env intensity={0.7} />
       <ambientLight intensity={1.1} />
       <hemisphereLight args={['#ffffff', '#6b6f58', 0.9]} />
       <directionalLight position={[30, 50, 20]} intensity={2} />
