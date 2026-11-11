@@ -234,7 +234,7 @@ export function CarModel({ body, color, car, handlers, steer }: Props) {
         <Part id={`caliper_${s}`}>
           <mesh position={[1.38, 0.455, z(0.785)]}>
             <boxGeometry args={[0.2, 0.12, 0.11]} />
-            <Mat color="#b3261e" metal={0.4} rough={0.5} />
+            <Mat color="#8a9097" metal={0.7} rough={0.45} />
           </mesh>
         </Part>
         {bolts(`caliper_${s}`, [[1.32, 0.455, z(0.84)], [1.44, 0.455, z(0.84)]], axis)}
