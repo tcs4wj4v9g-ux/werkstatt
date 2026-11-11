@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { driveInput, useDriveHud } from '../game/drive';
+import { startEngine } from '../game/sfx';
 import { useGame } from '../game/store';
 
 function Hold({ on, off, className, children }: { on(): void; off(): void; className: string; children: ReactNode }) {
@@ -8,6 +9,7 @@ function Hold({ on, off, className, children }: { on(): void; off(): void; class
       className={`pedal ${className}`}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
+        startEngine(); // falls der Ton erst jetzt freigeschaltet wurde
         on();
       }}
       onPointerUp={off}
