@@ -15,6 +15,7 @@ export interface CarHandlers {
   onBody(): void;
   onComponent(id: string): void;
   onBolt(id: string, index: number): void;
+  onConnector(id: string): void;
 }
 
 interface Props {
@@ -67,7 +68,7 @@ const ghostTap = (id: string, fn: () => void) => (e: ThreeEvent<MouseEvent>) => 
 };
 
 /** Platzhalter schweben etwas neben der Einbauposition, damit das Teil darunter erreichbar bleibt. */
-const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14 };
+const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14, engine_cover: 0.14 };
 
 type Axis = 'y' | 'y-' | 'z+' | 'z-' | 'x+';
 const AXIS_ROT: Record<Axis, V3> = {
@@ -78,14 +79,24 @@ const AXIS_ROT: Record<Axis, V3> = {
   'x+': [0, 0, -Math.PI / 2],
 };
 
-function Bolt({ pos, axis = 'y', present, live, label, onTap }: { pos: V3; axis?: Axis; present: boolean; live?: string; label: string; onTap?: () => void }) {
+/** Schraube: 2 = fest, 1 = gelöst (steht sichtbar heraus), 0 = entfernt (grüne Markierung am Gewinde). */
+function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: Axis; state: number; live?: string; label: string; onTap?: () => void }) {
+  const text = `${label} (${state === 2 ? 'fest' : state === 1 ? 'gelöst' : 'entfernt'})`;
   return (
-    <group position={pos} rotation={AXIS_ROT[axis]} userData={{ liveId: live, label }} onClick={onTap && tap(onTap)}>
-      {present ? (
-        <mesh position={[0, 0.012, 0]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.03, 6]} />
-          <meshStandardMaterial color="#d9dde2" metalness={0.9} roughness={0.25} />
-        </mesh>
+    <group position={pos} rotation={AXIS_ROT[axis]} userData={{ liveId: live, label: onTap ? text : undefined }} onClick={onTap && tap(onTap)}>
+      {state > 0 ? (
+        <group position={[0, state === 1 ? 0.03 : 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
+          <mesh>
+            <cylinderGeometry args={[0.02, 0.02, 0.03, 6]} />
+            <meshStandardMaterial color={state === 1 ? '#e8c35a' : '#d9dde2'} metalness={0.9} roughness={0.25} />
+          </mesh>
+          {state === 1 && (
+            <mesh position={[0, -0.025, 0]}>
+              <cylinderGeometry args={[0.009, 0.009, 0.03, 6]} />
+              <meshStandardMaterial color="#8d9399" metalness={0.9} roughness={0.4} />
+            </mesh>
+          )}
+        </group>
       ) : (
         <mesh position={[0, 0.004, 0]}>
           <cylinderGeometry args={[0.024, 0.024, 0.008, 12]} />
@@ -95,6 +106,25 @@ function Bolt({ pos, axis = 'y', present, live, label, onTap }: { pos: V3; axis?
       {onTap && (
         <mesh>
           <sphereGeometry args={[0.046, 8, 6]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/** Elektrischer Stecker: aufgesteckt sitzt er am Bauteil, abgezogen hängt er sichtbar daneben. */
+function Connector({ pos, off, connected, label, onTap }: { pos: V3; off: V3; connected: boolean; label: string; onTap?: () => void }) {
+  const p: V3 = connected ? pos : [pos[0] + off[0], pos[1] + off[1], pos[2] + off[2]];
+  return (
+    <group position={p} userData={{ label: onTap ? `Stecker ${label} (${connected ? 'verbunden' : 'abgezogen'})` : undefined }} onClick={onTap && tap(onTap)}>
+      <mesh>
+        <boxGeometry args={[0.045, 0.03, 0.04]} />
+        <meshStandardMaterial color={connected ? '#3a3f46' : '#e3a81c'} roughness={0.6} />
+      </mesh>
+      {onTap && (
+        <mesh>
+          <sphereGeometry args={[0.04, 8, 6]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       )}
@@ -181,7 +211,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
   };
   const toolFitsBolt = (id: string) => {
     const need = COMPONENT_MAP[id].fastener;
-    return !!need && (tool === need.driver || tool === 'lamp' || (!!need.torque && tool === 'torque'));
+    return !!need && (tool === need.driver || tool === 'hand' || tool === 'lamp' || (!!need.torque && tool === 'torque'));
   };
 
   /** Ausbaubares Bauteil: eingebaut = echtes Teil, ausgebaut = grüner Platzhalter zum Einbauen. */
@@ -220,12 +250,17 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
         key={i}
         pos={p}
         axis={axis}
-        present={st(id)?.bolts[i] ?? true}
+        state={st(id)?.bolts[i] ?? 2}
         label={`Schraube – ${COMPONENT_MAP[id].name}`}
         live={interactive && blockersRemoved(car!, id) && toolFitsBolt(id) ? id : undefined}
         onTap={handlers && (() => handlers.onBolt(id, i))}
       />
     ));
+
+  const connector = (id: string, pos: V3, off: V3) =>
+    installed(id) && (
+      <Connector pos={pos} off={off} connected={st(id)?.connected ?? true} label={COMPONENT_MAP[id].name} onTap={handlers && (() => handlers.onConnector(id))} />
+    );
 
   const bodyTap = handlers && tap(handlers.onBody);
 
@@ -294,6 +329,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
   const oilLeak = st('oil_pan_gasket')?.condition === 'defect';
   const pumpLeak = st('water_pump')?.condition === 'defect';
   const beltBad = st('belt')?.condition === 'defect';
+  const hoseLeak = st('hose')?.condition === 'defect';
+  const intakeBad = st('intake_hose')?.condition === 'defect';
 
   return (
     <group>
@@ -411,7 +448,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
         <mesh position={[1.3, 0.405, 0]} material={mats.dark}>
           <boxGeometry args={[0.66, 0.09, 0.32]} />
         </mesh>
-        <mesh position={[1.1, 0.6, 0.3]}>
+        <mesh position={[1.28, 0.6, 0.44]}>
           <boxGeometry args={[0.3, 0.16, 0.2]} />
           <meshStandardMaterial color="#1b1c1f" roughness={0.7} />
         </mesh>
@@ -444,6 +481,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
             <meshStandardMaterial color="#bfe3c4" roughness={0.9} />
           </mesh>
         )}
+        {hoseLeak && (
+          <mesh position={[1.36, 0.6, -0.45]}>
+            <boxGeometry args={[0.1, 0.12, 0.05]} />
+            <meshStandardMaterial color="#bfe3c4" roughness={0.9} />
+          </mesh>
+        )}
         {oilLeak && (
           <mesh position={[1.42, 0.185, 0.1]} scale={[1, 1.6, 1]}>
             <sphereGeometry args={[0.022, 8, 8]} />
@@ -467,6 +510,58 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
         </mesh>,
       )}
       {bolts('valve_cover', COVER_BOLTS)}
+      {/* Ventiltrieb unter dem Ventildeckel */}
+      {!installed('valve_cover') &&
+        part(
+          'rocker',
+          <mesh position={[1.3, 0.72, 0.1]}>
+            <boxGeometry args={[0.62, 0.04, 0.07]} />
+            <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#aeb3ba'} metal={0.85} rough={0.35} />
+          </mesh>,
+        )}
+      {!installed('valve_cover') && bolts('rocker', [[1.12, 0.74, 0.1], [1.48, 0.74, 0.1]])}
+      {part(
+        'engine_cover',
+        <>
+          <mesh position={[1.25, 0.862, 0]}>
+            <boxGeometry args={[0.54, 0.02, 0.34]} />
+            <Mat color="#1c1e22" rough={0.55} />
+          </mesh>
+          <mesh position={[1.25, 0.874, 0]}>
+            <boxGeometry args={[0.3, 0.006, 0.08]} />
+            <Mat color="#8d9399" metal={0.8} rough={0.3} />
+          </mesh>
+        </>,
+      )}
+      {part(
+        'intake_hose',
+        <>
+          <mesh position={[1.28, 0.62, 0.262]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.042, 0.042, 0.16, 14]} />
+            <Mat color="#151517" rough={0.9} />
+          </mesh>
+          {intakeBad && (
+            <mesh position={[1.28, 0.662, 0.27]}>
+              <boxGeometry args={[0.05, 0.006, 0.012]} />
+              <meshStandardMaterial color="#000000" roughness={1} />
+            </mesh>
+          )}
+        </>,
+      )}
+      {bolts('intake_hose', [[1.28, 0.66, 0.215]])}
+      {part(
+        'chain_tensioner',
+        <>
+          <mesh position={[1.45, 0.5, -0.215]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.07, 6]} />
+            <Mat color="#c9a54a" metal={0.85} rough={0.35} />
+          </mesh>
+          <mesh position={[1.45, 0.5, -0.23]}>
+            <sphereGeometry args={[0.05, 8, 6]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        </>,
+      )}
       {COIL_X.map((x, i) => (
         <group key={i}>
           {/* Zündkerze sitzt im Kerzenschacht unter der Spule */}
@@ -502,6 +597,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
             </>,
           )}
           {bolts(`coil${i + 1}`, [[x, 0.78, -0.085]])}
+          {connector(`coil${i + 1}`, [x, 0.838, 0.095], [0, 0.03, 0.06])}
         </group>
       ))}
 
@@ -543,6 +639,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
         </>,
       )}
       {bolts('alternator', [[1.53, 0.68, 0.27], [1.63, 0.68, 0.27]])}
+      {connector('alternator', [1.48, 0.6, 0.3], [-0.05, 0.05, 0.03])}
       {part(
         'water_pump',
         <>
@@ -595,6 +692,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
           <Mat color={oilLeak ? '#3d3a35' : '#7b8188'} metal={0.7} rough={oilLeak ? 0.25 : 0.5} />
         </mesh>,
       )}
+      {!installed('oil_pan') &&
+        part(
+          'bearing',
+          <mesh position={[1.3, 0.248, 0]}>
+            <boxGeometry args={[0.14, 0.035, 0.16]} />
+            <Mat color={st('bearing')?.condition === 'defect' ? '#a8703a' : '#aeb3ba'} metal={0.85} rough={0.35} />
+          </mesh>,
+        )}
+      {!installed('oil_pan') && bolts('bearing', [[1.3, 0.23, -0.06], [1.3, 0.23, 0.06]], 'y-')}
       {bolts('oil_pan', [[1.1, 0.202, -0.12], [1.5, 0.202, -0.12], [1.1, 0.202, 0.12], [1.5, 0.202, 0.12]], 'y-')}
 
       {/* Motorhaube, Scharnier an der Windschutzscheibe */}

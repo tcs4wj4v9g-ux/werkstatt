@@ -2,7 +2,7 @@ import { COMPONENTS, COMPONENT_MAP } from './data/components';
 import { DEFECT_LIST } from './data/defects';
 import { PARTS } from './data/parts';
 import { toolName } from './data/tools';
-import type { ActionResult, CarInstance, DefectId, Inventory, ToolNeed, Toolset } from './types';
+import { TIGHT, type ActionResult, type CarInstance, type DefectId, type Inventory, type ToolNeed, type Toolset } from './types';
 
 // Reine Reparaturlogik. Alle Funktionen verändern das übergebene (zuvor
 // geklonte) Fahrzeug und liefern ein Ergebnis mit Meldung für die UI.
@@ -10,9 +10,10 @@ import type { ActionResult, CarInstance, DefectId, Inventory, ToolNeed, Toolset 
 const fail = (message: string): ActionResult => ({ ok: false, message });
 const done = (message?: string): ActionResult => ({ ok: true, message });
 
+/** Eingebaut, alle Schrauben fest, Stecker verbunden. */
 export const isComplete = (car: CarInstance, id: string) => {
   const c = car.components[id];
-  return c.installed && c.bolts.every(Boolean);
+  return c.installed && c.bolts.every((b) => b === TIGHT) && (!COMPONENT_MAP[id].connector || c.connected);
 };
 
 export const blockersRemoved = (car: CarInstance, id: string) =>
@@ -22,8 +23,10 @@ export const blockersRemoved = (car: CarInstance, id: string) =>
 const dependents = (id: string) => COMPONENTS.filter((c) => c.blockedBy.includes(id)).map((c) => c.id);
 
 /** Kann das Bauteil jetzt sofort herausgenommen werden? */
-export const removable = (car: CarInstance, id: string) =>
-  car.components[id].installed && car.components[id].bolts.every((b) => !b) && blockersRemoved(car, id);
+export const removable = (car: CarInstance, id: string) => {
+  const c = car.components[id];
+  return c.installed && c.bolts.every((b) => b === 0) && !(COMPONENT_MAP[id].connector && c.connected) && blockersRemoved(car, id);
+};
 
 /** Alle Bauteile, die (auch indirekt) unter `id` verbaut sind. */
 export const beneath = (id: string): string[] => dependents(id).flatMap((d) => [d, ...beneath(d)]);
@@ -40,18 +43,24 @@ function checkAccess(car: CarInstance, id: string): string | null {
   return null;
 }
 
+function blockedMessage(car: CarInstance, id: string): string | null {
+  const b = COMPONENT_MAP[id].blockedBy.find((x) => car.components[x].installed);
+  return b ? `Nicht zugänglich – erst ausbauen: ${COMPONENT_MAP[b].name}.` : null;
+}
+
 export const describeNeed = (need: ToolNeed) =>
   need.socket ? `${toolName(need.driver)} mit ${toolName(need.socket)}` : toolName(need.driver);
 
 /** Prüft, ob das aktive Werkzeug samt Stecknuss zur Anforderung passt. */
-function checkTool(need: ToolNeed, tools: Toolset, tightening: boolean): string | null {
-  const wantsTorque = !!need.torque && tightening;
-  if (tools.active === 'torque' && !need.torque) return `Falsches Werkzeug – du brauchst: ${describeNeed(need)}.`;
-  if (tools.active === 'torque' && !tightening) return 'Der Drehmomentschlüssel ist nur zum Anziehen da – zum Lösen die Ratsche nehmen.';
-  if (wantsTorque && tools.active !== 'torque') {
-    return `Radschrauben werden mit dem Drehmomentschlüssel angezogen (mit ${toolName(need.socket!)}).`;
+function checkTool(need: ToolNeed, tools: Toolset, mode: 'loosen' | 'tighten' | 'other'): string | null {
+  const wantsTorque = !!need.torque && mode === 'tighten';
+  if (tools.active === 'torque') {
+    if (!need.torque) return `Falsches Werkzeug – du brauchst: ${describeNeed(need)}.`;
+    if (mode === 'loosen') return 'Der Drehmomentschlüssel ist nur zum Anziehen da – zum Lösen die Ratsche nehmen.';
+  } else {
+    if (tools.active !== need.driver) return `Falsches Werkzeug – du brauchst: ${describeNeed(need)}.`;
+    if (wantsTorque) return `Die Schraube sitzt handfest. Endgültig angezogen wird mit dem Drehmomentschlüssel (mit ${toolName(need.socket!)}).`;
   }
-  if (!wantsTorque && tools.active !== need.driver) return `Falsches Werkzeug – du brauchst: ${describeNeed(need)}.`;
   if (need.socket && !tools.carried.includes(need.socket)) {
     return `Dir fehlt die ${toolName(need.socket)} – hol sie aus dem Werkzeugschrank.`;
   }
@@ -67,12 +76,17 @@ export function toggleHood(car: CarInstance): ActionResult {
 export function toggleLift(car: CarInstance): ActionResult {
   if (car.lifted) {
     const loose = ['wheel_fl', 'wheel_fr'].find((w) => !isComplete(car, w));
-    if (loose) return fail('Erst beide Vorderräder montieren und alle Radschrauben anziehen.');
+    if (loose) return fail('Erst beide Vorderräder montieren und alle Radschrauben festziehen.');
   }
   car.lifted = !car.lifted;
   return done(car.lifted ? 'Auto angehoben.' : 'Auto abgelassen.');
 }
 
+/**
+ * Schraube bedienen. Ablauf wie in der echten Werkstatt:
+ * fest –(Werkzeug)→ gelöst –(Hand)→ entfernt, und zurück:
+ * entfernt –(Hand/Werkzeug)→ angesetzt –(Werkzeug)→ fest.
+ */
 export function boltAction(car: CarInstance, id: string, index: number, tools: Toolset): ActionResult {
   const def = COMPONENT_MAP[id];
   const st = car.components[id];
@@ -81,17 +95,47 @@ export function boltAction(car: CarInstance, id: string, index: number, tools: T
   if (tools.active === 'lamp') return inspect(car, id);
   if (!st.installed) return fail(`${def.name} ist nicht eingebaut.`);
   if (!def.fastener) return fail('Hier gibt es nichts zu schrauben.');
-  const tightening = !st.bolts[index];
-  const wrong = checkTool(def.fastener, tools, tightening);
-  if (wrong) return fail(wrong);
-  if (!blockersRemoved(car, id)) {
-    const b = def.blockedBy.find((x) => car.components[x].installed)!;
-    return fail(`Nicht zugänglich – erst ausbauen: ${COMPONENT_MAP[b].name}.`);
+  const blocked = blockedMessage(car, id);
+  if (blocked) return fail(blocked);
+  const b = st.bolts[index];
+  const count = (v: number) => st.bolts.filter((x) => x === v).length;
+
+  if (tools.active === 'hand') {
+    if (b === TIGHT) return fail(`Die Schraube sitzt fest – erst mit Werkzeug lösen (${describeNeed(def.fastener)}).`);
+    st.bolts[index] = b === 1 ? 0 : 1;
+    car.testDriven = false;
+    return done(b === 1 ? `Schraube herausgedreht (${count(0)}/${def.bolts} entfernt).` : 'Schraube von Hand angesetzt – jetzt mit Werkzeug festziehen.');
   }
-  st.bolts[index] = tightening;
+
+  const wrong = checkTool(def.fastener, tools, b === TIGHT ? 'loosen' : b === 1 ? 'tighten' : 'other');
+  if (wrong) return fail(wrong);
   car.testDriven = false;
-  const left = st.bolts.filter(Boolean).length;
-  return done(tightening ? `Schraube angezogen (${left}/${def.bolts}).` : `Schraube gelöst (${def.bolts - left}/${def.bolts}).`);
+  if (b === TIGHT) {
+    st.bolts[index] = 1;
+    return done(`Schraube gelöst (${count(1) + count(0)}/${def.bolts}) – mit der Hand herausdrehen.`);
+  }
+  if (b === 1) {
+    st.bolts[index] = TIGHT;
+    return done(`Schraube festgezogen (${count(TIGHT)}/${def.bolts}).`);
+  }
+  st.bolts[index] = 1;
+  return done('Schraube angesetzt – noch einmal antippen zum Festziehen.');
+}
+
+/** Elektrischen Stecker abziehen bzw. aufstecken (mit der Hand). */
+export function connectorAction(car: CarInstance, id: string, tools: Toolset): ActionResult {
+  const def = COMPONENT_MAP[id];
+  const st = car.components[id];
+  const access = checkAccess(car, id);
+  if (access) return fail(access);
+  if (tools.active === 'lamp') return done(`Stecker ${def.name}: Kontakte sauber, Verriegelung in Ordnung.`);
+  if (tools.active !== 'hand') return fail('Stecker ziehst du mit der Hand ab.');
+  if (!st.installed) return fail(`${def.name} ist nicht eingebaut.`);
+  const blocked = blockedMessage(car, id);
+  if (blocked) return fail(blocked);
+  st.connected = !st.connected;
+  car.testDriven = false;
+  return done(st.connected ? `Stecker ${def.name} eingerastet.` : `Stecker ${def.name} abgezogen.`);
 }
 
 export function inspect(car: CarInstance, id: string): ActionResult {
@@ -107,7 +151,7 @@ export function inspect(car: CarInstance, id: string): ActionResult {
     }
   }
   if (def.hidden && st.installed) {
-    return done(`${def.name}: Von außen ist nichts zu erkennen – hier hilft nur die OBD-Diagnose oder der Ausbau.`);
+    return done(`${def.name}: Im eingebauten Zustand ist nichts zu erkennen – ausbauen und ansehen.`);
   }
   st.known = true;
   return done(`${def.name}: ${st.condition === 'defect' ? def.defectText : def.okText}`);
@@ -127,27 +171,27 @@ export function componentAction(
   if (tools.active === 'lamp') return inspect(car, id);
 
   if (def.removeWith) {
-    const wrong = checkTool(def.removeWith, tools, false);
+    const wrong = checkTool(def.removeWith, tools, 'other');
     if (wrong) return fail(wrong);
   } else if (tools.active !== 'hand') {
-    if (st.installed && st.bolts.some(Boolean)) return fail('Tippe direkt auf die Schrauben, um sie zu lösen.');
+    if (st.installed && st.bolts.some((b) => b > 0)) return fail('Tippe direkt auf die Schrauben, um sie zu lösen.');
     return fail('Zum Aus- und Einbauen die Hand wählen.');
   }
 
   if (st.installed) {
-    if (!blockersRemoved(car, id)) {
-      const b = def.blockedBy.find((x) => car.components[x].installed)!;
-      return fail(`Erst ausbauen: ${COMPONENT_MAP[b].name}.`);
-    }
-    if (st.bolts.some(Boolean)) return fail(`Erst alle Schrauben lösen (${describeNeed(def.fastener!)}).`);
+    const blocked = blockedMessage(car, id);
+    if (blocked) return fail(blocked);
+    if (st.bolts.some((b) => b === TIGHT)) return fail(`Erst alle Schrauben lösen (${describeNeed(def.fastener!)}).`);
+    if (st.bolts.some((b) => b === 1)) return fail('Die gelösten Schrauben noch mit der Hand herausdrehen.');
+    if (def.connector && st.connected) return fail('Erst den elektrischen Stecker abziehen.');
     st.installed = false;
     car.testDriven = false;
     if (def.partId) {
       st.known = true;
       return done(
         st.condition === 'defect'
-          ? `${def.name} ausgebaut – ${def.defectText} Neuteil nötig.`
-          : `${def.name} ausgebaut – ${def.okText}`,
+          ? `${def.name} ausgebaut und begutachtet – ${def.defectText} Neuteil nötig.`
+          : `${def.name} ausgebaut und begutachtet – ${def.okText}`,
       );
     }
     return done(`${def.name} ausgebaut.`);
@@ -155,7 +199,8 @@ export function componentAction(
 
   // Einbau
   const missing = dependents(id).find((d) => !isComplete(car, d));
-  if (missing) return fail(`Erst montieren und festschrauben: ${COMPONENT_MAP[missing].name}.`);
+  if (missing) return fail(`Erst fertig montieren: ${COMPONENT_MAP[missing].name}.`);
+  const next = def.bolts ? ' Jetzt Schrauben ansetzen und festziehen.' : def.connector ? ' Stecker nicht vergessen.' : '';
   if (def.partId && st.condition === 'defect' && !opts.useOldPart) {
     if (inv[def.partId] > 0) {
       inv[def.partId] -= 1;
@@ -163,18 +208,19 @@ export function componentAction(
       st.installed = true;
       // Teilekosten werden dem Auto zugerechnet, in das das Teil wandert.
       car.partsSpent += Math.round(PARTS[def.partId].price / PARTS[def.partId].units);
-      return done(`Neuteil eingebaut: ${def.name}.${def.bolts ? ' Jetzt festschrauben.' : ''}`);
+      return done(`Neuteil eingebaut: ${def.name}.${next}`);
     }
     return { ok: false, needsPart: def.partId, message: `Kein Neuteil im Lager: ${PARTS[def.partId].name}.` };
   }
   st.installed = true;
-  return done(`${def.name} eingebaut.${def.bolts ? ' Jetzt festschrauben.' : ''}`);
+  return done(`${def.name} eingebaut.${next}`);
 }
 
 export function activeDefects(car: CarInstance): DefectId[] {
   return DEFECT_LIST.filter((d) => d.components.some((c) => car.components[c].condition === 'defect')).map((d) => d.id);
 }
 
+/** Defekte, die der Spieler am Bauteil selbst festgestellt hat. */
 export function knownDefects(car: CarInstance): DefectId[] {
   return DEFECT_LIST.filter((d) =>
     d.components.some((c) => car.components[c].condition === 'defect' && car.components[c].known),
@@ -189,35 +235,8 @@ export function driveBlocker(car: CarInstance): string | null {
   return null;
 }
 
-/** OBD-Diagnose: liest nur elektronisch erkennbare Fehler aus. */
-export function obdScan(car: CarInstance): string[] {
-  const codes: string[] = [];
-  const bad = (id: string) => car.components[id].condition === 'defect';
-  const mark = (ids: string[]) => ids.forEach((i) => bad(i) && (car.components[i].known = true));
-  for (let n = 1; n <= 4; n++) {
-    const c = car.components[`coil${n}`];
-    if (c.condition === 'defect' || !c.installed) {
-      codes.push(`P030${n} – Zündaussetzer Zylinder ${n} erkannt`);
-      mark([`coil${n}`]);
-    }
-  }
-  const plugs = ['plug1', 'plug2', 'plug3', 'plug4'];
-  if (plugs.some(bad)) {
-    codes.push('P0300 – Sporadische Zündaussetzer, mehrere Zylinder (Zündkerzen prüfen)');
-    mark(plugs);
-  }
-  if (['pads_fl', 'pads_fr'].some(bad)) {
-    codes.push('5E20 – Bremsbelagverschleiß Vorderachse, Verschleißgrenze erreicht');
-    mark(['pads_fl', 'pads_fr']);
-  }
-  if (bad('alternator')) {
-    codes.push('P0562 – Bordnetzspannung zu niedrig (Lichtmaschine lädt nicht)');
-    mark(['alternator']);
-  }
-  if (bad('thermostat')) {
-    codes.push('P0128 – Kühlmitteltemperatur unter Thermostat-Regeltemperatur');
-    mark(['thermostat']);
-  }
-  car.obdCodes = codes;
-  return codes;
+/** Der Motor läuft nur, wenn am Motor nichts demontiert ist (Räder dürfen ab sein). */
+export function engineBlocker(car: CarInstance): string | null {
+  const open = COMPONENTS.find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing') && !isComplete(car, c.id));
+  return open ? `Der Motor startet so nicht – erst fertig montieren: ${open.name}.` : null;
 }

@@ -23,3 +23,5 @@ import { useGame } from './game/store';
 (window as any).__gk = useGame;
 import { player } from './three/player';
 (window as any).__gkPlayer = player;
+import { engineAudio } from './game/audio';
+(window as any).__gkAudio = engineAudio;

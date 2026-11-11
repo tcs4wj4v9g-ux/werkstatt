@@ -1,6 +1,9 @@
 import { CAR_MODELS } from './data/cars';
 import { COMPONENTS } from './data/components';
 import { DEFECTS, DEFECT_LIST } from './data/defects';
+import { SELLER_LIST, SELLER_NAMES, SELLERS, type SellerProfile } from './data/sellers';
+import { SYMPTOMS, type Channel } from './data/symptoms';
+import { observe } from './diagnosis';
 import { activeDefects, isAssembled } from './repair';
 import type { CarInstance, DefectId, Listing } from './types';
 
@@ -15,7 +18,7 @@ export const MAX_LISTINGS = 4;
 export function freshComponents(): CarInstance['components'] {
   const components: CarInstance['components'] = {};
   for (const c of COMPONENTS) {
-    components[c.id] = { installed: true, bolts: Array(c.bolts).fill(true), condition: 'ok', known: false };
+    components[c.id] = { installed: true, bolts: Array(c.bolts).fill(2), connected: true, condition: 'ok', known: false };
   }
   return components;
 }
@@ -46,6 +49,7 @@ export function createCar(modelId: string, defects: DefectId[], rng: Rng, opts: 
     testDriven: false,
     haggled: false,
     obdCodes: null,
+    observed: [],
     ...opts,
   };
 }
@@ -59,56 +63,61 @@ export function nextMarketIndex(current: number, rng: Rng): number {
 export const marketLabel = (index: number) =>
   index >= 1.06 ? 'Verkäufermarkt – Preise hoch' : index <= 0.94 ? 'Käufermarkt – Preise niedrig' : 'Markt ausgeglichen';
 
-const SELLERS = ['Herr Brandl', 'Frau Yildiz', 'Herr Kowalski', 'Frau Sommer', 'Herr Aigner', 'Herr Petrovic'];
+const between = ([a, b]: [number, number], rng: Rng) => a + (b - a) * rng();
+const eur = (n: number) => `${n.toLocaleString('de-DE')} €`;
 
-function createListing(car: CarInstance, rng: Rng, index: number, seller = pick(SELLERS, rng)): Listing {
+export function createListing(car: CarInstance, rng: Rng, index: number, profile: SellerProfile = pick(SELLER_LIST, rng), seller = pick(SELLER_NAMES, rng)): Listing {
   const penalties = activeDefects(car).reduce((s, d) => s + DEFECTS[d].penalty, 0);
-  // Verkäufer preisen Mängel nur teilweise ein – dort liegt die Marge des Spielers.
-  const asking = Math.max(900, round50((car.cleanValue * index - penalties * 0.7) * (0.82 + rng() * 0.08)));
+  // Wer sein Auto kennt, hat die Mängel schon eingepreist; Ahnungslose verlangen fast den vollen Preis.
+  const asking = Math.max(900, round50(car.cleanValue * index * (0.86 + rng() * 0.08) - penalties * (0.2 + 0.65 * profile.knowledge)));
   return {
     id: car.uid,
     car,
     seller,
     asking,
-    minPrice: round50(asking * (0.82 + rng() * 0.06)),
-    patience: 4,
+    minPrice: round50(asking * (1 - between(profile.flex, rng))),
+    patience: Math.round(between(profile.patience, rng)),
     current: asking,
     hints: [],
     checks: [],
+    profile: profile.id,
+    usedArgs: [],
     closed: false,
-    sellerLine: `„${asking.toLocaleString('de-DE')} € – top gepflegt, läuft einwandfrei!“`,
+    gone: false,
+    sellerLine: profile.opening(eur(asking)),
   };
 }
 
 /** Das feste erste Angebot: drei Einsteiger-Defekte, mit 6.000 € bezahlbar. */
 export function starterListing(rng: Rng): Listing {
   const car = createCar('bavaria_320', ['coil', 'brakes', 'gasket'], rng, { year: 2007, km: 189000, color: '#2a3a5c' });
-  const l = createListing(car, rng, 1, 'Herr Brandl');
+  const l = createListing(car, rng, 1, SELLERS.private, 'Herr Brandl');
   l.asking = l.current = 5400;
   l.minPrice = 4800;
-  l.sellerLine = '„5.400 € – top gepflegt, läuft wie ein Uhrwerk!“';
+  l.patience = 4;
+  l.sellerLine = SELLERS.private.opening(eur(5400));
   return l;
 }
 
 function randomListing(rng: Rng, index: number): Listing {
-  const n = 1 + Math.floor(rng() * 4);
+  const n = 1 + Math.floor(rng() * 3);
   const defects = [...DEFECT_LIST].sort(() => rng() - 0.5).slice(0, n).map((d) => d.id);
   return createListing(createCar(pick(Object.keys(CAR_MODELS), rng), defects, rng), rng, index);
 }
 
 /** Günstiges Bastlerfahrzeug, damit auch bei knapper Kasse etwas geht. */
 function budgetListing(money: number, rng: Rng, index: number): Listing {
-  const car = createCar('bavaria_320', ['coil', 'brakes', 'gasket', 'plugs', 'belt'], rng, { year: 2005, km: 268000 });
-  const l = createListing(car, rng, index);
+  const car = createCar('bavaria_318', ['coil', 'brakes', 'gasket', 'plugs', 'belt'], rng, { year: 2005, km: 268000 });
+  const l = createListing(car, rng, index, SELLERS.hurry);
   l.asking = l.current = Math.max(1000, round50(Math.min(l.asking, money * 0.85)));
   l.minPrice = round50(l.asking * 0.85);
-  l.sellerLine = `„${l.asking.toLocaleString('de-DE')} € – Bastlerfahrzeug, aber ehrlich.“`;
+  l.sellerLine = `„${eur(l.asking)} – Bastlerfahrzeug, aber ehrlich.“`;
   return l;
 }
 
 /** Füllt den Markt auf. Mindestens ein Angebot bleibt bezahlbar. */
 export function fillListings(existing: Listing[], money: number, rng: Rng, index = 1, first = false): Listing[] {
-  const out = first ? [starterListing(rng)] : [...existing];
+  const out = first ? [starterListing(rng)] : existing.filter((l) => !l.gone);
   while (out.length < MAX_LISTINGS) out.push(randomListing(rng, index));
   if (!out.some((o) => o.asking <= money)) out[out.length - 1] = budgetListing(money, rng, index);
   return out;
@@ -116,66 +125,96 @@ export function fillListings(existing: Listing[], money: number, rng: Rng, index
 
 /** Neuer Tag: ein bis zwei alte Angebote verschwinden, neue kommen dazu. */
 export function refreshListings(existing: Listing[], money: number, rng: Rng, index: number): Listing[] {
-  const keep = [...existing];
+  const keep = existing.filter((l) => !l.gone);
   const drop = Math.min(keep.length, 1 + Math.floor(rng() * 2));
   for (let i = 0; i < drop; i++) keep.splice(Math.floor(rng() * keep.length), 1);
   return fillListings(keep, money, rng, index);
 }
 
-export const MARKET_CHECKS = [
-  { id: 'listen', label: 'Motor starten & anhören', none: 'Der Motor läuft ruhig und rund.' },
-  { id: 'hood', label: 'Unter die Haube schauen', none: 'Motorraum trocken und sauber.' },
-  { id: 'brakes', label: 'Bremsen ansehen', none: 'Beläge und Scheiben sehen gut aus.' },
-  { id: 'under', label: 'Unter das Auto schauen', none: 'Unterboden trocken, kein Tropfen.' },
-  { id: 'dash', label: 'Zündung an: Anzeigen prüfen', none: 'Alle Kontrollleuchten gehen aus, Anzeigen normal.' },
-] as const;
+/** Was man beim Verkäufer prüfen kann – jede Prüfung zeigt nur Symptome, nie die Ursache. */
+export const MARKET_CHECKS: { id: string; label: string; channels: Channel[]; warm: boolean; none: string }[] = [
+  { id: 'listen', label: 'Motor starten & anhören', channels: ['idle', 'sound'], warm: false, none: 'Der Motor springt sofort an und läuft ruhig.' },
+  { id: 'dash', label: 'Anzeigen & Kontrollleuchten', channels: ['dash'], warm: false, none: 'Alle Kontrollleuchten gehen aus.' },
+  { id: 'hood', label: 'Unter die Haube schauen', channels: ['hood'], warm: false, none: 'Motorraum trocken und sauber.' },
+  { id: 'under', label: 'Unter das Auto schauen', channels: ['under'], warm: false, none: 'Unterboden trocken, kein Tropfen.' },
+  { id: 'brakes', label: 'Bremsen ansehen', channels: ['wheels'], warm: false, none: 'Beläge und Scheiben sehen gut aus.' },
+  { id: 'drive', label: 'Probefahrt mit dem Verkäufer', channels: ['idle', 'sound', 'dash', 'rev', 'drive'], warm: true, none: 'Bei der Probefahrt fällt dir nichts weiter auf.' },
+];
 
-/** Untersuchung auf dem Markt – deckt Mängel auf und liefert Verhandlungsargumente. */
+/** Untersuchung beim Verkäufer – liefert Symptome als mögliche Verhandlungsargumente. */
 export function inspectListing(l: Listing, check: string): string {
+  const def = MARKET_CHECKS.find((c) => c.id === check)!;
   if (!l.checks.includes(check)) l.checks.push(check);
-  const found = activeDefects(l.car).filter((d) => DEFECTS[d].marketCheck === check);
-  if (!found.length) return MARKET_CHECKS.find((c) => c.id === check)!.none;
-  found.forEach((d) => !l.hints.includes(d) && l.hints.push(d));
-  return found.map((d) => DEFECTS[d].marketHint).join(' ');
+  const probe: CarInstance = { ...l.car, observed: [...l.hints] };
+  const { added } = observe(probe, def.channels, def.warm);
+  l.hints = probe.observed;
+  return added.length ? added.map((s) => s.text).join(' ') : def.none;
 }
 
-export const sellerFloor = (l: Listing) => round50(l.minPrice * (1 - Math.min(0.2, 0.04 * l.hints.length)));
+/** Schmerzgrenze des Verkäufers nach allen bisher vorgebrachten Argumenten. */
+export const sellerFloor = (l: Listing) => l.minPrice;
 
 export interface OfferResult {
   accepted: boolean;
   price: number;
 }
 
-/** Verhandlungsrunde: Angebot des Spielers, Reaktion des Verkäufers. */
-export function makeOffer(l: Listing, amount: number): OfferResult {
-  const eur = (n: number) => `${n.toLocaleString('de-DE')} €`;
-  const floor = sellerFloor(l);
+/**
+ * Verhandlungsrunde. `args` sind Symptome, die der Spieler selbst bemerkt hat
+ * und jetzt als Begründung nennt. Jedes Argument wirkt nur einmal, und nur
+ * soweit der Verkäufer den Mangel nicht ohnehin schon eingepreist hat.
+ */
+export function makeOffer(l: Listing, amount: number, args: string[] = []): OfferResult {
+  const profile = SELLERS[l.profile] ?? SELLERS.private;
+  if (l.gone) return { accepted: false, price: l.current };
+
+  const fresh = args.filter((a) => l.hints.includes(a) && !l.usedArgs.includes(a));
+  let conceded = 0;
+  if (fresh.length) {
+    const active = activeDefects(l.car);
+    const evidenced = (ids: string[]) => active.filter((d) => DEFECTS[d].symptoms.some((s) => ids.includes(s)));
+    const before = evidenced(l.usedArgs);
+    const newly = evidenced([...l.usedArgs, ...fresh]).filter((d) => !before.includes(d));
+    conceded = newly.reduce((s, d) => s + DEFECTS[d].penalty, 0) * (1 - profile.knowledge) * profile.concede;
+    l.usedArgs.push(...fresh);
+    // Auch mit den besten Argumenten verschenkt niemand sein Auto.
+    l.minPrice = Math.max(round50(l.asking * 0.7), round50(l.minPrice - conceded));
+  }
+  const argLine = !fresh.length
+    ? ''
+    : conceded < 60
+      ? '„Das weiß ich alles, das steckt schon im Preis.“ '
+      : `„${fresh.map((a) => SYMPTOMS[a].argument).join(', ')}? Hm, das stimmt allerdings.“ `;
+
+  const floor = l.minPrice;
   if (amount >= l.current) {
     l.sellerLine = '„Abgemacht! Schlüssel und Papiere liegen bereit.“';
     return { accepted: true, price: Math.min(amount, l.current) };
   }
-  if (l.closed) {
-    l.sellerLine = `„Ich sagte doch: ${eur(l.current)} ist mein letztes Wort.“`;
-    return { accepted: false, price: l.current };
-  }
-  if (amount >= floor) {
-    l.sellerLine = l.hints.length
-      ? '„Na gut… wegen der Mängel. Sie haben ein gutes Auge. Abgemacht.“'
-      : '„Hm. Na gut, weil Sie es sind. Abgemacht.“';
+  if (amount >= floor && !l.closed) {
+    l.sellerLine = `${argLine}„Na gut – ${eur(amount)}, abgemacht.“`;
     return { accepted: true, price: amount };
   }
-  const insulting = amount < floor * 0.78;
+  const insulting = amount < floor * profile.insultAt;
+  if (l.closed) {
+    l.patience -= 1;
+    if (insulting || l.patience < -1) {
+      l.gone = true;
+      l.sellerLine = '„Wir kommen nicht zusammen. Ich verkaufe an jemand anderen – auf Wiedersehen.“';
+    } else {
+      l.sellerLine = `„Ich sagte doch: ${eur(l.current)} ist mein letztes Wort.“`;
+    }
+    return { accepted: false, price: l.current };
+  }
   l.patience -= insulting ? 2 : 1;
-  l.current = Math.max(floor, round50(l.current - (l.current - floor) * (insulting ? 0.15 : 0.5)));
+  l.current = Math.max(floor, round50(l.current - (l.current - floor) * (insulting ? profile.step * 0.3 : profile.step)));
   if (l.patience <= 0) {
     l.closed = true;
-    l.sellerLine = `„Jetzt reicht's. ${eur(l.current)} – letztes Wort, nehmen oder gehen.“`;
+    l.sellerLine = `${argLine}„Jetzt reicht's. ${eur(l.current)} – letztes Wort, nehmen oder gehen.“`;
   } else if (insulting) {
-    l.sellerLine = `„${eur(amount)}? Wollen Sie mich beleidigen? ${eur(l.current)}, mehr geht nicht runter.“`;
+    l.sellerLine = `${argLine}„${eur(amount)}? Das ist eine Frechheit. ${eur(l.current)}, mehr geht nicht runter.“`;
   } else {
-    l.sellerLine = l.hints.length
-      ? `„Die Mängel sehe ich ein… aber ${eur(amount)} ist zu wenig. Sagen wir ${eur(l.current)}.“`
-      : `„Für ${eur(amount)} kann ich ihn nicht hergeben. ${eur(l.current)} könnte ich machen.“`;
+    l.sellerLine = `${argLine}„${eur(amount)} ist mir zu wenig. Sagen wir ${eur(l.current)}.“`;
   }
   return { accepted: false, price: l.current };
 }
