@@ -298,21 +298,27 @@ function SellCard({ bay, car }: { bay: number; car: CarInstance }) {
   const v = valuate(car, s.marketIndex);
   const price = car.haggled ? v.haggleOffer : v.offer;
   const profit = price - car.purchasePrice - car.partsSpent;
+  // Mängel, die der Spieler noch nicht gefunden hat, nennt der Käufer nicht beim Namen.
+  const known = knownDefects(car);
+  const named = v.deductions.filter((d) => !d.defect || known.includes(d.defect));
+  const hidden = v.deductions.filter((d) => d.defect && !known.includes(d.defect)).reduce((a, d) => a + d.amount, 0);
   return (
     <div className="sell-card">
       <b>Bühne {bay + 1}: {carName(car)} · {car.km.toLocaleString('de-DE')} km</b>
       <table className="val">
         <tbody>
           <tr><td>Marktwert in Bestzustand (heutige Marktlage)</td><td>{eur(v.cleanValue)}</td></tr>
-          {v.deductions.map((d) => (
+          {named.map((d) => (
             <tr key={d.label} className="bad"><td>− {d.label}</td><td>−{eur(d.amount)}</td></tr>
           ))}
+          {hidden > 0 && (
+            <tr className="bad"><td>− Weitere Mängel laut Gutachter des Käufers (dir noch unbekannt)</td><td>−{eur(hidden)}</td></tr>
+          )}
           <tr className="sum"><td>Angebot des Käufers</td><td data-testid={`sell-price-${bay}`}>{eur(price)}</td></tr>
           <tr><td>Einkauf {eur(car.purchasePrice)} + verbaute Teile {eur(car.partsSpent)}</td><td>−{eur(car.purchasePrice + car.partsSpent)}</td></tr>
           <tr className={`sum ${profit >= 0 ? 'good' : 'bad'}`}><td>{profit >= 0 ? 'Gewinn' : 'Verlust'}</td><td>{eur(Math.abs(profit))}</td></tr>
         </tbody>
       </table>
-      <p className="meta">Bekannt sind dir bisher nur die Mängel, die du selbst gefunden hast – der Käufer findet alle.</p>
       <div className="row">
         <button className="btn" disabled={car.haggled} onClick={() => s.haggle(bay)}>
           {car.haggled ? 'Bereits nachverhandelt' : 'Nachverhandeln (1 Versuch)'}

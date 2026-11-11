@@ -182,7 +182,7 @@ export function makeOffer(l: Listing, amount: number): OfferResult {
 
 export interface Valuation {
   cleanValue: number;
-  deductions: { label: string; amount: number }[];
+  deductions: { label: string; amount: number; defect?: DefectId }[];
   value: number;
   offer: number;
   haggleOffer: number;
@@ -194,7 +194,7 @@ export interface Valuation {
  */
 export function valuate(car: CarInstance, index = 1): Valuation {
   const cleanValue = round50(car.cleanValue * index);
-  const deductions = activeDefects(car).map((d) => ({ label: DEFECTS[d].name, amount: DEFECTS[d].penalty }));
+  const deductions: Valuation['deductions'] = activeDefects(car).map((d) => ({ label: DEFECTS[d].name, amount: DEFECTS[d].penalty, defect: d }));
   if (!isAssembled(car)) deductions.push({ label: 'Nicht fahrbereit (Teile demontiert)', amount: 1500 });
   const clean = deductions.length === 0;
   if (!car.testDriven) deductions.push({ label: 'Keine Probefahrt nach Reparatur', amount: round50(cleanValue * 0.06) });

@@ -94,7 +94,7 @@ function Bolt({ pos, axis = 'y', present, live, label, onTap }: { pos: V3; axis?
       )}
       {onTap && (
         <mesh>
-          <sphereGeometry args={[0.055, 8, 6]} />
+          <sphereGeometry args={[0.046, 8, 6]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       )}
@@ -439,7 +439,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
           </mesh>
         )}
         {pumpLeak && (
-          <mesh position={[1.6, 0.46, -0.26]}>
+          <mesh position={[1.6, 0.46, -0.3]}>
             <boxGeometry args={[0.09, 0.1, 0.1]} />
             <meshStandardMaterial color="#bfe3c4" roughness={0.9} />
           </mesh>
@@ -509,8 +509,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
       {part(
         'belt',
         <>
-          <mesh position={[1.69, 0.627, 0.005]}>
-            <boxGeometry args={[0.028, 0.012, 0.54]} />
+          <mesh position={[1.69, 0.627, -0.015]}>
+            <boxGeometry args={[0.028, 0.012, 0.58]} />
             <Mat color={beltBad ? '#3b332b' : '#0d0d0e'} rough={0.95} />
           </mesh>
           {[-1, 1].map((k) => (
@@ -546,39 +546,39 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
       {part(
         'water_pump',
         <>
-          <mesh position={[1.6, 0.58, -0.26]}>
-            <boxGeometry args={[0.1, 0.16, 0.14]} />
+          <mesh position={[1.58, 0.58, -0.3]}>
+            <boxGeometry args={[0.14, 0.16, 0.16]} />
             <Mat color="#9aa0a7" metal={0.7} rough={0.5} />
           </mesh>
-          <mesh position={[1.69, 0.58, -0.26]} rotation={[0, 0, Math.PI / 2]}>
+          <mesh position={[1.69, 0.58, -0.3]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.048, 0.048, 0.03, 16]} />
             <Mat color="#6f757c" metal={0.8} rough={0.4} />
           </mesh>
         </>,
       )}
-      {bolts('water_pump', [[1.57, 0.66, -0.31], [1.63, 0.66, -0.31], [1.57, 0.66, -0.21], [1.63, 0.66, -0.21]])}
+      {bolts('water_pump', [[1.53, 0.66, -0.35], [1.63, 0.66, -0.35], [1.53, 0.66, -0.25], [1.63, 0.66, -0.25]])}
       {part(
         'thermostat',
         <mesh position={[1.3, 0.6, -0.235]}>
-          <boxGeometry args={[0.11, 0.1, 0.1]} />
+          <boxGeometry args={[0.17, 0.1, 0.1]} />
           <Mat color="#a7adb4" metal={0.75} rough={0.45} />
         </mesh>,
       )}
-      {bolts('thermostat', [[1.27, 0.65, -0.235], [1.33, 0.65, -0.235]])}
+      {bolts('thermostat', [[1.235, 0.65, -0.235], [1.365, 0.65, -0.235]])}
       {part(
         'hose',
         <>
-          <mesh position={[1.63, 0.69, -0.39]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.03, 0.03, 0.6, 12]} />
+          <mesh position={[1.565, 0.69, -0.45]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.03, 0.03, 0.47, 12]} />
             <Mat color="#151517" rough={0.85} />
           </mesh>
-          <mesh position={[1.33, 0.67, -0.33]} rotation={[0.5, 0, 0]}>
-            <boxGeometry args={[0.06, 0.07, 0.14]} />
+          <mesh position={[1.34, 0.675, -0.375]}>
+            <boxGeometry args={[0.06, 0.06, 0.2]} />
             <Mat color="#151517" rough={0.85} />
           </mesh>
         </>,
       )}
-      {bolts('hose', [[1.39, 0.72, -0.39]])}
+      {bolts('hose', [[1.42, 0.72, -0.45]])}
 
       {/* Ölwanne unter dem Motor – nur von der Hebebühne aus erreichbar */}
       {part(
