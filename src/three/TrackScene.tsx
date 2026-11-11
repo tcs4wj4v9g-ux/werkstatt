@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { driveInput, useDriveHud } from '../game/drive';
 import { activeDefects } from '../game/repair';
+import { setEngine, startEngine, stopEngine } from '../game/sfx';
 import { useGame } from '../game/store';
 import { CarModel } from './CarModel';
 
@@ -81,9 +82,11 @@ export function TrackScene() {
     };
     const down = (e: KeyboardEvent) => ((keys[e.key] = true), apply());
     const up = (e: KeyboardEvent) => ((keys[e.key] = false), apply());
+    startEngine();
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
+      stopEngine();
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
@@ -124,6 +127,7 @@ export function TrackScene() {
     else if (off && s.v > vmax) s.v -= 12 * dt;
 
     const steerAngle = (steer * 0.5) / (1 + Math.abs(s.v) / 14);
+    setEngine(s.v, throttle, perf.misfire);
     steerVis.current += (steer - steerVis.current) * Math.min(1, dt * 10);
     s.heading += (s.v / 2.76) * Math.tan(steerAngle) * dt;
     s.x += Math.cos(s.heading) * s.v * dt;
