@@ -552,11 +552,11 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', steer }: P
       {part(
         'chain_tensioner',
         <>
-          <mesh position={[1.45, 0.5, -0.215]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[1.45, 0.6, -0.215]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.03, 0.03, 0.07, 6]} />
             <Mat color="#c9a54a" metal={0.85} rough={0.35} />
           </mesh>
-          <mesh position={[1.45, 0.5, -0.23]}>
+          <mesh position={[1.45, 0.6, -0.23]}>
             <sphereGeometry args={[0.05, 8, 6]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
