@@ -931,12 +931,13 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'drain_plug',
               <>
-                <mesh position={[1.3, 0.193, 0]}>
+                {/* sitzt am hinteren Wannenrand, damit die Wannenmitte antippbar bleibt */}
+                <mesh position={[1.44, 0.193, 0]}>
                   <cylinderGeometry args={[0.026, 0.026, 0.022, 6]} />
                   <Mat color="#c9a54a" metal={0.9} rough={0.3} />
                 </mesh>
-                <group position={[1.3, 0.185, 0]}>
-                  <Hit r={0.055} />
+                <group position={[1.44, 0.185, 0]}>
+                  <Hit r={0.045} />
                 </group>
               </>,
             )}

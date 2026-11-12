@@ -72,6 +72,9 @@ export function GarageUI() {
               <button className="btn" data-testid="file" onClick={() => s.setPanel('file', nearBay)}>📋 Akte</button>
               {kind === 'lift' && <button className="btn" data-testid="fluids" onClick={() => s.setPanel('fluids', nearBay)}>🛢 Flüssigkeiten</button>}
               <button className="btn" data-testid="move" onClick={() => s.setPanel('move', nearBay)}>🅿 Umparken</button>
+              {!near.lifted && kind !== 'wash' && kind !== 'paint' && (
+                <button className="btn" data-testid="drive" onClick={() => s.startDrive(nearBay)}>🏁 Probefahrt</button>
+              )}
               <button className={`btn ${running ? 'active' : ''}`} data-testid="engine" onClick={() => s.toggleEngine(nearBay)}>
                 {running ? '⏹ Motor aus' : '🔑 Motor starten'}
               </button>
