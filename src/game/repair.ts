@@ -180,6 +180,9 @@ export function componentAction(
     return fail('Zum Aus- und Einbauen die Hand wählen.');
   }
 
+  if (def.equipment && tools.active === 'hand' && !tools.equipment?.includes(def.equipment)) {
+    return fail(`${def.name}: Das geht nur mit dem Motor- und Getriebeheber (Werkstatt-Computer → Ausbau).`);
+  }
   if (st.installed) {
     const blocked = blockedMessage(car, id);
     if (blocked) return fail(blocked);
@@ -196,7 +199,7 @@ export function componentAction(
       car.checked.oil = undefined;
       return done(`Ablassschraube heraus – ${liters.toLocaleString('de-DE')} l Altöl laufen in die Auffangwanne.`);
     }
-    if (['water_pump', 'thermostat', 'hose'].includes(id)) {
+    if (['water_pump', 'thermostat', 'hose', 'cyl_head'].includes(id)) {
       // Kühlsystem geöffnet: ein Großteil läuft aus, danach ist Luft im System.
       car.fluids.coolant.level = Math.min(car.fluids.coolant.level, Math.round(car.fluids.coolant.level * 3.5) / 10);
       car.fluids.coolant.air = true;
@@ -264,7 +267,7 @@ export function driveBlocker(car: CarInstance): string | null {
 export function engineBlocker(car: CarInstance): string | null {
   // Eine tote Batterie bemerkt man vor allem anderen: Es klackt nur das Relais.
   if (car.components.battery.condition === 'defect' && car.components.battery.installed) return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
-  const open = defsOf(car).find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf') && !isComplete(car, c.id));
+  const open = defsOf(car).find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf' || c.id === 'gearbox') && !isComplete(car, c.id));
   if (open) return `Der Motor startet so nicht – erst fertig montieren: ${open.name}.`;
   if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
   return null;

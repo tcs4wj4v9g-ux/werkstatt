@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { COMPONENT_MAP, defOf, defsOf } from './data/components';
-import { applicableDefects, CLASS_TARGETS } from './market';
+import { applicableDefects, CLASS_TARGETS, randomDefects } from './market';
 import { basePartPrice, defectLabor, defectPenalty, migrateInventory, partKey } from './fitment';
 import { cylinderSlots, ENGINES } from './data/engines';
 import { firingHz, VOICES } from './audio';
+import { ACHIEVEMENTS, collection, countRepair, emptyCareer, newlyAchieved, type CareerView } from './career';
 import { performance, powerCurve } from './performance';
 import { adCondition, DEFAULT_FILTER, filterListings, type MarketFilter } from './marketFilter';
 import { engineOf } from './data/components';
@@ -31,11 +32,12 @@ const rng = (seed = 42) => {
 /** Lager, das von jedem Teil in jeder Passform `n` Stück enthält. */
 const inv = (n = 0): Inventory => new Proxy({} as Inventory, { get: (t, k: string) => t[k] ?? n });
 const ALL: ToolId[] = ['ratchet', 'torque', 'wrench', 'screwdriver', 'obd', 'socket10', 'socket13', 'socket16', 'socket17'];
-const HAND: Toolset = { active: 'hand', carried: ALL };
+const HAND: Toolset = { active: 'hand', carried: ALL, equipment: ['hoist'] };
 const LAMP: Toolset = { active: 'lamp', carried: [] };
 const driver = (need: ToolNeed | undefined, tighten = false): Toolset => ({
   active: !need ? 'hand' : need.torque && tighten ? 'torque' : need.driver,
   carried: ALL,
+  equipment: ['hoist'],
 });
 
 /** Komplett ausbauen: Schrauben lösen, herausdrehen, Stecker ab, Teil heraus. */
@@ -175,7 +177,7 @@ describe('Reparatur', () => {
 
   it('alle Defekte zusammen: abzugsfrei erst nach Reparatur und Probefahrt', () => {
     const all = applicableDefects('bavaria_320');
-    expect(all.length).toBe(17);
+    expect(all.length).toBe(19);
     const car = mk('bavaria_320', all);
     const i = inv(8);
     expect(valuate(car).deductions.filter((d) => d.defect).length).toBe(all.length);
@@ -604,7 +606,7 @@ describe('Werkstattausbau und Scheunenfunde', () => {
     expect(availableSlots([]).map((s) => s.kind)).toEqual(['lift', 'lift', 'park']);
     expect(availableSlots(['parking']).filter((s) => s.kind === 'park').length).toBe(4);
     expect(availableSlots(['parking', 'wash', 'paint', 'expansion']).length).toBe(SLOTS.length);
-    expect(UPGRADES.map((u) => u.stage)).toEqual([2, 3, 4, 5]);
+    expect(UPGRADES.filter((u) => !u.equipment).map((u) => u.stage)).toEqual([2, 3, 4, 5]);
   });
 
   it('Scheunenfund: selten, verdreckt, rostig, tot – und nur Schritt für Schritt zu retten', () => {
@@ -1022,5 +1024,114 @@ describe('Marktfilter', () => {
     expect(sorted(f({ sort: 'power' }).map((l) => -engineOf(l.car).ps))).toBe(true);
     expect(sorted(f({ sort: 'condition' }).map((l) => -l.asking / l.car.cleanValue))).toBe(true);
     for (const row of filterListings(ls, { ...DEFAULT_FILTER, sort: 'power' })) expect(ls[row.index]).toBe(row.listing);
+  });
+});
+
+describe('Kapitale Schäden und Spezialgeräte', () => {
+  it('Getriebe: ohne Motor- und Getriebeheber weder Aus- noch Einbau', () => {
+    const car = mk('bavaria_320', ['gearbox']);
+    expect(presentSymptoms(car)).toEqual(expect.arrayContaining(['gear_grind']));
+    expect(obdScan(car)).toEqual([]); // rein mechanisch: kein Fehlercode
+    r.toggleLift(car);
+    const i = inv(1);
+    const noHoist: Toolset = { active: 'hand', carried: ALL };
+    const ratchet = driver(defOf(car, 'gearbox').fastener);
+    car.components.gearbox.bolts.forEach((_, n) => { r.boltAction(car, 'gearbox', n, ratchet); r.boltAction(car, 'gearbox', n, HAND); });
+    const res = r.componentAction(car, i, 'gearbox', noHoist);
+    expect(res.ok).toBe(false);
+    expect(res.message).toContain('Getriebeheber');
+    expect(r.componentAction(car, i, 'gearbox', HAND).ok).toBe(true);
+    expect(r.engineBlocker(car)).toContain('Getriebe');
+    expect(r.componentAction(car, i, 'gearbox', noHoist).ok).toBe(false);
+    install(car, i, 'gearbox');
+    expect(r.activeDefects(car)).toEqual([]);
+  });
+
+  it('Zylinderkopfdichtung: erst Ventildeckel, Dichtung, Stößel und Kopf – Kühlsystem ist danach offen', () => {
+    for (const model of ['bavaria_320', 'bavaria_340_ms', 'bavaria_320d']) {
+      const car = mk(model, ['head_gasket']);
+      expect(presentSymptoms(car), model).toEqual(expect.arrayContaining(['white_smoke', 'oil_milky']));
+      expect(performance(car).ps).toBeLessThan(performance(mk(model, [])).ps);
+      r.toggleHood(car);
+      const order: string[] = [];
+      removeDeep(car, inv(2), 'head_gasket', order);
+      expect(order, model).toEqual(expect.arrayContaining(['engine_cover', 'valve_cover', 'gasket', 'rocker', 'cyl_head', 'head_gasket']));
+      expect(order.indexOf('cyl_head')).toBeGreaterThan(order.indexOf('rocker'));
+      expect(car.fluids.coolant.air).toBe(true);
+      expect(car.components.head_gasket.known).toBe(true);
+    }
+  });
+
+  it('kapitale Schäden sind selten, teuer und an teuren Autos teils unwirtschaftlich', () => {
+    const g = rng(8);
+    let severe = 0;
+    let common = 0;
+    for (let n = 0; n < 600; n++) {
+      const d = randomDefects('bavaria_320', 2, g);
+      severe += d.filter((x) => x === 'gearbox' || x === 'head_gasket').length;
+      common += d.filter((x) => x === 'belt' || x === 'plugs').length;
+    }
+    expect(severe).toBeGreaterThan(5);
+    expect(severe).toBeLessThan(common * 0.5);
+    const cheap = mk('tanaka_piccolo', ['gearbox', 'head_gasket']);
+    const v = valuate(cheap);
+    // Am Kleinwagen übersteigen Teile und Abzüge schnell den Fahrzeugwert.
+    expect(basePartPrice(cheap, 'gearbox') + basePartPrice(cheap, 'head_gasket')).toBeGreaterThan(v.cleanValue * 0.5);
+    expect(defectPenalty(mk('kaiser_600', []), 'gearbox')).toBeGreaterThan(10000);
+  });
+});
+
+describe('Karriere: Erfolge, Sammlung, Prüfstand', () => {
+  const view = (patch: Partial<CareerView> = {}): CareerView => ({ career: emptyCareer(), carsSold: 0, totalProfit: 0, jobsDone: 0, money: 6000, upgrades: [], cars: [], ...patch });
+
+  it('Erfolge werden genau einmal ausgelöst', () => {
+    expect(newlyAchieved(view(), [])).toEqual([]);
+    const first = newlyAchieved(view({ carsSold: 1 }), []);
+    expect(first.map((a) => a.id)).toEqual(['first_sale']);
+    expect(newlyAchieved(view({ carsSold: 1 }), ['first_sale'])).toEqual([]); // nach Neuladen keine zweite Belohnung
+    expect(newlyAchieved(view({ carsSold: 10, totalProfit: 60000 }), ['first_sale']).map((a) => a.id).sort()).toEqual(['dealer_10', 'profit_50k']);
+    expect(new Set(ACHIEVEMENTS.map((a) => a.id)).size).toBe(ACHIEVEMENTS.length);
+    for (const a of ACHIEVEMENTS) {
+      expect(a.reward, a.id).toBeGreaterThan(0);
+      const [n, of] = a.progress(view());
+      expect(n < of, a.id).toBe(true); // nichts ist zu Spielbeginn schon erreicht
+    }
+  });
+
+  it('reparierte Autos zählen je Motorbauart, Diesel und Turbo', () => {
+    let c = emptyCareer();
+    const untouched = mk('bavaria_330', []);
+    expect(countRepair(c, untouched)).toBe(c); // ohne eigene Reparatur zählt nichts
+    for (const m of ['bavaria_320', 'bavaria_330', 'nordwind_s6', 'bavaria_550', 'bavaria_320d']) c = countRepair(c, { ...mk(m, []), partsSpent: 100 });
+    expect(c.layouts.sort()).toEqual(['R4', 'R6', 'V6', 'V8']);
+    expect(c.dieselFixed).toBe(1);
+    expect(c.turboFixed).toBe(2);
+    expect(newlyAchieved(view({ career: c }), []).map((a) => a.id)).toEqual(expect.arrayContaining(['six', 'vee', 'all_layouts']));
+  });
+
+  it('Sammlung: nur eigene Privatfahrzeuge; seltene Autos in Bestzustand bringen Ansehen und Sammlerzuschlag', () => {
+    const daily = detail(mk('bavaria_320', [], 1, { keep: true, testDriven: true }));
+    const jewel = detail(mk('bavaria_30cs', [], 2, { keep: true, testDriven: true }));
+    const broken = detail(mk('bavaria_30cs', ['head_gasket'], 3, { keep: true }));
+    const forSale = mk('veloce_gt', [], 4);
+    const entries = collection([daily, null, jewel, broken, forSale]);
+    expect(entries.map((e) => e.slot)).toEqual([0, 2, 3]);
+    expect(entries[1].prestige).toBeGreaterThan(entries[0].prestige * 10);
+    expect(entries[2].prestige).toBeLessThan(entries[1].prestige * 0.5);
+    expect(valuate(jewel).extras.some((e) => e.label.startsWith('Sammlerzustand'))).toBe(true);
+    expect(valuate(broken).extras.some((e) => e.label.startsWith('Sammlerzustand'))).toBe(false);
+    expect(valuate(daily).extras.some((e) => e.label.includes('Sammler'))).toBe(false);
+    expect(newlyAchieved(view({ cars: [daily, jewel, broken] }), []).map((a) => a.id).sort()).toEqual(['collection_3', 'collector_car']);
+    expect(newlyAchieved(view({ cars: [broken] }), [])).toEqual([]);
+  });
+
+  it('Prüfstandsprotokoll mit voller Leistung steigert den Wert, mit Minderleistung nicht', () => {
+    const car = detail(mk('bavaria_335_coupe', [], 5, { testDriven: true }));
+    const base = valuate(car).value;
+    const p = performance(car);
+    car.dyno = { ps: p.ps, nm: p.nm, ratedPs: p.ratedPs, day: 3 };
+    expect(valuate(car).value).toBeGreaterThan(base);
+    car.dyno.ps = Math.round(p.ratedPs * 0.8);
+    expect(valuate(car).value).toBe(base);
   });
 });

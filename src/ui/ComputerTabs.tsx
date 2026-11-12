@@ -85,12 +85,12 @@ export function UpgradesTab() {
         return (
           <div key={u.id} className="shop-row">
             <div>
-              <b>Stufe {u.stage}: {u.name}</b>
+              <b>{u.equipment ? 'Spezialgerät' : `Stufe ${u.stage}`}: {u.name}</b>
               <div className="meta">{u.desc}</div>
               {locked && <div className="meta bad">Voraussetzung: {UPGRADES.find((x) => x.id === u.requires)!.name}</div>}
             </div>
             <button className="btn primary" disabled={owned || locked || s.money < u.price} onClick={() => s.buyUpgrade(u.id)}>
-              {owned ? '✓ gebaut' : eur(u.price)}
+              {owned ? (u.equipment ? '✓ vorhanden' : '✓ gebaut') : eur(u.price)}
             </button>
           </div>
         );

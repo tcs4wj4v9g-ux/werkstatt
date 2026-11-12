@@ -4,7 +4,7 @@ import { DEFECTS, DEFECT_LIST, defectApplies, defectComponents } from './data/de
 import { costFactor, defectPenalty } from './fitment';
 import { SELLER_LIST, SELLER_NAMES, SELLERS, type SellerProfile } from './data/sellers';
 import { SYMPTOMS, type Channel } from './data/symptoms';
-import { createZones, detailFactor } from './detail';
+import { createZones, detailFactor, dirtLevel, rustLevel } from './detail';
 import { observe } from './diagnosis';
 import { createFluids, serviceState } from './fluids';
 import { activeDefects, isAssembled } from './repair';
@@ -142,7 +142,13 @@ export function starterListing(rng: Rng): Listing {
 
 /** Zufällige Schäden, die zu diesem Modell passen. */
 export function randomDefects(modelId: string, n: number, rng: Rng, exclude: DefectId[] = []): DefectId[] {
-  return applicableDefects(modelId).filter((d) => !exclude.includes(d)).sort(() => rng() - 0.5).slice(0, n);
+  // Gewichtete Auswahl: kapitale Schäden (Kopfdichtung, Getriebe) kommen deutlich seltener vor.
+  return applicableDefects(modelId)
+    .filter((d) => !exclude.includes(d))
+    .map((d) => ({ d, key: rng() ** (1 / (DEFECTS[d].weight ?? 1)) }))
+    .sort((a, b) => b.key - a.key)
+    .slice(0, n)
+    .map((x) => x.d);
 }
 
 export function randomListing(rng: Rng, index: number, cls: CarClass = 'budget', day = 1): Listing {
@@ -340,6 +346,13 @@ export function valuate(car: CarInstance, index = 1): Valuation {
   const extras: Valuation['extras'] = [];
   if (sv.oilChanged) extras.push({ label: 'Frischer Ölwechsel mit Filter', amount: 100 });
   for (const f of detailFactor(car)) extras.push({ label: f.label, amount: Math.round((cleanValue * f.pct * (f.pct > 0 ? condition : 1)) / 10) * 10 });
+  // Liebhaber zahlen für seltene Autos in Bestzustand einen Aufschlag – technisch einwandfrei und gepflegt.
+  if (car.rarity > 0 && clean) {
+    const kept = dirtLevel(car) < 0.2 && rustLevel(car) < 0.05;
+    extras.push({ label: kept ? `Sammlerzustand (${RARITY_NAMES[car.rarity]})` : `Liebhaberfahrzeug (${RARITY_NAMES[car.rarity]}), Pflege mäßig`, amount: round50(cleanValue * (car.rarity === 2 ? 0.12 : 0.06) * (kept ? 1 : 0.3)) });
+  }
+  // Ein aktuelles Prüfstandsprotokoll mit voller Leistung überzeugt Käufer.
+  if (car.dyno && clean && car.dyno.ps >= car.dyno.ratedPs * 0.97) extras.push({ label: `Leistungsprotokoll (${car.dyno.ps} PS gemessen)`, amount: round50(cleanValue * 0.015) });
   value = Math.max(400, value + extras.reduce((s, e) => s + e.amount, 0));
   const offer = round50(value * (clean ? 0.97 : 0.93));
   // Nachverhandeln klappt nur, wenn das Auto überzeugt.

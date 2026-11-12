@@ -38,6 +38,7 @@ const LOSSES: Record<string, [string, number]> = {
   lifters: ['Ventiltrieb verschlissen', 0.06],
   chain: ['Steuerzeiten ungenau (Kette)', 0.08],
   bearing: ['Lagerschaden', 0.15],
+  head_gasket: ['Kompressionsverlust (Kopfdichtung)', 0.28],
 };
 const BODY_AGILITY = { sedan: 1, wagon: 0.94, hatch: 1.08, coupe: 1.12, sport: 1.3, luxury: 0.88, classic: 0.96 };
 

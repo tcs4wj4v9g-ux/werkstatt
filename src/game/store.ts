@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { engineAudio, setMuted, sfx } from './audio';
 import { advanceAuction, createAuction, heldMoney, MAX_AUCTIONS, placeBid, seeded } from './auctions';
 import { COMPONENT_MAP, defsOf } from './data/components';
+import { ACHIEVEMENTS, countRepair, emptyCareer, newlyAchieved, type Career } from './career';
+import { performance } from './performance';
 import { basePartPrice, fitOf, migrateInventory, partKey } from './fitment';
 import { CAR_MODELS } from './data/cars';
 import { DEFECTS } from './data/defects';
@@ -24,7 +26,7 @@ export const START_MONEY = 6000;
 export const BAYS = LIFTS;
 /** Sekunden, bis der Motor im Stand warm ist. */
 export const WARM_AFTER = 9;
-export type Panel = 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
+export type Panel = 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
 
 interface Toast {
   id: number;
@@ -62,6 +64,14 @@ export interface GameState {
   carsSold: number;
   totalProfit: number;
   jobsDone: number;
+  /** Karrierezähler und bereits belohnte Erfolge. */
+  career: Career;
+  achieved: string[];
+  /** Gerade erreichter Erfolg (Einblendung). */
+  unlocked: { title: string; reward: number }[];
+  dismissUnlocked(): void;
+  /** Auto auf den Leistungsprüfstand stellen und messen. */
+  runDyno(slot: number): void;
   jobEarnings: number;
   sound: boolean;
   started: boolean;
@@ -227,7 +237,7 @@ const describe = (o: Observation, quiet: string) =>
 export const useGame = create<GameState>()(
   persist(
     (set, get) => {
-      const tools = () => ({ active: get().tool, carried: get().carried });
+      const tools = () => ({ active: get().tool, carried: get().carried, equipment: get().upgrades as string[] });
 
       /** Führt eine Aktion auf einer Kopie des Autos aus und übernimmt das Ergebnis. */
       const act = (bay: number, fn: (car: CarInstance, inv: Inventory) => ActionResult, sound: keyof typeof sfx = 'click') => {
@@ -253,7 +263,9 @@ export const useGame = create<GameState>()(
               events = [...events, extraWorkEvent(car.uid, car.job.customer, d, DEFECTS[d].name, s.day)];
             }
           }
-          set({ cars, inventory, liftUp: liftUp.slice(0, LIFTS), events });
+          // Kapitaler Schaden behoben? (Kopfdichtung oder Getriebe gegen ein Neuteil getauscht)
+          const severe = ['head_gasket', 'gearbox'].filter((id) => current.components[id]?.condition === 'defect' && car.components[id]?.condition === 'ok').length;
+          set({ cars, inventory, liftUp: liftUp.slice(0, LIFTS), events, ...(severe ? { career: { ...s.career, severeFixed: s.career.severeFixed + severe } } : {}) });
         } else if (!r.needsPart) sfx.error();
         if (r.message) get().say(r.message, !r.ok);
         return r;
@@ -310,6 +322,26 @@ export const useGame = create<GameState>()(
         carsSold: 0,
         totalProfit: 0,
         jobsDone: 0,
+        career: emptyCareer(),
+        achieved: [],
+        unlocked: [],
+        dismissUnlocked: () => set({ unlocked: [] }),
+        runDyno: (slot) => {
+          const s = get();
+          const car = s.cars[slot];
+          if (!car) return;
+          if (!s.upgrades.includes('dyno')) return s.say('Dafür brauchst du den Leistungsprüfstand (Werkstatt-Computer → Ausbau).', true);
+          const blocker = repair.driveBlocker(car);
+          if (blocker) return s.say(`Prüfstand: ${blocker}`, true);
+          if (s.engineBay !== null) stopEngine();
+          const p = performance(car);
+          const cars = [...s.cars];
+          cars[slot] = { ...car, dyno: { ps: p.ps, nm: p.nm, ratedPs: p.ratedPs, day: s.day } };
+          set({ cars, career: { ...s.career, dynoRuns: s.career.dynoRuns + 1 }, panel: 'dyno', panelBay: slot });
+          // Volllast auf der Rolle ist wie eine Probefahrt: man hört und sieht, was der Motor macht.
+          engineAudio.demo(soundProfile(car), true);
+          perceive(slot, ['idle', 'sound', 'dash', 'rev', 'drive'], true, 'Messung abgeschlossen – beim Lauf auf der Rolle fällt dir nichts weiter auf.');
+        },
         jobEarnings: 0,
         sound: true,
         started: false,
@@ -351,6 +383,9 @@ export const useGame = create<GameState>()(
             carsSold: 0,
             totalProfit: 0,
             jobsDone: 0,
+            career: emptyCareer(),
+            achieved: [],
+            unlocked: [],
             jobEarnings: 0,
             started: true,
             screen: 'garage',
@@ -503,6 +538,7 @@ export const useGame = create<GameState>()(
             money: s.money + paid,
             cars,
             jobsDone: s.jobsDone + (bill.done ? 1 : 0),
+            career: bill.done ? countRepair(s.career, car) : s.career,
             jobEarnings: s.jobEarnings + profit,
             jobs: fillJobs(s.jobs, Math.random),
             lastSale: {
@@ -709,7 +745,15 @@ export const useGame = create<GameState>()(
           const liftUp = [...s.liftUp];
           if (bay < LIFTS) liftUp[bay] = false;
           sfx.cash();
+          const c0 = countRepair(s.career, car);
           set({
+            career: {
+              ...c0,
+              bestSale: Math.max(c0.bestSale, price),
+              bestProfit: Math.max(c0.bestProfit, profit),
+              barnSold: c0.barnSold + (car.origin === 'barn' ? 1 : 0),
+              cleanSales: c0.cleanSales + (v.deductions.length === 0 ? 1 : 0),
+            },
             money: s.money + price,
             cars,
             liftUp,
@@ -808,12 +852,14 @@ export const useGame = create<GameState>()(
           const auctions = clone(s.auctions).map((a) => advanceAuction(a, now));
           let { money } = s;
           const cars = [...s.cars];
+          let won = 0;
           const waiting = [...s.waiting];
           let note = '';
           for (const a of auctions) {
             if (!a.result || a.settled) continue;
             a.settled = true; // Abwicklung genau einmal – auch über Neustarts hinweg
             if (a.result === 'won') {
+              won++;
               money -= a.current;
               const car: CarInstance = { ...a.car, purchasePrice: a.current, lifted: false, hoodOpen: false };
               const slot = freeSlot({ cars, upgrades: s.upgrades }, 'park');
@@ -825,7 +871,7 @@ export const useGame = create<GameState>()(
               note = `Auktion verloren: ${a.title} ging für ${a.current.toLocaleString('de-DE')} € an ${a.leader}.`;
             }
           }
-          set({ auctions, money, cars, waiting });
+          set({ auctions, money, cars, waiting, ...(won ? { career: { ...s.career, auctionsWon: s.career.auctionsWon + won } } : {}) });
           if (note) get().say(note, note.startsWith('Auktion verloren'));
         },
         claimWaiting: () => {
@@ -939,6 +985,9 @@ export const useGame = create<GameState>()(
           .map((l: Listing) => ({ ...l, usedArgs: l.usedArgs ?? [], gone: !!l.gone, car: normalizeCar(l.car)! }));
         merged.jobs = (p.jobs ?? []).filter((j: JobOffer) => j?.car?.job).map((j: JobOffer) => ({ ...j, car: normalizeCar(j.car)! }));
         merged.sound = p.sound ?? true;
+        merged.career = { ...emptyCareer(), ...(p.career ?? {}) };
+        merged.achieved = Array.isArray(p.achieved) ? p.achieved : [];
+        merged.unlocked = [];
         if (merged.started) {
           // Füllt auch einen alten, kleinen Markt auf die neue Größe auf; vorhandene Inserate bleiben.
           merged.listings = fillListings(merged.listings, merged.money, Math.random, merged.marketIndex, false, merged.day);
@@ -970,6 +1019,8 @@ export const useGame = create<GameState>()(
         carsSold: s.carsSold,
         totalProfit: s.totalProfit,
         jobsDone: s.jobsDone,
+        career: s.career,
+        achieved: s.achieved,
         jobEarnings: s.jobEarnings,
         sound: s.sound,
         started: s.started,
@@ -977,3 +1028,17 @@ export const useGame = create<GameState>()(
     },
   ),
 );
+
+// Erfolge: nach jeder Änderung prüfen, ob etwas neu erreicht ist – Belohnung gibt es genau einmal.
+useGame.subscribe((s) => {
+  if (!s.started) return;
+  const fresh = newlyAchieved(s, s.achieved);
+  if (!fresh.length) return;
+  sfx.cash();
+  useGame.setState({
+    achieved: [...s.achieved, ...fresh.map((a) => a.id)],
+    money: s.money + fresh.reduce((sum, a) => sum + a.reward, 0),
+    unlocked: [...s.unlocked, ...fresh.map((a) => ({ title: a.title, reward: a.reward }))],
+  });
+});
+export { ACHIEVEMENTS };

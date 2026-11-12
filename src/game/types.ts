@@ -51,7 +51,9 @@ export type PartId =
   | 'turbo'
   | 'charge_pipe'
   | 'egr'
-  | 'dpf';
+  | 'dpf'
+  | 'head_gasket'
+  | 'gearbox';
 
 export type DefectId =
   | 'coil'
@@ -76,7 +78,9 @@ export type DefectId =
   | 'turbo'
   | 'boost_leak'
   | 'egr'
-  | 'dpf';
+  | 'dpf'
+  | 'head_gasket'
+  | 'gearbox';
 
 export type Access = 'hood' | 'lifted';
 export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic';
@@ -114,6 +118,8 @@ export interface ComponentDef {
   hidden?: boolean;
   /** Beim Prüfen dieses Bauteils wird (zusätzlich) der Zustand anderer sichtbar. */
   inspectReveals?: string[];
+  /** Spezialgerät, ohne das dieses Bauteil weder aus- noch eingebaut werden kann (z. B. Motor- und Getriebeheber). */
+  equipment?: string;
 }
 
 /** Schraubenzustand: 0 = entfernt, 1 = gelöst/angesetzt, 2 = fest. */
@@ -150,6 +156,8 @@ export interface CarInstance {
   obdCodes: string[] | null;
   /** Symptome, die der Spieler an diesem Auto bisher wahrgenommen hat. */
   observed: string[];
+  /** Letzte Messung auf dem Leistungsprüfstand. */
+  dyno?: { ps: number; nm: number; ratedPs: number; day: number };
   /** Kundenauftrag, falls das Auto einem Kunden gehört. */
   job?: JobInfo;
   /** Betriebsflüssigkeiten – tatsächlicher Zustand. */
@@ -253,6 +261,8 @@ export type Inventory = Record<string, number>;
 export interface Toolset {
   active: ToolId;
   carried: ToolId[];
+  /** Vorhandene Spezialgeräte der Werkstatt. */
+  equipment?: string[];
 }
 
 export interface ActionResult {

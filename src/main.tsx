@@ -25,3 +25,5 @@ import { player } from './three/player';
 (window as any).__gkPlayer = player;
 import { engineAudio } from './game/audio';
 (window as any).__gkAudio = engineAudio;
+import { createCar } from './game/market';
+(window as any).__gkLib = { createCar };

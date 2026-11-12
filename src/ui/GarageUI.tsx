@@ -4,6 +4,7 @@ import { CAR_MODELS } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { fitOf, splitKey } from '../game/fitment';
 import { MarketTab } from './MarketTab';
+import { AchievementsTab, CollectionTab, DynoModal, UnlockedModal } from './CareerTabs';
 import { DEFECTS } from '../game/data/defects';
 import { PARTS } from '../game/data/parts';
 import { availableSlots, SLOTS } from '../game/data/workshop';
@@ -76,6 +77,9 @@ export function GarageUI() {
               <button className="btn" data-testid="move" onClick={() => s.setPanel('move', nearBay)}>🅿 Umparken</button>
               {!near.lifted && kind !== 'wash' && kind !== 'paint' && (
                 <button className="btn" data-testid="drive" onClick={() => s.startDrive(nearBay)}>🏁 Probefahrt</button>
+              )}
+              {s.upgrades.includes('dyno') && !near.lifted && kind === 'lift' && (
+                <button className="btn" data-testid="dyno" onClick={() => s.runDyno(nearBay)}>📈 Prüfstand</button>
               )}
               <button className={`btn ${running ? 'active' : ''}`} data-testid="engine" onClick={() => s.toggleEngine(nearBay)}>
                 {running ? '⏹ Motor aus' : '🔑 Motor starten'}
@@ -191,6 +195,8 @@ export function GarageUI() {
         </Modal>
       )}
       {s.panel === 'bench' && <BenchModal />}
+      {s.panel === 'dyno' && <DynoModal />}
+      {!s.panel && !s.lastSale && <UnlockedModal />}
       {s.panel === 'drive' && <DriveModal />}
       {s.panel === 'obd' && <ObdModal />}
       {s.panel === 'file' && <FileModal />}
@@ -337,7 +343,7 @@ function ObdModal() {
 
 function ComputerModal() {
   const s = useGame();
-  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'jobs' | 'parts' | 'build' | 'news'>('market');
+  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'news'>('market');
   const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
@@ -347,9 +353,11 @@ function ComputerModal() {
           ['market', 'Gebrauchtwagen'],
           ['auctions', 'Auktionen'],
           ['mine', 'Meine Autos'],
+          ['collection', 'Sammlung'],
           ['jobs', 'Aufträge'],
           ['parts', 'Teile'],
           ['build', 'Ausbau'],
+          ['career', `Erfolge (${s.achieved.length})`],
           ['news', news ? `Neuigkeiten (${news})` : 'Neuigkeiten'],
         ] as const).map(([id, label]) => (
           <button key={id} className={`btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
@@ -367,6 +375,8 @@ function ComputerModal() {
       )}
 
       {tab === 'auctions' && <AuctionsTab />}
+      {tab === 'collection' && <CollectionTab />}
+      {tab === 'career' && <AchievementsTab />}
       {tab === 'jobs' && <JobsTab />}
       {tab === 'parts' && <ShopList />}
       {tab === 'build' && <UpgradesTab />}

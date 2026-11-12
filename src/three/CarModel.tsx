@@ -79,7 +79,7 @@ const ghostTap = (car: CarInstance, id: string, fn: () => void) => (e: ThreeEven
 };
 
 /** Platzhalter schweben etwas neben der Einbauposition, damit das Teil darunter erreichbar bleibt. */
-const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, valve_cover_b: 0.14, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14, engine_cover: 0.36, charge_pipe: 0.12 };
+const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, valve_cover_b: 0.14, cyl_head: 0.1, gearbox: -0.12, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14, engine_cover: 0.36, charge_pipe: 0.12 };
 
 type Axis = 'y' | 'y-' | 'z+' | 'z-' | 'x+';
 const AXIS_ROT: Record<Axis, V3> = {
@@ -143,7 +143,7 @@ function Connector({ pos, off, connected, label, onTap }: { pos: V3; off: V3; co
 
 const COVER_BOLTS: V3[] = [1.0, 1.3, 1.6].flatMap((x) => [-0.15, 0.15].map((z) => [x, 0.78, z] as V3));
 /** Ventildeckelschrauben einer Bank beim V-Motor (vier je Deckel). */
-const bankBolts = (bank: number): V3[] => [0.975, 1.635].flatMap((x) => [0.04, 0.17].map((z) => [x, 0.78, bank * z] as V3));
+const bankBolts = (bank: number, cylinders: number): V3[] => [[0.975, 0.18], [1.635, 0.18], [0.985, 0.03], [cylinders === 8 ? 1.35 : 1.25, 0.03]].map(([x, z]) => [x, 0.78, bank * z] as V3);
 const WX = 1.38; // Radmitte vorn/hinten (±)
 const WZ = 0.8;
 const WY = 0.33;
@@ -742,10 +742,17 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
-            <mesh position={[1.3, 0.565, 0]}>
-              <boxGeometry args={[0.7, 0.23, 0.36 + wide * 2]} />
+            {/* Motorblock; der Zylinderkopf darüber ist ein eigenes, ausbaubares Teil (beim V-Motor der Kopf der Bank 1) */}
+            <mesh position={[1.3, 0.535, 0]}>
+              <boxGeometry args={[0.7, 0.17, 0.36 + wide * 2]} />
               <meshStandardMaterial color={diesel ? '#5d6166' : '#70767d'} metalness={0.6} roughness={0.55} />
             </mesh>
+            {vee && (
+              <mesh position={[1.3, 0.65, 0.115]}>
+                <boxGeometry args={[0.7, 0.06, 0.23]} />
+                <meshStandardMaterial color="#8a9097" metalness={0.65} roughness={0.5} />
+              </mesh>
+            )}
             {vee && (
               <mesh position={[1.3, 0.72, 0]}>
                 <boxGeometry args={[0.66, 0.05, 0.036]} />
@@ -871,6 +878,36 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               </mesh>
             </group>,
           )}
+          {part(
+            'head_gasket',
+            <mesh position={[1.3, 0.624, vee ? -0.115 : 0]}>
+              <boxGeometry args={[0.68, 0.008, vee ? 0.21 : 0.34]} />
+              <Mat color={st('head_gasket')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
+            </mesh>,
+          )}
+          {part(
+            'cyl_head',
+            <mesh position={[1.3, 0.65, vee ? -0.115 : 0]}>
+              <boxGeometry args={[0.7, 0.06, vee ? 0.23 : 0.36]} />
+              <Mat color="#8a9097" metal={0.65} rough={0.5} />
+            </mesh>,
+          )}
+          {!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => [-0.07, 0.07].map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}
+          {/* Getriebe hinter dem Motor – nur von unten und nur mit dem Getriebeheber */}
+          {part(
+            'gearbox',
+            <>
+              <mesh position={[0.9, 0.215, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.12, 0.15, 0.12, 14]} />
+                <Mat color="#8d9399" metal={0.75} rough={0.5} />
+              </mesh>
+              <mesh position={[0.68, 0.2, 0]}>
+                <boxGeometry args={[0.34, 0.15, 0.2]} />
+                <Mat color={st('gearbox')?.condition === 'defect' && st('gearbox')?.known ? '#6e5a4a' : '#9aa0a7'} metal={0.75} rough={0.5} />
+              </mesh>
+            </>,
+          )}
+          {bolts('gearbox', [[0.58, 0.122, -0.07], [0.78, 0.122, -0.07], [0.58, 0.122, 0.07], [0.78, 0.122, 0.07]], 'y-')}
           {/* Zylinderkopf: Reihenmotor ein Ventildeckel, V-Motor je Bank einer */}
           {(vee ? ([['valve_cover', 'gasket', -1], ['valve_cover_b', 'gasket_b', 1]] as const) : ([['valve_cover', 'gasket', 0]] as const)).map(([cover, gasket, bank]) => (
             <group key={cover}>
@@ -888,7 +925,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                   <Mat color={diesel ? '#23252a' : '#2b2e33'} metal={0.5} rough={0.5} />
                 </mesh>,
               )}
-              {bolts(cover, bank ? bankBolts(bank) : COVER_BOLTS)}
+              {bolts(cover, bank ? bankBolts(bank, engine.cylinders) : COVER_BOLTS)}
             </group>
           ))}
           {/* Ventiltrieb unter dem Ventildeckel (beim V-Motor unter dem der Bank 1) */}
@@ -950,9 +987,11 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             const top = diesel ? `inj${n}` : `coil${n}`;
             const low = diesel ? `glow${n}` : `plug${n}`;
             const lowBad = st(low)?.condition === 'defect';
-            // Reihenmotor: Schraube auf der einen, Stecker auf der anderen Seite. V-Motor: Schraube zwischen den Zylindern, Stecker außen.
-            const boltPos: V3 = bank ? [x + 0.075, 0.78, z] : [x, 0.78, -0.085];
+            // Reihenmotor: Schraube auf der einen, Stecker auf der anderen Seite. V-Motor: Schraube innen zum V hin, Stecker außen.
+            const boltPos: V3 = bank ? [x + 0.05, 0.78, z - bank * 0.06] : [x, 0.78, -0.085];
             const out = bank || 1;
+            // Ohne Zylinderkopf gibt es an dieser Bank nichts einzusetzen.
+            if (bank <= 0 && !installed('cyl_head')) return null;
             return (
               <group key={n}>
                 {!installed(top) &&
@@ -1014,36 +1053,36 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'charge_pipe',
               <>
-                <mesh position={[1.88, 0.66, 0.1]} rotation={[Math.PI / 2, 0, 0]}>
-                  <cylinderGeometry args={[0.034, 0.034, 0.62, 12]} />
+                <mesh position={[1.56, 0.7, 0.52]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.032, 0.032, 0.3, 12]} />
                   <Mat color="#9aa0a7" metal={0.85} rough={0.3} />
                 </mesh>
-                <mesh position={[1.88, 0.66, 0.36]} rotation={[Math.PI / 2, 0, 0]}>
-                  <cylinderGeometry args={[0.04, 0.04, 0.09, 12]} />
+                <mesh position={[1.69, 0.7, 0.52]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.039, 0.039, 0.075, 12]} />
                   <Mat color={st('charge_pipe')?.condition === 'defect' ? '#3a2a18' : '#151517'} rough={0.9} />
                 </mesh>
               </>,
             )}
-          {st('charge_pipe') && bolts('charge_pipe', [[1.88, 0.705, 0.3]])}
+          {st('charge_pipe') && bolts('charge_pipe', [[1.69, 0.745, 0.52]])}
           {st('turbo') &&
             part(
               'turbo',
               <>
-                <mesh position={[1.82, 0.56, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[1.8, 0.6, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.085, 0.085, 0.07, 18]} />
                   <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
                 </mesh>
-                <mesh position={[1.75, 0.56, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[1.73, 0.6, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.07, 0.07, 0.07, 18]} />
                   <Mat color="#5a4a3c" metal={0.7} rough={0.6} />
                 </mesh>
-                <mesh position={[1.86, 0.56, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[1.85, 0.6, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.035, 0.035, 0.04, 14]} />
                   <Mat color="#1b1d21" rough={0.5} />
                 </mesh>
               </>,
             )}
-          {st('turbo') && bolts('turbo', [[1.75, 0.64, 0.46], [1.82, 0.655, 0.42], [1.82, 0.655, 0.5]])}
+          {st('turbo') && bolts('turbo', [[1.73, 0.675, 0.46], [1.8, 0.69, 0.42], [1.8, 0.69, 0.5]])}
           {/* Diesel: Abgasrückführung am Kopf, Partikelfilter unter dem Wagenboden */}
           {st('egr') &&
             part(

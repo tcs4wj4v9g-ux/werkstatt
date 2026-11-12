@@ -12,7 +12,9 @@ export interface DefectDef {
   symptoms: string[];
   /** Arbeitslohn, den ein Kunde für die Behebung zahlt. */
   labor: number;
-  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung';
+  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung' | 'Antrieb';
+  /** Wie oft der Schaden zufällig vorkommt (1 = normal). Kapitale Schäden sind selten. */
+  weight?: number;
   /** Kontrollleuchte während der Probefahrt. */
   lamp?: string;
 }
@@ -95,6 +97,14 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
   dpf: {
     id: 'dpf', name: 'Zugesetzter Partikelfilter', components: ['dpf'], pick: 'all',
     penalty: 1600, symptoms: ['limp_mode', 'dpf_lamp'], labor: 220, category: 'Motor', lamp: '🟠 DPF',
+  },
+  head_gasket: {
+    id: 'head_gasket', name: 'Durchgebrannte Zylinderkopfdichtung', components: ['head_gasket'], pick: 'all',
+    penalty: 2600, symptoms: ['white_smoke', 'oil_milky', 'temp_high'], labor: 650, category: 'Motor', lamp: '🌡️ heiß', weight: 0.3,
+  },
+  gearbox: {
+    id: 'gearbox', name: 'Getriebeschaden', components: ['gearbox'], pick: 'all',
+    penalty: 3200, symptoms: ['gear_grind', 'gear_whine'], labor: 520, category: 'Antrieb', weight: 0.3,
   },
   battery: {
     id: 'battery', name: 'Defekte Batterie', components: ['battery'], pick: 'all',

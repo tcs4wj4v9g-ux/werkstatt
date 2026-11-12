@@ -33,6 +33,8 @@ export const PARTS: Record<PartId, PartDef> = {
   turbo: { id: 'turbo', name: 'Turbolader', price: 780, units: 1, desc: 'generalüberholt, mit Dichtsatz' },
   charge_pipe: { id: 'charge_pipe', name: 'Ladeluftrohr', price: 85, units: 1, desc: 'Rohr mit Muffen und Schelle' },
   egr: { id: 'egr', name: 'AGR-Ventil', price: 210, units: 1, desc: 'Abgasrückführventil mit Stellmotor' },
+  head_gasket: { id: 'head_gasket', name: 'Zylinderkopfdichtung', price: 240, units: 1, desc: 'Dichtsatz mit neuen Kopfschrauben' },
+  gearbox: { id: 'gearbox', name: 'Austauschgetriebe', price: 1900, units: 1, desc: 'generalüberholt – nur mit Getriebeheber einzubauen' },
   dpf: { id: 'dpf', name: 'Partikelfilter', price: 950, units: 1, desc: 'Dieselpartikelfilter' },
 };
 

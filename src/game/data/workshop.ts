@@ -14,7 +14,7 @@ export interface SlotDef {
   needs?: UpgradeId;
 }
 
-export type UpgradeId = 'parking' | 'wash' | 'paint' | 'expansion';
+export type UpgradeId = 'parking' | 'wash' | 'paint' | 'expansion' | 'hoist' | 'dyno';
 
 const R = Math.PI / 2;
 export const SLOTS: SlotDef[] = [
@@ -39,12 +39,16 @@ export interface UpgradeDef {
   price: number;
   desc: string;
   requires?: UpgradeId;
+  /** Spezialgerät statt Ausbaustufe. */
+  equipment?: boolean;
 }
 
 export const UPGRADES: UpgradeDef[] = [
   { id: 'parking', stage: 2, name: 'Erweiterter Außenbereich', price: 2500, desc: 'Drei zusätzliche Stellplätze im Hof und Flutlicht – Platz für Projekt- und Privatfahrzeuge.' },
   { id: 'wash', stage: 3, name: 'Fahrzeugaufbereitung', price: 4000, desc: 'Waschplatz mit Hochdruckreiniger, Schaumlanze, Poliermaschine und Innenraumreinigung.' },
   { id: 'paint', stage: 4, name: 'Lackierkabine', price: 9000, desc: 'Rost abschleifen, grundieren und Bereich für Bereich neu lackieren – in neun Farben.', requires: 'wash' },
+  { id: 'hoist', stage: 0, equipment: true, name: 'Motor- und Getriebeheber', price: 6500, desc: 'Hydraulischer Heber für schwere Aggregate. Ohne ihn lässt sich kein Getriebe aus- oder einbauen – damit werden kapitale Schäden reparierbar.' },
+  { id: 'dyno', stage: 0, equipment: true, name: 'Leistungsprüfstand', price: 28000, desc: 'Rollenprüfstand: misst Leistung und Drehmoment im aktuellen Zustand, zeigt die Kurve und Abweichungen vom Werkswert. Ein Messprotokoll steigert den Verkaufswert.', requires: 'expansion' },
   { id: 'expansion', stage: 5, name: 'Größere Werkstatt', price: 15000, desc: 'Lageranbau mit Großhandelskonditionen (Teile und Flüssigkeiten 10 % günstiger) und zwei weitere Stellplätze.', requires: 'parking' },
 ];
 
