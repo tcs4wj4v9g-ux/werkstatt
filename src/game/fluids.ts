@@ -8,6 +8,8 @@ import type { ActionResult, CarInstance, FluidId, FluidProduct, Fluids, FluidSto
 const fail = (message: string): ActionResult => ({ ok: false, message });
 const done = (message: string): ActionResult => ({ ok: true, message });
 const r1 = (n: number) => Math.round(n * 10) / 10;
+/** Liter in deutscher Schreibweise, z. B. „3,6“. */
+const lit = (n: number) => r1(n).toLocaleString('de-DE');
 
 export const capacity = (car: CarInstance, id: FluidId) =>
   id === 'oil' ? CAR_MODELS[car.modelId].oilCapacity : id === 'coolant' ? CAR_MODELS[car.modelId].coolantCapacity : BRAKE_CAPACITY;
@@ -53,7 +55,7 @@ export function checkFluid(car: CarInstance, id: FluidId, day: number): ActionRe
         : id === 'brake' && car.fluids.brake.air
           ? ' Luft im System – Bremse entlüften.'
           : '';
-  return done(`${FLUID_NAMES[id]}: ${r1(f.level)} von ${cap} l (${state}), Zustand ${quality(f.quality)}.${extra}`);
+  return done(`${FLUID_NAMES[id]}: ${lit(f.level)} von ${lit(cap)} l (${state}), Zustand ${quality(f.quality)}.${extra}`);
 }
 
 /** Nachfüllen aus dem Lager. */
@@ -86,7 +88,7 @@ export function addFluid(car: CarInstance, stock: FluidStock, id: FluidId, produ
   car.checked[id] = undefined;
   car.testDriven = false;
   const over = f.level > cap * 1.03 ? ' Achtung: überfüllt!' : '';
-  return done(`${r1(amount)} l ${FLUID_PRODUCTS[product].name} eingefüllt.${over} Stand kontrollieren.`);
+  return done(`${lit(amount)} l ${FLUID_PRODUCTS[product].name} eingefüllt.${over} Stand kontrollieren.`);
 }
 
 /** Kühlsystem entlüften: Motor muss laufen, Behälter voll. */
