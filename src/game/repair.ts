@@ -259,9 +259,10 @@ export function driveBlocker(car: CarInstance): string | null {
 
 /** Der Motor läuft nur, wenn am Motor nichts demontiert ist (Räder dürfen ab sein). */
 export function engineBlocker(car: CarInstance): string | null {
+  // Eine tote Batterie bemerkt man vor allem anderen: Es klackt nur das Relais.
+  if (car.components.battery.condition === 'defect' && car.components.battery.installed) return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
   const open = COMPONENTS.find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug') && !isComplete(car, c.id));
   if (open) return `Der Motor startet so nicht – erst fertig montieren: ${open.name}.`;
-  if (car.components.battery.condition === 'defect') return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
   if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
   return null;
 }
