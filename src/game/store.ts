@@ -1098,7 +1098,7 @@ export const useGame = create<GameState>()(
 );
 
 // Erfolge: nach jeder Änderung prüfen, ob etwas neu erreicht ist – Belohnung gibt es genau einmal.
-useGame.subscribe((s) => {
+function checkAchievements(s: GameState) {
   if (!s.started) return;
   const fresh = newlyAchieved(s, s.achieved);
   if (!fresh.length) return;
@@ -1108,5 +1108,9 @@ useGame.subscribe((s) => {
     money: s.money + fresh.reduce((sum, a) => sum + a.reward, 0),
     unlocked: [...s.unlocked, ...fresh.map((a) => ({ title: a.title, reward: a.reward }))],
   });
-});
+}
+useGame.subscribe(checkAchievements);
+// Ältere Spielstände: was dort schon erreicht ist, wird direkt nach dem Laden einmalig nachgetragen.
+useGame.persist?.onFinishHydration?.((s) => checkAchievements(s));
+if (useGame.persist?.hasHydrated?.()) checkAchievements(useGame.getState());
 export { ACHIEVEMENTS };

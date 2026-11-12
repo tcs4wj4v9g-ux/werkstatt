@@ -82,6 +82,29 @@ export function Annex() {
 
   return (
     <group>
+      {upgrades.includes('hoist') && (
+        <group position={[5.75, 0, 4.95]} rotation={[0, -0.5, 0]}>
+          {/* Motor- und Getriebeheber: Fahrgestell, Mast, Ausleger mit Kette und Haken */}
+          {[-0.3, 0.3].map((z) => (
+            <Box key={z} p={[-0.2, 0.07, z]} s={[1.0, 0.08, 0.08]} c="#b3261e" m={0.5} r={0.5} />
+          ))}
+          <Box p={[0.3, 0.07, 0]} s={[0.1, 0.08, 0.7]} c="#b3261e" m={0.5} r={0.5} />
+          <Box p={[0.3, 0.85, 0]} s={[0.1, 1.6, 0.1]} c="#b3261e" m={0.5} r={0.5} />
+          <mesh position={[-0.1, 1.72, 0]} rotation={[0, 0, 0.18]}>
+            <boxGeometry args={[0.95, 0.08, 0.08]} />
+            <meshStandardMaterial color="#b3261e" metalness={0.5} roughness={0.5} />
+          </mesh>
+          <mesh position={[0.05, 1.2, 0]} rotation={[0, 0, -0.5]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.8, 10]} />
+            <meshStandardMaterial color="#c9ccd1" metalness={0.9} roughness={0.25} />
+          </mesh>
+          <Box p={[-0.52, 1.42, 0]} s={[0.015, 0.4, 0.015]} c="#8d9399" m={0.9} r={0.3} />
+          <mesh position={[-0.52, 1.2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.045, 0.012, 6, 12, Math.PI * 1.4]} />
+            <meshStandardMaterial color="#2a2c30" metalness={0.8} roughness={0.4} />
+          </mesh>
+        </group>
+      )}
       {pro && (
         <group>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[CX, 0, cz2]} receiveShadow>

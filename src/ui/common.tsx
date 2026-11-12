@@ -74,6 +74,11 @@ export function HelpModal() {
         <li><b>Hof:</b> Durch die offenen Tore geht es hinaus. 🅿 Umparken stellt ein Auto auf einen anderen Platz. Waschplatz, Lackierkabine und weitere Stellplätze kaufst du am Computer unter „Ausbau“.</li>
         <li><b>Waschen & Lack:</b> Am Waschplatz Gerät wählen und Karosseriebereiche antippen: vorspülen, einschäumen, abspülen, trocknen – dann polieren. Innenraum über das Dach. In der Kabine erst Rost schleifen, dann lackieren.</li>
         <li><b>Auktionen, Scheunenfunde, Neuigkeiten:</b> am Computer. Auktionen laufen in Echtzeit, auch wenn das Spiel zu ist.</li>
+        <li><b>Motoren:</b> Jedes Auto hat seinen eigenen Motor – Reihen- oder V-Motor, vier bis acht Zylinder, Benziner oder Diesel, mit oder ohne Turbo. Ein Sechszylinder hat sechs Zündspulen, ein Diesel Einspritzdüsen und Glühkerzen. Die Daten stehen in der 📋 Akte.</li>
+        <li><b>Ersatzteile:</b> Teile passen nur zur Motorfamilie und Fahrzeugklasse. Im Teileshop zuerst das Auto wählen. Teile für teure Autos kosten mehr.</li>
+        <li><b>Markt:</b> 25 Inserate, die mehrere Tage stehen bleiben. Am Computer filtern und sortieren; beim Händler mit ◀ ▶ blättern.</li>
+        <li><b>Karriere:</b> Erfolge bringen einmalige Prämien. Privatfahrzeuge bilden deine Sammlung. Wettbewerbe und Fahrzeugtreffen findest du am Computer unter „Wettbewerbe“.</li>
+        <li><b>Spezialgeräte & Standorte:</b> Motor- und Getriebeheber, Leistungsprüfstand (📈 am Auto), Halle 2 mit weiteren Hebebühnen und der Showroom – alles unter „Ausbau“. In die neuen Hallen führt ein Durchgang in der Seitenwand.</li>
         <li><b>Ton:</b> 🔊 oben schaltet alle Geräusche ein oder aus.</li>
       </ol>
       <button className="btn primary big" onClick={() => setPanel(null)}>Los geht's</button>

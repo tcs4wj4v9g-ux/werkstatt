@@ -14,11 +14,12 @@ export const PASSAGE = { minX: -2.9, maxX: 1.4, height: 2.5 };
 export const hall2 = (center: boolean) => ({ minX: ROOM.minX, maxX: ROOM.maxX, minZ: center ? -16.4 : -11.0, maxZ: ROOM.minZ });
 export const SHOWROOM = { minX: ROOM.minX, maxX: ROOM.maxX, minZ: ROOM.maxZ, maxZ: 14.6 };
 /** Welche Gebäudeteile es gibt – wird aus den gekauften Standorten gesetzt. */
-export const site = { pro: false, center: false, hq: false };
+export const site = { pro: false, center: false, hq: false, hoist: false };
 export function setSite(upgrades: string[]) {
   site.pro = upgrades.includes('loc_pro');
   site.center = upgrades.includes('loc_center');
   site.hq = upgrades.includes('loc_hq');
+  site.hoist = upgrades.includes('hoist');
 }
 export const BAY_Z = [-2.7, 2.7];
 export const LIFT_HEIGHT = 1.7;
@@ -96,6 +97,7 @@ function siteBoxes(): Box[] {
   if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1));
   if (site.center) out.push(box(5.8, -13.6, 0.6, 0.8));
   if (site.hq) out.push(box(5.6, 6.6, 1.0, 1.6));
+  if (site.hoist) out.push(box(5.75, 4.95, 1.1, 0.9));
   return out;
 }
 
