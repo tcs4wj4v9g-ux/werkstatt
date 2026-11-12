@@ -14,7 +14,18 @@ export type ToolId =
   | 'socket10'
   | 'socket13'
   | 'socket16'
-  | 'socket17';
+  | 'socket17'
+  // Geräte am Waschplatz und in der Lackierkabine (werden nicht getragen)
+  | 'washer'
+  | 'foam'
+  | 'brush'
+  | 'towel'
+  | 'polisher'
+  | 'vacuum'
+  | 'upholstery'
+  | 'cockpit'
+  | 'sander'
+  | 'spraygun';
 
 export type PartId =
   | 'ignition_coil'
@@ -31,7 +42,10 @@ export type PartId =
   | 'coolant_hose'
   | 'rod_bearing'
   | 'lifters'
-  | 'chain_tensioner';
+  | 'chain_tensioner'
+  | 'oil_filter'
+  | 'battery'
+  | 'tire';
 
 export type DefectId =
   | 'coil'
@@ -48,7 +62,9 @@ export type DefectId =
   | 'coolant_hose'
   | 'bearing'
   | 'lifters'
-  | 'chain';
+  | 'chain'
+  | 'battery'
+  | 'tires';
 
 export type Access = 'hood' | 'lifted';
 export type BodyStyle = 'sedan' | 'wagon';
@@ -79,6 +95,8 @@ export interface ComponentDef {
   defectText: string;
   /** Elektrischer Stecker, der vor dem Ausbau gelöst und danach wieder verbunden werden muss. */
   connector?: boolean;
+  /** Verschleißteil: einmal ausgebaut, kommt immer ein neues hinein (z. B. Ölfilter). */
+  consumable?: boolean;
   /** Defekt ist von außen nicht zu sehen (nur Diagnose oder Ausbau). */
   hidden?: boolean;
   /** Beim Prüfen dieses Bauteils wird (zusätzlich) der Zustand anderer sichtbar. */
@@ -119,6 +137,43 @@ export interface CarInstance {
   observed: string[];
   /** Kundenauftrag, falls das Auto einem Kunden gehört. */
   job?: JobInfo;
+  /** Betriebsflüssigkeiten – tatsächlicher Zustand. */
+  fluids: Fluids;
+  /** Was der Spieler zuletzt selbst abgelesen hat. */
+  checked: Partial<Record<FluidId, { level: number; quality: number; day: number }>>;
+  /** Zustand der Karosserie je Bereich (Schmutz, Glanz, Rost, Lack). */
+  zones: Record<ZoneId, ZoneState>;
+  /** Innenraum: 0 = sauber … 1 = stark verschmutzt. */
+  interior: { seats: number; dash: number; floor: number };
+  /** 0 = gewöhnlich, 1 = selten, 2 = sehr selten. */
+  rarity: number;
+  origin: 'market' | 'barn' | 'auction' | 'job';
+  /** Privatfahrzeug: wird behalten und ist vor versehentlichem Verkauf geschützt. */
+  keep: boolean;
+}
+
+export type FluidId = 'oil' | 'coolant' | 'brake';
+export type FluidProduct = 'oil_5w30' | 'oil_5w40' | 'coolant' | 'brake_fluid';
+export type FluidStock = Record<FluidProduct, number>;
+
+export interface Fluids {
+  oil: { level: number; quality: number; product: FluidProduct | 'mixed'; filterFresh: boolean };
+  coolant: { level: number; quality: number; air: boolean };
+  brake: { level: number; quality: number; air: boolean; bled: { fl: boolean; fr: boolean } };
+}
+
+export type ZoneId = 'front' | 'rear' | 'left' | 'right' | 'top' | 'wheels';
+export interface ZoneState {
+  /** 0 = sauber … 1 = stark verschmutzt. */
+  dirt: number;
+  /** Waschfortschritt: 0 schmutzig, 1 vorgespült, 2 eingeschäumt/gebürstet, 3 abgespült (4 = trocken → sauber). */
+  step: number;
+  /** Lackglanz 0 … 1. */
+  shine: number;
+  /** Rost 0 … 1. */
+  rust: number;
+  /** Neue Lackfarbe dieses Bereichs, solange nicht das ganze Auto lackiert ist. */
+  paint?: string;
 }
 
 export interface JobInfo {
@@ -132,6 +187,14 @@ export interface JobInfo {
   required: DefectId[];
   /** Alle Defekte bei Annahme (für die Abrechnung von Zusatzarbeiten). */
   initial: DefectId[];
+  /** Beauftragte Wartung statt/zusätzlich zur Fehlersuche. */
+  service?: 'oil_change';
+  /** Vom Kunden freigegebene Zusatzarbeiten. */
+  approved?: DefectId[];
+  /** Zusatzarbeiten, zu denen der Kunde schon gefragt wurde. */
+  asked?: DefectId[];
+  /** Eilauftrag: muss bis zu diesem Tag fertig sein. */
+  dueDay?: number;
 }
 
 export interface JobOffer {
@@ -159,6 +222,10 @@ export interface Listing {
   closed: boolean;
   /** Verkäufer hat die Verhandlung abgebrochen – kein Kauf mehr möglich. */
   gone: boolean;
+  /** Scheunenfund: steht seit Jahren, springt nicht an, muss transportiert werden. */
+  barn?: boolean;
+  /** Angebot verschwindet nach diesem Tag. */
+  expiresDay?: number;
   sellerLine: string;
 }
 
@@ -175,4 +242,44 @@ export interface ActionResult {
   message?: string;
   /** Kein Neuteil vorhanden – UI soll Shop / Altteil-Einbau anbieten. */
   needsPart?: PartId;
+}
+
+export interface Auction {
+  id: string;
+  car: CarInstance;
+  title: string;
+  /** Zustandsbericht des Auktionshauses: ein Teil der Symptome, nie die Ursache. */
+  report: string[];
+  startBid: number;
+  increment: number;
+  current: number;
+  /** 'player', Name eines Händlers oder null (noch kein Gebot). */
+  leader: string | null;
+  /** Echtzeit in ms – so bleibt die Auktion über Neustarts hinweg konsistent. */
+  startsAt: number;
+  endsAt: number;
+  /** Bis hierhin sind die Gebote der Händler bereits ausgewertet. */
+  simulatedTo: number;
+  seed: number;
+  bidders: { name: string; limit: number; style: 'früh' | 'stetig' | 'spät' }[];
+  log: string[];
+  /** won = an den Spieler, lost = an einen Händler, unsold = ohne Gebot beendet. */
+  result?: 'won' | 'lost' | 'unsold';
+  /** Kaufpreis abgebucht und Auto übergeben – verhindert doppelte Abwicklung nach Neustart. */
+  settled?: boolean;
+}
+
+export interface GameEvent {
+  id: string;
+  type: 'urgent_job' | 'special_listing' | 'barn_hint' | 'parts_sale' | 'rare_auction' | 'extra_work';
+  title: string;
+  text: string;
+  /** Letzter Tag, an dem das Ereignis angenommen werden kann. */
+  expiresDay: number;
+  /** Mitgelieferte Daten – einmalig, damit nichts doppelt ausgelöst wird. */
+  job?: JobOffer;
+  listing?: Listing;
+  auction?: Auction;
+  sale?: { partId: PartId; pct: number };
+  extra?: { uid: string; defect: DefectId };
 }

@@ -1,9 +1,11 @@
-import { CAR_MODELS } from './data/cars';
+import { CAR_MODELS, COMMON_MODELS, RARE_MODELS } from './data/cars';
 import { COMPONENTS } from './data/components';
 import { DEFECTS, DEFECT_LIST } from './data/defects';
 import { SELLER_LIST, SELLER_NAMES, SELLERS, type SellerProfile } from './data/sellers';
 import { SYMPTOMS, type Channel } from './data/symptoms';
+import { createZones, detailFactor } from './detail';
 import { observe } from './diagnosis';
+import { createFluids, serviceState } from './fluids';
 import { activeDefects, isAssembled } from './repair';
 import type { CarInstance, DefectId, Listing } from './types';
 
@@ -25,9 +27,13 @@ export function freshComponents(): CarInstance['components'] {
 
 export function createCar(modelId: string, defects: DefectId[], rng: Rng, opts: Partial<CarInstance> = {}): CarInstance {
   const model = CAR_MODELS[modelId];
-  const year = opts.year ?? 2005 + Math.floor(rng() * 7);
+  const [y0, y1] = model.years ?? [2005, 2011];
+  const year = opts.year ?? y0 + Math.floor(rng() * (y1 - y0 + 1));
   const km = opts.km ?? round50(120000 + rng() * 140000);
-  const cleanValue = round50(model.baseValue * (1 + (year - 2008) * 0.04) * (1 - (km - 180000) / 900000));
+  // Seltene Modelle sind Liebhaberstücke: das Alter drückt ihren Wert nicht.
+  const age = model.rare ? 1 : 1 + (year - 2008) * 0.04;
+  const cleanValue = round50(model.baseValue * age * (1 - (km - 180000) / 900000));
+  const wear = opts.rarity !== undefined && opts.origin === 'barn' ? 1 : 0.15 + rng() * 0.45;
   const components = freshComponents();
   for (const d of defects) {
     const def = DEFECTS[d];
@@ -50,6 +56,13 @@ export function createCar(modelId: string, defects: DefectId[], rng: Rng, opts: 
     haggled: false,
     obdCodes: null,
     observed: [],
+    fluids: createFluids(modelId, wear, rng),
+    checked: {},
+    zones: createZones(0.15 + rng() * 0.5, 0.35 + rng() * 0.4, 0, rng),
+    interior: { seats: rng() * 0.7, dash: rng() * 0.6, floor: rng() * 0.8 },
+    rarity: model.rare ? 1 : 0,
+    origin: 'market',
+    keep: false,
     ...opts,
   };
 }
@@ -102,7 +115,7 @@ export function starterListing(rng: Rng): Listing {
 function randomListing(rng: Rng, index: number): Listing {
   const n = 1 + Math.floor(rng() * 3);
   const defects = [...DEFECT_LIST].sort(() => rng() - 0.5).slice(0, n).map((d) => d.id);
-  return createListing(createCar(pick(Object.keys(CAR_MODELS), rng), defects, rng), rng, index);
+  return createListing(createCar(pick(COMMON_MODELS, rng), defects, rng), rng, index);
 }
 
 /** Günstiges Bastlerfahrzeug, damit auch bei knapper Kasse etwas geht. */
@@ -118,16 +131,19 @@ function budgetListing(money: number, rng: Rng, index: number): Listing {
 /** Füllt den Markt auf. Mindestens ein Angebot bleibt bezahlbar. */
 export function fillListings(existing: Listing[], money: number, rng: Rng, index = 1, first = false): Listing[] {
   const out = first ? [starterListing(rng)] : existing.filter((l) => !l.gone);
-  while (out.length < MAX_LISTINGS) out.push(randomListing(rng, index));
-  if (!out.some((o) => o.asking <= money)) out[out.length - 1] = budgetListing(money, rng, index);
+  // Scheunenfunde und Sonderangebote zählen nicht zum normalen Marktbestand.
+  const regular = () => out.filter((l) => !l.barn && !l.expiresDay).length;
+  while (regular() < MAX_LISTINGS) out.push(randomListing(rng, index));
+  if (!out.some((o) => o.asking <= money)) out[out.findIndex((l) => !l.barn && !l.expiresDay)] = budgetListing(money, rng, index);
   return out;
 }
 
 /** Neuer Tag: ein bis zwei alte Angebote verschwinden, neue kommen dazu. */
-export function refreshListings(existing: Listing[], money: number, rng: Rng, index: number): Listing[] {
-  const keep = existing.filter((l) => !l.gone);
-  const drop = Math.min(keep.length, 1 + Math.floor(rng() * 2));
-  for (let i = 0; i < drop; i++) keep.splice(Math.floor(rng() * keep.length), 1);
+export function refreshListings(existing: Listing[], money: number, rng: Rng, index: number, day = 0): Listing[] {
+  const keep = existing.filter((l) => !l.gone && (!l.expiresDay || l.expiresDay >= day));
+  const normal = keep.filter((l) => !l.barn && !l.expiresDay);
+  const drop = Math.min(normal.length, 1 + Math.floor(rng() * 2));
+  for (let i = 0; i < drop; i++) keep.splice(keep.indexOf(normal.splice(Math.floor(rng() * normal.length), 1)[0]), 1);
   return fillListings(keep, money, rng, index);
 }
 
@@ -145,6 +161,7 @@ export const MARKET_CHECKS: { id: string; label: string; channels: Channel[]; wa
 export function inspectListing(l: Listing, check: string): string {
   const def = MARKET_CHECKS.find((c) => c.id === check)!;
   if (!l.checks.includes(check)) l.checks.push(check);
+  if (l.barn && check === 'drive') return 'Eine Probefahrt ist ausgeschlossen – der Wagen steht seit Jahren und ist abgemeldet.';
   const probe: CarInstance = { ...l.car, observed: [...l.hints] };
   const { added } = observe(probe, def.channels, def.warm);
   l.hints = probe.observed;
@@ -219,9 +236,43 @@ export function makeOffer(l: Listing, amount: number, args: string[] = []): Offe
   return { accepted: false, price: l.current };
 }
 
+/**
+ * Scheunenfund: seltenes Modell, seit Jahren abgestellt. Verdreckt, rostig,
+ * Batterie tot, Reifen und Flüssigkeiten am Ende, dazu fehlende Teile und
+ * technische Schäden – ein Langzeitprojekt.
+ */
+export function createBarnFind(rng: Rng, index: number, day: number): Listing {
+  const modelId = pick(RARE_MODELS, rng);
+  const pool: DefectId[] = ['plugs', 'belt', 'brakes', 'discs', 'coolant_hose', 'gasket', 'water_pump', 'lifters', 'chain', 'thermostat', 'oil_pan'];
+  const defects: DefectId[] = ['battery', 'tires', ...pool.sort(() => rng() - 0.5).slice(0, 2 + Math.floor(rng() * 3))];
+  const rarity = rng() < 0.3 ? 2 : 1;
+  const car = createCar(modelId, defects, rng, { km: round50(60000 + rng() * 110000), rarity, origin: 'barn' });
+  // Sehr seltene Exemplare (wenig gelaufen, Erstbesitz) sind deutlich mehr wert.
+  car.cleanValue = round50(car.cleanValue * (rarity === 2 ? 1.45 : 1.1));
+  car.zones = createZones(1, 0.1, 0.35 + rng() * 0.45, rng);
+  car.interior = { seats: 0.9, dash: 1, floor: 1 };
+  // Über die Jahre sind Teile abhandengekommen.
+  for (const id of pick([['alternator'], ['intake_hose'], ['alternator', 'intake_hose'], ['belt']], rng)) {
+    car.components[id] = { installed: false, bolts: car.components[id].bolts.map(() => 0 as const), connected: false, condition: 'defect', known: true };
+  }
+  const l = createListing(car, rng, index, SELLERS.heir, pick(SELLER_NAMES, rng));
+  const years = 8 + Math.floor(rng() * 14);
+  l.barn = true;
+  l.expiresDay = day + 3;
+  l.asking = l.current = Math.max(1500, round50(car.cleanValue * (0.16 + rng() * 0.1)));
+  l.minPrice = round50(l.asking * 0.78);
+  l.sellerLine = `„Der stand ${years} Jahre in Opas Scheune. Für ${eur(l.asking)} gehört er Ihnen – Hauptsache, er kommt weg.“`;
+  return l;
+}
+
+export const BARN_TRANSPORT = 180;
+export const RARITY_NAMES = ['gewöhnlich', 'selten', 'sehr selten'];
+
 export interface Valuation {
   cleanValue: number;
   deductions: { label: string; amount: number; defect?: DefectId }[];
+  /** Zu- und Abschläge für Pflegezustand, Rost und Wartung. */
+  extras: { label: string; amount: number }[];
   value: number;
   offer: number;
   haggleOffer: number;
@@ -237,9 +288,20 @@ export function valuate(car: CarInstance, index = 1): Valuation {
   if (!isAssembled(car)) deductions.push({ label: 'Nicht fahrbereit (Teile demontiert)', amount: 1500 });
   const clean = deductions.length === 0;
   if (!car.testDriven) deductions.push({ label: 'Keine Probefahrt nach Reparatur', amount: round50(cleanValue * 0.06) });
-  const value = Math.max(500, cleanValue - deductions.reduce((s, d) => s + d.amount, 0));
+  // Wartungszustand der Flüssigkeiten
+  const sv = serviceState(car);
+  if (!sv.oilOk) deductions.push({ label: 'Motoröl alt, falsch oder zu wenig', amount: 150 });
+  if (!sv.coolantOk) deductions.push({ label: 'Kühlsystem nicht in Ordnung', amount: 120 });
+  if (!sv.brakeOk) deductions.push({ label: 'Bremsflüssigkeit überaltert', amount: 150 });
+  let value = Math.max(500, cleanValue - deductions.reduce((s, d) => s + d.amount, 0));
+  // Aufbereitung wirkt nur anteilig am tatsächlichen Zustand: ein defektes Auto wird durch Waschen nicht wertvoll.
+  const condition = value / cleanValue;
+  const extras: Valuation['extras'] = [];
+  if (sv.oilChanged) extras.push({ label: 'Frischer Ölwechsel mit Filter', amount: 100 });
+  for (const f of detailFactor(car)) extras.push({ label: f.label, amount: Math.round((cleanValue * f.pct * (f.pct > 0 ? condition : 1)) / 10) * 10 });
+  value = Math.max(400, value + extras.reduce((s, e) => s + e.amount, 0));
   const offer = round50(value * (clean ? 0.97 : 0.93));
   // Nachverhandeln klappt nur, wenn das Auto überzeugt.
   const haggleOffer = round50(offer * (clean && car.testDriven ? 1.05 : 0.98));
-  return { cleanValue, deductions, value, offer, haggleOffer };
+  return { cleanValue, deductions, extras, value, offer, haggleOffer };
 }

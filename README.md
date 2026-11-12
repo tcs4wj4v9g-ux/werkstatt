@@ -57,6 +57,41 @@ Zusatzarbeiten), wenn die tatsächliche Ursache behoben und das Auto komplett is
 **Ton:** Alle Geräusche werden im Browser synthetisch erzeugt – es sind keine Aufnahmen echter Fahrzeuge. Der Motorklang hängt am
 technischen Zustand. 🔊 in der Kopfzeile schaltet den Ton ein oder aus.
 
+**Betriebsflüssigkeiten:** Jedes Auto hat eigenen Ölstand, Ölzustand und vorgeschriebene Ölsorte, dazu Kühlmittel und
+Bremsflüssigkeit. Füllmengen hängen vom Motor ab (Vierzylinder 4,5 l, Sechszylinder 6,5 l). Flüssigkeiten werden gekauft, gelagert
+und beim Einfüllen verbraucht. Der angezeigte Stand ist immer nur der zuletzt selbst abgelesene.
+
+- Ölwechsel: anheben, Auffangwanne unterstellen, Ablassschraube lösen und wieder eindrehen, ablassen, Ölfilter tauschen,
+  richtiges Öl einfüllen, Stand prüfen. Die Ölwanne lässt sich erst abnehmen, wenn das Öl abgelassen ist.
+- Kühlmittel: Arbeiten an Wasserpumpe, Thermostat oder Schlauch öffnen das System – danach auffüllen und bei laufendem Motor entlüften.
+- Bremsflüssigkeit: beide Vorderräder ab, je Seite mit dem Schraubenschlüssel entlüften.
+- Undichte Autos verlieren über Nacht Flüssigkeit; wer mit fast leerem Ölstand fährt, ruiniert die Lager.
+
+Die Abläufe sind spielgerecht vereinfacht und keine Werkstattanleitung.
+
+**Hof und Ausbau:** Durch die offenen Hallentore geht es in den Hof. Am Computer unter „Ausbau" kaufst du
+Stufe 2 Außenbereich (drei Stellplätze, Flutlicht), Stufe 3 Fahrzeugaufbereitung (Waschplatz), Stufe 4 Lackierkabine und
+Stufe 5 größere Werkstatt (Lageranbau, 10 % Rabatt auf Teile und Flüssigkeiten, zwei Stellplätze). Alles erscheint sichtbar im Hof.
+🅿 Umparken stellt ein Auto auf einen anderen freien Platz; reparieren und warten geht nur auf den Hebebühnen.
+
+**Aufbereitung:** Am Waschplatz Gerät wählen und die Karosseriebereiche antippen: vorspülen, einschäumen (Felgen: bürsten),
+abspülen, trocknen. Danach polieren; Innenraum mit Sauger, Polsterreiniger und Cockpitpflege. Schmutz, Schaum, Glanz und Rost
+sind am Auto sichtbar. In der Lackierkabine erst Rost abschleifen, dann Bereich für Bereich lackieren (neun Farben).
+Der Verkaufspreis steigt dadurch begrenzt – ein defektes Auto wird durch Waschen nicht wertvoll.
+
+**Scheunenfunde:** Seltene Sechszylinder, die nur über einen Hinweis unter „Neuigkeiten" auftauchen. Verdreckt, rostig,
+Batterie tot, Reifen überaltert, Teile fehlen, Flüssigkeiten am Ende. Keine Probefahrt, Transport kostet extra. Restauriert
+sind sie ein Vielfaches wert – aber nur Schritt für Schritt.
+
+**Auktionen:** Am Computer. Simulierte Händler bieten mit, jeder nur bis zu seinem eigenen Limit und mit eigener Taktik.
+Auktionen laufen in Echtzeit und werden beim nächsten Start nachgeholt, wenn das Spiel zwischendurch geschlossen war.
+Geld in eigenen Höchstgeboten ist so lange gebunden.
+
+**Ereignisse:** Ab und zu gibt es Neuigkeiten – Eilauftrag, Sonderangebot, Teile-Rabatt, seltene Auktion, Scheunenfund,
+Zusatzbefund am Kundenauto. Nichts davon ist Pflicht; was du liegen lässt, verfällt.
+
+**Privatfahrzeuge:** Unter „Meine Autos" lässt sich jedes eigene Auto als Privatfahrzeug markieren und ist dann vor Verkauf geschützt.
+
 **Preise** hängen von Modell, Baujahr, Laufleistung, offenen Schäden, Probefahrt und der täglichen Marktlage ab.
 Der Spielstand (beide Autos mit jeder einzelnen Schraube, Werkzeuge, Lager, Markt, Aufträge) wird automatisch lokal gespeichert;
 ältere Spielstände werden beim Laden übernommen. Das fertige Spiel braucht kein Internet und keine KI-Dienste.
@@ -94,6 +129,10 @@ src/game/         reine Spiellogik, ohne React/Three.js – serialisierbar und t
   diagnosis.ts    Symptome, mögliche Ursachen, OBD, Klangbild
   market.ts       Angebote, Verkäuferprofile, Verhandlung, Bewertung
   jobs.ts         Kundenaufträge und Abrechnung
+  fluids.ts       Motoröl, Kühlmittel, Bremsflüssigkeit
+  detail.ts       Waschen, Polieren, Innenraum, Rost und Lack je Karosseriebereich
+  auctions.ts     Auktionen mit simulierten Händlern (reproduzierbar über Startwert)
+  events.ts       Zufallsereignisse
   audio.ts        synthetischer Motor und Effekte
   store.ts        Spielstand (zustand + localStorage)
 src/three/        3D: Karosserie-Generator, Fahrzeugmodell, begehbare Werkstatt, Händlerhof, Teststrecke

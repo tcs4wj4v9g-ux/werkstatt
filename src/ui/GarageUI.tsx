@@ -3,14 +3,18 @@ import { engineAudio } from '../game/audio';
 import { CAR_MODELS } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { DEFECTS } from '../game/data/defects';
-import { PARTS, PART_LIST } from '../game/data/parts';
+import { PARTS } from '../game/data/parts';
+import { availableSlots, SLOTS } from '../game/data/workshop';
+import { PAINT_COLORS, PAINT_TOOLS, WASH_TOOLS } from '../game/detail';
 import { CABINET_TOOLS, MAX_CARRIED, TOOL_MAP } from '../game/data/tools';
-import { marketLabel, valuate } from '../game/market';
+import { marketLabel, RARITY_NAMES, valuate } from '../game/market';
 import { driveBlocker, isAssembled, knownDefects } from '../game/repair';
 import { useGame } from '../game/store';
 import type { CarInstance, PartId, ToolId } from '../game/types';
 import { player, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
+import { AuctionsTab, EventsTab, MoveList, ShopList, UpgradesTab } from './ComputerTabs';
 import { FileModal } from './FileModal';
+import { FluidModal } from './FluidModal';
 import { JobsTab } from './JobsTab';
 import { eur, Modal, TopBar } from './common';
 import { Joystick } from './Joystick';
@@ -39,12 +43,20 @@ export function GarageUI() {
   const nearBay = workBay >= 0 ? workBay : focus.nearBay;
   const near = nearBay >= 0 ? s.cars[nearBay] : null;
   const running = nearBay >= 0 && s.engineBay === nearBay;
-  const views: WorkView[] = !near ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
+  const kind = nearBay >= 0 ? SLOTS[nearBay].kind : null;
+  const views: WorkView[] = !near || kind !== 'lift' ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
+  // Am Waschplatz und in der Lackierkabine liegen andere Geräte bereit als am Werkzeuggürtel.
+  const station: ToolId[] = kind === 'wash' ? WASH_TOOLS : kind === 'paint' ? PAINT_TOOLS : [];
+  useEffect(() => {
+    const t = useGame.getState().tool;
+    if (TOOL_MAP[t].kind === 'station' && !station.includes(t)) useGame.getState().setTool('hand');
+  }, [kind]);
   useEffect(() => {
     if (work && !views.includes(work.split(':')[0] as WorkView)) leave();
   });
   const open = s.panel !== null || s.partPrompt !== null || s.lastSale !== null;
   const belt: ToolId[] = ['hand', 'lamp', ...s.carried];
+  const news = s.events.filter((e) => e.expiresDay >= s.day).length;
 
   return (
     <>
@@ -58,6 +70,11 @@ export function GarageUI() {
           {near && (
             <div className="car-actions">
               <button className="btn" data-testid="file" onClick={() => s.setPanel('file', nearBay)}>📋 Akte</button>
+              {kind === 'lift' && <button className="btn" data-testid="fluids" onClick={() => s.setPanel('fluids', nearBay)}>🛢 Flüssigkeiten</button>}
+              <button className="btn" data-testid="move" onClick={() => s.setPanel('move', nearBay)}>🅿 Umparken</button>
+              {!near.lifted && kind !== 'wash' && kind !== 'paint' && (
+                <button className="btn" data-testid="drive" onClick={() => s.startDrive(nearBay)}>🏁 Probefahrt</button>
+              )}
               <button className={`btn ${running ? 'active' : ''}`} data-testid="engine" onClick={() => s.toggleEngine(nearBay)}>
                 {running ? '⏹ Motor aus' : '🔑 Motor starten'}
               </button>
@@ -108,7 +125,7 @@ export function GarageUI() {
 
       {near && !open && (
         <div className="panel left">
-          <h3 className="small">Bühne {nearBay + 1}: {CAR_MODELS[near.modelId].name}</h3>
+          <h3 className="small">{SLOTS[nearBay].label}: {CAR_MODELS[near.modelId].name}</h3>
           <div className="meta">{near.job ? `Kundenfahrzeug von ${near.job.customer}` : 'Dein Fahrzeug'}</div>
           <h4>Bisher bekannt</h4>
           <div className="meta">{near.observed.length} Symptom(e) beobachtet – Details in der Akte</div>
@@ -118,10 +135,29 @@ export function GarageUI() {
           ))}
           <h4>Status</h4>
           <div className="meta">{isAssembled(near) ? '✓ komplett montiert' : '✗ Teile demontiert'}</div>
-          <div className="meta">{near.lifted ? '▲ angehoben' : '▼ am Boden'} · {near.hoodOpen ? 'Haube offen' : 'Haube zu'}</div>
+          {kind === 'lift' && <div className="meta">{near.lifted ? '▲ angehoben' : '▼ am Boden'} · {near.hoodOpen ? 'Haube offen' : 'Haube zu'}</div>}
           <div className="meta">{near.testDriven ? '✓ Probefahrt gemacht' : '– Probefahrt offen'}</div>
         </div>
       )}
+
+      {station.length > 0 && near && !open && (
+        <div className="station" data-testid="station">
+          {station.map((id) => (
+            <button key={id} className={`btn tool ${s.tool === id ? 'active' : ''}`} onClick={() => s.setTool(id)}>
+              <span className="ico">{TOOL_MAP[id].icon}</span>
+              {TOOL_MAP[id].short}
+            </button>
+          ))}
+          {kind === 'paint' && (
+            <div className="swatches">
+              {PAINT_COLORS.map((c) => (
+                <button key={c} aria-label={`Farbe ${c}`} className={`swatch ${s.paintColor === c ? 'on' : ''}`} style={{ background: c }} onClick={() => s.setPaintColor(c)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!open && news > 0 && <div className="newsbadge">✉ {news} Neuigkeit{news > 1 ? 'en' : ''} am Computer</div>}
 
       <div className="toolbar" data-testid="toolbelt">
         {belt.map((id) => {
@@ -156,6 +192,12 @@ export function GarageUI() {
       {s.panel === 'drive' && <DriveModal />}
       {s.panel === 'obd' && <ObdModal />}
       {s.panel === 'file' && <FileModal />}
+      {s.panel === 'fluids' && <FluidModal />}
+      {s.panel === 'move' && (
+        <Modal title="Auto umparken" onClose={() => s.setPanel(null)}>
+          <MoveList from={s.panelBay} />
+        </Modal>
+      )}
 
       {s.panel === 'report' && (
         <Modal title="Probefahrt-Bericht" onClose={() => s.setPanel(null)}>
@@ -222,25 +264,6 @@ function CabinetModal() {
   );
 }
 
-function ShopList() {
-  const s = useGame();
-  return (
-    <>
-      {PART_LIST.map((p) => (
-        <div key={p.id} className="shop-row">
-          <div>
-            <b>{p.name}</b>
-            <div className="meta">{p.desc} · im Regal: {s.inventory[p.id]}</div>
-          </div>
-          <button className="btn primary" disabled={s.money < p.price} onClick={() => s.buyPart(p.id)}>
-            Bestellen {eur(p.price)}
-          </button>
-        </div>
-      ))}
-    </>
-  );
-}
-
 /** Werkbank: Übersicht über Lager und Befunde beider Autos. */
 function BenchModal() {
   const s = useGame();
@@ -253,7 +276,7 @@ function BenchModal() {
       {s.cars.map((car, i) =>
         car ? (
           <div key={i}>
-            <h4>Bühne {i + 1}: {carName(car)}{car.job ? ` – Kunde ${car.job.customer}` : ''}</h4>
+            <h4>{SLOTS[i].label}: {carName(car)}{car.job ? ` – Kunde ${car.job.customer}` : ''}</h4>
             {knownDefects(car).length === 0 && <p className="meta">Noch kein Schaden am Bauteil bestätigt.</p>}
             {knownDefects(car).map((d) => <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>)}
             {Object.keys(car.components).filter((c) => !car.components[c].installed).map((c) => (
@@ -281,7 +304,7 @@ function DriveModal() {
         return (
           <div key={i} className="shop-row">
             <div>
-              <b>Bühne {i + 1}: {carName(car)}</b>
+              <b>{SLOTS[i].label}: {carName(car)}</b>
               <div className={`meta ${blocker ? 'bad' : ''}`}>{blocker ?? 'Fahrbereit.'}</div>
             </div>
             <button className="btn primary" disabled={!!blocker} onClick={() => s.startDrive(i)}>🏁 Losfahren</button>
@@ -297,7 +320,7 @@ function ObdModal() {
   const car = s.cars[s.panelBay];
   if (!car) return null;
   return (
-    <Modal title={`OBD-Diagnose – Bühne ${s.panelBay + 1}`} onClose={() => s.setPanel(null)}>
+    <Modal title={`OBD-Diagnose – ${SLOTS[s.panelBay].label}`} onClose={() => s.setPanel(null)}>
       <div className="obd">
         {car.obdCodes === null && <div>BEREIT – Stecker verbunden.</div>}
         {car.obdCodes?.length === 0 && <div>KEINE FEHLER GESPEICHERT</div>}
@@ -311,28 +334,36 @@ function ObdModal() {
 
 function ComputerModal() {
   const s = useGame();
-  const [tab, setTab] = useState<'market' | 'mine' | 'jobs' | 'parts'>('market');
-  const free = s.cars.filter((c) => !c).length;
+  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'jobs' | 'parts' | 'build' | 'news'>('market');
+  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
+  const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
     <Modal title="Werkstatt-Computer" onClose={() => s.setPanel(null)} wide>
-      <div className="seg4">
-        <button className={`btn ${tab === 'market' ? 'active' : ''}`} onClick={() => setTab('market')}>Gebrauchtwagen</button>
-        <button className={`btn ${tab === 'mine' ? 'active' : ''}`} onClick={() => setTab('mine')}>Meine Autos</button>
-        <button className={`btn ${tab === 'jobs' ? 'active' : ''}`} onClick={() => setTab('jobs')}>Aufträge</button>
-        <button className={`btn ${tab === 'parts' ? 'active' : ''}`} onClick={() => setTab('parts')}>Teile bestellen</button>
+      <div className="tabrow">
+        {([
+          ['market', 'Gebrauchtwagen'],
+          ['auctions', 'Auktionen'],
+          ['mine', 'Meine Autos'],
+          ['jobs', 'Aufträge'],
+          ['parts', 'Teile'],
+          ['build', 'Ausbau'],
+          ['news', news ? `Neuigkeiten (${news})` : 'Neuigkeiten'],
+        ] as const).map(([id, label]) => (
+          <button key={id} className={`btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
       </div>
 
       {tab === 'market' && (
         <>
           <p className="meta">
-            Tag {s.day} · {marketLabel(s.marketIndex)} · freie Hebebühnen: {free}
+            Tag {s.day} · {marketLabel(s.marketIndex)} · freie Stellplätze: {free}
           </p>
           {s.listings.map((l, i) => (
             <div key={l.id} className="shop-row">
               <div>
-                <b>{CAR_MODELS[l.car.modelId].name}</b>
+                <b>{l.barn ? '🏚 Scheunenfund: ' : l.expiresDay ? '⏳ ' : ''}{CAR_MODELS[l.car.modelId].name}{l.car.rarity > 0 ? ` (${RARITY_NAMES[l.car.rarity]})` : ''}</b>
                 <div className="meta">
-                  Bj. {l.car.year} · {l.car.km.toLocaleString('de-DE')} km · {l.seller}
+                  {l.expiresDay !== undefined && `nur bis Tag ${l.expiresDay} · `}Bj. {l.car.year} · {l.car.km.toLocaleString('de-DE')} km · {l.seller}
                   {l.hints.length > 0 && ` · ${l.hints.length} Auffälligkeit(en) notiert`}
                   {l.gone && ' · Verkäufer hat abgebrochen'}
                 </div>
@@ -353,8 +384,11 @@ function ComputerModal() {
         </>
       )}
 
+      {tab === 'auctions' && <AuctionsTab />}
       {tab === 'jobs' && <JobsTab />}
       {tab === 'parts' && <ShopList />}
+      {tab === 'build' && <UpgradesTab />}
+      {tab === 'news' && <EventsTab />}
     </Modal>
   );
 }
@@ -370,7 +404,10 @@ function SellCard({ bay, car }: { bay: number; car: CarInstance }) {
   const hidden = v.deductions.filter((d) => d.defect && !known.includes(d.defect)).reduce((a, d) => a + d.amount, 0);
   return (
     <div className="sell-card">
-      <b>Bühne {bay + 1}: {carName(car)} · {car.km.toLocaleString('de-DE')} km</b>
+      <div className="row-between">
+        <b>{SLOTS[bay].label}: {carName(car)} · {car.km.toLocaleString('de-DE')} km{car.rarity > 0 ? ` · ${RARITY_NAMES[car.rarity]}` : ''}</b>
+        <button className={`chip ${car.keep ? 'on' : ''}`} onClick={() => s.toggleKeep(bay)}>{car.keep ? '★ Privatfahrzeug' : '☆ als Privatfahrzeug behalten'}</button>
+      </div>
       <table className="val">
         <tbody>
           <tr><td>Marktwert in Bestzustand (heutige Marktlage)</td><td>{eur(v.cleanValue)}</td></tr>
@@ -380,6 +417,9 @@ function SellCard({ bay, car }: { bay: number; car: CarInstance }) {
           {hidden > 0 && (
             <tr className="bad"><td>− Weitere Mängel laut Gutachter des Käufers (dir noch unbekannt)</td><td>−{eur(hidden)}</td></tr>
           )}
+          {v.extras.map((x) => (
+            <tr key={x.label} className={x.amount < 0 ? 'bad' : 'good'}><td>{x.amount < 0 ? '−' : '+'} {x.label}</td><td>{x.amount < 0 ? '−' : '+'}{eur(Math.abs(x.amount))}</td></tr>
+          ))}
           <tr className="sum"><td>Angebot des Käufers</td><td data-testid={`sell-price-${bay}`}>{eur(price)}</td></tr>
           <tr><td>Einkauf {eur(car.purchasePrice)} + verbaute Teile {eur(car.partsSpent)}</td><td>−{eur(car.purchasePrice + car.partsSpent)}</td></tr>
           <tr className={`sum ${profit >= 0 ? 'good' : 'bad'}`}><td>{profit >= 0 ? 'Gewinn' : 'Verlust'}</td><td>{eur(Math.abs(profit))}</td></tr>
@@ -389,7 +429,7 @@ function SellCard({ bay, car }: { bay: number; car: CarInstance }) {
         <button className="btn" disabled={car.haggled} onClick={() => s.haggle(bay)}>
           {car.haggled ? 'Bereits nachverhandelt' : 'Nachverhandeln (1 Versuch)'}
         </button>
-        <button className="btn primary" onClick={() => s.sell(bay)}>Verkaufen für {eur(price)}</button>
+        <button className="btn primary" disabled={car.keep} onClick={() => s.sell(bay)}>{car.keep ? 'Privatfahrzeug – nicht zu verkaufen' : `Verkaufen für ${eur(price)}`}</button>
       </div>
     </div>
   );

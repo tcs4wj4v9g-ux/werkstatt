@@ -1,4 +1,9 @@
 import { CAR_MODELS } from '../game/data/cars';
+import { SLOTS } from '../game/data/workshop';
+import { dirtLevel, interiorDirt, rustLevel, shineLevel } from '../game/detail';
+import { capacity, FLUID_NAMES } from '../game/fluids';
+import { RARITY_NAMES } from '../game/market';
+import type { FluidId } from '../game/types';
 import { COMPONENT_MAP } from '../game/data/components';
 import { DEFECTS } from '../game/data/defects';
 import { SYMPTOMS } from '../game/data/symptoms';
@@ -22,7 +27,8 @@ export function FileModal() {
   const loose = Object.keys(car.components).filter((c) => car.components[c].installed && (car.components[c].bolts.some((b) => b < 2) || (COMPONENT_MAP[c].connector && !car.components[c].connected)));
   const symptoms = car.observed.filter((id) => SYMPTOMS[id]);
   return (
-    <Modal title={`Fahrzeugakte – Bühne ${s.panelBay + 1}: ${CAR_MODELS[car.modelId].name}`} onClose={() => s.setPanel(null)} wide>
+    <Modal title={`Fahrzeugakte – ${SLOTS[s.panelBay].label}: ${CAR_MODELS[car.modelId].name}`} onClose={() => s.setPanel(null)} wide>
+      <p className="meta">{CAR_MODELS[car.modelId].engine} · Bj. {car.year} · {car.km.toLocaleString('de-DE')} km{car.rarity > 0 ? ` · ${RARITY_NAMES[car.rarity]}` : ''}</p>
       {car.job && (
         <div className="note">
           <b>Kundenauftrag von {car.job.customer}:</b> „{car.job.complaint}“
@@ -38,6 +44,11 @@ export function FileModal() {
         <div key={id} className="symptom">
           <div>{SYMPTOMS[id].text}</div>
           <div className="causes">
+            {SYMPTOMS[id].fluid && (
+              <span className={`cause ${car.checked[SYMPTOMS[id].fluid!] ? '' : ''}`}>
+                {FLUID_NAMES[SYMPTOMS[id].fluid!]} · {car.checked[SYMPTOMS[id].fluid!] ? 'Stand abgelesen' : 'Stand ungeprüft'}
+              </span>
+            )}
             {possibleCauses(id).map((d) => {
               const [label, cls] = STATUS[causeStatus(car, d)];
               return (
@@ -49,6 +60,15 @@ export function FileModal() {
           </div>
         </div>
       ))}
+      <h4>Flüssigkeiten (zuletzt abgelesen)</h4>
+      {(['oil', 'coolant', 'brake'] as FluidId[]).map((id) => {
+        const c = car.checked[id];
+        return <div key={id} className="meta">{FLUID_NAMES[id]}: {c ? `${c.level.toLocaleString('de-DE')} von ${capacity(car, id)} l (Tag ${c.day})` : 'noch nicht abgelesen'}</div>;
+      })}
+      <h4>Pflegezustand</h4>
+      <div className="meta">
+        Schmutz {Math.round(dirtLevel(car) * 100)} % · Lackglanz {Math.round(shineLevel(car) * 100)} % · Rost {Math.round(rustLevel(car) * 100)} % · Innenraum {Math.round((1 - interiorDirt(car)) * 100)} % sauber
+      </div>
       <h4>OBD-Fehlerspeicher</h4>
       {car.obdCodes === null && <p className="meta">Noch nicht ausgelesen (OBD-Gerät aus dem Werkzeugschrank).</p>}
       {car.obdCodes?.length === 0 && <p className="meta">Keine Fehler gespeichert. Mechanische Schäden erkennt das Gerät nicht.</p>}

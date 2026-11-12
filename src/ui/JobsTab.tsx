@@ -1,4 +1,5 @@
 import { CAR_MODELS } from '../game/data/cars';
+import { availableSlots, SLOTS } from '../game/data/workshop';
 import { billJob } from '../game/jobs';
 import { useGame } from '../game/store';
 import { eur } from './common';
@@ -6,7 +7,7 @@ import { eur } from './common';
 /** Kundenaufträge am Werkstatt-Computer: Anfragen annehmen, laufende Aufträge abrechnen. */
 export function JobsTab() {
   const s = useGame();
-  const free = s.cars.filter((c) => !c).length;
+  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
   const active = s.cars.map((car, bay) => ({ car, bay })).filter((x) => x.car?.job);
   return (
     <>
@@ -17,12 +18,12 @@ export function JobsTab() {
       {active.length === 0 && <p className="meta">Kein Kundenfahrzeug in der Werkstatt.</p>}
       {active.map(({ car, bay }) => {
         const job = car!.job!;
-        const bill = billJob(car!);
+        const bill = billJob(car!, s.day);
         const touched = car!.partsSpent > 0 || car!.observed.length > 0 || car!.obdCodes !== null;
         return (
           <div key={job.id} className="sell-card">
             <b>
-              Bühne {bay + 1}: {CAR_MODELS[car!.modelId].name} von {job.customer} · {bill.done ? 'bereit zur Abholung' : touched ? 'in Bearbeitung' : 'angenommen'}
+              {SLOTS[bay].label}: {CAR_MODELS[car!.modelId].name} von {job.customer}{job.dueDay !== undefined ? ` · Eilauftrag bis Tag ${job.dueDay}` : ''} · {bill.done ? 'bereit zur Abholung' : touched ? 'in Bearbeitung' : 'angenommen'}
             </b>
             <p className="meta">„{job.complaint}“</p>
             <table className="val">
@@ -44,7 +45,7 @@ export function JobsTab() {
           </div>
         );
       })}
-      <h4>Neue Anfragen · freie Hebebühnen: {free}</h4>
+      <h4>Neue Anfragen · freie Stellplätze: {free}</h4>
       {s.jobs.map((j, i) => (
         <div key={j.id} className="shop-row">
           <div>

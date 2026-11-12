@@ -70,6 +70,10 @@ export function HelpModal() {
         <li><b>Stecker & Abdeckung:</b> Erst die Motorabdeckung abnehmen. Zündspulen und Lichtmaschine haben einen Stecker, der mit der Hand abgezogen wird.</li>
         <li><b>Arbeitsansicht:</b> 🎯-Knöpfe fahren die Kamera nah an Motor, Rad oder Unterboden. „Ansicht verlassen“ bringt dich zurück.</li>
         <li><b>Hebebühne:</b> Räder, Bremsen, Ölwanne nur angehoben; Motorraum nur abgelassen. Am laufenden Motor wird nicht geschraubt.</li>
+        <li><b>Flüssigkeiten:</b> Auf der Hebebühne 🛢 antippen oder Peilstab und Behälter am Motor. Ölwechsel: anheben, Auffangwanne unterstellen, Ablassschraube raus und wieder rein, Ölfilter neu, richtiges Öl einfüllen, Stand prüfen.</li>
+        <li><b>Hof:</b> Durch die offenen Tore geht es hinaus. 🅿 Umparken stellt ein Auto auf einen anderen Platz. Waschplatz, Lackierkabine und weitere Stellplätze kaufst du am Computer unter „Ausbau“.</li>
+        <li><b>Waschen & Lack:</b> Am Waschplatz Gerät wählen und Karosseriebereiche antippen: vorspülen, einschäumen, abspülen, trocknen – dann polieren. Innenraum über das Dach. In der Kabine erst Rost schleifen, dann lackieren.</li>
+        <li><b>Auktionen, Scheunenfunde, Neuigkeiten:</b> am Computer. Auktionen laufen in Echtzeit, auch wenn das Spiel zu ist.</li>
         <li><b>Ton:</b> 🔊 oben schaltet alle Geräusche ein oder aus.</li>
       </ol>
       <button className="btn primary big" onClick={() => setPanel(null)}>Los geht's</button>

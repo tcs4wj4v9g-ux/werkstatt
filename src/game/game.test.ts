@@ -5,11 +5,17 @@ import { PARTS } from './data/parts';
 import { SELLERS } from './data/sellers';
 import { SYMPTOMS } from './data/symptoms';
 import { causeStatus, obdScan, observe, possibleCauses, presentSymptoms, soundProfile } from './diagnosis';
+import { advanceAuction, createAuction, heldMoney, minBid, placeBid } from './auctions';
+import { CAR_MODELS } from './data/cars';
+import { availableSlots, SLOTS, UPGRADES } from './data/workshop';
+import { BODY_ZONES, detailFactor, dirtLevel, paintAction, PAINT_COST, rustLevel, shineLevel, washAction } from './detail';
+import { rollEvents } from './events';
+import * as fl from './fluids';
 import { billJob, createJobOffer, JOB_TEMPLATES } from './jobs';
-import { createCar, createListing, fillListings, inspectListing, makeOffer, nextMarketIndex, refreshListings, starterListing, valuate } from './market';
+import { createBarnFind, createCar, createListing, fillListings, inspectListing, makeOffer, nextMarketIndex, refreshListings, starterListing, valuate } from './market';
 import * as r from './repair';
 import { normalizeCar } from './store';
-import type { CarInstance, DefectId, Inventory, ToolId, ToolNeed, Toolset } from './types';
+import type { CarInstance, DefectId, FluidStock, Inventory, ToolId, ToolNeed, Toolset } from './types';
 
 const rng = (seed = 42) => {
   let s = seed;
@@ -45,9 +51,33 @@ const install = (car: CarInstance, i: Inventory, id: string) => {
   });
   if (def.connector) expect(r.connectorAction(car, id, HAND).ok).toBe(true);
 };
+const stock = (): FluidStock => ({ oil_5w30: 20, oil_5w40: 20, coolant: 20, brake_fluid: 5 });
+/** Frisch gewartetes Auto: alle Flüssigkeiten voll, sauber, entlüftet. */
+function service(car: CarInstance) {
+  const m = CAR_MODELS[car.modelId];
+  car.fluids = {
+    oil: { level: m.oilCapacity, quality: 1, product: m.oilSpec, filterFresh: true },
+    coolant: { level: m.coolantCapacity, quality: 1, air: false },
+    brake: { level: 1, quality: 1, air: false, bled: { fl: false, fr: false } },
+  };
+  return car;
+}
+/** Sauber, poliert, rostfrei, Innenraum gereinigt. */
+function detail(car: CarInstance) {
+  for (const z of Object.values(car.zones)) Object.assign(z, { dirt: 0, step: 0, shine: 1, rust: 0, paint: undefined });
+  car.interior = { seats: 0, dash: 0, floor: 0 };
+  return car;
+}
+const mk = (model: string, defects: DefectId[], seed = 42, opts = {}) => service(createCar(model, defects, rng(seed), opts));
+
 function removeDeep(car: CarInstance, i: Inventory, id: string, order: string[]) {
   if (!car.components[id].installed) return;
   COMPONENT_MAP[id].blockedBy.forEach((b) => removeDeep(car, i, b, order));
+  // Die Ölwanne kommt erst ab, wenn das Öl abgelassen ist.
+  if (id === 'oil_pan' && car.components.drain_plug.installed) {
+    remove(car, i, 'drain_plug');
+    order.push('drain_plug');
+  }
   remove(car, i, id);
   order.push(id);
 }
@@ -65,11 +95,13 @@ function fix(car: CarInstance, i: Inventory, d: DefectId) {
     order.reverse().forEach((id) => install(car, i, id));
   }
   if (car.lifted) expect(r.toggleLift(car).ok).toBe(true);
+  if (car.fluids.oil.level === 0) car.fluids.oil.level = CAR_MODELS[car.modelId].oilCapacity; // wieder aufgefüllt
+  if (car.fluids.coolant.air) Object.assign(car.fluids.coolant, { air: false, level: CAR_MODELS[car.modelId].coolantCapacity });
 }
 
 describe('Schrauben, Stecker, Werkzeuge', () => {
   it('Schraube: fest → gelöst (Werkzeug) → entfernt (Hand) und zurück', () => {
-    const car = createCar('bavaria_320', [], rng());
+    const car = mk('bavaria_320', []);
     r.toggleHood(car);
     const i = inv();
     remove(car, i, 'engine_cover');
@@ -89,7 +121,7 @@ describe('Schrauben, Stecker, Werkzeuge', () => {
   });
 
   it('Reihenfolge: Abdeckung vor Spule, Spulen vor Ventildeckel, Zugang nur mit offener Haube', () => {
-    const car = createCar('bavaria_320', [], rng());
+    const car = mk('bavaria_320', []);
     const ratchet = driver(COMPONENT_MAP.coil1.fastener);
     expect(r.boltAction(car, 'coil1', 0, ratchet).message).toContain('Motorhaube');
     r.toggleHood(car);
@@ -104,7 +136,7 @@ describe('Schrauben, Stecker, Werkzeuge', () => {
   });
 
   it('Radschrauben: Ratsche löst und setzt an, festgezogen wird mit dem Drehmomentschlüssel', () => {
-    const car = createCar('bavaria_320', [], rng());
+    const car = mk('bavaria_320', []);
     r.toggleLift(car);
     const ratchet: Toolset = { active: 'ratchet', carried: ['ratchet', 'socket17', 'torque'] };
     const torque: Toolset = { ...ratchet, active: 'torque' };
@@ -121,7 +153,7 @@ describe('Schrauben, Stecker, Werkzeuge', () => {
 describe('Reparatur', () => {
   it('jeder Defekt lässt sich einzeln beheben und das Auto wieder komplett montieren', () => {
     for (const d of DEFECT_LIST) {
-      const car = createCar('bavaria_320', [d.id], rng());
+      const car = mk('bavaria_320', [d.id]);
       const i = inv(4);
       expect(r.activeDefects(car)).toEqual([d.id]);
       fix(car, i, d.id);
@@ -134,18 +166,19 @@ describe('Reparatur', () => {
 
   it('alle Defekte zusammen: abzugsfrei erst nach Reparatur und Probefahrt', () => {
     const all = DEFECT_LIST.map((d) => d.id);
-    const car = createCar('bavaria_320', all, rng());
+    const car = mk('bavaria_320', all);
     const i = inv(8);
-    expect(valuate(car).deductions.length).toBe(all.length + 1);
+    expect(valuate(car).deductions.filter((d) => d.defect).length).toBe(all.length);
     all.forEach((d) => fix(car, i, d));
     expect(r.driveBlocker(car)).toBeNull();
     expect(obdScan(car)).toEqual([]);
     car.testDriven = true;
+    service(car);
     expect(valuate(car).deductions).toEqual([]);
   });
 
   it('ohne Neuteil: Hinweis, Altteil kann notfalls wieder rein', () => {
-    const car = createCar('bavaria_320', ['belt'], rng());
+    const car = mk('bavaria_320', ['belt']);
     const i = inv();
     r.toggleHood(car);
     remove(car, i, 'belt');
@@ -156,28 +189,29 @@ describe('Reparatur', () => {
   });
 
   it('Motor startet nicht mit demontierten Motorteilen, wohl aber ohne Räder', () => {
-    const car = createCar('bavaria_320', [], rng());
+    const car = mk('bavaria_320', []);
     r.toggleLift(car);
     remove(car, inv(), 'wheel_fl');
     expect(r.engineBlocker(car)).toBeNull();
-    remove(car, inv(), 'oil_pan');
-    expect(r.engineBlocker(car)).toContain('Ölwanne');
+    expect(r.componentAction(car, inv(), 'oil_pan', HAND).ok).toBe(false);
+    remove(car, inv(), 'drain_plug');
+    expect(r.engineBlocker(car)).toContain('Ölablassschraube');
   });
 });
 
 describe('Diagnose', () => {
   it('Defekte sind gespeichert, aber dem Spieler zunächst unbekannt', () => {
-    const car = createCar('bavaria_325', ['bearing', 'coil'], rng());
+    const car = mk('bavaria_325', ['bearing', 'coil']);
     expect(r.activeDefects(car).sort()).toEqual(['bearing', 'coil']);
     expect(r.knownDefects(car)).toEqual([]);
     expect(car.observed).toEqual([]);
   });
 
   it('OBD verrät keinen mechanischen Schaden und nennt bei Aussetzern nur den Zylinder', () => {
-    const mech = createCar('bavaria_325', ['bearing', 'lifters', 'chain', 'gasket', 'oil_pan', 'water_pump', 'coolant_hose', 'discs'], rng());
+    const mech = mk('bavaria_325', ['bearing', 'lifters', 'chain', 'gasket', 'oil_pan', 'water_pump', 'coolant_hose', 'discs']);
     expect(obdScan(mech)).toEqual([]);
-    const coil = createCar('bavaria_320', ['coil'], rng(1));
-    const plug = createCar('bavaria_320', ['plugs'], rng(1));
+    const coil = mk('bavaria_320', ['coil'], 1);
+    const plug = mk('bavaria_320', ['plugs'], 1);
     expect(obdScan(coil).length).toBe(1);
     expect(obdScan(coil)[0].slice(0, 4)).toBe('P030');
     expect(obdScan(plug)[0].slice(0, 4)).toBe('P030'); // gleicher Code – Spule oder Kerze?
@@ -185,7 +219,7 @@ describe('Diagnose', () => {
   });
 
   it('Symptome zeigen sich je nach Untersuchung, warme erst bei warmem Motor', () => {
-    const car = createCar('bavaria_325', ['bearing'], rng());
+    const car = mk('bavaria_325', ['bearing']);
     expect(observe(car, ['idle', 'sound', 'dash'], false).added).toEqual([]); // kalt: nichts zu hören
     expect(observe(car, ['idle', 'sound', 'dash'], true).added.map((s) => s.id)).toEqual(['metal_noise']);
     expect(observe(car, ['rev'], true).added.map((s) => s.id)).toEqual(['knock_load']);
@@ -198,7 +232,7 @@ describe('Diagnose', () => {
     expect(possibleCauses('coolant_wet').map((d) => d.id).sort()).toEqual(['coolant_hose', 'water_pump']);
     DEFECT_LIST.forEach((d) => d.symptoms.forEach((s) => expect(SYMPTOMS[s], `${d.id}:${s}`).toBeTruthy()));
 
-    const car = createCar('bavaria_318', ['vacuum'], rng());
+    const car = mk('bavaria_318', ['vacuum']);
     r.toggleHood(car);
     const vac = DEFECTS.vacuum;
     expect(causeStatus(car, vac)).toBe('open');
@@ -214,7 +248,7 @@ describe('Diagnose', () => {
   });
 
   it('nach der Reparatur verschwindet das Symptom aus der Akte', () => {
-    const car = createCar('bavaria_320', ['belt'], rng());
+    const car = mk('bavaria_320', ['belt']);
     observe(car, ['idle', 'sound', 'dash'], false);
     expect(car.observed.sort()).toEqual(['battery_lamp', 'squeal']);
     fix(car, inv(2), 'belt');
@@ -224,9 +258,9 @@ describe('Diagnose', () => {
   });
 
   it('Motorklang hängt am technischen Zustand', () => {
-    const quiet = createCar('bavaria_320', [], rng());
+    const quiet = mk('bavaria_320', []);
     expect(Object.values(soundProfile(quiet)).every((v) => v === 0)).toBe(true);
-    const car = createCar('bavaria_320', ['coil', 'belt', 'bearing', 'lifters', 'chain', 'vacuum'], rng());
+    const car = mk('bavaria_320', ['coil', 'belt', 'bearing', 'lifters', 'chain', 'vacuum']);
     const p = soundProfile(car);
     expect([p.misfire, p.squeal, p.knock, p.tick, p.rattle, p.hiss].every((v) => v > 0)).toBe(true);
     fix(car, inv(4), 'belt');
@@ -243,7 +277,7 @@ describe('Markt und Verhandlung', () => {
     for (const d of DEFECT_LIST) expect(text).not.toContain(d.name);
     expect(l.hints.length).toBeGreaterThanOrEqual(4);
     expect(r.knownDefects(l.car)).toEqual([]);
-    const fixed = createCar('bavaria_320', [], rng(), { year: 2007, km: 189000, testDriven: true });
+    const fixed = mk('bavaria_320', [], 42, { year: 2007, km: 189000, testDriven: true });
     expect(valuate(fixed).offer).toBeGreaterThan(l.asking + 500);
   });
 
@@ -263,16 +297,16 @@ describe('Markt und Verhandlung', () => {
   });
 
   it('Verkäufertypen reagieren verschieden; wer alles weiß, lässt sich kaum drücken', () => {
-    const mk = (profile: string) => {
-      const car = createCar('bavaria_325', ['coil', 'gasket', 'belt'], rng(7), { year: 2008, km: 170000 });
+    const deal = (profile: string) => {
+      const car = mk('bavaria_325', ['coil', 'gasket', 'belt'], 7, { year: 2008, km: 170000 });
       const l = createListing(car, rng(7), 1, SELLERS[profile]);
       ['listen', 'dash', 'hood', 'under'].forEach((c) => inspectListing(l, c));
       const before = l.minPrice;
       makeOffer(l, 1, l.hints);
       return { asking: l.asking, drop: before - l.minPrice };
     };
-    const naive = mk('private');
-    const expert = mk('tinkerer');
+    const naive = deal('private');
+    const expert = deal('tinkerer');
     expect(expert.asking).toBeLessThan(naive.asking); // Schrauber hat die Mängel eingepreist
     expect(naive.drop).toBeGreaterThan(expert.drop * 3); // und gibt auf Argumente kaum nach
   });
@@ -308,7 +342,7 @@ describe('Markt und Verhandlung', () => {
         expect(ls.some((l) => l.asking <= money)).toBe(true);
       }
     }
-    const good = createCar('bavaria_320', [], rng(), { testDriven: true });
+    const good = mk('bavaria_320', [], 42, { testDriven: true });
     expect(valuate(good, 1.1).offer).toBeGreaterThan(valuate(good, 0.9).offer);
   });
 });
@@ -320,20 +354,23 @@ describe('Kundenaufträge', () => {
       const { car } = createJobOffer(g);
       const job = car.job!;
       expect(job.complaint.length).toBeGreaterThan(10);
-      expect(billJob(car).done).toBe(false);
+      expect(billJob(car).done, job.category).toBe(false);
       const i = inv(6);
       job.required.forEach((d) => fix(car, i, d));
+      if (job.service === 'oil_change') {
+        expect(billJob(car).done).toBe(false); // Wartung noch nicht gemacht
+        service(car);
+      }
       const bill = billJob(car);
       expect(bill.done, job.category).toBe(true);
-      expect(bill.total).toBeGreaterThan(job.fee);
-      expect(bill.profit).toBeGreaterThanOrEqual(job.fee);
+      expect(bill.total).toBeGreaterThanOrEqual(job.fee);
     }
     expect(new Set(JOB_TEMPLATES.map((t) => t.category)).size).toBeGreaterThanOrEqual(5);
   });
 
   it('halb zerlegt oder nur Nebensache repariert: nicht abrechenbar; Zusatzarbeit wird bezahlt', () => {
-    const car = createCar('bavaria_318', ['coil', 'belt'], rng());
-    car.job = { id: 'j', customer: 'Frau Test', complaint: 'ruckelt', category: 'Motorproblem', fee: 130, required: ['coil'], initial: ['coil', 'belt'] };
+    const car = mk('bavaria_318', ['coil', 'belt']);
+    car.job = { id: 'j', customer: 'Frau Test', complaint: 'ruckelt', category: 'Motorproblem', fee: 130, required: ['coil'], initial: ['coil', 'belt'], approved: ['belt'] };
     const i = inv(4);
     fix(car, i, 'belt');
     expect(billJob(car).done).toBe(false);
@@ -345,6 +382,8 @@ describe('Kundenaufträge', () => {
     const bill = billJob(car);
     expect(bill.done).toBe(true);
     expect(bill.lines.some((l) => l.label.includes('Zusatzarbeit'))).toBe(true);
+    car.job.approved = [];
+    expect(billJob(car).lines.some((l) => l.label.includes('Zusatzarbeit'))).toBe(false); // ohne Freigabe keine Rechnung
   });
 });
 
@@ -367,7 +406,297 @@ describe('Spielstand', () => {
     expect(car.components.valve_cover.bolts).toEqual([2, 2, 0, 0, 2, 2]); // unterbrochene Reparatur bleibt erhalten
     expect(car.components.engine_cover.installed).toBe(true);
     expect(car.observed).toEqual([]);
+    // Felder der neuen Version bekommen feste Standardwerte
+    expect(car.fluids.oil.level).toBeGreaterThan(2);
+    expect(car.components.drain_plug.installed && car.components.battery.condition === 'ok').toBe(true);
+    expect(Object.keys(car.zones).length).toBe(6);
+    expect(normalizeCar(old)!.fluids).toEqual(car.fluids); // kein Würfeln bei jedem Laden
+    expect(car.keep).toBe(false);
     expect(car.purchasePrice).toBe(4600);
     expect(r.activeDefects(car)).toEqual(['coil']);
+  });
+});
+
+describe('Betriebsflüssigkeiten', () => {
+  it('kompletter Ölwechsel: ablassen, Filter, Schraube, richtiges Öl, Stand prüfen', () => {
+    const car = createCar('bavaria_325', [], rng());
+    car.fluids.oil = { level: 5.2, quality: 0.2, product: 'oil_5w40', filterFresh: false };
+    const st = stock();
+    const i = inv(2);
+    expect(fl.serviceState(car).oilChanged).toBe(false);
+    expect(fl.checkFluid(car, 'oil', 1).ok).toBe(false); // Haube zu
+    r.toggleHood(car);
+    expect(fl.checkFluid(car, 'oil', 1).message).toContain('überaltert');
+    expect(car.checked.oil?.level).toBe(5.2);
+    // Nachfüllen allein macht altes Öl nicht neu
+    fl.addFluid(car, st, 'oil', 'oil_5w40', 1);
+    expect(fl.serviceState(car).oilChanged).toBe(false);
+    r.toggleHood(car);
+    r.toggleLift(car);
+    remove(car, i, 'drain_plug');
+    expect(car.fluids.oil.level).toBe(0);
+    expect(r.engineBlocker(car)).toBeTruthy();
+    install(car, i, 'drain_plug');
+    r.toggleLift(car);
+    r.toggleHood(car);
+    remove(car, i, 'oil_filter');
+    expect(fl.addFluid(car, st, 'oil', 'oil_5w40', 1).ok).toBe(false); // ohne Filter
+    expect(r.componentAction(car, inv(0), 'oil_filter', driver(COMPONENT_MAP.oil_filter.removeWith)).needsPart).toBe('oil_filter'); // alter Filter kommt nicht wieder rein
+    install(car, i, 'oil_filter');
+    expect(i.oil_filter).toBe(1);
+    expect(fl.addFluid(car, st, 'oil', 'coolant', 1).ok).toBe(false); // falscher Behälter
+    expect(fl.addFluid(car, st, 'oil', 'oil_5w40', 6.5).ok).toBe(true);
+    expect(st.oil_5w40).toBe(12.5); // 1 l vorhin + 6,5 l jetzt
+    expect(fl.checkFluid(car, 'oil', 2).message).toContain('in Ordnung');
+    expect(fl.serviceState(car).oilChanged).toBe(true);
+    expect(r.engineBlocker(car)).toBeNull();
+  });
+
+  it('falsches Öl, Überfüllen und leeres Lager haben Folgen', () => {
+    const car = mk('bavaria_320', []);
+    car.fluids.oil.level = 0;
+    r.toggleHood(car);
+    const st = stock();
+    fl.addFluid(car, st, 'oil', 'oil_5w40', 4.5); // Vierzylinder braucht 5W-30
+    expect(fl.serviceState(car).oilOk).toBe(false);
+    expect(valuate({ ...car, testDriven: true }).deductions.some((d) => d.label.includes('Motoröl'))).toBe(true);
+    expect(fl.addFluid(car, { ...st, oil_5w30: 0 }, 'oil', 'oil_5w30', 1).ok).toBe(false);
+    fl.addFluid(car, st, 'oil', 'oil_5w30', 5);
+    expect(car.fluids.oil.product).toBe('mixed');
+    expect(car.fluids.oil.level).toBeLessThanOrEqual(4.5 * 1.1 + 0.05);
+  });
+
+  it('Kühlsystem: Öffnen lässt Kühlmittel ab, danach auffüllen und bei laufendem Motor entlüften', () => {
+    const car = mk('bavaria_320', ['water_pump']);
+    const i = inv(2);
+    const st = stock();
+    r.toggleHood(car);
+    const order: string[] = [];
+    removeDeep(car, i, 'water_pump', order);
+    expect(car.fluids.coolant.air).toBe(true);
+    expect(fl.fill(car, 'coolant')).toBeLessThan(0.5);
+    expect(fl.addFluid(car, st, 'coolant', 'coolant', 5).ok).toBe(false); // System noch offen
+    order.reverse().forEach((id) => install(car, i, id));
+    expect(fl.fluidSymptoms(car)).toContain('temp_high');
+    expect(fl.bleedCoolant(car, true).ok).toBe(false); // erst auffüllen
+    fl.addFluid(car, st, 'coolant', 'coolant', 7);
+    expect(fl.bleedCoolant(car, false).ok).toBe(false); // Motor muss laufen
+    expect(fl.bleedCoolant(car, true).ok).toBe(true);
+    expect(fl.fluidSymptoms(car)).not.toContain('temp_high');
+    expect(presentSymptoms(car)).toEqual([]);
+  });
+
+  it('Bremsflüssigkeit: beide Seiten entlüften, mit Schlüssel, Rad ab, Vorrat nötig', () => {
+    const car = mk('bavaria_320', []);
+    car.fluids.brake = { level: 0.8, quality: 0.15, air: true, bled: { fl: false, fr: false } };
+    expect(presentSymptoms(car)).toEqual(['brake_soft']);
+    const st = stock();
+    const wrench: Toolset = { active: 'wrench', carried: ['wrench'] };
+    expect(fl.bleedBrake(car, st, 'fl', wrench).ok).toBe(false); // nicht angehoben
+    r.toggleLift(car);
+    expect(fl.bleedBrake(car, st, 'fl', wrench).ok).toBe(false); // Rad dran
+    remove(car, inv(), 'wheel_fl');
+    remove(car, inv(), 'wheel_fr');
+    expect(fl.bleedBrake(car, st, 'fl', HAND).ok).toBe(false);
+    expect(fl.bleedBrake(car, { ...st, brake_fluid: 0.2 }, 'fl', wrench).ok).toBe(false);
+    expect(fl.bleedBrake(car, st, 'fl', wrench).ok).toBe(true);
+    expect(car.fluids.brake.air).toBe(true); // eine Seite reicht nicht
+    expect(fl.bleedBrake(car, st, 'fr', wrench).ok).toBe(true);
+    expect(car.fluids.brake).toMatchObject({ air: false, quality: 1 });
+    expect(st.brake_fluid).toBe(4);
+  });
+
+  it('undichte Autos verlieren über Nacht Flüssigkeit; Füllmengen sind je Motor verschieden', () => {
+    const car = mk('bavaria_330', ['oil_pan', 'coolant_hose']);
+    const before = { ...car.fluids.oil }.level;
+    fl.dailyLeaks(car);
+    expect(car.fluids.oil.level).toBeLessThan(before);
+    expect(car.fluids.coolant.level).toBeLessThan(CAR_MODELS.bavaria_330.coolantCapacity);
+    expect(fl.capacity(mk('bavaria_318', []), 'oil')).toBeLessThan(fl.capacity(car, 'oil'));
+  });
+});
+
+describe('Aufbereitung und Lack', () => {
+  const dirty = () => {
+    const car = mk('bavaria_320', []);
+    for (const z of Object.values(car.zones)) Object.assign(z, { dirt: 0.9, step: 0, shine: 0.3, rust: 0 });
+    car.interior = { seats: 0.8, dash: 0.8, floor: 0.8 };
+    return car;
+  };
+
+  it('Waschen braucht die richtige Reihenfolge je Bereich', () => {
+    const car = dirty();
+    expect(washAction(car, 'front', 'foam').ok).toBe(false); // erst vorspülen
+    expect(washAction(car, 'front', 'towel').ok).toBe(false);
+    for (const t of ['washer', 'foam', 'washer', 'towel'] as ToolId[]) expect(washAction(car, 'front', t).ok).toBe(true);
+    expect(car.zones.front.dirt).toBe(0);
+    expect(washAction(car, 'wheels', 'washer').ok).toBe(true);
+    expect(washAction(car, 'wheels', 'foam').ok).toBe(false); // Felgen werden gebürstet
+    expect(washAction(car, 'wheels', 'brush').ok).toBe(true);
+    expect(dirtLevel(car)).toBeGreaterThan(0.4); // der Rest ist noch schmutzig
+  });
+
+  it('Polieren nur auf sauberem Lack, Rost bleibt; Innenraum mit drei Geräten', () => {
+    const car = dirty();
+    expect(washAction(car, 'left', 'polisher').ok).toBe(false);
+    for (const t of ['washer', 'foam', 'washer', 'towel'] as ToolId[]) washAction(car, 'left', t);
+    car.zones.left.rust = 0.5;
+    expect(washAction(car, 'left', 'polisher').ok).toBe(true);
+    expect(car.zones.left.shine).toBeLessThan(0.8);
+    expect(car.zones.left.rust).toBe(0.5);
+    expect(washAction(car, 'left', 'vacuum').ok).toBe(false); // falsche Stelle
+    for (const t of ['vacuum', 'upholstery', 'cockpit'] as ToolId[]) expect(washAction(car, 'top', t).ok).toBe(true);
+    expect(car.interior).toEqual({ seats: 0, dash: 0, floor: 0 });
+  });
+
+  it('Aufbereitung hebt den Preis nur begrenzt und rettet kein defektes Auto', () => {
+    const base = mk('bavaria_320', [], 42, { testDriven: true });
+    for (const z of Object.values(base.zones)) Object.assign(z, { dirt: 0.3, shine: 0.5, rust: 0 });
+    base.interior = { seats: 0.3, dash: 0.3, floor: 0.3 };
+    const clean = detail(JSON.parse(JSON.stringify(base)));
+    const gain = valuate(clean).value - valuate(base).value;
+    expect(gain).toBeGreaterThan(0);
+    expect(gain).toBeLessThan(base.cleanValue * 0.06);
+    const wreck = mk('bavaria_320', ['bearing', 'alternator', 'gasket'], 42, { testDriven: true });
+    const wreckClean = detail(JSON.parse(JSON.stringify(wreck)));
+    expect(valuate(wreckClean).value).toBeLessThan(valuate(clean).value - 3500);
+    expect(detailFactor(dirty()).some((f) => f.pct < 0)).toBe(true);
+  });
+
+  it('Lackierkabine: Rost schleifen, dann lackieren; fertig erst, wenn alle Bereiche einheitlich sind', () => {
+    const car = detail(mk('bavaria_328_klassik', []));
+    car.zones.rear.rust = 0.6;
+    const pct = (c: CarInstance) => detailFactor(c).reduce((s, f) => s + f.pct, 0);
+    const rusty = pct(car);
+    expect(paintAction(car, 'rear', 'spraygun', '#101114', 5000).ok).toBe(false); // Rost zuerst
+    expect(paintAction(car, 'rear', 'sander', '#101114', 5000).ok).toBe(true);
+    expect(rustLevel(car)).toBe(0);
+    expect(paintAction(car, 'rear', 'spraygun', '#101114', 10).ok).toBe(false); // kein Geld
+    let cost = 0;
+    for (const z of BODY_ZONES) {
+      const res = paintAction(car, z, 'spraygun', '#101114', 5000);
+      expect(res.ok).toBe(true);
+      cost += res.cost ?? 0;
+      if (z !== BODY_ZONES[BODY_ZONES.length - 1]) expect(pct(car)).toBeLessThan(0.05); // halb lackiert bringt Abzug
+    }
+    expect(cost).toBe(PAINT_COST * 5);
+    expect(car.color).toBe('#101114');
+    expect(shineLevel(car)).toBe(1);
+    expect(pct(car)).toBeGreaterThan(rusty);
+  });
+});
+
+describe('Werkstattausbau und Scheunenfunde', () => {
+  it('Stellplätze kommen mit den Ausbaustufen', () => {
+    expect(availableSlots([]).map((s) => s.kind)).toEqual(['lift', 'lift', 'park']);
+    expect(availableSlots(['parking']).filter((s) => s.kind === 'park').length).toBe(4);
+    expect(availableSlots(['parking', 'wash', 'paint', 'expansion']).length).toBe(SLOTS.length);
+    expect(UPGRADES.map((u) => u.stage)).toEqual([2, 3, 4, 5]);
+  });
+
+  it('Scheunenfund: selten, verdreckt, rostig, tot – und nur Schritt für Schritt zu retten', () => {
+    const g = rng(5);
+    for (let n = 0; n < 12; n++) {
+      const l = createBarnFind(g, 1, 3);
+      const car = l.car;
+      expect(CAR_MODELS[car.modelId].rare).toBe(true);
+      expect(car.rarity).toBeGreaterThanOrEqual(1);
+      expect(dirtLevel(car)).toBeGreaterThan(0.6);
+      expect(rustLevel(car)).toBeGreaterThan(0.05);
+      expect(r.engineBlocker(car)).toBeTruthy();
+      expect(r.activeDefects(car)).toEqual(expect.arrayContaining(['battery', 'tires']));
+      expect(Object.values(car.components).some((c) => !c.installed)).toBe(true); // fehlende Teile
+      expect(inspectListing(l, 'drive')).toContain('ausgeschlossen');
+      expect(l.asking).toBeLessThan(car.cleanValue * 0.3);
+      expect(l.expiresDay).toBe(6);
+      // Restauriert ist er ein Vielfaches wert
+      const restored = detail(service(JSON.parse(JSON.stringify(car)) as CarInstance));
+      Object.values(restored.components).forEach((c) => Object.assign(c, { installed: true, condition: 'ok', connected: true, bolts: c.bolts.map(() => 2) }));
+      restored.testDriven = true;
+      expect(valuate(restored).value).toBeGreaterThan(l.asking * 3);
+      expect(valuate(car).value).toBeLessThan(valuate(restored).value * 0.6);
+    }
+    expect(fillListings([createBarnFind(g, 1, 3)], 6000, g).length).toBe(5); // zählt nicht zum normalen Markt
+    expect(refreshListings([createBarnFind(g, 1, 3)], 6000, g, 1, 9).some((l) => l.barn)).toBe(false); // abgelaufen
+  });
+});
+
+describe('Auktionen', () => {
+  it('Händler bieten nachvollziehbar bis zu ihrem Limit; Ergebnis ist reproduzierbar', () => {
+    const run = (stepMs: number) => {
+      const a = createAuction(rng(11), 1, 1_000_000);
+      for (let t = a.startsAt; !a.result && t < a.startsAt + 3_600_000; t += stepMs) advanceAuction(a, t);
+      return a;
+    };
+    const fine = run(1000);
+    const coarse = run(1_800_000); // Spiel war geschlossen, ein großer Sprung
+    expect(fine.result).toBeTruthy();
+    expect([coarse.result, coarse.current, coarse.leader]).toEqual([fine.result, fine.current, fine.leader]);
+    const top = Math.max(0, ...fine.bidders.map((b) => b.limit));
+    expect(fine.current).toBeLessThanOrEqual(Math.max(top, fine.startBid));
+    if (fine.leader) expect(fine.bidders.find((b) => b.name === fine.leader)!.limit).toBeGreaterThanOrEqual(fine.current);
+  });
+
+  it('Gebotsregeln: Mindestschritt, Geld, kein Überbieten des eigenen Gebots; gewinnen und verlieren', () => {
+    let won = 0;
+    let lost = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const a = createAuction(rng(seed), 1, 0);
+      expect(placeBid(a, minBid(a) - 10, 1e6, 1000).ok).toBe(false);
+      expect(placeBid(a, minBid(a), 100, 1000).ok).toBe(false);
+      expect(placeBid(a, minBid(a), 1e6, 1000).ok).toBe(true);
+      expect(placeBid(a, minBid(a), 1e6, 1500).ok).toBe(false);
+      expect(heldMoney([a])).toBe(a.current);
+      // einmal bieten und abwarten
+      advanceAuction(a, a.endsAt + 3_600_000);
+      expect(a.result).toBeTruthy();
+      expect(placeBid(a, a.current + 500, 1e6, a.endsAt + 1).ok).toBe(false);
+      a.result === 'won' ? won++ : lost++;
+    }
+    expect(lost).toBeGreaterThan(5); // ein Mindestgebot reicht meistens nicht
+    expect(won + lost).toBe(30);
+  });
+
+  it('wer über dem höchsten Händlerlimit bietet, gewinnt – auch gegen späte Bieter', () => {
+    const a = createAuction(rng(4), 1, 0);
+    const top = Math.max(a.startBid, ...a.bidders.map((b) => b.limit));
+    expect(placeBid(a, top + a.increment, 1e6, 1000).ok).toBe(true);
+    advanceAuction(a, a.endsAt + 3_600_000);
+    expect(a.result).toBe('won');
+    expect(a.report.join(' ')).not.toMatch(/Zündspule|Lager|Dichtung/);
+  });
+});
+
+describe('Ereignisse', () => {
+  it('treten nicht ständig auf, passen zum Fortschritt und bringen fertige Daten mit', () => {
+    const g = rng(9);
+    let total = 0;
+    const seen = new Set<string>();
+    for (let day = 1; day <= 200; day++) {
+      const ev = rollEvents([], g, { day, marketIndex: 1, deals: 0, now: 0 });
+      total += ev.length;
+      ev.forEach((e) => seen.add(e.type));
+    }
+    expect(total).toBeGreaterThan(60);
+    expect(total).toBeLessThan(140);
+    expect(seen.has('barn_hint')).toBe(false); // erst nach ein paar Geschäften
+    expect(seen.has('rare_auction')).toBe(false);
+    const later = new Set<string>();
+    for (let day = 1; day <= 300; day++) rollEvents([], g, { day, marketIndex: 1, deals: 5, now: 0 }).forEach((e) => later.add(e.type));
+    expect([...later].sort()).toEqual(['barn_hint', 'parts_sale', 'rare_auction', 'special_listing', 'urgent_job']);
+  });
+
+  it('abgelaufene verschwinden, gleiche Art nicht doppelt, höchstens drei aktiv', () => {
+    const g = rng(2);
+    let ev = rollEvents([], g, { day: 1, marketIndex: 1, deals: 5, now: 0 });
+    for (let day = 1; day <= 60; day++) {
+      ev = rollEvents(ev, g, { day, marketIndex: 1, deals: 5, now: 0 });
+      expect(ev.length).toBeLessThanOrEqual(3);
+      expect(new Set(ev.map((e) => e.type)).size).toBe(ev.length);
+      expect(ev.every((e) => e.expiresDay >= day)).toBe(true);
+    }
+    const barn = [...Array(400)].map((_, d) => rollEvents([], g, { day: d, marketIndex: 1, deals: 5, now: 0 })).flat().find((e) => e.type === 'barn_hint')!;
+    expect(barn.listing!.barn).toBe(true);
+    expect(barn.text).not.toContain(CAR_MODELS[barn.listing!.car.modelId].name); // der Hinweis verrät nicht alles
   });
 });

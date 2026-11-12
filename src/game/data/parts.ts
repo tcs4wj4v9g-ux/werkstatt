@@ -25,6 +25,9 @@ export const PARTS: Record<PartId, PartDef> = {
   rod_bearing: { id: 'rod_bearing', name: 'Pleuellager-Satz', price: 380, units: 1, desc: 'Lagerschalen inkl. Schrauben – teure Motorreparatur' },
   lifters: { id: 'lifters', name: 'Hydrostößel-Satz', price: 160, units: 1, desc: 'Ventilspielausgleich, kompletter Satz' },
   chain_tensioner: { id: 'chain_tensioner', name: 'Steuerkettenspanner', price: 95, units: 1, desc: 'hydraulischer Kettenspanner' },
+  oil_filter: { id: 'oil_filter', name: 'Ölfilter', price: 14, units: 1, desc: 'Filtereinsatz mit Dichtring – bei jedem Ölwechsel neu' },
+  battery: { id: 'battery', name: 'Starterbatterie', price: 115, units: 1, desc: '12 V, 70 Ah' },
+  tire: { id: 'tire', name: 'Reifen (Paar Vorderachse)', price: 180, units: 2, desc: 'zwei neue Reifen, auf Felge montiert' },
 };
 
 export const PART_LIST = Object.values(PARTS);
