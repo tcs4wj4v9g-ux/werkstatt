@@ -17,6 +17,12 @@ function TestHook() {
   return null;
 }
 
+/**
+ * Testmodus (`?test` in der Adresse): halbe Auflösung, keine Schatten, keine Kantenglättung.
+ * Nur für automatisierte Browser-Tests ohne Grafikkarte – Spiellogik und Tipp-Erkennung sind unverändert.
+ */
+const TEST_MODE = new URLSearchParams(window.location.search).has('test');
+
 export function App() {
   const stored = useGame((s) => s.screen);
   const hasListings = useGame((s) => (s.marketSource === 'auctions' ? s.auctions.length : s.listings.length) > 0);
@@ -34,7 +40,7 @@ export function App() {
 
   return (
     <div className="app">
-      <Canvas shadows dpr={[1, 1.6]} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
+      <Canvas shadows={!TEST_MODE} dpr={TEST_MODE ? 0.5 : [1, 1.6]} gl={{ antialias: !TEST_MODE }} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
         <TestHook />
         {screen === 'menu' && <MarketScene showroom />}
         {screen === 'market' && <MarketScene />}

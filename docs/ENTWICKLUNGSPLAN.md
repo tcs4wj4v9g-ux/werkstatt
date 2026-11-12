@@ -48,3 +48,4 @@ Alle drei Pakete sind umgesetzt und gehen gemeinsam in einen Pull Request.
 - Bewusste Grenzen: Die Standorte sind Erweiterungen desselben Geländes (kein getrennter zweiter Ort mit eigenem Fuhrpark); Glühkerzen sitzen spielmechanisch unter der Einspritzdüse; Biturbo-Motoren haben ein Lader-Bauteil; hinten gibt es weiterhin keine demontierbaren Räder/Bremsen.
 - iPad-Leistung: Auf den Hebebühnen wird nur das Auto mit Motorraum und Schrauben aufgebaut, an dem gearbeitet wird (`detailed` in `GarageScene.tsx`); im Markt nur das besichtigte Auto.
 - Mögliche nächste Schritte: getrennte Standorte mit eigenem Fuhrpark, zerlegbare Hinterachse, weitere Spezialgeräte (Reifenmontage, Achsvermessung), mehr Sammlermodelle.
+- Browser-Durchläufe liegen jetzt im Repository unter `e2e/` (Start: `e2e/run.sh`, Testmodus `?test` mit reduzierter Grafik). Endstand: 219 Prüfpunkte in sieben Durchläufen grün.
