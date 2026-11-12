@@ -19,6 +19,8 @@ export interface CarHandlers {
   onBolt(id: string, index: number): void;
   onConnector(id: string): void;
   onFluid(id: FluidId): void;
+  /** Entlüfternippel am Bremssattel. */
+  onBleed(side: 'fl' | 'fr'): void;
 }
 
 interface Props {
@@ -434,6 +436,37 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           </mesh>,
         )}
         {bolts(`caliper_${s}`, [[WX - 0.06, cy, z(0.78)], [WX + 0.06, cy, z(0.78)]], axis)}
+        {/* Entlüfternippel oben am Bremssattel; nach dem Entlüften steckt ein Schlauch mit Auffangflasche daran */}
+        {installed(`caliper_${s}`) && (
+          <group
+            position={[WX + 0.075, cy + 0.07, z(0.8)]}
+            rotation={[sign * 0.6, 0, 0]}
+            userData={{ liveId: `caliper_${s}`, label: interactive ? `Entlüfternippel vorne ${s === 'fl' ? 'links' : 'rechts'}${car!.fluids.brake.bled[s] ? ' (entlüftet)' : ''}` : undefined }}
+            onClick={interactive ? tap(() => handlers!.onBleed(s)) : undefined}
+          >
+            <mesh>
+              <cylinderGeometry args={[0.009, 0.012, 0.035, 8]} />
+              <meshStandardMaterial color="#c9a54a" metalness={0.9} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, 0.02, 0]}>
+              <sphereGeometry args={[0.012, 8, 6]} />
+              <meshStandardMaterial color="#1b1d21" roughness={0.6} />
+            </mesh>
+            {car?.fluids.brake.bled[s] && (
+              <>
+                <mesh position={[0, 0.07, z(0.05)]} rotation={[sign * 0.9, 0, 0]}>
+                  <cylinderGeometry args={[0.006, 0.006, 0.13, 6]} />
+                  <meshStandardMaterial color="#d9e9f2" transparent opacity={0.7} />
+                </mesh>
+                <mesh position={[0, 0.02, z(0.13)]}>
+                  <cylinderGeometry args={[0.035, 0.035, 0.1, 12]} />
+                  <meshStandardMaterial color="#e9e6d8" transparent opacity={0.85} />
+                </mesh>
+              </>
+            )}
+            {interactive && <Hit r={0.05} />}
+          </group>
+        )}
         <group ref={wheelRef} position={[WX, WY, z(WZ)]}>
           {part(`wheel_${s}`, <WheelMeshes geo={geo.tire} out={sign} dirt={wheelDirt} />)}
           <group position={[-WX, -WY, -z(WZ)]}>{bolts(`wheel_${s}`, lug, axis)}</group>

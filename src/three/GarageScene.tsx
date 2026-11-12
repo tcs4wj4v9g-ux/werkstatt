@@ -171,6 +171,7 @@ function Bay({ index }: { index: number }) {
       onConnector: (id: string) => g().tapConnector(index, id),
       onBody: (zone?: ZoneId) => g().tapBody(index, zone),
       onFluid: () => g().setPanel('fluids', index),
+      onBleed: (side: 'fl' | 'fr') => g().bleedBrake(index, side),
     };
   }, [index]);
   const useLift = useMemo(() => () => useGame.getState().tapLift(index), [index]);
@@ -319,7 +320,7 @@ function Parked({ slot }: { slot: number }) {
   const handlers = useMemo(() => {
     const g = useGame.getState;
     const lift = () => g().say('Für Arbeiten an Motor und Fahrwerk das Auto auf eine Hebebühne umparken.', true);
-    return { onHood: lift, onBody: (zone?: ZoneId) => g().tapBody(slot, zone), onComponent: lift, onBolt: lift, onConnector: lift, onFluid: lift };
+    return { onHood: lift, onBody: (zone?: ZoneId) => g().tapBody(slot, zone), onComponent: lift, onBolt: lift, onConnector: lift, onFluid: lift, onBleed: lift };
   }, [slot]);
   if (!car) return null;
   const def = SLOTS[slot];

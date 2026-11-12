@@ -21,7 +21,7 @@ export function FluidModal() {
   const steps: Record<FluidId, string> = {
     oil: `Ölwechsel: Auto anheben, Auffangwanne unterstellen, Ablassschraube lösen (Ratsche + 17er Nuss), wieder eindrehen, ablassen, Ölfilter tauschen (Schraubenschlüssel), ${model.oilCapacity} l ${FLUID_PRODUCTS[model.oilSpec].name} einfüllen, Stand prüfen.`,
     coolant: 'Nach Arbeiten an Wasserpumpe, Thermostat oder Schlauch: auffüllen, Motor starten, entlüften, nachfüllen.',
-    brake: 'Wechsel: Auto anheben, beide Vorderräder ab, mit dem Schraubenschlüssel an jeder Seite entlüften (je 0,5 l frische Flüssigkeit).',
+    brake: 'Wechsel: Auto anheben, beide Vorderräder ab, Schraubenschlüssel holen und den Entlüfternippel oben am Bremssattel antippen – an beiden Seiten (je 0,5 l frische Flüssigkeit aus dem Lager).',
   };
   return (
     <Modal title={`Betriebsflüssigkeiten – ${model.name}`} onClose={() => s.setPanel(null)} wide>
