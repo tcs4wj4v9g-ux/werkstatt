@@ -194,4 +194,4 @@ h3.small { font-size: 15px; }
 .newsbadge { position: absolute; left: calc(10px + var(--sal)); bottom: calc(190px + var(--sab)); background: var(--bg); border: 1px solid #ffd23f; border-radius: 12px; padding: 6px 10px; font-size: 13px; font-weight: 700; pointer-events: none !important; }
 .car-actions { max-height: calc(100% - 300px); overflow-y: auto; touch-action: pan-y; }
 .note .btn { margin-left: 10px; }
-.toast { bottom: calc(190px + var(--sab)); }
+.toast { bottom: calc(250px + var(--sab)); }
