@@ -157,6 +157,11 @@ function Bay({ index }: { index: number }) {
   const car = useGame((s) => s.cars[index]);
   const up = useGame((s) => (s.cars[index] ? s.cars[index]!.lifted : s.liftUp[index]));
   const tool = useGame((s) => s.tool);
+  // iPad-Leistung: Motorraum, Schrauben und Bremsen werden nur an dem Auto aufgebaut, an dem gerade gearbeitet wird
+  // (Spieler steht daneben, Haube offen, angehoben oder Motor läuft). Alle anderen Bühnenautos zeigen die einfache Darstellung.
+  const near = useFocus((f) => f.nearBay === index);
+  const running = useGame((s) => s.engineBay === index);
+  const detailed = near || running || !!car?.hoodOpen || !!car?.lifted || up;
   const carriage = useRef<THREE.Group>(null);
   const target = up ? LIFT_HEIGHT : 0;
   const z = SLOTS[index].z;
@@ -287,7 +292,7 @@ function Bay({ index }: { index: number }) {
             ))}
           </group>
         ))}
-        {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} />}
+        {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} lod={detailed ? 'full' : 'simple'} hoodTap />}
       </group>
       <Blob />
     </group>

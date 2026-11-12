@@ -35,6 +35,8 @@ interface Props {
   /** 'simple' lässt Motorraum, Schrauben und Bremsenteile weg (Hof, Waschplatz, Markt). */
   lod?: 'full' | 'simple';
   steer?: React.MutableRefObject<number>;
+  /** Motorhaube auch in der einfachen Darstellung bedienbar (Auto auf einer Hebebühne, aber gerade nicht in Arbeit). */
+  hoodTap?: boolean;
   /** Modell für Front, Felgen und Auspuff, falls kein `car` übergeben wird. */
   modelId?: string;
 }
@@ -252,7 +254,7 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
   attr.needsUpdate = true;
 }
 
-export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, modelId }: Props) {
+export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, modelId, hoodTap }: Props) {
   const shared = useMemo(() => carGeometry(body), [body]);
   // Eigene Kopien je Auto, weil jede Karosserie ihre eigene Einfärbung trägt.
   const geo = useMemo(() => ({ shell: shared.shell.clone(), cabin: shared.cabin.clone(), hood: shared.hood.clone(), tire: shared.tire }), [shared, car?.uid]);
@@ -1243,8 +1245,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           geometry={geo.hood}
           material={mats.paint}
           castShadow
-          userData={{ label: interactive ? (hoodOpen ? 'Motorhaube schließen' : 'Motorhaube öffnen') : undefined }}
-          onClick={interactive ? tap(handlers!.onHood) : bodyTap}
+          userData={{ label: interactive || (hoodTap && handlers) ? (hoodOpen ? 'Motorhaube schließen' : 'Motorhaube öffnen') : undefined }}
+          onClick={interactive || (hoodTap && handlers) ? tap(handlers!.onHood) : bodyTap}
         />
       </group>
 
