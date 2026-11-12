@@ -109,7 +109,8 @@ export function bleedBrake(car: CarInstance, stock: FluidStock, side: 'fl' | 'fr
   if (!car.lifted) return fail('Zum Entlüften muss das Auto auf der Hebebühne angehoben sein.');
   if (car.components[`wheel_${side}`].installed) return fail('Erst das Rad abnehmen – der Entlüfternippel sitzt am Bremssattel.');
   if (!isComplete(car, `caliper_${side}`)) return fail('Der Bremssattel muss montiert sein.');
-  if (tools.active !== 'wrench') return fail('Den Entlüfternippel öffnest du mit dem Schraubenschlüssel.');
+  if (tools.active !== 'wrench' && !tools.carried.includes('wrench')) return fail('Den Entlüfternippel öffnest du mit dem Schraubenschlüssel – hol ihn aus dem Werkzeugschrank.');
+  if (tools.active !== 'wrench' && tools.active !== 'hand') return fail('Den Entlüfternippel öffnest du mit dem Schraubenschlüssel.');
   const b = car.fluids.brake;
   if (b.bled[side]) return fail('Diese Seite ist schon entlüftet.');
   if (stock.brake_fluid < 0.5) return fail('Du brauchst 0,5 l frische Bremsflüssigkeit im Lager.');

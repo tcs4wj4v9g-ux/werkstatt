@@ -497,7 +497,8 @@ describe('Betriebsflüssigkeiten', () => {
     expect(fl.bleedBrake(car, st, 'fl', wrench).ok).toBe(false); // Rad dran
     remove(car, inv(), 'wheel_fl');
     remove(car, inv(), 'wheel_fr');
-    expect(fl.bleedBrake(car, st, 'fl', HAND).ok).toBe(false);
+    expect(fl.bleedBrake(car, st, 'fl', { active: 'hand', carried: [] }).ok).toBe(false); // kein Schlüssel dabei
+    expect(fl.bleedBrake(car, st, 'fl', { active: 'ratchet', carried: ['ratchet', 'wrench'] }).ok).toBe(false); // falsches Werkzeug in der Hand
     expect(fl.bleedBrake(car, { ...st, brake_fluid: 0.2 }, 'fl', wrench).ok).toBe(false);
     expect(fl.bleedBrake(car, st, 'fl', wrench).ok).toBe(true);
     expect(car.fluids.brake.air).toBe(true); // eine Seite reicht nicht
