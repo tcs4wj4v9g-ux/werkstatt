@@ -174,3 +174,24 @@ h3.small { font-size: 15px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #1a0d00; }
 .chip.used { opacity: 0.5; }
 .panel.market { width: 350px; }
+
+/* --- Flüssigkeiten, Aufbereitung, Auktionen, Ausbau --- */
+.tabrow { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 8px; padding-bottom: 4px; touch-action: pan-x; }
+.tabrow .btn { white-space: nowrap; flex: 0 0 auto; padding: 8px 12px; font-size: 14px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.gauge { height: 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.12); overflow: hidden; margin: 8px 0 4px; }
+.gauge div { height: 100%; background: var(--good); }
+.gauge div.low { background: var(--bad); }
+.chip small { font-weight: 400; color: var(--dim); }
+.log { font-size: 12.5px; color: var(--dim); background: rgba(0, 0, 0, 0.25); border-radius: 10px; padding: 6px 10px; margin: 6px 0; }
+.price.live { color: var(--good); }
+.station { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(96px + var(--sab)); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; background: var(--bg); border: 1px solid #1f6fb2; border-radius: 16px; padding: 6px; max-width: 760px; }
+.station .tool { width: 84px; padding: 6px 4px; font-size: 12.5px; }
+.station .tool .ico { font-size: 22px; }
+.swatches { display: flex; gap: 6px; align-items: center; padding: 0 6px; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); touch-action: manipulation; }
+.swatch.on { border-color: #fff; box-shadow: 0 0 0 3px var(--accent); }
+.newsbadge { position: absolute; left: calc(10px + var(--sal)); bottom: calc(190px + var(--sab)); background: var(--bg); border: 1px solid #ffd23f; border-radius: 12px; padding: 6px 10px; font-size: 13px; font-weight: 700; pointer-events: none !important; }
+.car-actions { max-height: calc(100% - 300px); overflow-y: auto; touch-action: pan-y; }
+.note .btn { margin-left: 10px; }
+.toast { bottom: calc(190px + var(--sab)); }

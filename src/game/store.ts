@@ -904,7 +904,7 @@ export const useGame = create<GameState>()(
         merged.events = (p.events ?? []).filter((e: GameEvent) => e && e.id && e.type);
         merged.auctions = (p.auctions ?? []).filter((a: Auction) => a && a.car && a.bidders).map((a: Auction) => ({ ...a, car: normalizeCar(a.car)! }));
         merged.inventory = { ...emptyInventory(), ...(p.inventory ?? {}) };
-        merged.carried = (p.carried ?? []).filter((t: ToolId) => TOOL_MAP[t] && TOOL_MAP[t].kind !== 'builtin').slice(0, MAX_CARRIED);
+        merged.carried = (p.carried ?? []).filter((t: ToolId) => TOOL_MAP[t] && ['driver', 'socket', 'device'].includes(TOOL_MAP[t].kind)).slice(0, MAX_CARRIED);
         if (!TOOL_MAP[merged.tool] || (TOOL_MAP[merged.tool].kind !== 'builtin' && !merged.carried.includes(merged.tool))) merged.tool = 'hand';
         merged.listings = (p.listings ?? [])
           .filter((l: Listing) => l && l.profile && l.car)

@@ -3,10 +3,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { useGame } from '../game/store';
+import type { ZoneId } from '../game/types';
 import { CarModel } from './CarModel';
 import { Env } from './Env';
 import { Interactable } from './Interactable';
-import { BAY_Z, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, player, pushOutOf, REACH, useFocus } from './player';
+import { SLOTS, slotAvailable } from '../game/data/workshop';
+import { BAY_Z, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box } from './player';
+import { Yard } from './Yard';
 import { textTexture } from './textures';
 import { Workshop } from './Workshop';
 
@@ -90,7 +93,9 @@ function FirstPerson() {
         const dx = (-sin * moveInput.y + cos * moveInput.x) * k;
         const dz = (-cos * moveInput.y - sin * moveInput.x) * k;
         // Autos am Boden sind Hindernisse; unter angehobenen kann man durchlaufen.
-        const dynamic = s.cars.flatMap((c, i) => (c && !c.lifted ? [carBox(i)] : []));
+        const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted ? [carBox(i)] : []));
+        if (s.upgrades.includes('expansion')) dynamic.push({ minX: -22.9, maxX: -21.3, minZ: 0.1, maxZ: 3.9 });
+        if (s.upgrades.includes('paint')) dynamic.push({ minX: -22.9, maxX: -16, minZ: 8.6, maxZ: 9 });
         movePlayer(dx, dz, dynamic);
       }
     }
@@ -136,10 +141,8 @@ function FirstPerson() {
         }
         break;
       }
-      let nearBay = -1;
-      BAY_Z.forEach((z, i) => {
-        if (Math.abs(player.z - z) < 2.4 && Math.abs(player.x) < 4.6) nearBay = i;
-      });
+      const st = useGame.getState();
+      const nearBay = nearestSlot(player.x, player.z, (i) => slotAvailable(SLOTS[i], st.upgrades));
       const f = useFocus.getState();
       if (f.id !== id || f.label !== label || f.nearBay !== nearBay) f.set({ id, label, nearBay });
     }
@@ -163,13 +166,17 @@ function Bay({ index }: { index: number }) {
     const g = useGame.getState;
     return {
       onHood: () => g().tapHood(index),
-      onBody: () => g().tapBody(index),
       onComponent: (id: string) => g().tapComponent(index, id),
       onBolt: (id: string, i: number) => g().tapBolt(index, id, i),
       onConnector: (id: string) => g().tapConnector(index, id),
+      onBody: (zone?: ZoneId) => g().tapBody(index, zone),
+      onFluid: () => g().setPanel('fluids', index),
     };
   }, [index]);
   const useLift = useMemo(() => () => useGame.getState().tapLift(index), [index]);
+  const usePan = useMemo(() => () => useGame.getState().togglePan(index), [index]);
+  const pan = useGame((s) => s.drainPan[index]);
+  const drained = !!car && !car.components.drain_plug.installed;
 
   useEffect(() => {
     // Beim Ablassen niemanden unter dem Auto einklemmen.
@@ -229,6 +236,25 @@ function Bay({ index }: { index: number }) {
         </mesh>
       </Interactable>
 
+      {/* Ölauffangwanne: steht an der Säule oder unter dem Motor */}
+      <Interactable
+        id={`pan${index}`}
+        label={pan ? 'Auffangwanne wegräumen' : 'Auffangwanne unter den Motor stellen'}
+        onUse={usePan}
+        position={pan ? [1.3, 0, 0] : [0.75, 0, -inner * 1.45]}
+        halo={[0.7, 0.3, 0.7]}
+        haloPos={[0, 0.12, 0]}
+      >
+        <mesh position={[0, 0.09, 0]}>
+          <cylinderGeometry args={[0.3, 0.26, 0.16, 20]} />
+          <meshStandardMaterial color="#23262b" metalness={0.4} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 0.172, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.27, 20]} />
+          <meshStandardMaterial color={pan && drained ? '#0d0905' : '#3a3d42'} metalness={pan && drained ? 0.9 : 0.3} roughness={pan && drained ? 0.1 : 0.7} />
+        </mesh>
+      </Interactable>
+
       {/* Flecken auf dem Boden verraten Lecks */}
       {leak && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[1.4, 0.006, 0.1]}>
@@ -260,6 +286,47 @@ function Bay({ index }: { index: number }) {
         ))}
         {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} />}
       </group>
+      <Blob />
+    </group>
+  );
+}
+
+/** Weicher Kontaktschatten unter einem Auto – billig und macht viel aus. */
+function Blob() {
+  const tex = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d')!;
+    const grad = g.createRadialGradient(64, 64, 8, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(0,0,0,0.6)');
+    grad.addColorStop(0.6, 'rgba(0,0,0,0.3)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  }, []);
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} raycast={() => null}>
+      <planeGeometry args={[6.2, 3.2]} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} />
+    </mesh>
+  );
+}
+
+/** Auto auf einem Hofplatz, am Waschplatz oder in der Lackierkabine: vereinfachtes Modell, Karosserie antippbar. */
+function Parked({ slot }: { slot: number }) {
+  const car = useGame((s) => s.cars[slot]);
+  const handlers = useMemo(() => {
+    const g = useGame.getState;
+    const lift = () => g().say('Für Arbeiten an Motor und Fahrwerk das Auto auf eine Hebebühne umparken.', true);
+    return { onHood: lift, onBody: (zone?: ZoneId) => g().tapBody(slot, zone), onComponent: lift, onBolt: lift, onConnector: lift, onFluid: lift };
+  }, [slot]);
+  if (!car) return null;
+  const def = SLOTS[slot];
+  return (
+    <group position={[def.x, 0, def.z]} rotation={[0, def.rot, 0]}>
+      <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} lod="simple" />
+      <Blob />
     </group>
   );
 }
@@ -267,9 +334,10 @@ function Bay({ index }: { index: number }) {
 export function GarageScene() {
   return (
     <>
-      <color attach="background" args={['#15171b']} />
+      <color attach="background" args={['#9fc4e8']} />
       <Env intensity={0.45} />
-      <ambientLight intensity={0.35} />
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[-14, 16, 6]} intensity={1.1} />
       <hemisphereLight args={['#f4f8ff', '#3a3d42', 0.55]} />
       <directionalLight
         position={[2.5, 9, 1.5]}
@@ -290,8 +358,12 @@ export function GarageScene() {
       ))}
       <FirstPerson />
       <Workshop />
+      <Yard />
       <Bay index={0} />
       <Bay index={1} />
+      {SLOTS.filter((x) => x.kind !== 'lift').map((x) => (
+        <Parked key={x.id} slot={x.id} />
+      ))}
     </>
   );
 }

@@ -1,4 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber';
+import { useEffect } from 'react';
 import { useGame } from './game/store';
 import { GarageScene } from './three/GarageScene';
 import { MarketScene } from './three/MarketScene';
@@ -18,8 +19,15 @@ function TestHook() {
 
 export function App() {
   const stored = useGame((s) => s.screen);
-  const hasListings = useGame((s) => s.listings.length > 0);
+  const hasListings = useGame((s) => (s.marketSource === 'auctions' ? s.auctions.length : s.listings.length) > 0);
   const panel = useGame((s) => s.panel);
+  // Auktionen laufen in Echtzeit – auch die Zeit, in der das Spiel geschlossen war, wird beim Start nachgeholt.
+  useEffect(() => {
+    const tick = () => useGame.getState().tickAuctions(Date.now());
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
   // Ungültige Kombinationen (z. B. nach Update eines alten Spielstands) abfangen.
   const hasDriveCar = useGame((s) => !!s.cars[s.driveBay]);
   const screen = stored === 'track' && !hasDriveCar ? 'garage' : stored === 'market' && !hasListings ? 'garage' : stored;

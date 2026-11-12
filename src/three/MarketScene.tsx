@@ -11,7 +11,10 @@ const SPACING = 4.4;
 
 /** Händlerhof: hier werden Angebote vor Ort besichtigt. `showroom` = Hintergrund des Hauptmenüs. */
 export function MarketScene({ showroom = false }: { showroom?: boolean }) {
-  const listings = useGame((s) => s.listings);
+  const source = useGame((s) => s.marketSource);
+  const market = useGame((s) => s.listings);
+  const auctions = useGame((s) => s.auctions);
+  const listings = source === 'auctions' ? auctions.map((a) => ({ id: a.id, car: a.car })) : market;
   const selected = useGame((s) => s.selected);
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const offset = (i: number) => (i - (listings.length - 1) / 2) * SPACING;
@@ -73,11 +76,11 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
       ))}
 
       {showroom ? (
-        <CarModel body="sedan" color="#2a3a5c" />
+        <CarModel body="sedan" color="#1f2a44" lod="simple" />
       ) : (
         listings.map((l, i) => (
           <group key={l.id} position={[0, 0, offset(i)]}>
-            <CarModel body={CAR_MODELS[l.car.modelId].body} color={l.car.color} />
+            <CarModel body={CAR_MODELS[l.car.modelId].body} color={l.car.color} car={l.car} lod="simple" />
             {i === selected && (
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
                 <ringGeometry args={[2.75, 2.9, 48]} />

@@ -6,7 +6,7 @@ export interface ToolDef {
   short: string;
   icon: string;
   /** builtin = immer dabei, driver = wird aktiv benutzt, socket = steckt automatisch auf der Ratsche. */
-  kind: 'builtin' | 'driver' | 'socket' | 'device';
+  kind: 'builtin' | 'driver' | 'socket' | 'device' | 'station';
   hint: string;
 }
 
@@ -24,8 +24,19 @@ export const TOOLS: ToolDef[] = [
   { id: 'wrench', name: 'Schraubenschlüssel', short: 'Schlüssel', icon: '🗜️', kind: 'driver', hint: 'Riemenspanner entlasten' },
   { id: 'screwdriver', name: 'Schraubendreher', short: 'Dreher', icon: '🪛', kind: 'driver', hint: 'Schlauchschellen, Bremsscheiben-Halteschraube' },
   { id: 'obd', name: 'OBD-Diagnosegerät', short: 'OBD', icon: '📟', kind: 'device', hint: 'Fehlerspeicher auslesen: Gerät wählen, Auto antippen' },
+  // Geräte am Waschplatz und in der Lackierkabine – stehen dort bereit, werden nicht getragen.
+  { id: 'washer', name: 'Hochdruckreiniger', short: 'Hochdruck', icon: '💦', kind: 'station', hint: 'Vorspülen und Abspülen' },
+  { id: 'foam', name: 'Schaumlanze', short: 'Schaum', icon: '🫧', kind: 'station', hint: 'Karosserie einschäumen' },
+  { id: 'brush', name: 'Felgenbürste', short: 'Felgen', icon: '🪥', kind: 'station', hint: 'Felgen schrubben' },
+  { id: 'towel', name: 'Trockentuch', short: 'Trocknen', icon: '🧽', kind: 'station', hint: 'Abledern' },
+  { id: 'polisher', name: 'Poliermaschine', short: 'Polieren', icon: '✨', kind: 'station', hint: 'Lack aufpolieren' },
+  { id: 'vacuum', name: 'Staubsauger', short: 'Saugen', icon: '🧹', kind: 'station', hint: 'Fußraum' },
+  { id: 'upholstery', name: 'Polsterreiniger', short: 'Sitze', icon: '🪑', kind: 'station', hint: 'Sitze' },
+  { id: 'cockpit', name: 'Cockpitpflege', short: 'Cockpit', icon: '🧴', kind: 'station', hint: 'Armaturenbrett' },
+  { id: 'sander', name: 'Schleifer', short: 'Schleifen', icon: '🪚', kind: 'station', hint: 'Rost entfernen und grundieren' },
+  { id: 'spraygun', name: 'Lackierpistole', short: 'Lackieren', icon: '🎨', kind: 'station', hint: 'Bereich lackieren' },
 ];
 
 export const TOOL_MAP = Object.fromEntries(TOOLS.map((t) => [t.id, t])) as Record<ToolId, ToolDef>;
-export const CABINET_TOOLS = TOOLS.filter((t) => t.kind !== 'builtin');
+export const CABINET_TOOLS = TOOLS.filter((t) => t.kind === 'driver' || t.kind === 'socket' || t.kind === 'device');
 export const toolName = (id: ToolId) => TOOL_MAP[id].name;

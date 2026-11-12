@@ -170,13 +170,16 @@ function buildHood() {
   const xs = range(HOOD_X0, HOOD_X1, 0.061);
   const pos: number[] = [];
   const idx: number[] = [];
-  const N = 9;
+  const N = 17;
   const y0 = topY(HOOD_X0);
   xs.forEach((x) => {
     const w = halfWidth(x);
     for (let i = 0; i < N; i++) {
       const z = (i / (N - 1) - 0.5) * 2 * 0.8 * w;
-      pos.push(x - HOOD_X0, topY(x) - 0.018 * (z / w) ** 2 - y0 + 0.004, z);
+      // Leichter Powerdome: zwei Sicken, die zur Front hin zusammenlaufen.
+      const half = 0.36 - 0.1 * ((x - HOOD_X0) / (HOOD_X1 - HOOD_X0));
+      const dome = Math.abs(z) < half ? 0.014 * Math.cos(((z / half) * Math.PI) / 2) ** 0.6 : 0;
+      pos.push(x - HOOD_X0, topY(x) - 0.018 * (z / w) ** 2 - y0 + 0.004 + dome, z);
     }
   });
   for (let s = 0; s < xs.length - 1; s++) {
@@ -252,9 +255,26 @@ function buildCabin(body: BodyStyle) {
 /** Reifenquerschnitt als Rotationskörper. */
 function buildTire() {
   const p = [
-    [0.205, -0.1], [0.27, -0.105], [0.305, -0.09], [0.32, -0.06], [0.322, 0], [0.32, 0.06], [0.305, 0.09], [0.27, 0.105], [0.205, 0.1],
+    [0.232, -0.1], [0.285, -0.108], [0.314, -0.094], [0.327, -0.062], [0.33, 0], [0.327, 0.062], [0.314, 0.094], [0.285, 0.108], [0.232, 0.1],
   ].map(([r, y]) => new THREE.Vector2(r, y));
-  return new THREE.LatheGeometry(p, 32);
+  return new THREE.LatheGeometry(p, 36);
+}
+
+/** Abgerundetes Rechteck, in +z extrudiert – für Leuchten und Grill. */
+export function roundedRect(w: number, h: number, r: number, depth: number) {
+  const s = new THREE.Shape();
+  const x = -w / 2;
+  const y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y);
+  s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r);
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h);
+  s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r);
+  s.quadraticCurveTo(x, y, x + r, y);
+  return new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 6 });
 }
 
 export interface CarGeometry {

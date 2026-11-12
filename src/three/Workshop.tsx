@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { useGame } from '../game/store';
 import { Interactable } from './Interactable';
 import { BAY_Z, ROOM } from './player';
-import { concreteTexture, doorTexture, screenTexture, textTexture, wallTexture } from './textures';
+import { concreteTexture, screenTexture, textTexture, wallTexture } from './textures';
 
 type V3 = [number, number, number];
 const W = ROOM.maxX - ROOM.minX;
@@ -40,15 +40,11 @@ export function Workshop() {
     const wall = wallTexture().clone();
     wall.repeat.set(5, 2);
     wall.needsUpdate = true;
-    const door = doorTexture().clone();
-    door.repeat.set(1, 3);
-    door.needsUpdate = true;
-    return { floor, wall, door, screen: screenTexture() };
+    return { floor, wall, screen: screenTexture() };
   }, []);
 
   const walls: { p: V3; r: number; w: number }[] = [
     { p: [ROOM.maxX, H / 2, 0], r: -Math.PI / 2, w: D },
-    { p: [ROOM.minX, H / 2, 0], r: Math.PI / 2, w: D },
     { p: [CX, H / 2, ROOM.minZ], r: 0, w: W },
     { p: [CX, H / 2, ROOM.maxZ], r: Math.PI, w: W },
   ];
@@ -58,7 +54,7 @@ export function Workshop() {
       {/* Boden, Wände, Decke */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[CX, 0, 0]} receiveShadow>
         <planeGeometry args={[W, D]} />
-        <meshStandardMaterial map={tex.floor} roughness={0.82} metalness={0.05} />
+        <meshStandardMaterial map={tex.floor} roughness={0.5} metalness={0.08} />
       </mesh>
       {walls.map((w, i) => (
         <group key={i} position={w.p} rotation={[0, w.r, 0]}>
@@ -128,30 +124,6 @@ export function Workshop() {
         <planeGeometry args={[0.5, 0.5]} />
         <meshStandardMaterial color="#2c2f34" metalness={0.7} roughness={0.5} />
       </mesh>
-
-      {/* Garagentore: von hier geht es zur Probefahrt */}
-      {BAY_Z.map((z, i) => (
-        <Interactable
-          key={z}
-          id={`door${i}`}
-          label="Garagentor – Probefahrt"
-          onUse={() => setPanel('drive')}
-          position={[ROOM.minX + 0.03, 0, z]}
-          halo={[0.2, 3.1, 3.5]}
-          haloPos={[0.05, 1.55, 0]}
-        >
-          <mesh position={[0, 1.5, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[3.4, 3]} />
-            <meshStandardMaterial map={tex.door} metalness={0.5} roughness={0.5} />
-          </mesh>
-          <Box p={[0.02, 3.08, 0]} s={[0.12, 0.16, 3.6]} c="#3f4650" m={0.5} />
-          {[-1.75, 1.75].map((o) => (
-            <Box key={o} p={[0.02, 1.5, o]} s={[0.1, 3, 0.1]} c="#3f4650" m={0.5} />
-          ))}
-          <Box p={[0.03, 1.1, 0]} s={[0.04, 0.08, 0.5]} c="#16181d" />
-        </Interactable>
-      ))}
-      <Sign text="AUSFAHRT · PROBEFAHRT" p={[ROOM.minX + 0.02, 3.65, 0]} rot={[0, Math.PI / 2, 0]} size={[3.6, 0.42]} bg="#1d6b3a" />
 
       {/* Werkzeugschrank */}
       <Interactable id="cabinet" label="Werkzeugschrank" onUse={() => setPanel('cabinet')} position={[6.05, 0, 0]} halo={[0.76, 2.0, 1.36]} haloPos={[0, 1.0, 0]}>
