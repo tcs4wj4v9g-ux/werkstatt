@@ -47,5 +47,12 @@ export const SELLERS: Record<string, SellerProfile> = {
   },
 };
 
-export const SELLER_LIST = Object.values(SELLERS);
+/** Erbe eines Scheunenfunds – kein normaler Marktverkäufer. */
+SELLERS.heir = {
+  id: 'heir', label: 'Erbe', vibe: 'hat keine Ahnung von Autos und will die Scheune leer haben',
+  flex: [0.15, 0.22], patience: [2, 3], knowledge: 0.05, concede: 0.3, insultAt: 0.7, step: 0.6,
+  opening: (p) => `„${p} – Hauptsache, er kommt weg.“`,
+};
+
+export const SELLER_LIST = Object.values(SELLERS).filter((s) => s.id !== 'heir');
 export const SELLER_NAMES = ['Herr Brandl', 'Frau Yildiz', 'Herr Kowalski', 'Frau Sommer', 'Herr Aigner', 'Herr Petrovic', 'Frau Lindner', 'Herr Okafor'];

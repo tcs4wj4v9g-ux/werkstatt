@@ -1,6 +1,7 @@
 import { COMPONENT_MAP } from './data/components';
 import { DEFECTS, DEFECT_LIST, type DefectDef } from './data/defects';
 import { SYMPTOMS, type Channel, type SymptomDef } from './data/symptoms';
+import { fluidSymptoms } from './fluids';
 import { activeDefects } from './repair';
 import type { CarInstance } from './types';
 
@@ -9,7 +10,7 @@ import type { CarInstance } from './types';
 
 /** Symptome, die das Auto im aktuellen technischen Zustand zeigt. */
 export function presentSymptoms(car: CarInstance): string[] {
-  return [...new Set(activeDefects(car).flatMap((d) => DEFECTS[d].symptoms))];
+  return [...new Set([...activeDefects(car).flatMap((d) => DEFECTS[d].symptoms), ...fluidSymptoms(car)])];
 }
 
 export interface Observation {

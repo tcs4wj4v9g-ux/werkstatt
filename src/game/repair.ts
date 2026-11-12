@@ -1,3 +1,4 @@
+import { CAR_MODELS } from './data/cars';
 import { COMPONENTS, COMPONENT_MAP } from './data/components';
 import { DEFECT_LIST } from './data/defects';
 import { PARTS } from './data/parts';
@@ -184,8 +185,23 @@ export function componentAction(
     if (st.bolts.some((b) => b === TIGHT)) return fail(`Erst alle Schrauben lösen (${describeNeed(def.fastener!)}).`);
     if (st.bolts.some((b) => b === 1)) return fail('Die gelösten Schrauben noch mit der Hand herausdrehen.');
     if (def.connector && st.connected) return fail('Erst den elektrischen Stecker abziehen.');
+    if (id === 'oil_pan' && car.fluids.oil.level > 0.05) return fail('In der Ölwanne steht noch Öl – erst über die Ablassschraube ablassen.');
     st.installed = false;
     car.testDriven = false;
+    if (id === 'drain_plug') {
+      const liters = car.fluids.oil.level;
+      car.fluids.oil.level = 0;
+      car.fluids.oil.quality = 1;
+      car.checked.oil = undefined;
+      return done(`Ablassschraube heraus – ${liters.toLocaleString('de-DE')} l Altöl laufen in die Auffangwanne.`);
+    }
+    if (['water_pump', 'thermostat', 'hose'].includes(id)) {
+      // Kühlsystem geöffnet: ein Großteil läuft aus, danach ist Luft im System.
+      car.fluids.coolant.level = Math.min(car.fluids.coolant.level, Math.round(car.fluids.coolant.level * 3.5) / 10);
+      car.fluids.coolant.air = true;
+      car.checked.coolant = undefined;
+    }
+    if (def.consumable) st.condition = 'defect';
     if (def.partId) {
       st.known = true;
       return done(
@@ -198,6 +214,8 @@ export function componentAction(
   }
 
   // Einbau
+  const above = blockedMessage(car, id);
+  if (above) return fail(above);
   const missing = dependents(id).find((d) => !isComplete(car, d));
   if (missing) return fail(`Erst fertig montieren: ${COMPONENT_MAP[missing].name}.`);
   const next = def.bolts ? ' Jetzt Schrauben ansetzen und festziehen.' : def.connector ? ' Stecker nicht vergessen.' : '';
@@ -206,6 +224,7 @@ export function componentAction(
       inv[def.partId] -= 1;
       st.condition = 'ok';
       st.installed = true;
+      if (id === 'oil_filter') car.fluids.oil.filterFresh = true;
       // Teilekosten werden dem Auto zugerechnet, in das das Teil wandert.
       car.partsSpent += Math.round(PARTS[def.partId].price / PARTS[def.partId].units);
       return done(`Neuteil eingebaut: ${def.name}.${next}`);
@@ -231,12 +250,18 @@ export const isAssembled = (car: CarInstance) => COMPONENTS.every((c) => isCompl
 
 export function driveBlocker(car: CarInstance): string | null {
   if (!isAssembled(car)) return 'Das Auto ist nicht komplett zusammengebaut.';
+  const engine = engineBlocker(car);
+  if (engine) return engine;
+  if (['wheel_fl', 'wheel_fr'].some((w) => car.components[w].condition === 'defect')) return 'Mit diesen uralten Reifen fährst du keinen Meter – erst neue montieren.';
   if (car.lifted) return 'Das Auto steht noch auf der Hebebühne.';
   return null;
 }
 
 /** Der Motor läuft nur, wenn am Motor nichts demontiert ist (Räder dürfen ab sein). */
 export function engineBlocker(car: CarInstance): string | null {
-  const open = COMPONENTS.find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing') && !isComplete(car, c.id));
-  return open ? `Der Motor startet so nicht – erst fertig montieren: ${open.name}.` : null;
+  const open = COMPONENTS.find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug') && !isComplete(car, c.id));
+  if (open) return `Der Motor startet so nicht – erst fertig montieren: ${open.name}.`;
+  if (car.components.battery.condition === 'defect') return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
+  if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
+  return null;
 }

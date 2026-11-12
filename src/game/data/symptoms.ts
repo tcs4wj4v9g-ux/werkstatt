@@ -16,6 +16,8 @@ export interface SymptomDef {
   warm?: boolean;
   /** Kurzform als Verhandlungsargument. */
   argument: string;
+  /** Kann (auch) an dieser Betriebsflüssigkeit liegen. */
+  fluid?: 'oil' | 'coolant' | 'brake';
 }
 
 const list: SymptomDef[] = [
@@ -29,13 +31,17 @@ const list: SymptomDef[] = [
   { id: 'rattle_start', channel: 'idle', text: 'Rasseln in den ersten Sekunden nach dem Start.', argument: 'Rasseln beim Start' },
   { id: 'squeal', channel: 'sound', text: 'Quietschen aus dem Riementrieb.', argument: 'Quietschender Riemen' },
   { id: 'battery_lamp', channel: 'dash', text: 'Die Batteriekontrollleuchte geht nicht aus.', argument: 'Batterieleuchte brennt' },
-  { id: 'temp_high', channel: 'drive', warm: true, text: 'Die Kühlmitteltemperatur steigt bedenklich an.', argument: 'Motor wird zu heiß' },
+  { id: 'temp_high', channel: 'drive', warm: true, text: 'Die Kühlmitteltemperatur steigt bedenklich an.', argument: 'Motor wird zu heiß', fluid: 'coolant' },
   { id: 'temp_low', channel: 'dash', warm: true, text: 'Die Temperaturanzeige bleibt auch bei warmem Motor im Keller.', argument: 'Motor wird nicht warm' },
   { id: 'coolant_wet', channel: 'hood', text: 'Kühlmittelstand niedrig, Feuchtigkeit und Kalkspuren im Motorraum.', argument: 'Kühlmittelverlust' },
   { id: 'oil_top', channel: 'hood', text: 'Der Motor ist oben ölfeucht, es riecht nach verbranntem Öl.', argument: 'Ölfeuchter Motor' },
   { id: 'oil_drip', channel: 'under', text: 'Unter dem Motor hängen Öltropfen, der Unterboden ist verschmiert.', argument: 'Ölverlust' },
   { id: 'brake_look', channel: 'wheels', text: 'Durch die Felgen sieht die Bremse vorn mitgenommen aus.', argument: 'Verschlissene Bremse' },
   { id: 'brake_grind', channel: 'drive', text: 'Schleifgeräusch und schwache Wirkung beim Bremsen.', argument: 'Bremse schleift' },
+  { id: 'brake_soft', channel: 'drive', text: 'Das Bremspedal ist weich und lässt sich weit durchtreten.', argument: 'Weiches Bremspedal', fluid: 'brake' },
+  { id: 'oil_lamp', channel: 'dash', text: 'Die Öldruck-Warnleuchte flackert.', argument: 'Ölwarnleuchte', fluid: 'oil' },
+  { id: 'no_start', channel: 'idle', text: 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.', argument: 'Springt nicht an' },
+  { id: 'tire_look', channel: 'wheels', text: 'Die Reifen sind rissig und uralt.', argument: 'Alte Reifen' },
   { id: 'brake_judder', channel: 'drive', text: 'Beim Bremsen rubbelt und vibriert das Lenkrad.', argument: 'Bremse rubbelt' },
 ];
 

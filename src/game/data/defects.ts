@@ -72,6 +72,14 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
     id: 'thermostat', name: 'Defekter Thermostat', components: ['thermostat'], pick: 'all',
     penalty: 500, symptoms: ['temp_low'], labor: 120, category: 'Kühlung', lamp: '🌡️ kalt',
   },
+  battery: {
+    id: 'battery', name: 'Defekte Batterie', components: ['battery'], pick: 'all',
+    penalty: 250, symptoms: ['no_start'], labor: 40, category: 'Elektrik',
+  },
+  tires: {
+    id: 'tires', name: 'Überalterte Reifen vorne', components: ['wheel_fl', 'wheel_fr'], pick: 'all',
+    penalty: 350, symptoms: ['tire_look'], labor: 50, category: 'Wartung',
+  },
   brakes: {
     id: 'brakes', name: 'Verschlissene Bremsbeläge vorne', components: ['pads_fl', 'pads_fr'], pick: 'all',
     penalty: 600, symptoms: ['brake_look', 'brake_grind'], labor: 110, category: 'Bremsen', lamp: '🛑 Bremse',
