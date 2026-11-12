@@ -123,7 +123,8 @@ export function Yard() {
       <Sign text="AUSFAHRT · PROBEFAHRT" p={[YARD.minX + 0.12, 2.5, BAY_Z[0]]} rot={[0, Math.PI / 2, 0]} size={[3.6, 0.42]} bg="#1d6b3a" />
       {/* Bäume hinter dem Zaun */}
       {[-20, -15, -9, -6].flatMap((x, i) =>
-        [YARD.minZ - 3, YARD.maxZ + 3].map((z) => (
+        // Wo Halle 2 bzw. der Showroom steht, wächst kein Baum mehr.
+        [YARD.minZ - 3, YARD.maxZ + 3].filter((z) => x < -8 || !(z < 0 ? has('loc_pro') : has('loc_hq'))).map((z) => (
           <group key={`${x}${z}`} position={[x + (i % 2), 0, z + (i % 3) - 1]}>
             <mesh position={[0, 0.8, 0]}>
               <cylinderGeometry args={[0.18, 0.24, 1.6, 6]} />

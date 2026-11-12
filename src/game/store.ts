@@ -127,7 +127,7 @@ export interface GameState {
   tapComponent(bay: number, compId: string, useOldPart?: boolean): void;
   closePartPrompt(): void;
   /** Bestellt ein Teil in der Passform des Autos auf diesem Stellplatz. */
-  buyPart(id: PartId, slot: number): void;
+  buyPart(id: PartId, slot?: number): void;
   scanObd(bay: number): void;
   toggleEngine(bay: number): void;
   engineTick(): void;
@@ -681,7 +681,9 @@ export const useGame = create<GameState>()(
 
         buyPart: (id, slot) => {
           const s = get();
-          const car = s.cars[slot];
+          // Ohne Angabe: das im Shop gewählte Auto, sonst das erste vorhandene.
+          const at = slot ?? (s.cars[s.shopSlot] ? s.shopSlot : s.cars.findIndex(Boolean));
+          const car = at >= 0 ? s.cars[at] : null;
           if (!car) return s.say('Wähle zuerst das Auto, für das du bestellst.', true);
           const p = PARTS[id];
           const price = partPrice(s, id, car);
