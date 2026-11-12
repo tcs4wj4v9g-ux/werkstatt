@@ -4,6 +4,7 @@ import { engineOf } from '../game/data/components';
 import { SLOTS } from '../game/data/workshop';
 import { RARITY_NAMES } from '../game/market';
 import { performance, powerCurve } from '../game/performance';
+import { contestScore, meetBlocker, meetScore } from '../game/contests';
 import { useGame } from '../game/store';
 import { eur, Modal } from './common';
 
@@ -129,6 +130,76 @@ export function UnlockedModal() {
         <p key={u.title} className="bigline">{u.title}: +{eur(u.reward)}</p>
       ))}
       <button className="btn primary big" onClick={s.dismissUnlocked}>Weiter</button>
+    </Modal>
+  );
+}
+
+const CONTEST_UNIT: Record<string, (n: number) => string> = {
+  restoration: (n) => `${n} Punkte`,
+  dealer: (n) => eur(n),
+  collector: (n) => `Ansehen ${n}`,
+};
+
+/** Händler-Wettbewerbe und Fahrzeugtreffen. */
+export function ContestsTab() {
+  const s = useGame();
+  const c = s.contest;
+  const m = s.meet;
+  const own = s.cars.map((car, slot) => ({ car, slot })).filter((x) => x.car && !x.car.job);
+  return (
+    <>
+      <h4>Händler-Wettbewerb</h4>
+      {!c && <p className="meta">Zurzeit ist kein Wettbewerb ausgeschrieben. Die Innung meldet sich alle paar Tage.</p>}
+      {c && (
+        <div data-testid="contest">
+          <p><b>{c.title}</b> · bis einschließlich Tag {c.endDay} · Startgeld {eur(c.fee)} · Siegprämie {eur(c.prize)}</p>
+          <p className="meta">{c.desc}</p>
+          <p className="meta">Dein aktueller Stand: {CONTEST_UNIT[c.type](contestScore(c, s))}{c.joined ? '' : ' (noch nicht angemeldet)'}</p>
+          <div className="meta">Konkurrenz: {c.rivals.map((r) => r.name).join(', ')} – ihre Ergebnisse siehst du erst bei der Auswertung.</div>
+          <button className="btn primary big" disabled={c.joined || s.money < c.fee} onClick={s.joinContest}>{c.joined ? '✓ Angemeldet' : `Anmelden für ${eur(c.fee)}`}</button>
+        </div>
+      )}
+      <h4>Fahrzeugtreffen</h4>
+      {!m && <p className="meta">Heute findet kein Treffen statt. Treffen gibt es an jedem dritten Tag.</p>}
+      {m && (
+        <div data-testid="meet">
+          <p><b>{m.title}</b> · nur heute · Startgeld {eur(m.fee)} · Siegprämie {eur(m.prize)}</p>
+          <p className="meta">{m.desc}</p>
+          {m.result ? (
+            <p className="meta">Du warst mit dem {m.result.car} dabei: Platz {m.result.place} von {m.result.of} mit {m.result.score} Punkten.</p>
+          ) : (
+            <>
+              {own.length === 0 && <p className="meta">Du brauchst ein eigenes, fahrbereites Auto.</p>}
+              {own.map(({ car, slot }) => (
+                <div key={car!.uid} className="shop-row">
+                  <div>
+                    <b>{CAR_MODELS[car!.modelId].name}</b>
+                    <div className="meta">{SLOTS[slot].label} · voraussichtliche Wertung: {meetScore(car!, m.category, s.day)} Punkte{meetBlocker(car!) ? ` · ${meetBlocker(car!)}` : ''}</div>
+                  </div>
+                  <button className="btn primary" disabled={!!meetBlocker(car!) || s.money < m.fee} onClick={() => s.enterMeet(slot)}>Hinfahren</button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Ergebnistafel nach Wettbewerb oder Treffen. */
+export function ContestResultModal() {
+  const s = useGame();
+  const r = s.contestResult;
+  if (!r) return null;
+  return (
+    <Modal title={`${r.title} – Ergebnis`} onClose={s.dismissContestResult}>
+      <p className="bigline">{r.place === 1 ? '🏆 Sieg!' : `Platz ${r.place} von ${r.of}`}</p>
+      {r.table.map((row, i) => (
+        <div key={row.name} className={`meta${row.name === 'Du' ? ' good' : ''}`}>{i + 1}. {row.name}: {row.score.toLocaleString('de-DE')}</div>
+      ))}
+      <p>{r.payout > 0 ? `Auszahlung: ${eur(r.payout)}` : 'Diesmal kein Preisgeld.'}</p>
+      <button className="btn primary big" onClick={s.dismissContestResult}>Weiter</button>
     </Modal>
   );
 }

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { useGame } from '../game/store';
 import { Interactable } from './Interactable';
 import { BAY_Z, ROOM } from './player';
+import { GapWall } from './Annex';
 import { concreteTexture, screenTexture, textTexture, wallTexture } from './textures';
 
 type V3 = [number, number, number];
@@ -33,6 +34,8 @@ function Sign({ text, sub, p, rot, size, bg, fg }: { text: string; sub?: string;
 /** Raum, Einrichtung und alle Stationen der Werkstatt (ohne Hebebühnen und Autos). */
 export function Workshop() {
   const setPanel = useGame((s) => s.setPanel);
+  const pro = useGame((s) => s.upgrades.includes('loc_pro'));
+  const hq = useGame((s) => s.upgrades.includes('loc_hq'));
   const tex = useMemo(() => {
     const floor = concreteTexture().clone();
     floor.repeat.set(W / 2.8, D / 2.8);
@@ -45,8 +48,9 @@ export function Workshop() {
 
   const walls: { p: V3; r: number; w: number }[] = [
     { p: [ROOM.maxX, H / 2, 0], r: -Math.PI / 2, w: D },
-    { p: [CX, H / 2, ROOM.minZ], r: 0, w: W },
-    { p: [CX, H / 2, ROOM.maxZ], r: Math.PI, w: W },
+    // Mit Halle 2 bzw. Showroom ersetzt eine Wand mit Durchgang die geschlossene Seitenwand.
+    ...(pro ? [] : [{ p: [CX, H / 2, ROOM.minZ] as V3, r: 0, w: W }]),
+    ...(hq ? [] : [{ p: [CX, H / 2, ROOM.maxZ] as V3, r: Math.PI, w: W }]),
   ];
 
   return (
@@ -56,6 +60,8 @@ export function Workshop() {
         <planeGeometry args={[W, D]} />
         <meshStandardMaterial map={tex.floor} roughness={0.5} metalness={0.08} />
       </mesh>
+      {pro && <GapWall z={ROOM.minZ - 0.1} />}
+      {hq && <GapWall z={ROOM.maxZ + 0.1} />}
       {walls.map((w, i) => (
         <group key={i} position={w.p} rotation={[0, w.r, 0]}>
           <mesh receiveShadow>
@@ -232,7 +238,7 @@ export function Workshop() {
           <meshStandardMaterial color="#23262b" />
         </mesh>
       </Interactable>
-      <Sign text="GARAGE KINGS" sub="Kfz-Meisterbetrieb" p={[2.2, 2.75, ROOM.maxZ - 0.02]} rot={[0, Math.PI, 0]} size={[2.6, 0.7]} bg="#16181d" fg="#ff7a1a" />
+      {!hq && <Sign text="GARAGE KINGS" sub="Kfz-Meisterbetrieb" p={[2.2, 2.75, ROOM.maxZ - 0.02]} rot={[0, Math.PI, 0]} size={[2.6, 0.7]} bg="#16181d" fg="#ff7a1a" />}
 
       {/* Kleinkram, der die Halle lebendig macht */}
       {[0.13, 0.39, 0.65, 0.91].map((y, i) => (
@@ -294,7 +300,7 @@ export function Workshop() {
         <Box p={[0, 0.09, 0]} s={[1.0, 0.04, 0.42]} c="#23262b" shadow />
         <Box p={[-0.42, 0.13, 0]} s={[0.14, 0.05, 0.3]} c="#b3261e" />
       </group>
-      <Sign text="⚠ HEBEBÜHNE: NICHT UNTER SCHWEBENDE LASTEN TRETEN" p={[CX - 0.6, 2.2, ROOM.minZ + 0.02]} rot={[0, 0, 0]} size={[3.4, 0.28]} bg="#e3a81c" fg="#16181d" />
+      {!pro && <Sign text="⚠ HEBEBÜHNE: NICHT UNTER SCHWEBENDE LASTEN TRETEN" p={[CX - 0.6, 2.2, ROOM.minZ + 0.02]} rot={[0, 0, 0]} size={[3.4, 0.28]} bg="#e3a81c" fg="#16181d" />}
     </group>
   );
 }

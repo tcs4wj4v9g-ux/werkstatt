@@ -1,5 +1,6 @@
 import { CAR_MODELS } from './data/cars';
 import { engineOf } from './data/components';
+import { SLOTS } from './data/workshop';
 import { valuate } from './market';
 import type { CarInstance } from './types';
 
@@ -37,7 +38,6 @@ export interface CareerView {
   money: number;
   upgrades: string[];
   cars: (CarInstance | null)[];
-  location?: string;
 }
 
 export interface Achievement {
@@ -79,7 +79,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'dyno', title: 'Schwarz auf weiß', desc: 'Miss ein Auto auf dem Leistungsprüfstand.', reward: 500, progress: (v) => count(v.career.dynoRuns, 1) },
   { id: 'competition', title: 'Besser als die Konkurrenz', desc: 'Gewinne einen Händler-Wettbewerb.', reward: 3000, progress: (v) => count(v.career.competitionsWon, 1) },
   { id: 'meet', title: 'Publikumsliebling', desc: 'Gewinne bei einem Fahrzeugtreffen.', reward: 2000, progress: (v) => count(v.career.meetsWon, 1) },
-  { id: 'hq', title: 'Headquarters', desc: 'Ziehe in das Headquarters mit Showroom.', reward: 50000, progress: (v) => flag(v.location === 'hq') },
+  { id: 'hq', title: 'Headquarters', desc: 'Ziehe in das Headquarters mit Showroom.', reward: 50000, progress: (v) => flag(v.upgrades.includes('loc_hq')) },
 ];
 
 export const isAchieved = (a: Achievement, v: CareerView) => {
@@ -117,6 +117,8 @@ export function collection(cars: (CarInstance | null)[], index = 1): CollectionE
     const m = CAR_MODELS[car.modelId];
     const base = { budget: 1, mid: 2, sport: 5, luxury: 9, collector: 20 }[m.cls] + car.rarity * 4;
     const flawless = v.deductions.every((d) => !d.defect);
-    return [{ slot, car, value: v.value, prestige: Math.round(base * (flawless ? 1 : 0.4) * (0.6 + 0.4 * Math.min(1, v.value / Math.max(1, v.cleanValue)))) }];
+    // Im Showroom ausgestellt zählt ein Auto anderthalbfach.
+    const shown = SLOTS[slot]?.kind === 'show' ? 1.5 : 1;
+    return [{ slot, car, value: v.value, prestige: Math.round(base * shown * (flawless ? 1 : 0.4) * (0.6 + 0.4 * Math.min(1, v.value / Math.max(1, v.cleanValue)))) }];
   });
 }

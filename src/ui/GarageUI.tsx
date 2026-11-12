@@ -4,7 +4,7 @@ import { CAR_MODELS } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { fitOf, splitKey } from '../game/fitment';
 import { MarketTab } from './MarketTab';
-import { AchievementsTab, CollectionTab, DynoModal, UnlockedModal } from './CareerTabs';
+import { AchievementsTab, CollectionTab, ContestResultModal, ContestsTab, DynoModal, UnlockedModal } from './CareerTabs';
 import { DEFECTS } from '../game/data/defects';
 import { PARTS } from '../game/data/parts';
 import { availableSlots, SLOTS } from '../game/data/workshop';
@@ -197,6 +197,7 @@ export function GarageUI() {
       {s.panel === 'bench' && <BenchModal />}
       {s.panel === 'dyno' && <DynoModal />}
       {!s.panel && !s.lastSale && <UnlockedModal />}
+      {!s.lastSale && s.contestResult && <ContestResultModal />}
       {s.panel === 'drive' && <DriveModal />}
       {s.panel === 'obd' && <ObdModal />}
       {s.panel === 'file' && <FileModal />}
@@ -343,7 +344,7 @@ function ObdModal() {
 
 function ComputerModal() {
   const s = useGame();
-  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'news'>('market');
+  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'contests' | 'news'>('market');
   const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
@@ -358,6 +359,7 @@ function ComputerModal() {
           ['parts', 'Teile'],
           ['build', 'Ausbau'],
           ['career', `Erfolge (${s.achieved.length})`],
+          ['contests', s.meet && !s.meet.result ? 'Wettbewerbe ●' : 'Wettbewerbe'],
           ['news', news ? `Neuigkeiten (${news})` : 'Neuigkeiten'],
         ] as const).map(([id, label]) => (
           <button key={id} className={`btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
@@ -377,6 +379,7 @@ function ComputerModal() {
       {tab === 'auctions' && <AuctionsTab />}
       {tab === 'collection' && <CollectionTab />}
       {tab === 'career' && <AchievementsTab />}
+      {tab === 'contests' && <ContestsTab />}
       {tab === 'jobs' && <JobsTab />}
       {tab === 'parts' && <ShopList />}
       {tab === 'build' && <UpgradesTab />}

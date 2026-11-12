@@ -4,6 +4,7 @@ import { applicableDefects, CLASS_TARGETS, randomDefects } from './market';
 import { basePartPrice, defectLabor, defectPenalty, migrateInventory, partKey } from './fitment';
 import { cylinderSlots, ENGINES } from './data/engines';
 import { firingHz, VOICES } from './audio';
+import { conditionScore, contestScore, createContest, createMeet, enterMeet, meetBlocker, meetScore, resolveContest, type Contest, type ContestView } from './contests';
 import { ACHIEVEMENTS, collection, countRepair, emptyCareer, newlyAchieved, type CareerView } from './career';
 import { performance, powerCurve } from './performance';
 import { adCondition, DEFAULT_FILTER, filterListings, type MarketFilter } from './marketFilter';
@@ -605,8 +606,18 @@ describe('Werkstattausbau und Scheunenfunde', () => {
   it('Stellplätze kommen mit den Ausbaustufen', () => {
     expect(availableSlots([]).map((s) => s.kind)).toEqual(['lift', 'lift', 'park']);
     expect(availableSlots(['parking']).filter((s) => s.kind === 'park').length).toBe(4);
-    expect(availableSlots(['parking', 'wash', 'paint', 'expansion']).length).toBe(SLOTS.length);
-    expect(UPGRADES.filter((u) => !u.equipment).map((u) => u.stage)).toEqual([2, 3, 4, 5]);
+    expect(availableSlots(['parking', 'wash', 'paint', 'expansion']).length).toBe(10);
+    expect(UPGRADES.filter((u) => !u.equipment).map((u) => u.stage)).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    // Größere Standorte: dritte und vierte Hebebühne, dann der Showroom
+    const lifts = (u: string[]) => availableSlots(u).filter((s) => s.kind === 'lift').length;
+    expect(lifts(['loc_pro'])).toBe(3);
+    expect(lifts(['loc_pro', 'loc_center'])).toBe(4);
+    expect(availableSlots(['loc_pro', 'loc_center', 'loc_hq']).filter((s) => s.kind === 'show').length).toBe(3);
+    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.length);
+    expect(UPGRADES.find((u) => u.id === 'loc_center')!.grants).toEqual(['wash', 'paint', 'dyno']);
+    expect(UPGRADES.filter((u) => u.location).map((u) => u.price)).toEqual([75000, 200000, 500000]);
+    // Keine zwei Stellplätze überlappen
+    for (const a of SLOTS) for (const b of SLOTS) if (a.id < b.id) expect(Math.hypot(a.x - b.x, a.z - b.z), `${a.label}/${b.label}`).toBeGreaterThan(2.5);
   });
 
   it('Scheunenfund: selten, verdreckt, rostig, tot – und nur Schritt für Schritt zu retten', () => {
@@ -1133,5 +1144,93 @@ describe('Karriere: Erfolge, Sammlung, Prüfstand', () => {
     expect(valuate(car).value).toBeGreaterThan(base);
     car.dyno.ps = Math.round(p.ratedPs * 0.8);
     expect(valuate(car).value).toBe(base);
+  });
+});
+
+describe('Wettbewerbe und Fahrzeugtreffen', () => {
+  const view = (cars: (CarInstance | null)[], totalProfit = 0, money = 20000): ContestView => ({ cars, totalProfit, money, marketIndex: 1 });
+
+  it('Zustandswertung folgt Technik und Pflege', () => {
+    const top = detail(mk('bavaria_330', [], 1, { testDriven: true }));
+    const dirty = mk('bavaria_330', [], 1);
+    for (const z of Object.values(dirty.zones)) Object.assign(z, { dirt: 0.9, shine: 0.1, rust: 0.3 });
+    const broken = detail(mk('bavaria_330', ['coil', 'water_pump'], 1));
+    expect(conditionScore(top)).toBeGreaterThan(92);
+    expect(conditionScore(dirty)).toBeLessThan(conditionScore(top) - 15);
+    expect(conditionScore(broken)).toBeLessThan(conditionScore(top) - 20);
+  });
+
+  it('Restaurierungs-Wettbewerb: bestes eigenes Auto zählt, Kundenautos nicht; Gegner bleiben nach dem Speichern gleich', () => {
+    const g = rng(4);
+    const top = detail(mk('bavaria_330', [], 1, { testDriven: true }));
+    const customer = { ...detail(mk('bavaria_320', [], 2)), job: {} as any };
+    const c = createContest(g, 5, view([]), 'restoration');
+    expect(c.rivals.length).toBe(4);
+    expect(c.endDay).toBe(8);
+    expect(contestScore(c, view([customer]))).toBe(0);
+    expect(contestScore(c, view([customer, top]))).toBe(conditionScore(top));
+    const loaded: Contest = JSON.parse(JSON.stringify(c));
+    expect(resolveContest(loaded, view([top]))).toEqual(resolveContest(c, view([top])));
+    const win = resolveContest({ ...c, rivals: c.rivals.map((r) => ({ ...r, score: 60 })) }, view([top]));
+    expect(win.place).toBe(1);
+    expect(win.payout).toBe(c.prize);
+    const lose = resolveContest({ ...c, rivals: c.rivals.map((r) => ({ ...r, score: 101 })) }, view([top]));
+    expect(lose.place).toBe(5);
+    expect(lose.payout).toBe(0);
+    const second = resolveContest({ ...c, rivals: c.rivals.map((r, i) => ({ ...r, score: i ? 10 : 101 })) }, view([top]));
+    expect(second.place).toBe(2);
+    expect(second.payout).toBe(c.fee); // Startgeld zurück
+  });
+
+  it('Händler-Challenge zählt nur Gewinn seit der Anmeldung; Sammler-Wettbewerb das Ansehen der Sammlung', () => {
+    const g = rng(6);
+    const d = { ...createContest(g, 3, view([], 12000), 'dealer'), joined: true };
+    expect(d.baseline).toBe(12000);
+    expect(contestScore(d, view([], 12000))).toBe(0);
+    expect(contestScore(d, view([], 15500))).toBe(3500);
+    expect(contestScore(d, view([], 9000))).toBe(0); // Verlust zählt nicht negativ
+    const col = createContest(g, 3, view([]), 'collector');
+    const jewel = detail(mk('bavaria_30cs', [], 2, { keep: true, testDriven: true }));
+    expect(contestScore(col, view([jewel]))).toBe(collection([jewel])[0].prestige);
+    expect(contestScore(col, view([{ ...jewel, keep: false }]))).toBe(0);
+    // Alle drei Arten werden ausgeschrieben
+    const types = new Set(Array.from({ length: 40 }, () => createContest(g, 3, view([])).type));
+    expect(types.size).toBe(3);
+  });
+
+  it('Treffen: Wertung kommt aus den echten Fahrzeugdaten', () => {
+    const fast = detail(mk('veloce_stradale', [], 1));
+    const slow = detail(mk('tanaka_piccolo', [], 1));
+    const old = detail(mk('bavaria_30cs', [], 1));
+    const grubby = mk('veloce_stradale', [], 1);
+    for (const z of Object.values(grubby.zones)) Object.assign(z, { dirt: 1, shine: 0, rust: 0.2 });
+    expect(meetScore(fast, 'power')).toBeGreaterThan(meetScore(slow, 'power') + 50);
+    expect(meetScore(mk('veloce_stradale', ['coil'], 1), 'power')).toBeLessThan(meetScore(fast, 'power'));
+    expect(meetScore(old, 'classic')).toBeGreaterThan(meetScore(fast, 'classic') + 40);
+    expect(meetScore(detail(mk('bavaria_30cs', ['gasket'], 1)), 'classic')).toBeLessThan(meetScore(old, 'classic'));
+    expect(meetScore(fast, 'clean')).toBeGreaterThan(meetScore(grubby, 'clean') + 50);
+    for (const cat of ['clean', 'power', 'classic', 'crowd'] as const) for (const c of [fast, slow, old, grubby]) {
+      expect(meetScore(c, cat)).toBeGreaterThanOrEqual(0);
+      expect(meetScore(c, cat)).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('Teilnahme nur mit eigenem, fahrbereitem Auto; Platzierung und Preisgeld stimmen', () => {
+    const g = rng(9);
+    const meet = createMeet(g, 6, 20000);
+    expect(meet.rivals.length).toBe(5);
+    const car = detail(mk('bavaria_330', [], 1));
+    expect(meetBlocker(car)).toBeNull();
+    expect(meetBlocker({ ...car, job: {} as any })).toContain('Kundenfahrzeug');
+    expect(meetBlocker(mk('bavaria_330', ['battery'], 1))).toContain('Nicht fahrbereit');
+    const noWheel = detail(mk('bavaria_330', [], 1));
+    noWheel.components.wheel_fl.installed = false;
+    expect(meetBlocker(noWheel)).toContain('Nicht fahrbereit');
+    const weak = { ...meet, rivals: meet.rivals.map((r) => ({ ...r, score: 1 })) };
+    const res = enterMeet(weak, car);
+    expect(res.place).toBe(1);
+    expect(res.payout).toBe(meet.prize);
+    const strong = { ...meet, rivals: meet.rivals.map((r) => ({ ...r, score: 101 })) };
+    expect(enterMeet(strong, car)).toMatchObject({ place: 6, payout: 0 });
   });
 });

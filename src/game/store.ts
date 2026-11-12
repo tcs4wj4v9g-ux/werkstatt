@@ -5,12 +5,13 @@ import { advanceAuction, createAuction, heldMoney, MAX_AUCTIONS, placeBid, seede
 import { COMPONENT_MAP, defsOf } from './data/components';
 import { ACHIEVEMENTS, countRepair, emptyCareer, newlyAchieved, type Career } from './career';
 import { performance } from './performance';
+import { createContest, createMeet, enterMeet, meetBlocker, resolveContest, type Contest, type ContestResult, type Meet } from './contests';
 import { basePartPrice, fitOf, migrateInventory, partKey } from './fitment';
 import { CAR_MODELS } from './data/cars';
 import { DEFECTS } from './data/defects';
 import { FLUID_PRODUCTS } from './data/fluids';
 import { PARTS } from './data/parts';
-import { availableSlots, LIFTS, SLOT_COUNT, SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
+import { availableSlots, isLift, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
 import * as fluids from './fluids';
@@ -23,7 +24,7 @@ import * as repair from './repair';
 import type { ActionResult, Auction, BoltState, CarInstance, DefectId, FluidId, FluidProduct, FluidStock, GameEvent, Inventory, JobOffer, Listing, PartId, Screen, ToolId, ZoneId } from './types';
 
 export const START_MONEY = 6000;
-export const BAYS = LIFTS;
+const noSlots = (): boolean[] => Array(SLOT_COUNT).fill(false);
 /** Sekunden, bis der Motor im Stand warm ist. */
 export const WARM_AFTER = 9;
 export type Panel = 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
@@ -64,6 +65,13 @@ export interface GameState {
   carsSold: number;
   totalProfit: number;
   jobsDone: number;
+  /** Laufender Händler-Wettbewerb und heutiges Fahrzeugtreffen. */
+  contest: Contest | null;
+  meet: Meet | null;
+  contestResult: ContestResult | null;
+  joinContest(): void;
+  enterMeet(slot: number): void;
+  dismissContestResult(): void;
   /** Karrierezähler und bereits belohnte Erfolge. */
   career: Career;
   achieved: string[];
@@ -253,7 +261,7 @@ export const useGame = create<GameState>()(
           cars[bay] = car;
           const liftUp = [...s.liftUp];
           liftUp[bay] = car.lifted;
-          liftUp[bay] = bay < LIFTS ? car.lifted : false;
+          liftUp[bay] = isLift(bay) ? car.lifted : false;
           // Zusatzbefund am Kundenauto: Der Kunde wird gefragt, statt dass ungefragt repariert und berechnet wird.
           let events = s.events;
           if (car.job) {
@@ -265,7 +273,7 @@ export const useGame = create<GameState>()(
           }
           // Kapitaler Schaden behoben? (Kopfdichtung oder Getriebe gegen ein Neuteil getauscht)
           const severe = ['head_gasket', 'gearbox'].filter((id) => current.components[id]?.condition === 'defect' && car.components[id]?.condition === 'ok').length;
-          set({ cars, inventory, liftUp: liftUp.slice(0, LIFTS), events, ...(severe ? { career: { ...s.career, severeFixed: s.career.severeFixed + severe } } : {}) });
+          set({ cars, inventory, liftUp, events, ...(severe ? { career: { ...s.career, severeFixed: s.career.severeFixed + severe } } : {}) });
         } else if (!r.needsPart) sfx.error();
         if (r.message) get().say(r.message, !r.ok);
         return r;
@@ -306,11 +314,11 @@ export const useGame = create<GameState>()(
         cars: Array(SLOT_COUNT).fill(null),
         upgrades: [],
         fluidStock: emptyStock(),
-        drainPan: [false, false],
+        drainPan: noSlots(),
         auctions: [],
         waiting: [],
         events: [],
-        liftUp: [false, false],
+        liftUp: noSlots(),
         carried: [],
         tool: 'hand',
         inventory: emptyInventory(),
@@ -322,6 +330,36 @@ export const useGame = create<GameState>()(
         carsSold: 0,
         totalProfit: 0,
         jobsDone: 0,
+        contest: null,
+        meet: null,
+        contestResult: null,
+        dismissContestResult: () => set({ contestResult: null }),
+        joinContest: () => {
+          const s = get();
+          const c = s.contest;
+          if (!c || c.joined) return;
+          if (s.money - heldMoney(s.auctions) < c.fee) return s.say('Für das Startgeld reicht das freie Geld nicht.', true);
+          sfx.cash();
+          set({ money: s.money - c.fee, contest: { ...c, joined: true, baseline: s.totalProfit } });
+          s.say(`Angemeldet: ${c.title}. Ausgewertet wird am Morgen nach Tag ${c.endDay}.`);
+        },
+        enterMeet: (slot) => {
+          const s = get();
+          const m = s.meet;
+          const car = s.cars[slot];
+          if (!m || m.result || !car) return;
+          const blocker = meetBlocker(car);
+          if (blocker) return s.say(blocker, true);
+          if (s.money - heldMoney(s.auctions) < m.fee) return s.say('Für das Startgeld reicht das freie Geld nicht.', true);
+          const result = enterMeet(m, car, s.day);
+          sfx.cash();
+          set({
+            money: s.money - m.fee + result.payout,
+            meet: { ...m, result },
+            contestResult: result,
+            career: result.place === 1 ? { ...s.career, meetsWon: s.career.meetsWon + 1 } : s.career,
+          });
+        },
         career: emptyCareer(),
         achieved: [],
         unlocked: [],
@@ -367,11 +405,11 @@ export const useGame = create<GameState>()(
             cars: Array(SLOT_COUNT).fill(null),
             upgrades: [],
             fluidStock: emptyStock(),
-            drainPan: [false, false],
+            drainPan: noSlots(),
             auctions: [createAuction(Math.random, 1, Date.now())],
             waiting: [],
             events: [],
-            liftUp: [false, false],
+            liftUp: noSlots(),
             carried: [],
             tool: 'hand',
             inventory: emptyInventory(),
@@ -386,6 +424,9 @@ export const useGame = create<GameState>()(
             career: emptyCareer(),
             achieved: [],
             unlocked: [],
+            contest: null,
+            meet: null,
+            contestResult: null,
             jobEarnings: 0,
             started: true,
             screen: 'garage',
@@ -465,7 +506,7 @@ export const useGame = create<GameState>()(
           const cars = [...s.cars];
           cars[bay] = car;
           const liftUp = [...s.liftUp];
-          if (bay < LIFTS) liftUp[bay] = false;
+          if (isLift(bay)) liftUp[bay] = false;
           listings.splice(s.selected, 1);
           set({ money: s.money - r.price - transport, cars, liftUp, listings, selected: 0, screen: 'garage', panel: null, marketNote: null });
           get().say(`${l.seller}: ${l.sellerLine} – Gekauft für ${r.price.toLocaleString('de-DE')} €${transport ? ` plus ${transport} € Transport` : ''}. Das Auto steht jetzt hier: ${SLOTS[bay].label}.`);
@@ -487,17 +528,37 @@ export const useGame = create<GameState>()(
           const fresh = events.filter((e) => !s.events.includes(e));
           const auctions = s.auctions.filter((a) => !a.result);
           while (auctions.length < MAX_AUCTIONS) auctions.push(createAuction(Math.random, marketIndex, Date.now()));
+          // Wettbewerb auswerten, wenn sein letzter Tag vorbei ist; alle paar Tage wird ein neuer ausgeschrieben.
+          const view = { cars, totalProfit: s.totalProfit, money: s.money, marketIndex };
+          let { contest, career, money } = s;
+          let contestResult = s.contestResult;
+          if (contest && day > contest.endDay) {
+            if (contest.joined) {
+              contestResult = resolveContest(contest, view);
+              money += contestResult.payout;
+              if (contestResult.place === 1) career = { ...career, competitionsWon: career.competitionsWon + 1 };
+            }
+            contest = null;
+          }
+          if (!contest && day >= 3 && day % 2 === 1) contest = createContest(Math.random, day, view);
+          // Treffen finden an jedem dritten Tag statt und gelten nur für diesen Tag.
+          const meet = day % 3 === 0 ? createMeet(Math.random, day, s.money) : null;
           set({
+            contest,
+            contestResult,
+            career,
+            money,
+            meet,
             day,
             marketIndex,
             cars,
             events,
             auctions,
-            listings: refreshListings(s.listings, s.money, Math.random, marketIndex, day),
+            listings: refreshListings(s.listings, money, Math.random, marketIndex, day),
             jobs: refreshJobs(s.jobs, Math.random),
             selected: 0,
           });
-          get().say(`Tag ${day}: neue Angebote, Auktionen und Kundenanfragen.${fresh.length ? ` Neuigkeit: ${fresh[0].title}.` : ''}`);
+          get().say(`Tag ${day}: neue Angebote, Auktionen und Kundenanfragen.${fresh.length ? ` Neuigkeit: ${fresh[0].title}.` : ''}${meet ? ` Heute: ${meet.title}.` : ''}`);
         },
 
         acceptJob: (i) => {
@@ -510,7 +571,7 @@ export const useGame = create<GameState>()(
           const cars = [...s.cars];
           cars[bay] = { ...offer.car, lifted: false, hoodOpen: false };
           const liftUp = [...s.liftUp];
-          if (bay < LIFTS) liftUp[bay] = false;
+          if (isLift(bay)) liftUp[bay] = false;
           set({ cars, liftUp, jobs: s.jobs.filter((_, k) => k !== i) });
           s.say(`Auftrag angenommen: ${offer.car.job!.customer} hat den Wagen abgestellt – ${SLOTS[bay].label}.`);
         },
@@ -558,7 +619,7 @@ export const useGame = create<GameState>()(
         },
         tapLift: (bay) => {
           const s = get();
-          if (bay >= LIFTS) return;
+          if (!isLift(bay)) return;
           if (s.cars[bay]) return void act(bay, (car) => repair.toggleLift(car), 'clunk');
           const liftUp = [...s.liftUp];
           liftUp[bay] = !liftUp[bay];
@@ -738,12 +799,13 @@ export const useGame = create<GameState>()(
           if (car.keep) return s.say('Das ist als Privatfahrzeug markiert – erst die Markierung entfernen.', true);
           if (s.engineBay === bay) stopEngine();
           const v = valuate(car, s.marketIndex);
-          const price = car.haggled ? v.haggleOffer : v.offer;
+          // Aus dem Showroom heraus verkauft sich ein Auto teurer.
+          const price = Math.round(((car.haggled ? v.haggleOffer : v.offer) * (SLOTS[bay].kind === 'show' ? 1 + SHOWROOM_BONUS : 1)) / 50) * 50;
           const profit = price - car.purchasePrice - car.partsSpent;
           const cars = [...s.cars];
           cars[bay] = null;
           const liftUp = [...s.liftUp];
-          if (bay < LIFTS) liftUp[bay] = false;
+          if (isLift(bay)) liftUp[bay] = false;
           sfx.cash();
           const c0 = countRepair(s.career, car);
           set({
@@ -772,8 +834,9 @@ export const useGame = create<GameState>()(
           if (u.requires && !s.upgrades.includes(u.requires)) return s.say(`Dafür brauchst du zuerst: ${UPGRADES.find((x) => x.id === u.requires)!.name}.`, true);
           if (s.money - heldMoney(s.auctions) < u.price) return s.say('Dafür reicht das freie Geld nicht.', true);
           sfx.cash();
-          set({ money: s.money - u.price, upgrades: [...s.upgrades, id] });
-          s.say(`Ausbau fertig: ${u.name}. Sieh es dir draußen im Hof an.`);
+          const upgrades = [...new Set([...s.upgrades, id, ...(u.grants ?? [])])];
+          set({ money: s.money - u.price, upgrades });
+          s.say(u.equipment ? `Geliefert: ${u.name}.` : u.location ? `Eröffnet: ${u.name}. Der Durchgang ist in der Hallenwand – sieh dich um.` : `Ausbau fertig: ${u.name}. Sieh es dir draußen im Hof an.`);
         },
 
         moveCar: (from, to) => {
@@ -970,10 +1033,10 @@ export const useGame = create<GameState>()(
         const p = persisted ?? {};
         const merged = { ...current, ...p } as GameState;
         merged.cars = Array.from({ length: SLOT_COUNT }, (_, i) => normalizeCar(p.cars?.[i] ?? null));
-        merged.liftUp = [0, 1].map((i) => (merged.cars[i] ? merged.cars[i]!.lifted : !!p.liftUp?.[i]));
+        merged.liftUp = SLOTS.map((x) => isLift(x.id) && (merged.cars[x.id] ? merged.cars[x.id]!.lifted : !!p.liftUp?.[x.id]));
         merged.upgrades = (p.upgrades ?? []).filter((u: UpgradeId) => UPGRADES.some((x) => x.id === u));
         merged.fluidStock = { ...emptyStock(), ...(p.fluidStock ?? {}) };
-        merged.drainPan = [!!p.drainPan?.[0], !!p.drainPan?.[1]];
+        merged.drainPan = SLOTS.map((x) => isLift(x.id) && !!p.drainPan?.[x.id]);
         merged.waiting = (p.waiting ?? []).map((c: CarInstance) => normalizeCar(c)!);
         merged.events = (p.events ?? []).filter((e: GameEvent) => e && e.id && e.type);
         merged.auctions = (p.auctions ?? []).filter((a: Auction) => a && a.car && a.bidders).map((a: Auction) => ({ ...a, car: normalizeCar(a.car)! }));
@@ -988,6 +1051,9 @@ export const useGame = create<GameState>()(
         merged.career = { ...emptyCareer(), ...(p.career ?? {}) };
         merged.achieved = Array.isArray(p.achieved) ? p.achieved : [];
         merged.unlocked = [];
+        merged.contest = p.contest?.rivals ? p.contest : null;
+        merged.meet = p.meet?.rivals ? p.meet : null;
+        merged.contestResult = null;
         if (merged.started) {
           // Füllt auch einen alten, kleinen Markt auf die neue Größe auf; vorhandene Inserate bleiben.
           merged.listings = fillListings(merged.listings, merged.money, Math.random, merged.marketIndex, false, merged.day);
@@ -1021,6 +1087,8 @@ export const useGame = create<GameState>()(
         jobsDone: s.jobsDone,
         career: s.career,
         achieved: s.achieved,
+        contest: s.contest,
+        meet: s.meet,
         jobEarnings: s.jobEarnings,
         sound: s.sound,
         started: s.started,

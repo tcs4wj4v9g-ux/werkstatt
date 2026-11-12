@@ -93,7 +93,7 @@ export function Yard() {
       <Box p={[ROOM.minX - 0.1, H + 0.15, 0]} s={[0.5, 0.3, ROOM.maxZ - ROOM.minZ + 0.6]} c="#3f4650" m={0.4} />
       <Sign text="GARAGE KINGS" p={[ROOM.minX - 0.22, 3.75, 0]} rot={[0, -Math.PI / 2, 0]} size={[3.0, 0.7]} fg="#ff7a1a" />
       {/* Seitenwände der Halle von außen */}
-      {[ROOM.minZ - 0.1, ROOM.maxZ + 0.1].map((z) => (
+      {[...(has('loc_pro') ? [] : [ROOM.minZ - 0.1]), ...(has('loc_hq') ? [] : [ROOM.maxZ + 0.1])].map((z) => (
         <Box key={z} p={[(ROOM.minX + ROOM.maxX) / 2, H / 2, z]} s={[ROOM.maxX - ROOM.minX + 0.4, H, 0.2]} c="#d9d6cc" r={0.95} />
       ))}
 

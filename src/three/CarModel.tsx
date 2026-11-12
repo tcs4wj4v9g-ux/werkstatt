@@ -398,7 +398,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
 
   const connector = (id: string, pos: V3, off: V3) =>
     installed(id) && (
-      <Connector pos={pos} off={off} connected={st(id)?.connected ?? true} label={def(id).name} onTap={interactive ? () => handlers!.onConnector(id) : undefined} />
+      <Connector pos={pos} off={off} connected={st(id)?.connected ?? true} label={def(id).name} onTap={interactive && blockersRemoved(car!, id) ? () => handlers!.onConnector(id) : undefined} />
     );
 
   /** Tipp auf die Karosserie: meldet den getroffenen Bereich (für Waschen, Lackieren, Sichtprüfung). */
@@ -1068,21 +1068,21 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'turbo',
               <>
-                <mesh position={[1.8, 0.6, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.085, 0.085, 0.07, 18]} />
                   <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
                 </mesh>
-                <mesh position={[1.73, 0.6, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[1.73, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.07, 0.07, 0.07, 18]} />
                   <Mat color="#5a4a3c" metal={0.7} rough={0.6} />
                 </mesh>
-                <mesh position={[1.85, 0.6, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[1.85, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.035, 0.035, 0.04, 14]} />
                   <Mat color="#1b1d21" rough={0.5} />
                 </mesh>
               </>,
             )}
-          {st('turbo') && bolts('turbo', [[1.73, 0.675, 0.46], [1.8, 0.69, 0.42], [1.8, 0.69, 0.5]])}
+          {st('turbo') && bolts('turbo', [[1.73, 0.735, 0.46], [1.8, 0.75, 0.42], [1.8, 0.75, 0.5]])}
           {/* Diesel: Abgasrückführung am Kopf, Partikelfilter unter dem Wagenboden */}
           {st('egr') &&
             part(
