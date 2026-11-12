@@ -1,9 +1,8 @@
-import { CAR_MODELS, COMMON_MODELS, RARE_MODELS } from './data/cars';
-import { DEFECT_LIST } from './data/defects';
+import { CAR_MODELS, COLLECTOR_MODELS, modelsOfClass, RARE_MODELS } from './data/cars';
 import { SYMPTOMS } from './data/symptoms';
 import { createZones } from './detail';
 import { presentSymptoms } from './diagnosis';
-import { createCar, valuate, type Rng } from './market';
+import { createCar, randomDefects, valuate, type Rng } from './market';
 import type { Auction } from './types';
 
 // Fahrzeugauktionen mit simulierten Händlern. Alles läuft lokal und ist über
@@ -33,10 +32,14 @@ const DEALERS = [
 let counter = 0;
 
 export function createAuction(rng: Rng, index: number, now: number, rare = false): Auction {
-  const modelId = pick(rare ? RARE_MODELS : COMMON_MODELS, rng);
+  const roll = rng();
+  // Sonderauktionen bringen Liebhaberstücke, ganz selten ein echtes Sammlerfahrzeug.
+  const modelId = rare
+    ? pick(roll < 0.2 ? COLLECTOR_MODELS : RARE_MODELS, rng)
+    : pick(modelsOfClass(roll < 0.4 ? 'budget' : roll < 0.75 ? 'mid' : roll < 0.93 ? 'sport' : 'luxury'), rng);
   const n = 1 + Math.floor(rng() * 3);
-  const defects = [...DEFECT_LIST].sort(() => rng() - 0.5).slice(0, n).map((d) => d.id).filter((d) => d !== 'battery' && d !== 'tires');
-  const car = createCar(modelId, defects, rng, { origin: 'auction', rarity: rare ? 1 : 0 });
+  const defects = randomDefects(modelId, n, rng, ['battery', 'tires']);
+  const car = createCar(modelId, defects, rng, { origin: 'auction', rarity: CAR_MODELS[modelId].collector ? 2 : rare ? 1 : 0 });
   if (rare) car.zones = createZones(0.5, 0.3, 0.1 + rng() * 0.2, rng);
   // Was ein Händler für das Auto in diesem Zustand wiederbekäme.
   const worth = valuate({ ...car, testDriven: true }, index).value;
@@ -59,7 +62,7 @@ export function createAuction(rng: Rng, index: number, now: number, rare = false
     title: `${CAR_MODELS[modelId].name}, Bj. ${car.year}, ${car.km.toLocaleString('de-DE')} km`,
     report,
     startBid,
-    increment: worth > 9000 ? 100 : 50,
+    increment: worth > 150000 ? 2500 : worth > 60000 ? 1000 : worth > 25000 ? 250 : worth > 9000 ? 100 : 50,
     current: startBid,
     leader: null,
     startsAt: now,

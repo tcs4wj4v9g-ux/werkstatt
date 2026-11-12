@@ -45,7 +45,13 @@ export type PartId =
   | 'chain_tensioner'
   | 'oil_filter'
   | 'battery'
-  | 'tire';
+  | 'tire'
+  | 'injector'
+  | 'glow_plug'
+  | 'turbo'
+  | 'charge_pipe'
+  | 'egr'
+  | 'dpf';
 
 export type DefectId =
   | 'coil'
@@ -64,10 +70,17 @@ export type DefectId =
   | 'lifters'
   | 'chain'
   | 'battery'
-  | 'tires';
+  | 'tires'
+  | 'glow'
+  | 'injector'
+  | 'turbo'
+  | 'boost_leak'
+  | 'egr'
+  | 'dpf';
 
 export type Access = 'hood' | 'lifted';
-export type BodyStyle = 'sedan' | 'wagon';
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic';
+export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 
 /** Welches Werkzeug eine Schraube bzw. ein Bauteil verlangt. */
@@ -115,6 +128,8 @@ export interface ComponentState {
   condition: 'ok' | 'defect';
   /** Hat der Spieler den Zustand bereits festgestellt? */
   known: boolean;
+  /** Restzustand in Prozent (bei Zünd- und Einspritzteilen). */
+  health?: number;
 }
 
 export interface CarInstance {
@@ -226,10 +241,13 @@ export interface Listing {
   barn?: boolean;
   /** Angebot verschwindet nach diesem Tag. */
   expiresDay?: number;
+  /** Normales Inserat: bleibt bis zu diesem Tag am Markt. */
+  until?: number;
   sellerLine: string;
 }
 
-export type Inventory = Record<PartId, number>;
+/** Lagerbestand je Teil und Passform, Schlüssel `teil@passform` (siehe fitment.ts). */
+export type Inventory = Record<string, number>;
 
 /** Was der Spieler gerade benutzt und bei sich trägt. */
 export interface Toolset {

@@ -195,3 +195,9 @@ h3.small { font-size: 15px; }
 .car-actions { max-height: calc(100% - 300px); overflow-y: auto; touch-action: pan-y; }
 .note .btn { margin-left: 10px; }
 .toast { bottom: calc(250px + var(--sab)); }
+
+/* Marktfilter */
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 6px 0; }
+.filters label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted, #9aa3ad); }
+.filters select { font: inherit; font-size: 15px; padding: 9px 8px; border-radius: 8px; border: 1px solid var(--line); background: #1b2026; color: #fff; min-height: 42px; }
+.price.bad { color: #ff8a80; }

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CAR_MODELS } from '../game/data/cars';
+import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
+import { engineOf } from '../game/data/components';
+import { adCondition } from '../game/marketFilter';
 import { SELLERS } from '../game/data/sellers';
 import { SYMPTOMS } from '../game/data/symptoms';
 import { minBid } from '../game/auctions';
@@ -64,29 +66,36 @@ function ListingView() {
   }, [l?.id]);
   if (!l) return null;
   const model = CAR_MODELS[l.car.modelId];
+  const e = engineOf(l.car);
   const profile = SELLERS[l.profile] ?? SELLERS.private;
   const toggle = (id: string) => setArgs((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
   const full = freeSlot(s, 'lift') < 0;
   const bump = (d: number) => setOffer((o) => Math.max(100, Math.min(s.money, o + d)));
+  // Bei teuren Autos verhandelt man in größeren Schritten.
+  const [small, big] = l.asking > 150000 ? [1000, 10000] : l.asking > 30000 ? [250, 2500] : [50, 500];
 
   return (
     <>
       <TopBar title="Besichtigung beim Händler" back={{ label: '← Werkstatt', onClick: () => s.goto('garage') }} />
       <div className="tabs">
-        {s.listings.map((x, i) => (
-          <button key={x.id} className={`btn tab ${i === s.selected ? 'active' : ''}`} onClick={() => s.selectListing(i)}>
-            {CAR_MODELS[x.car.modelId].name.replace('Bavaria ', '')}
-            <small>{eur(x.asking)}</small>
-          </button>
-        ))}
+        <button className="btn tab" onClick={() => { s.goto('garage'); s.setPanel('computer'); }}>
+          ☰ Alle Inserate
+          <small>{s.listings.length} Angebote · Filter am Computer</small>
+        </button>
+        <button className="btn tab" onClick={() => s.selectListing((s.selected + s.listings.length - 1) % s.listings.length)}>◀ Vorheriges</button>
+        <button className="btn tab" onClick={() => s.selectListing((s.selected + 1) % s.listings.length)}>Nächstes ▶</button>
       </div>
 
       <div className="panel right market">
         <h3>{l.barn ? '🏚 ' : ''}{model.name}</h3>
         {l.barn && <p className="meta">Scheunenfund · {RARITY_NAMES[l.car.rarity]} · {model.engine} · Transport zur Werkstatt {BARN_TRANSPORT} € extra</p>}
         <p className="meta">
-          Baujahr {l.car.year} · {l.car.km.toLocaleString('de-DE')} km
+          {CLASS_NAMES[model.cls]} · Baujahr {l.car.year} · {l.car.km.toLocaleString('de-DE')} km · Inserat: {adCondition(l)}
         </p>
+        <p className="meta">
+          {e.name} · {e.cylinders} Zylinder · {e.fuel === 'diesel' ? 'Diesel' : 'Benzin'}{e.turbo ? ' · Turbo' : ''} · {e.ps} PS · {e.nm} Nm · {model.weight.toLocaleString('de-DE')} kg
+        </p>
+        <p className="meta">{model.blurb}</p>
         <p className="meta">
           {l.seller} · {profile.label}: {profile.vibe}
         </p>
@@ -116,11 +125,11 @@ function ListingView() {
           })}
         </div>
         <div className="offer">
-          <button className="btn" onClick={() => bump(-500)}>−500</button>
-          <button className="btn" onClick={() => bump(-50)}>−50</button>
+          <button className="btn" onClick={() => bump(-big)}>−{big.toLocaleString('de-DE')}</button>
+          <button className="btn" onClick={() => bump(-small)}>−{small.toLocaleString('de-DE')}</button>
           <div className="amount" data-testid="offer">{eur(offer)}</div>
-          <button className="btn" onClick={() => bump(50)}>+50</button>
-          <button className="btn" onClick={() => bump(500)}>+500</button>
+          <button className="btn" onClick={() => bump(small)}>+{small.toLocaleString('de-DE')}</button>
+          <button className="btn" onClick={() => bump(big)}>+{big.toLocaleString('de-DE')}</button>
         </div>
         {l.gone && <p className="meta bad">Der Verkäufer hat die Verhandlung beendet. Dieses Auto bekommst du nicht mehr.</p>}
         {full && <p className="meta bad">Beide Hebebühnen sind belegt – verkaufe erst ein Auto oder schließe einen Auftrag ab.</p>}

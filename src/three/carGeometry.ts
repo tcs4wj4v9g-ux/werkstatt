@@ -10,37 +10,72 @@ export const HOOD_X0 = 0.8;
 export const HOOD_X1 = 2.02;
 const CABIN_X1 = 0.82;
 const BELT = 0.97;
-const ROOF = 1.42;
+
+/** Karosserieform. Die Front (ab Windschutzscheibe) ist bei allen gleich – dort sitzt der Motorraum. */
+export interface BodySpec {
+  /** Hinteres Fahrzeugende (x). */
+  tail: number;
+  /** Dachhöhe. */
+  roof: number;
+  /** Unterkante Heckscheibe, Dachkante hinten, Dachkante vorn. */
+  x0: number;
+  x1: number;
+  x2: number;
+  /** Lackierte Säulen zwischen den Seitenfenstern (x-Bereiche). */
+  pillars: [number, number][];
+  /** Seitenfenster reichen bis ans Heck (Kombi, Schrägheck). */
+  estate: boolean;
+  /** Türfugen und Türgriffe (x-Positionen). */
+  seams: number[];
+  handles: number[];
+  /** Rücksitzlehne sichtbar (bei flachen Coupés ragte sie durch die Heckscheibe). */
+  rearSeat: boolean;
+}
+const FOUR_DOOR = { seams: [0.74, -0.32, -1.22], handles: [0.3, -0.7] };
+const TWO_DOOR = { seams: [0.74, -0.52], handles: [-0.28] };
+export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
+  sedan: { tail: -2.3, roof: 1.42, x0: -1.55, x1: -0.95, x2: 0.1, pillars: [[-0.38, -0.28]], estate: false, rearSeat: true, ...FOUR_DOOR },
+  wagon: { tail: -2.3, roof: 1.43, x0: -2.2, x1: -1.98, x2: 0.1, pillars: [[-0.38, -0.28], [-1.42, -1.32]], estate: true, rearSeat: true, seams: [0.74, -0.32, -1.28], handles: [0.3, -0.7] },
+  hatch: { tail: -1.92, roof: 1.45, x0: -1.84, x1: -1.5, x2: 0.1, pillars: [[-0.56, -0.46]], estate: true, rearSeat: true, ...TWO_DOOR },
+  coupe: { tail: -2.3, roof: 1.36, x0: -1.72, x1: -0.7, x2: 0.02, pillars: [], estate: false, rearSeat: false, ...TWO_DOOR },
+  sport: { tail: -2.2, roof: 1.25, x0: -1.78, x1: -0.6, x2: -0.05, pillars: [], estate: false, rearSeat: false, ...TWO_DOOR },
+  luxury: { tail: -2.3, roof: 1.46, x0: -1.64, x1: -1.1, x2: 0.1, pillars: [[-0.38, -0.28]], estate: false, rearSeat: true, ...FOUR_DOOR },
+  classic: { tail: -2.3, roof: 1.33, x0: -1.52, x1: -0.85, x2: 0.08, pillars: [], estate: false, rearSeat: false, ...TWO_DOOR },
+};
+const SEDAN = BODY_SPECS.sedan;
 const WHEEL_X = 1.38;
 const ARCH_R = 0.41;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp01(t);
 
-export function halfWidth(x: number) {
+export function halfWidth(x: number, B: BodySpec = SEDAN) {
+  const r = B.tail + 0.6;
   if (x > 1.7) return 0.9 - 0.13 * ((x - 1.7) / 0.6) ** 2;
-  if (x < -1.7) return 0.9 - 0.11 * ((-1.7 - x) / 0.6) ** 2;
+  if (x < r) return 0.9 - 0.11 * ((r - x) / 0.6) ** 2;
   return 0.9;
 }
 
-export function topY(x: number) {
+export function topY(x: number, B: BodySpec = SEDAN) {
+  const r = B.tail + 0.15;
   if (x > 2.05) return 0.82 - ((x - 2.05) / 0.25) ** 3 * 0.12;
   if (x >= 0.78) return 0.99 - 0.134 * (x - 0.78);
   if (x >= -1.5) return 1.0;
-  if (x >= -2.15) return lerp(1.0, 0.97, (-1.5 - x) / 0.65);
-  return 0.97 - ((-2.15 - x) / 0.15) ** 2 * 0.12;
+  if (x >= r) return lerp(1.0, 0.97, (-1.5 - x) / (-1.5 - r));
+  return 0.97 - ((r - x) / 0.15) ** 2 * 0.12;
 }
 
-function baseY(x: number) {
+function baseY(x: number, B: BodySpec = SEDAN) {
   let b = 0.28;
+  const r = B.tail + 0.2;
   if (x > 2.1) b += ((x - 2.1) / 0.2) ** 2 * 0.08;
-  if (x < -2.1) b += ((-2.1 - x) / 0.2) ** 2 * 0.1;
+  if (x < r) b += ((r - x) / 0.2) ** 2 * 0.1;
   return b;
 }
 
 /** Unterkante der Außenhaut – im Bereich der Räder zum Radhaus hochgezogen. */
-function bottomY(x: number) {
-  let b = baseY(x);
+function bottomY(x: number, B: BodySpec) {
+  let b = baseY(x, B);
   for (const xc of [WHEEL_X, -WHEEL_X]) {
     const dx = Math.abs(x - xc);
     if (dx < ARCH_R) b = Math.max(b, 0.32 + Math.sqrt(ARCH_R * ARCH_R - dx * dx));
@@ -49,10 +84,10 @@ function bottomY(x: number) {
 }
 
 /** Halber Querschnitt des Unterbaus von der Dachmitte (z=0) außen herum bis zur Bodenmitte. */
-function bodyProfile(x: number): [number, number][] {
-  const w = halfWidth(x);
-  const top = topY(x);
-  const bot = bottomY(x);
+function bodyProfile(x: number, B: BodySpec): [number, number][] {
+  const w = halfWidth(x, B);
+  const top = topY(x, B);
+  const bot = bottomY(x, B);
   const k = Math.min(1, (top - bot) / 0.34);
   const sh = 0.13 * k; // Schulterhöhe
   const bc = 0.1 * k; // Schwellerrundung
@@ -72,7 +107,7 @@ function bodyProfile(x: number): [number, number][] {
     pts.push([0.86 * w + 0.14 * w * Math.cos(a), bot + bc * (1 - Math.sin(a))]);
   }
   // Innen fällt der Boden wieder auf Normalhöhe: das ergibt die Radhaus-Innenwand.
-  const base = baseY(x);
+  const base = baseY(x, B);
   const inner = Math.min(0.66, 0.8 * w);
   pts.push([inner, bot]);
   pts.push([inner - 0.02, base]);
@@ -126,11 +161,12 @@ function finish(positions: number[], groups: number[][]) {
 }
 
 function buildShell(body: BodyStyle) {
-  const cabinX0 = body === 'wagon' ? -2.2 : -1.55;
-  const xs = uniq([...range(-2.3, 2.3, 0.05), HOOD_X0, HOOD_X1, cabinX0, CABIN_X1]);
-  const half = bodyProfile(0).length;
+  const B = BODY_SPECS[body];
+  const cabinX0 = B.x0;
+  const xs = uniq([...range(B.tail, 2.3, 0.05), HOOD_X0, HOOD_X1, cabinX0, CABIN_X1]);
+  const half = bodyProfile(0, B).length;
   const loft = makeLoft(half, true);
-  xs.forEach((x) => loft.add(x, bodyProfile(x)));
+  xs.forEach((x) => loft.add(x, bodyProfile(x, B)));
   const R = loft.ring;
   const idx: number[] = [];
   // Ringindex der Dachmitte (z = 0 oben)
@@ -155,7 +191,7 @@ function buildShell(body: BodyStyle) {
   for (const s of [0, xs.length - 1]) {
     const x = xs[s];
     const center = loft.positions.length / 3;
-    loft.positions.push(x + (s ? 0.012 : -0.012), (topY(x) + baseY(x)) / 2, 0);
+    loft.positions.push(x + (s ? 0.012 : -0.012), (topY(x, B) + baseY(x, B)) / 2, 0);
     for (let j = 0; j < R; j++) {
       const a = s * R + j;
       const b = s * R + ((j + 1) % R);
@@ -193,11 +229,10 @@ function buildHood() {
 
 /** Fahrgastzelle: Gruppe 0 = Lack (Dach, Säulen), Gruppe 1 = Glas. */
 function buildCabin(body: BodyStyle) {
-  const wagon = body === 'wagon';
-  const x0 = wagon ? -2.2 : -1.55; // Unterkante Heckscheibe
-  const x1 = wagon ? -1.98 : -0.95; // Dachkante hinten
-  const x2 = 0.1; // Dachkante vorn
-  const pillars = wagon ? [[-0.38, -0.28], [-1.42, -1.32]] : [[-0.38, -0.28]];
+  const B = BODY_SPECS[body];
+  const wagon = B.estate;
+  const { x0, x1, x2, pillars } = B;
+  const ROOF = B.roof;
   const yb = BELT - 0.03;
   const height = (x: number) => {
     if (x < x1) return lerp(yb, ROOF - 0.02, (x - x0) / (x1 - x0));
@@ -206,7 +241,7 @@ function buildCabin(body: BodyStyle) {
   };
   const profile = (x: number): [number, number][] => {
     const yt = Math.max(yb + 0.001, height(x));
-    const wb = Math.min(0.8, halfWidth(x) * 0.89);
+    const wb = Math.min(0.8, halfWidth(x, B) * 0.89);
     const wr = wb - (wb - 0.6) * ((yt - yb) / (ROOF - yb));
     const k = Math.min(1, (yt - yb) / 0.2);
     const pts: [number, number][] = [];
@@ -221,7 +256,7 @@ function buildCabin(body: BodyStyle) {
     return pts;
   };
   const xs = uniq([
-    ...range(x0, x1, wagon ? 0.11 : 0.12),
+    ...range(x0, x1, x1 - x0 < 0.4 ? 0.11 : 0.12),
     ...range(x1, x2, 0.15),
     ...range(x2, CABIN_X1, 0.12),
     ...pillars.flat(),

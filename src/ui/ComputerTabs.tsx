@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { heldMoney, minBid } from '../game/auctions';
 import { CAR_MODELS } from '../game/data/cars';
 import { FLUID_LIST } from '../game/data/fluids';
+import { defsOf, engineOf } from '../game/data/components';
 import { PART_LIST } from '../game/data/parts';
+import { fitOf, stockOf } from '../game/fitment';
 import { availableSlots, SLOTS, UPGRADES } from '../game/data/workshop';
 import { RARITY_NAMES } from '../game/market';
 import { fluidPrice, partPrice, useGame } from '../game/store';
@@ -126,6 +128,11 @@ export function EventsTab() {
 /** Teile und Flüssigkeiten bestellen – mit Sonderangeboten und Großhandelsrabatt. */
 export function ShopList() {
   const s = useGame();
+  const slots = s.cars.map((c, i) => (c ? i : -1)).filter((i) => i >= 0);
+  const slot = s.cars[s.shopSlot] ? s.shopSlot : slots[0] ?? -1;
+  const car = slot >= 0 ? s.cars[slot]! : null;
+  // Nur Teile, die dieses Auto überhaupt hat (ein Diesel braucht keine Zündkerzen).
+  const fitted = car ? new Set(defsOf(car).map((d) => d.partId).filter(Boolean)) : new Set();
   return (
     <>
       <h4>Betriebsflüssigkeiten</h4>
@@ -139,16 +146,31 @@ export function ShopList() {
         </div>
       ))}
       <h4>Ersatzteile</h4>
-      {PART_LIST.map((p) => {
-        const price = partPrice(s, p.id);
+      {!car && <p className="meta">Ersatzteile werden passend zum Fahrzeug bestellt. Im Moment steht kein Auto in der Werkstatt.</p>}
+      {car && (
+        <>
+          <p className="meta">Teile passen nur zum jeweiligen Motor und zur Fahrzeugklasse. Für welches Auto bestellst du?</p>
+          <div className="chips">
+            {slots.map((i) => (
+              <button key={i} className={`btn small${i === slot ? ' primary' : ''}`} onClick={() => s.setShopSlot(i)}>
+                {SLOTS[i].label}: {CAR_MODELS[s.cars[i]!.modelId].name}
+              </button>
+            ))}
+          </div>
+          <p className="meta"><b>{CAR_MODELS[car.modelId].name}</b> · {engineOf(car).name} · Teilefamilie {engineOf(car).family}</p>
+        </>
+      )}
+      {car && PART_LIST.filter((p) => fitted.has(p.id)).map((p) => {
+        const price = partPrice(s, p.id, car);
+        const list = partPrice({ events: [], upgrades: [], day: s.day }, p.id, car);
         return (
           <div key={p.id} className="shop-row">
             <div>
               <b>{p.name}</b>
-              <div className="meta">{p.desc} · im Regal: {s.inventory[p.id]}</div>
+              <div className="meta">{p.desc} · passend für {fitOf(car, p.id)} · im Regal: {stockOf(s.inventory, car, p.id)}</div>
             </div>
-            <button className="btn primary" disabled={s.money < price} onClick={() => s.buyPart(p.id)}>
-              Bestellen {eur(price)}{price < p.price ? ` statt ${p.price}` : ''}
+            <button className="btn primary" disabled={s.money < price} onClick={() => s.buyPart(p.id, slot)}>
+              Bestellen {eur(price)}{price < list ? ` statt ${list.toLocaleString('de-DE')}` : ''}
             </button>
           </div>
         );

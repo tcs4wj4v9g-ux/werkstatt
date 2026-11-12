@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { engineAudio } from '../game/audio';
 import { CAR_MODELS } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
+import { fitOf, splitKey } from '../game/fitment';
+import { MarketTab } from './MarketTab';
 import { DEFECTS } from '../game/data/defects';
 import { PARTS } from '../game/data/parts';
 import { availableSlots, SLOTS } from '../game/data/workshop';
@@ -217,7 +219,8 @@ export function GarageUI() {
       {s.partPrompt && (
         <Modal title="Neuteil fehlt" onClose={s.closePartPrompt}>
           <p>
-            {COMPONENT_MAP[s.partPrompt.compId].name} ist defekt. Du hast kein Neuteil „{PARTS[s.partPrompt.partId].name}“ im Regal.
+            {COMPONENT_MAP[s.partPrompt.compId].name} ist defekt. Du hast kein passendes Neuteil „{PARTS[s.partPrompt.partId].name}“
+            {s.cars[s.partPrompt.bay] ? ` (${fitOf(s.cars[s.partPrompt.bay]!, s.partPrompt.partId)})` : ''} im Regal.
           </p>
           <button className="btn primary big" onClick={() => { s.closePartPrompt(); s.setPanel('shop'); }}>Teil bestellen</button>
           <button className="btn big" onClick={() => s.tapComponent(s.partPrompt!.bay, s.partPrompt!.compId, true)}>Defektes Altteil wieder einbauen</button>
@@ -267,12 +270,12 @@ function CabinetModal() {
 /** Werkbank: Übersicht über Lager und Befunde beider Autos. */
 function BenchModal() {
   const s = useGame();
-  const stock = (Object.keys(s.inventory) as PartId[]).filter((p) => s.inventory[p] > 0);
+  const stock = Object.keys(s.inventory).filter((k) => s.inventory[k] > 0 && PARTS[splitKey(k).part]);
   return (
     <Modal title="Werkbank" onClose={() => s.setPanel(null)} wide>
       <h4>Teile im Regal</h4>
       {stock.length === 0 && <p className="meta">Keine Ersatzteile vorrätig.</p>}
-      {stock.map((p) => <div key={p} className="meta">{s.inventory[p]}× {PARTS[p].name}</div>)}
+      {stock.map((k) => <div key={k} className="meta">{s.inventory[k]}× {PARTS[splitKey(k).part].name} – passend für {splitKey(k).fit}</div>)}
       {s.cars.map((car, i) =>
         car ? (
           <div key={i}>
@@ -353,28 +356,7 @@ function ComputerModal() {
         ))}
       </div>
 
-      {tab === 'market' && (
-        <>
-          <p className="meta">
-            Tag {s.day} · {marketLabel(s.marketIndex)} · freie Stellplätze: {free}
-          </p>
-          {s.listings.map((l, i) => (
-            <div key={l.id} className="shop-row">
-              <div>
-                <b>{l.barn ? '🏚 Scheunenfund: ' : l.expiresDay ? '⏳ ' : ''}{CAR_MODELS[l.car.modelId].name}{l.car.rarity > 0 ? ` (${RARITY_NAMES[l.car.rarity]})` : ''}</b>
-                <div className="meta">
-                  {l.expiresDay !== undefined && `nur bis Tag ${l.expiresDay} · `}Bj. {l.car.year} · {l.car.km.toLocaleString('de-DE')} km · {l.seller}
-                  {l.hints.length > 0 && ` · ${l.hints.length} Auffälligkeit(en) notiert`}
-                  {l.gone && ' · Verkäufer hat abgebrochen'}
-                </div>
-              </div>
-              <div className="price">{eur(l.current)}</div>
-              <button className="btn primary" disabled={l.gone} onClick={() => s.viewListing(i)}>Besichtigen</button>
-            </div>
-          ))}
-          <button className="btn big" onClick={s.nextDay}>🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)</button>
-        </>
-      )}
+      {tab === 'market' && <MarketTab />}
 
       {tab === 'mine' && (
         <>

@@ -1,6 +1,7 @@
-import { COMMON_MODELS } from './data/cars';
+import { modelsOfClass } from './data/cars';
 import { DEFECTS } from './data/defects';
-import { createCar, type Rng } from './market';
+import { defectLabor } from './fitment';
+import { applicableDefects, createCar, type Rng } from './market';
 import { CAR_MODELS } from './data/cars';
 import { fluidEngineBlocker, serviceState } from './fluids';
 import { activeDefects, isAssembled } from './repair';
@@ -30,6 +31,10 @@ export const JOB_TEMPLATES: JobTemplate[] = [
   { category: 'Elektrischer Defekt', complaint: 'Die Batterieleuchte brennt und gestern sprang er kaum noch an.', causes: [['alternator'], ['belt']] },
   { category: 'Wartung', complaint: 'Beim Anlassen quietscht es laut. Bitte nachsehen.', causes: [['belt']] },
   { category: 'Ölwechsel', complaint: 'Der Service ist überfällig. Bitte Ölwechsel mit neuem Filter.', causes: [[]], service: 'oil_change' },
+  { category: 'Dieselproblem', complaint: 'Morgens springt der Diesel ganz schlecht an und qualmt weiß.', causes: [['glow']] },
+  { category: 'Dieselproblem', complaint: 'Der Motor nagelt neuerdings hart und zieht nicht mehr richtig.', causes: [['injector']] },
+  { category: 'Leistungsverlust', complaint: 'Er zieht nicht mehr – als hätte jemand den Turbo abgeklemmt. Manchmal pfeift oder zischt es.', causes: [['turbo'], ['boost_leak']] },
+  { category: 'Abgasproblem', complaint: 'Auf der Autobahn geht er in den Notlauf, und er rußt beim Gasgeben.', causes: [['dpf'], ['egr']] },
   { category: 'Ölverlust', complaint: 'Ich habe Ölflecken in der Einfahrt. Wo kommt das her?', causes: [['gasket'], ['oil_pan']] },
 ];
 
@@ -42,16 +47,22 @@ const PARTS_MARKUP = 1.15;
 let counter = 0;
 
 export function createJobOffer(rng: Rng): JobOffer {
-  const t = pick(JOB_TEMPLATES, rng);
-  const required = pick(t.causes, rng);
+  // Kunden kommen überwiegend mit Alltagsautos, gelegentlich mit etwas Teurerem.
+  const roll = rng();
+  const modelId = pick(modelsOfClass(roll < 0.5 ? 'budget' : roll < 0.85 ? 'mid' : roll < 0.96 ? 'sport' : 'luxury'), rng);
+  const possible = applicableDefects(modelId);
+  const fits = (causes: DefectId[]) => causes.every((d) => possible.includes(d));
+  // Nur Beanstandungen, die es an diesem Motor geben kann (kein Zündproblem am Diesel).
+  const t = pick(JOB_TEMPLATES.filter((x) => x.causes.some(fits)), rng);
+  const required = pick(t.causes.filter(fits), rng);
   const defects = [...required];
   // Manchmal steckt noch ein zweiter, nicht beanstandeter Mangel im Auto.
   if (rng() < 0.3) {
     const extra = pick(['belt', 'plugs', 'brakes', 'coolant_hose'] as DefectId[], rng);
-    if (!defects.includes(extra)) defects.push(extra);
+    if (!defects.includes(extra) && possible.includes(extra)) defects.push(extra);
   }
-  const car = createCar(pick(COMMON_MODELS, rng), defects, rng, { origin: 'job' });
-  const fee = (t.service ? OIL_SERVICE_FEE : DIAGNOSIS_FEE) + required.reduce((s, d) => s + DEFECTS[d].labor, 0);
+  const car = createCar(modelId, defects, rng, { origin: 'job' });
+  const fee = (t.service ? OIL_SERVICE_FEE : DIAGNOSIS_FEE) + required.reduce((s, d) => s + defectLabor(car, d), 0);
   if (t.service) car.fluids.oil.quality = Math.min(car.fluids.oil.quality, 0.3);
   car.job = { id: `job-${Date.now().toString(36)}-${counter++}`, customer: pick(CUSTOMERS, rng), complaint: t.complaint, category: t.category, fee, required, initial: defects, service: t.service, approved: [] };
   return { id: car.job.id, car };
@@ -92,7 +103,7 @@ export function billJob(car: CarInstance, day = 0): JobBill {
   const lines = [{ label: `Arbeitslohn: ${job.category} (inkl. Diagnose)`, amount: job.fee }];
   // Zusatzarbeiten zahlt der Kunde nur, wenn er sie freigegeben hat.
   for (const d of job.approved ?? []) {
-    if (!job.required.includes(d) && !active.includes(d)) lines.push({ label: `Zusatzarbeit: ${DEFECTS[d].name}`, amount: DEFECTS[d].labor });
+    if (!job.required.includes(d) && !active.includes(d)) lines.push({ label: `Zusatzarbeit: ${DEFECTS[d].name}`, amount: defectLabor(car, d) });
   }
   if (job.service === 'oil_change' && serviceState(car).oilChanged) {
     lines.push({ label: `Motoröl ${CAR_MODELS[car.modelId].oilCapacity} l`, amount: Math.round(CAR_MODELS[car.modelId].oilCapacity * FLUID_PRICE.oil * PARTS_MARKUP) });

@@ -4,7 +4,7 @@ import { dirtLevel, interiorDirt, rustLevel, shineLevel } from '../game/detail';
 import { capacity, FLUID_NAMES } from '../game/fluids';
 import { RARITY_NAMES } from '../game/market';
 import type { FluidId } from '../game/types';
-import { COMPONENT_MAP } from '../game/data/components';
+import { COMPONENT_MAP, engineOf } from '../game/data/components';
 import { DEFECTS } from '../game/data/defects';
 import { SYMPTOMS } from '../game/data/symptoms';
 import { causeStatus, possibleCauses } from '../game/diagnosis';
@@ -26,9 +26,17 @@ export function FileModal() {
   const removed = Object.keys(car.components).filter((c) => !car.components[c].installed);
   const loose = Object.keys(car.components).filter((c) => car.components[c].installed && (car.components[c].bolts.some((b) => b < 2) || (COMPONENT_MAP[c].connector && !car.components[c].connected)));
   const symptoms = car.observed.filter((id) => SYMPTOMS[id]);
+  const model = CAR_MODELS[car.modelId];
+  const e = engineOf(car);
+  // Restzustand kennt man nur von Teilen, die man in der Hand hatte.
+  const measured = Object.keys(car.components).filter((c) => car.components[c].health !== undefined && car.components[c].known);
   return (
     <Modal title={`Fahrzeugakte – ${SLOTS[s.panelBay].label}: ${CAR_MODELS[car.modelId].name}`} onClose={() => s.setPanel(null)} wide>
-      <p className="meta">{CAR_MODELS[car.modelId].engine} · Bj. {car.year} · {car.km.toLocaleString('de-DE')} km{car.rarity > 0 ? ` · ${RARITY_NAMES[car.rarity]}` : ''}</p>
+      <p className="meta">{model.engine} · Bj. {car.year} · {car.km.toLocaleString('de-DE')} km{car.rarity > 0 ? ` · ${RARITY_NAMES[car.rarity]}` : ''}</p>
+      <p className="meta">
+        Motor: {e.layout === 'R4' || e.layout === 'R6' ? 'Reihe' : 'V-Motor'}, {e.cylinders} Zylinder · {e.fuel === 'diesel' ? 'Diesel' : 'Benzin'} ·{' '}
+        {e.turbo ? 'Turbo' : 'Sauger'} · {e.liters.toLocaleString('de-DE')} l · {e.ps} PS · {e.nm} Nm · {model.weight.toLocaleString('de-DE')} kg · Teilefamilie {e.family}
+      </p>
       {car.job && (
         <div className="note">
           <b>Kundenauftrag von {car.job.customer}:</b> „{car.job.complaint}“
@@ -49,7 +57,7 @@ export function FileModal() {
                 {FLUID_NAMES[SYMPTOMS[id].fluid!]} · {car.checked[SYMPTOMS[id].fluid!] ? 'Stand abgelesen' : 'Stand ungeprüft'}
               </span>
             )}
-            {possibleCauses(id).map((d) => {
+            {possibleCauses(id, car).map((d) => {
               const [label, cls] = STATUS[causeStatus(car, d)];
               return (
                 <span key={d.id} className={`cause ${cls}`}>
@@ -77,6 +85,12 @@ export function FileModal() {
       {knownDefects(car).length === 0 && <p className="meta">Noch keiner.</p>}
       {knownDefects(car).map((d) => <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>)}
       {(removed.length > 0 || loose.length > 0) && <h4>Laufende Arbeiten</h4>}
+      {measured.length > 0 && <h4>Geprüfte Zünd- und Einspritzteile</h4>}
+      {measured.map((c) => (
+        <div key={c} className="meta">
+          {COMPONENT_MAP[c].name}: {car.components[c].condition === 'defect' ? 'defekt' : `${car.components[c].health} %`}
+        </div>
+      ))}
       {removed.map((c) => <div key={c} className="meta">ausgebaut: {COMPONENT_MAP[c].name}</div>)}
       {loose.map((c) => <div key={c} className="meta">noch nicht fest / Stecker offen: {COMPONENT_MAP[c].name}</div>)}
       <p className="meta">Status: {car.testDriven ? 'Probefahrt nach letzter Arbeit gemacht' : 'Probefahrt steht aus'} · verbaute Teile bisher {car.partsSpent} €</p>

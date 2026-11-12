@@ -234,7 +234,7 @@ export function TrackScene() {
       })}
 
       <group ref={group}>
-        <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} />
+        <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} modelId={car.modelId} />
         {perf.smoke && (
           <mesh position={[1.4, 1.1, 0]}>
             <sphereGeometry args={[0.35, 8, 6]} />

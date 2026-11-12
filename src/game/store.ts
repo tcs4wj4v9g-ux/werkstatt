@@ -2,11 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { engineAudio, setMuted, sfx } from './audio';
 import { advanceAuction, createAuction, heldMoney, MAX_AUCTIONS, placeBid, seeded } from './auctions';
-import { COMPONENT_MAP } from './data/components';
+import { COMPONENT_MAP, defsOf } from './data/components';
+import { basePartPrice, fitOf, migrateInventory, partKey } from './fitment';
 import { CAR_MODELS } from './data/cars';
 import { DEFECTS } from './data/defects';
 import { FLUID_PRODUCTS } from './data/fluids';
-import { PARTS, PART_LIST } from './data/parts';
+import { PARTS } from './data/parts';
 import { availableSlots, LIFTS, SLOT_COUNT, SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
@@ -75,6 +76,9 @@ export interface GameState {
   engineWarm: boolean;
   toast: Toast | null;
   partPrompt: { bay: number; compId: string; partId: PartId } | null;
+  /** Für welches Auto der Teileshop gerade Teile anzeigt (Stellplatz). */
+  shopSlot: number;
+  setShopSlot(slot: number): void;
   marketNote: string | null;
   /** Was der Händlerhof gerade zeigt: Marktangebote oder Auktionsfahrzeuge. */
   marketSource: 'listings' | 'auctions';
@@ -104,7 +108,8 @@ export interface GameState {
   tapConnector(bay: number, compId: string): void;
   tapComponent(bay: number, compId: string, useOldPart?: boolean): void;
   closePartPrompt(): void;
-  buyPart(id: PartId): void;
+  /** Bestellt ein Teil in der Passform des Autos auf diesem Stellplatz. */
+  buyPart(id: PartId, slot: number): void;
   scanObd(bay: number): void;
   toggleEngine(bay: number): void;
   engineTick(): void;
@@ -133,10 +138,10 @@ export interface GameState {
 }
 
 /** Aktueller Preis eines Ersatzteils inklusive Sonderangebot und Großhandelsrabatt. */
-export function partPrice(s: Pick<GameState, 'events' | 'upgrades' | 'day'>, id: PartId): number {
+export function partPrice(s: Pick<GameState, 'events' | 'upgrades' | 'day'>, id: PartId, car?: CarInstance | null): number {
   const sale = s.events.find((e) => e.type === 'parts_sale' && e.sale?.partId === id && e.expiresDay >= s.day);
   const factor = (sale ? 1 - sale.sale!.pct / 100 : 1) * (s.upgrades.includes('expansion') ? 0.9 : 1);
-  return Math.round(PARTS[id].price * factor);
+  return Math.round((car ? basePartPrice(car, id) : PARTS[id].price) * factor);
 }
 export const fluidPrice = (s: Pick<GameState, 'upgrades'>, id: FluidProduct) => Math.round(FLUID_PRODUCTS[id].price * (s.upgrades.includes('expansion') ? 0.9 : 1));
 
@@ -149,7 +154,7 @@ export function freeSlot(s: Pick<GameState, 'cars' | 'upgrades'>, prefer: 'lift'
 
 const emptyStock = (): FluidStock => ({ oil_5w30: 0, oil_5w40: 0, coolant: 0, brake_fluid: 0 });
 const hash = (str: string) => [...str].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-const emptyInventory = (): Inventory => Object.fromEntries(PART_LIST.map((p) => [p.id, 0])) as Inventory;
+const emptyInventory = (): Inventory => ({});
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 let toastId = 0;
 
@@ -160,23 +165,39 @@ let toastId = 0;
  */
 export function normalizeCar(car: CarInstance | null): CarInstance | null {
   if (!car) return null;
-  const fresh = freshComponents();
+  const modelId = CAR_MODELS[car.modelId] ? car.modelId : 'bavaria_320';
+  // Fehlende Felder bekommen feste, aus der Fahrzeug-ID abgeleitete Standardwerte (kein Würfeln bei jedem Laden).
+  const rng = seeded(hash(car.uid ?? 'auto'));
+  const fresh = freshComponents(modelId);
+  const defs = defsOf({ modelId });
   const components: CarInstance['components'] = {};
+  const added: string[] = [];
   for (const id of Object.keys(fresh)) {
     const old = car.components?.[id] as any;
+    const health = fresh[id].health === undefined ? undefined : typeof old?.health === 'number' ? old.health : old?.condition === 'defect' ? Math.round(rng() * 22) : Math.round(60 + rng() * 38);
     if (!old) {
-      components[id] = fresh[id];
+      // Bauteil gab es früher nicht (z. B. Zylinder 5 und 6 am Sechszylinder): heil und eingebaut.
+      components[id] = { ...fresh[id], ...(health === undefined ? {} : { health }) };
+      added.push(id);
       continue;
     }
     const bolts = fresh[id].bolts.map((_, i): BoltState => {
       const b = old.bolts?.[i];
       return b === true || b === 2 || b === undefined ? 2 : b === 1 ? 1 : 0;
     });
-    components[id] = { installed: !!old.installed, bolts, connected: old.connected ?? true, condition: old.condition === 'defect' ? 'defect' : 'ok', known: !!old.known };
+    components[id] = { installed: !!old.installed, bolts, connected: old.connected ?? true, condition: old.condition === 'defect' ? 'defect' : 'ok', known: !!old.known, ...(health === undefined ? {} : { health }) };
   }
-  const modelId = CAR_MODELS[car.modelId] ? car.modelId : 'bavaria_320';
-  // Fehlende Felder bekommen feste, aus der Fahrzeug-ID abgeleitete Standardwerte (kein Würfeln bei jedem Laden).
-  const rng = seeded(hash(car.uid ?? 'auto'));
+  // Ein neu hinzugekommenes Teil darf nichts versperren, was der Spieler schon ausgebaut hat:
+  // liegt ein Teil darunter draußen, liegt auch das neue ausgebaut (und heil) daneben.
+  for (let again = true; again; ) {
+    again = false;
+    for (const id of added) {
+      if (components[id].installed && defs.some((d) => d.blockedBy.includes(id) && components[d.id] && !components[d.id].installed)) {
+        components[id] = { ...components[id], installed: false, bolts: components[id].bolts.map(() => 0 as BoltState), connected: false };
+        again = true;
+      }
+    }
+  }
   const base = fluids.createFluids(modelId, 0.3, rng);
   const zones = car.zones ?? createZones(0.35, 0.55, 0, rng);
   return {
@@ -300,6 +321,7 @@ export const useGame = create<GameState>()(
         engineWarm: false,
         toast: null,
         partPrompt: null,
+        shopSlot: 0,
         marketNote: null,
         marketSource: 'listings',
         paintColor: PAINT_COLORS[0],
@@ -555,18 +577,22 @@ export const useGame = create<GameState>()(
             return get().say('Erst die Auffangwanne unter den Motor stellen – sonst läuft das Altöl auf den Boden.', true);
           }
           const r = act(bay, (car, inv) => repair.componentAction(car, inv, compId, tools(), { useOldPart }), 'clunk');
-          set({ partPrompt: r?.needsPart ? { bay, compId, partId: r.needsPart } : null });
+          set(r?.needsPart ? { partPrompt: { bay, compId, partId: r.needsPart }, shopSlot: bay } : { partPrompt: null });
         },
         closePartPrompt: () => set({ partPrompt: null }),
+        setShopSlot: (shopSlot) => set({ shopSlot }),
 
-        buyPart: (id) => {
+        buyPart: (id, slot) => {
           const s = get();
+          const car = s.cars[slot];
+          if (!car) return s.say('Wähle zuerst das Auto, für das du bestellst.', true);
           const p = PARTS[id];
-          const price = partPrice(s, id);
+          const price = partPrice(s, id, car);
+          const key = partKey(car, id);
           if (s.money - heldMoney(s.auctions) < price) return s.say('Dafür reicht das freie Geld nicht.', true);
           sfx.cash();
-          set({ money: s.money - price, inventory: { ...s.inventory, [id]: s.inventory[id] + p.units } });
-          s.say(`Bestellt: ${p.name} (−${price} €). Liegt im Ersatzteilregal.`);
+          set({ money: s.money - price, inventory: { ...s.inventory, [key]: (s.inventory[key] ?? 0) + p.units } });
+          s.say(`Bestellt: ${p.name} für ${fitOf(car, id)} (−${price.toLocaleString('de-DE')} €). Liegt im Ersatzteilregal.`);
         },
 
         scanObd: (bay) => void act(bay, (car) => ({ ok: true, message: obdScan(car).length ? undefined : 'OBD: keine Fehler gespeichert.' })),
@@ -689,7 +715,7 @@ export const useGame = create<GameState>()(
             liftUp,
             carsSold: s.carsSold + 1,
             totalProfit: s.totalProfit + profit,
-            listings: fillListings(s.listings, s.money + price, Math.random, s.marketIndex),
+            listings: fillListings(s.listings, s.money + price, Math.random, s.marketIndex, false, s.day),
             lastSale: { title: 'Verkauft!', price, profit },
           });
         },
@@ -861,7 +887,7 @@ export const useGame = create<GameState>()(
     },
     {
       name: 'garage-kings-save-v1',
-      version: 4,
+      version: 5,
       migrate: (old: any, version) => {
         if (!old) return old;
         let s = old;
@@ -890,6 +916,8 @@ export const useGame = create<GameState>()(
           s = { ...s, listings: [], selected: 0 };
         }
         // Version 4 ergänzt nur neue Felder (Flüssigkeiten, Stellplätze, Ausbau, Auktionen, Ereignisse) – das erledigt `merge`.
+        // Version 5: Motoren je Modell (Sechszylinder bekommen Zylinder 5 und 6 – `normalizeCar`), Lager nach Passform
+        // (`migrateInventory`), großer Markt mit Laufzeiten. Autos, Reparaturstand, Geld und Lager bleiben erhalten.
         return s;
       },
       merge: (persisted: any, current) => {
@@ -903,7 +931,7 @@ export const useGame = create<GameState>()(
         merged.waiting = (p.waiting ?? []).map((c: CarInstance) => normalizeCar(c)!);
         merged.events = (p.events ?? []).filter((e: GameEvent) => e && e.id && e.type);
         merged.auctions = (p.auctions ?? []).filter((a: Auction) => a && a.car && a.bidders).map((a: Auction) => ({ ...a, car: normalizeCar(a.car)! }));
-        merged.inventory = { ...emptyInventory(), ...(p.inventory ?? {}) };
+        merged.inventory = migrateInventory(p.inventory);
         merged.carried = (p.carried ?? []).filter((t: ToolId) => TOOL_MAP[t] && ['driver', 'socket', 'device'].includes(TOOL_MAP[t].kind)).slice(0, MAX_CARRIED);
         if (!TOOL_MAP[merged.tool] || (TOOL_MAP[merged.tool].kind !== 'builtin' && !merged.carried.includes(merged.tool))) merged.tool = 'hand';
         merged.listings = (p.listings ?? [])
@@ -912,7 +940,8 @@ export const useGame = create<GameState>()(
         merged.jobs = (p.jobs ?? []).filter((j: JobOffer) => j?.car?.job).map((j: JobOffer) => ({ ...j, car: normalizeCar(j.car)! }));
         merged.sound = p.sound ?? true;
         if (merged.started) {
-          if (merged.listings.length === 0) merged.listings = fillListings([], merged.money, Math.random, merged.marketIndex);
+          // Füllt auch einen alten, kleinen Markt auf die neue Größe auf; vorhandene Inserate bleiben.
+          merged.listings = fillListings(merged.listings, merged.money, Math.random, merged.marketIndex, false, merged.day);
           if (merged.jobs.length === 0) merged.jobs = fillJobs([], Math.random);
           if (merged.auctions.length === 0) merged.auctions = [createAuction(Math.random, merged.marketIndex, Date.now())];
         }

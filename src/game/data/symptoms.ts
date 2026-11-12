@@ -42,6 +42,15 @@ const list: SymptomDef[] = [
   { id: 'oil_lamp', channel: 'dash', text: 'Die Öldruck-Warnleuchte flackert.', argument: 'Ölwarnleuchte', fluid: 'oil' },
   { id: 'no_start', channel: 'idle', text: 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.', argument: 'Springt nicht an' },
   { id: 'tire_look', channel: 'wheels', text: 'Die Reifen sind rissig und uralt.', argument: 'Alte Reifen' },
+  { id: 'cold_start', channel: 'idle', text: 'Der Diesel springt kalt nur widerwillig an, nagelt hart und qualmt weiß.', argument: 'Schlechter Kaltstart' },
+  { id: 'diesel_knock', channel: 'sound', text: 'Hartes, unregelmäßiges Nageln aus dem Motor.', argument: 'Hartes Nageln' },
+  { id: 'boost_loss', channel: 'drive', text: 'Unter Last fehlt der Schub – der Ladedruck kommt nicht.', argument: 'Kein Ladedruck' },
+  { id: 'turbo_whine', channel: 'rev', text: 'Beim Gasgeben heult es sirenenartig aus dem Turbolader.', argument: 'Turbolader heult' },
+  { id: 'boost_hiss', channel: 'rev', text: 'Beim Gasgeben zischt es laut aus dem Ansaugbereich.', argument: 'Zischen unter Last' },
+  { id: 'blue_smoke', channel: 'drive', warm: true, text: 'Blauer Rauch aus dem Auspuff – der Motor verbrennt Öl.', argument: 'Blauer Rauch' },
+  { id: 'black_smoke', channel: 'drive', text: 'Beim Beschleunigen stößt er eine schwarze Rußwolke aus.', argument: 'Schwarzer Rauch' },
+  { id: 'limp_mode', channel: 'drive', warm: true, text: 'Nach kurzer Fahrt geht er in den Notlauf und dreht nicht mehr aus.', argument: 'Notlauf' },
+  { id: 'dpf_lamp', channel: 'dash', text: 'Die Partikelfilter-Warnleuchte brennt.', argument: 'DPF-Warnleuchte' },
   { id: 'brake_judder', channel: 'drive', text: 'Beim Bremsen rubbelt und vibriert das Lenkrad.', argument: 'Bremse rubbelt' },
 ];
 

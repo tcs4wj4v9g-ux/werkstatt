@@ -7,7 +7,6 @@ import { CarModel } from './CarModel';
 import { Env } from './Env';
 import { OrbitRig } from './OrbitRig';
 
-const SPACING = 4.4;
 
 /** Händlerhof: hier werden Angebote vor Ort besichtigt. `showroom` = Hintergrund des Hauptmenüs. */
 export function MarketScene({ showroom = false }: { showroom?: boolean }) {
@@ -17,8 +16,9 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
   const listings = source === 'auctions' ? auctions.map((a) => ({ id: a.id, car: a.car })) : market;
   const selected = useGame((s) => s.selected);
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
-  const offset = (i: number) => (i - (listings.length - 1) / 2) * SPACING;
-  const z = showroom ? 0 : offset(Math.min(selected, listings.length - 1));
+  // Bei 25 Inseraten wird nur das gerade besichtigte Auto in 3D geladen – das schont iPad-Speicher und Bildrate.
+  const shown = listings[Math.min(selected, listings.length - 1)];
+  const z = 0;
 
   useEffect(() => {
     camera.fov = 45;
@@ -78,16 +78,16 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
       {showroom ? (
         <CarModel body="sedan" color="#1f2a44" lod="simple" />
       ) : (
-        listings.map((l, i) => (
-          <group key={l.id} position={[0, 0, offset(i)]}>
-            <CarModel body={CAR_MODELS[l.car.modelId].body} color={l.car.color} car={l.car} lod="simple" />
-            {i === selected && (
+        shown && (
+          <group key={shown.id}>
+            <CarModel body={CAR_MODELS[shown.car.modelId].body} color={shown.car.color} car={shown.car} lod="simple" />
+            {(
               <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
                 <ringGeometry args={[2.75, 2.9, 48]} />
                 <meshBasicMaterial color="#ffd23f" />
               </mesh>
             )}
-            {i === selected && (
+            {(
               <group position={[1.2, 0, 1.9]}>
                 <mesh position={[0, 0.75, 0]} castShadow>
                   <capsuleGeometry args={[0.2, 0.9, 4, 10]} />
@@ -100,7 +100,7 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
               </group>
             )}
           </group>
-        ))
+        )
       )}
     </>
   );
