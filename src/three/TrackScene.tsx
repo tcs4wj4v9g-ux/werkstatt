@@ -6,6 +6,8 @@ import { driveInput, useDriveHud } from '../game/drive';
 import { activeDefects } from '../game/repair';
 import { engineAudio } from '../game/audio';
 import { soundProfile } from '../game/diagnosis';
+import { engineOf } from '../game/data/components';
+import { performance } from '../game/performance';
 import { useGame } from '../game/store';
 import { CarModel } from './CarModel';
 import { Env } from './Env';
@@ -68,10 +70,13 @@ export function TrackScene() {
   const perf = useMemo(() => {
     const d = activeDefects(car);
     return {
-      misfire: d.includes('coil') || d.includes('plugs') || d.includes('vacuum'),
+      ...performance(car),
+      diesel: engineOf(car).fuel === 'diesel',
+      smokeColor: d.includes('turbo') ? '#8fa3c4' : d.includes('egr') || d.includes('dpf') ? '#1b1b1b' : '#e9e9e9',
+      misfire: d.includes('coil') || d.includes('plugs') || d.includes('vacuum') || d.includes('injector'),
       weakBrakes: d.includes('brakes'),
       judder: d.includes('discs'),
-      smoke: d.includes('gasket') || d.includes('water_pump') || d.includes('coolant_hose'),
+      smoke: ['gasket', 'water_pump', 'coolant_hose', 'turbo', 'egr', 'dpf'].some((x) => d.includes(x as never)),
     };
   }, [car]);
 
@@ -123,10 +128,10 @@ export function TrackScene() {
     const off = Math.sqrt(best) > WIDTH / 2 + 0.6;
 
     // Antrieb – Defekte sind spürbar
-    let power = 7.5;
+    let power = perf.accel;
     if (perf.misfire) power *= Math.sin(s.t * 11) > 0.3 ? 0.15 : 0.6;
-    const vmax = off ? 9 : perf.misfire ? 24 : 38;
-    const brakeForce = perf.weakBrakes ? 4.5 : 15;
+    const vmax = off ? 9 : perf.misfire ? Math.min(24, perf.vmax) : perf.vmax;
+    const brakeForce = perf.weakBrakes ? 4.5 : perf.brake;
     const { throttle, brake, steer } = driveInput;
     if (throttle && s.v < vmax) s.v += throttle * power * (1 - Math.max(0, s.v) / (vmax * 1.15)) * dt;
     if (brake) {
@@ -137,8 +142,10 @@ export function TrackScene() {
     if (!throttle && !brake) s.v -= Math.sign(s.v) * Math.min(Math.abs(s.v), drag * dt * 3);
     else if (off && s.v > vmax) s.v -= 12 * dt;
 
-    const steerAngle = (steer * 0.5) / (1 + Math.abs(s.v) / 14);
-    engineAudio.set(820 + Math.abs(s.v) * 150, throttle);
+    const steerAngle = (steer * 0.5) / (1 + Math.abs(s.v) / (14 * perf.agility));
+    // Drehzahl: mit der Geschwindigkeit durch die Gänge, Diesel dreht niedriger.
+    const gear = (Math.abs(s.v) % 13) / 13;
+    engineAudio.set((perf.diesel ? 780 : 820) + (Math.abs(s.v) < 13 ? Math.abs(s.v) / 13 : 0.35 + gear * 0.65) * (perf.diesel ? 2600 : 4300), throttle);
     steerVis.current += (steer - steerVis.current) * Math.min(1, dt * 10);
     s.heading += (s.v / 2.76) * Math.tan(steerAngle) * dt;
     s.x += Math.cos(s.heading) * s.v * dt;
@@ -238,7 +245,7 @@ export function TrackScene() {
         {perf.smoke && (
           <mesh position={[1.4, 1.1, 0]}>
             <sphereGeometry args={[0.35, 8, 6]} />
-            <meshBasicMaterial color="#cfcfcf" transparent opacity={0.35} depthWrite={false} />
+            <meshBasicMaterial color={perf.smokeColor} transparent opacity={0.35} depthWrite={false} />
           </mesh>
         )}
       </group>

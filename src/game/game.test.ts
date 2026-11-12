@@ -3,6 +3,9 @@ import { COMPONENT_MAP, defOf, defsOf } from './data/components';
 import { applicableDefects, CLASS_TARGETS } from './market';
 import { basePartPrice, defectLabor, defectPenalty, migrateInventory, partKey } from './fitment';
 import { cylinderSlots, ENGINES } from './data/engines';
+import { firingHz, VOICES } from './audio';
+import { performance, powerCurve } from './performance';
+import { adCondition, DEFAULT_FILTER, filterListings, type MarketFilter } from './marketFilter';
 import { engineOf } from './data/components';
 import { defectComponents, DEFECTS, DEFECT_LIST } from './data/defects';
 import { PARTS } from './data/parts';
@@ -946,5 +949,78 @@ describe('Großer Markt', () => {
     expect(defectLabor(dear, 'water_pump')).toBeGreaterThan(defectLabor(cheap, 'water_pump') * 2);
     expect(valuate(dear).deductions[0].amount).toBe(defectPenalty(dear, 'water_pump'));
     expect(valuate(dear).value).toBeGreaterThan(100000);
+  });
+});
+
+describe('Fahrleistungen und Motorklang', () => {
+  it('Leistung, Gewicht und Zustand bestimmen das Fahrverhalten', () => {
+    const small = performance(mk('tanaka_piccolo', []));
+    const mid = performance(mk('bavaria_320', []));
+    const fast = performance(mk('veloce_stradale', []));
+    expect(small.accel).toBeLessThan(mid.accel);
+    expect(fast.accel).toBeGreaterThan(mid.accel * 1.8);
+    expect(fast.vmax).toBeGreaterThan(mid.vmax * 1.4);
+    expect(fast.agility).toBeGreaterThan(performance(mk('kaiser_600', [])).agility);
+    expect(mid.losses).toEqual([]);
+    const sick = performance(mk('bavaria_550', ['turbo']));
+    expect(sick.ps).toBeLessThan(sick.ratedPs * 0.65);
+    expect(sick.losses[0].label).toContain('Turbolader');
+    const car = mk('bavaria_550', ['turbo']);
+    fix(car, inv(3), 'turbo');
+    expect(performance(car).ps).toBeGreaterThan(sick.ratedPs * 0.95);
+  });
+
+  it('Leistungskurve: Spitzenwerte stimmen, Turbo hat Drehmoment unten, Diesel dreht niedrig', () => {
+    for (const m of MODEL_LIST) {
+      const car = mk(m.id, []);
+      const curve = powerCurve(car);
+      const p = performance(car);
+      expect(Math.max(...curve.map((c) => c.ps)), m.id).toBe(p.ps);
+      expect(Math.max(...curve.map((c) => c.nm)), m.id).toBe(p.nm);
+      expect(curve.every((c) => c.ps > 0 && c.nm > 0), m.id).toBe(true);
+    }
+    const peakRpm = (id: string) => powerCurve(mk(id, [])).reduce((a, b) => (b.nm > a.nm ? b : a)).rpm;
+    expect(peakRpm('bavaria_335_coupe')).toBeLessThan(peakRpm('bavaria_330'));
+    expect(Math.max(...powerCurve(mk('bavaria_320d', [])).map((c) => c.rpm))).toBeLessThan(5000);
+    expect(Math.max(...powerCurve(mk('bavaria_340_ms', [])).map((c) => c.rpm))).toBeGreaterThan(8000);
+  });
+
+  it('jede Bauart hat ihre eigene Zündfrequenz und Klangfarbe', () => {
+    expect(firingHz(3000, 4)).toBe(100);
+    expect(firingHz(3000, 6)).toBe(150);
+    expect(firingHz(3000, 8)).toBe(200);
+    const voices = ['R4', 'R6', 'V6', 'V8'].map((l) => JSON.stringify(VOICES[l]));
+    expect(new Set(voices).size).toBe(4);
+    for (const e of Object.values(ENGINES)) expect(VOICES[e.layout], e.id).toBeTruthy();
+    expect(VOICES.V8.exhaust).toBeGreaterThan(VOICES.R6.exhaust);
+  });
+});
+
+describe('Marktfilter', () => {
+  const ls = fillListings([], 6000, rng(21), 1, true, 1);
+  const f = (patch: Partial<MarketFilter>, money = Infinity) => filterListings(ls, { ...DEFAULT_FILTER, ...patch }, money).map((x) => x.listing);
+  it('filtert nach Klasse, Marke, Motor, Seltenheit, Inseratszustand und Kontostand', () => {
+    expect(f({}).length).toBe(25);
+    expect(f({ cls: 'luxury' }).every((l) => CAR_MODELS[l.car.modelId].cls === 'luxury')).toBe(true);
+    expect(f({ cls: 'luxury' }).length).toBe(CLASS_TARGETS.luxury);
+    expect(f({ brand: 'Veloce' }).every((l) => CAR_MODELS[l.car.modelId].brand === 'Veloce')).toBe(true);
+    expect(f({ engine: 'V8' }).every((l) => engineOf(l.car).layout === 'V8')).toBe(true);
+    expect(f({ engine: 'diesel' }).every((l) => engineOf(l.car).fuel === 'diesel')).toBe(true);
+    expect(f({ engine: 'turbo' }).every((l) => engineOf(l.car).turbo)).toBe(true);
+    expect(f({ rare: true }).length).toBe(CLASS_TARGETS.collector);
+    expect(f({ damaged: true }).every((l) => adCondition(l) !== 'gepflegt')).toBe(true);
+    expect(f({ affordable: true }, 6000).every((l) => l.current <= 6000)).toBe(true);
+    expect(f({ affordable: true }, 6000).length).toBeGreaterThan(0);
+    expect(f({ cls: 'collector', engine: 'diesel' })).toEqual([]);
+  });
+  it('sortiert nach Preis, Kilometern, Baujahr, Leistung und Zustand; Index zeigt auf das Original', () => {
+    const sorted = (xs: number[]) => xs.every((v, i) => i === 0 || xs[i - 1] <= v);
+    expect(sorted(f({ sort: 'price_asc' }).map((l) => l.current))).toBe(true);
+    expect(sorted(f({ sort: 'price_desc' }).map((l) => -l.current))).toBe(true);
+    expect(sorted(f({ sort: 'km' }).map((l) => l.car.km))).toBe(true);
+    expect(sorted(f({ sort: 'year' }).map((l) => -l.car.year))).toBe(true);
+    expect(sorted(f({ sort: 'power' }).map((l) => -engineOf(l.car).ps))).toBe(true);
+    expect(sorted(f({ sort: 'condition' }).map((l) => -l.asking / l.car.cleanValue))).toBe(true);
+    for (const row of filterListings(ls, { ...DEFAULT_FILTER, sort: 'power' })) expect(ls[row.index]).toBe(row.listing);
   });
 });
