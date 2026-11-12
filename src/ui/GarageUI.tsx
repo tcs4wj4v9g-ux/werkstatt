@@ -196,7 +196,7 @@ export function GarageUI() {
       )}
       {s.panel === 'bench' && <BenchModal />}
       {s.panel === 'dyno' && <DynoModal />}
-      {!s.panel && !s.lastSale && <UnlockedModal />}
+      <UnlockedModal />
       {!s.lastSale && s.contestResult && <ContestResultModal />}
       {s.panel === 'drive' && <DriveModal />}
       {s.panel === 'obd' && <ObdModal />}

@@ -72,20 +72,20 @@ export function createContest(rng: Rng, day: number, v: ContestView, type: Conte
   const base = { id: `wb-${day}-${counter++}`, type, endDay: day + (type === 'dealer' ? 5 : 3), joined: false, baseline: v.totalProfit };
   if (type === 'restoration') {
     return {
-      ...base, title: 'Restaurierungs-Wettbewerb', fee: 300, prize: round50(1500 + level * 0.05),
+      ...base, title: 'Restaurierungs-Wettbewerb', fee: 300, prize: round50(Math.min(20000, 1500 + level * 0.05)),
       desc: 'Die Innung prämiert das am besten hergerichtete Auto: technisch einwandfrei, gewaschen, poliert, rostfrei, Innenraum sauber. Gewertet wird dein bestes eigenes Auto am Stichtag.',
       rivals: names.map((name) => ({ name, score: Math.round(62 + rng() * 30) })),
     };
   }
   if (type === 'dealer') {
     return {
-      ...base, title: 'Händler-Challenge', fee: 500, prize: round50(2000 + level * 0.08),
+      ...base, title: 'Händler-Challenge', fee: 500, prize: round50(Math.min(30000, 2000 + level * 0.08)),
       desc: 'Wer macht in fünf Tagen den meisten Gewinn mit Autoverkäufen? Es zählt nur, was du ab jetzt verkaufst.',
       rivals: names.map((name) => ({ name, score: round50(level * (0.04 + rng() * 0.2)) })),
     };
   }
   return {
-    ...base, title: 'Sammler-Wettbewerb', fee: 400, prize: round50(2500 + level * 0.06),
+    ...base, title: 'Sammler-Wettbewerb', fee: 400, prize: round50(Math.min(25000, 2500 + level * 0.06)),
     desc: 'Ein Sammlermagazin kürt die eindrucksvollste Privatsammlung. Gewertet wird das Ansehen deiner Privatfahrzeuge – Seltenheit, Klasse und Zustand.',
     rivals: names.map((name) => ({ name, score: Math.round(4 + rng() * 26) })),
   };
@@ -141,7 +141,7 @@ export function createMeet(rng: Rng, day: number, money: number): Meet {
   const [lo, hi] = def.band;
   return {
     id: `treffen-${day}-${counter++}`, day, category, title: def.title, desc: def.desc, fee: 80,
-    prize: round50(600 + Math.max(8000, money) * 0.02),
+    prize: round50(Math.min(6000, 600 + Math.max(8000, money) * 0.02)),
     rivals: pickN(['Opel-Freunde Süd', 'Team Tieferlegt', 'Oldtimer-Stammtisch', 'V8-Brigade', 'Youngtimer e. V.', 'Polier-Profis', 'Kombi-Kollektiv'], 5, rng).map((name) => ({ name, score: Math.round(lo + rng() * (hi - lo)) })),
   };
 }

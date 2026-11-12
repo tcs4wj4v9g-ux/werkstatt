@@ -897,17 +897,18 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'gearbox',
             <>
-              <mesh position={[0.9, 0.215, 0]} rotation={[0, 0, Math.PI / 2]}>
-                <cylinderGeometry args={[0.12, 0.15, 0.12, 14]} />
+              <mesh position={[0.9, 0.228, 0]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.085, 0.1, 0.12, 14]} />
                 <Mat color="#8d9399" metal={0.75} rough={0.5} />
               </mesh>
               <mesh position={[0.68, 0.2, 0]}>
-                <boxGeometry args={[0.34, 0.15, 0.2]} />
+                <boxGeometry args={[0.34, 0.15, 0.27]} />
                 <Mat color={st('gearbox')?.condition === 'defect' && st('gearbox')?.known ? '#6e5a4a' : '#9aa0a7'} metal={0.75} rough={0.5} />
               </mesh>
             </>,
           )}
-          {bolts('gearbox', [[0.58, 0.122, -0.07], [0.78, 0.122, -0.07], [0.58, 0.122, 0.07], [0.78, 0.122, 0.07]], 'y-')}
+          {/* versetzt angeordnet, damit von schräg vorn keine Schraube die andere verdeckt */}
+          {bolts('gearbox', [[0.58, 0.122, -0.11], [0.78, 0.122, -0.03], [0.58, 0.122, 0.11], [0.78, 0.122, 0.03]], 'y-')}
           {/* Zylinderkopf: Reihenmotor ein Ventildeckel, V-Motor je Bank einer */}
           {(vee ? ([['valve_cover', 'gasket', -1], ['valve_cover_b', 'gasket_b', 1]] as const) : ([['valve_cover', 'gasket', 0]] as const)).map(([cover, gasket, bank]) => (
             <group key={cover}>

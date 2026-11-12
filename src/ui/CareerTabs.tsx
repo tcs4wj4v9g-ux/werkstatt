@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
 import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
 import { engineOf } from '../game/data/components';
@@ -120,17 +121,22 @@ export function DynoModal() {
   );
 }
 
-/** Einblendung frisch erreichter Erfolge. */
+/** Einblendung frisch erreichter Erfolge: ein Banner, das die Arbeit nicht unterbricht und von selbst verschwindet. */
 export function UnlockedModal() {
-  const s = useGame();
-  if (!s.unlocked.length) return null;
+  const unlocked = useGame((s) => s.unlocked);
+  const dismiss = useGame((s) => s.dismissUnlocked);
+  useEffect(() => {
+    if (!unlocked.length) return;
+    const t = setTimeout(dismiss, 5000);
+    return () => clearTimeout(t);
+  }, [unlocked.length, dismiss]);
+  if (!unlocked.length) return null;
   return (
-    <Modal title="🏆 Erfolg erreicht" onClose={s.dismissUnlocked}>
-      {s.unlocked.map((u) => (
-        <p key={u.title} className="bigline">{u.title}: +{eur(u.reward)}</p>
+    <div className="unlock-banner" data-testid="unlocked">
+      {unlocked.slice(-3).map((u) => (
+        <div key={u.title}>🏆 Erfolg: <b>{u.title}</b> · +{eur(u.reward)}</div>
       ))}
-      <button className="btn primary big" onClick={s.dismissUnlocked}>Weiter</button>
-    </Modal>
+    </div>
   );
 }
 
