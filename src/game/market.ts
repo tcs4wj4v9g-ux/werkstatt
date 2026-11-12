@@ -38,6 +38,13 @@ export function applicableDefects(modelId: string): DefectId[] {
   return DEFECT_LIST.filter((d) => defectApplies(probe, d)).map((d) => d.id);
 }
 
+/** Verlangter Anteil am üblichen Wert (ohne Mängelabschlag) je Klasse. */
+const ASKING_BAND: Record<CarClass, [number, number]> = {
+  budget: [0.86, 0.94], mid: [0.9, 0.98], sport: [0.94, 1.02], luxury: [0.96, 1.04], collector: [0.98, 1.08],
+};
+/** Bei teuren Autos sind Mängel eher bekannt und eingepreist – aber eben nicht alle. */
+const KNOWLEDGE_BONUS: Record<CarClass, number> = { budget: 0, mid: 0.05, sport: 0.1, luxury: 0.15, collector: 0.15 };
+
 /** Übliche Laufleistung je Klasse: teure Autos werden weniger gefahren. */
 const KM_RANGE: Record<CarClass, [number, number]> = {
   budget: [120000, 260000], mid: [90000, 220000], sport: [50000, 150000], luxury: [25000, 110000], collector: [30000, 110000],
@@ -110,7 +117,10 @@ export function createListing(car: CarInstance, rng: Rng, index: number, profile
   const penalties = activeDefects(car).reduce((s, d) => s + defectPenalty(car, d), 0);
   // Wer sein Auto kennt, hat die Mängel schon eingepreist; Ahnungslose verlangen fast den vollen Preis.
   const floor = Math.max(600, round50(car.cleanValue * 0.22));
-  const asking = Math.max(floor, round50(car.cleanValue * index * (0.86 + rng() * 0.08) - penalties * (0.2 + 0.65 * profile.knowledge)));
+  // Je teurer die Klasse, desto knapper wird kalkuliert – und desto genauer kennen Verkäufer ihr Auto.
+  const [lo, hi] = ASKING_BAND[CAR_MODELS[car.modelId].cls];
+  const known = Math.min(0.95, 0.2 + 0.65 * profile.knowledge + KNOWLEDGE_BONUS[CAR_MODELS[car.modelId].cls]);
+  const asking = Math.max(floor, round50(car.cleanValue * index * (lo + rng() * (hi - lo)) - penalties * known));
   return {
     id: car.uid,
     car,
@@ -345,11 +355,13 @@ export function valuate(car: CarInstance, index = 1): Valuation {
   const condition = value / cleanValue;
   const extras: Valuation['extras'] = [];
   if (sv.oilChanged) extras.push({ label: 'Frischer Ölwechsel mit Filter', amount: 100 });
-  for (const f of detailFactor(car)) extras.push({ label: f.label, amount: Math.round((cleanValue * f.pct * (f.pct > 0 ? condition : 1)) / 10) * 10 });
+  // Pflege zählt bei jedem Auto, aber nicht proportional zum Preis: Politur macht aus 100.000 € keine 110.000 €.
+  const careScale = 1 / Math.sqrt(costFactor(car));
+  for (const f of detailFactor(car)) extras.push({ label: f.label, amount: Math.round((cleanValue * f.pct * careScale * (f.pct > 0 ? condition : 1)) / 10) * 10 });
   // Liebhaber zahlen für seltene Autos in Bestzustand einen Aufschlag – technisch einwandfrei und gepflegt.
   if (car.rarity > 0 && clean) {
     const kept = dirtLevel(car) < 0.2 && rustLevel(car) < 0.05;
-    extras.push({ label: kept ? `Sammlerzustand (${RARITY_NAMES[car.rarity]})` : `Liebhaberfahrzeug (${RARITY_NAMES[car.rarity]}), Pflege mäßig`, amount: round50(cleanValue * (car.rarity === 2 ? 0.12 : 0.06) * (kept ? 1 : 0.3)) });
+    extras.push({ label: kept ? `Sammlerzustand (${RARITY_NAMES[car.rarity]})` : `Liebhaberfahrzeug (${RARITY_NAMES[car.rarity]}), Pflege mäßig`, amount: round50(cleanValue * (car.rarity === 2 ? 0.07 : 0.05) * (kept ? 1 : 0.3)) });
   }
   // Ein aktuelles Prüfstandsprotokoll mit voller Leistung überzeugt Käufer.
   if (car.dyno && clean && car.dyno.ps >= car.dyno.ratedPs * 0.97) extras.push({ label: `Leistungsprotokoll (${car.dyno.ps} PS gemessen)`, amount: round50(cleanValue * 0.015) });

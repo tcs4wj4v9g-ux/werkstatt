@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COMPONENT_MAP, defOf, defsOf } from './data/components';
-import { applicableDefects, CLASS_TARGETS, randomDefects } from './market';
+import { applicableDefects, CLASS_TARGETS, randomDefects, randomListing } from './market';
 import { basePartPrice, defectLabor, defectPenalty, migrateInventory, partKey } from './fitment';
 import { cylinderSlots, ENGINES } from './data/engines';
 import { firingHz, VOICES } from './audio';
@@ -1232,5 +1232,53 @@ describe('Wettbewerbe und Fahrzeugtreffen', () => {
     expect(res.payout).toBe(meet.prize);
     const strong = { ...meet, rivals: meet.rivals.map((r) => ({ ...r, score: 101 })) };
     expect(enterMeet(strong, car)).toMatchObject({ place: 6, payout: 0 });
+  });
+});
+
+describe('Wirtschaft', () => {
+  it('Margen sinken mit der Preisklasse; teure Autos sind knapp kalkuliert und nicht jeder Kauf lohnt sich', () => {
+    const g = rng(7);
+    const run = (cls: 'budget' | 'mid' | 'sport' | 'luxury' | 'collector') => {
+      let profit = 0;
+      let paid = 0;
+      let losses = 0;
+      const N = 300;
+      for (let n = 0; n < N; n++) {
+        const l = randomListing(g, 1, cls, 1);
+        const car = l.car;
+        let parts = 0;
+        for (const d of r.activeDefects(car)) for (const c of defectComponents(car, DEFECTS[d])) {
+          if (car.components[c].condition !== 'defect') continue;
+          const pid = defOf(car, c).partId!;
+          parts += basePartPrice(car, pid) / PARTS[pid].units;
+          car.components[c].condition = 'ok';
+        }
+        detail(car).testDriven = true;
+        const buy = (l.asking + l.minPrice) / 2; // ordentlich verhandelt
+        const p = valuate(car).offer - buy - parts;
+        profit += p;
+        paid += buy;
+        if (p < 0) losses++;
+      }
+      return { margin: profit / paid, avg: profit / N, losses: losses / N };
+    };
+    const b = run('budget');
+    const m = run('mid');
+    const s = run('sport');
+    const l = run('luxury');
+    const c = run('collector');
+    expect(b.margin).toBeGreaterThan(0.2); // Einstieg ist dankbar
+    expect(m.margin).toBeLessThan(b.margin);
+    expect(s.margin).toBeLessThan(m.margin);
+    expect(l.margin).toBeLessThan(0.12);
+    expect(l.margin).toBeGreaterThan(0.02);
+    expect(c.margin).toBeLessThan(0.15);
+    // Absolut verdient man oben trotzdem mehr – der Aufstieg lohnt sich.
+    expect(m.avg).toBeGreaterThan(b.avg);
+    expect(l.avg).toBeGreaterThan(s.avg);
+    expect(c.avg).toBeGreaterThan(l.avg);
+    expect(l.losses).toBeGreaterThan(0);
+    // Weg zum Headquarters: mehrere Dutzend gute Geschäfte, kein Selbstläufer nach drei Verkäufen.
+    expect(500000 / l.avg).toBeGreaterThan(25);
   });
 });
