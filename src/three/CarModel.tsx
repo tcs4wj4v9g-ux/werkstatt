@@ -73,7 +73,7 @@ const ghostTap = (id: string, fn: () => void) => (e: ThreeEvent<MouseEvent>) => 
 };
 
 /** Platzhalter schweben etwas neben der Einbauposition, damit das Teil darunter erreichbar bleibt. */
-const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14, engine_cover: 0.14 };
+const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14, engine_cover: 0.36 };
 
 type Axis = 'y' | 'y-' | 'z+' | 'z-' | 'x+';
 const AXIS_ROT: Record<Axis, V3> = {
@@ -931,13 +931,13 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'drain_plug',
               <>
-                {/* sitzt am hinteren Wannenrand, damit die Wannenmitte antippbar bleibt */}
-                <mesh position={[1.44, 0.193, 0]}>
+                {/* sitzt seitlich am Wannenrand, damit die Wannenmitte antippbar bleibt */}
+                <mesh position={[1.4, 0.193, 0.08]}>
                   <cylinderGeometry args={[0.026, 0.026, 0.022, 6]} />
                   <Mat color="#c9a54a" metal={0.9} rough={0.3} />
                 </mesh>
-                <group position={[1.44, 0.185, 0]}>
-                  <Hit r={0.045} />
+                <group position={[1.4, 0.185, 0.08]}>
+                  <Hit r={0.035} />
                 </group>
               </>,
             )}
