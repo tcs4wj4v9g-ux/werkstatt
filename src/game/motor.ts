@@ -301,10 +301,10 @@ export function junkify(car: CarInstance, rng: Rng, day: number): CarInstance {
   const takeable = defs.filter((d) => d.partId && d.access !== 'stand' && !['harness', 'mounts'].includes(d.id));
   const gone = 2 + Math.floor(rng() * 5);
   for (let i = 0; i < gone; i++) {
-    const d = pick(takeable, rng);
-    const st = car.components[d.id];
     // Nur Teile, die nichts anderes verdecken (sonst wäre der Rest unerreichbar)
-    if (defs.some((x) => x.blockedBy.includes(d.id) && car.components[x.id]?.installed && !car.components[x.id]?.missing)) continue;
+    const free = takeable.filter((d) => !car.components[d.id].missing && !defs.some((x) => x.blockedBy.includes(d.id) && car.components[x.id]?.installed && !car.components[x.id]?.missing));
+    if (!free.length) break;
+    const st = car.components[pick(free, rng).id];
     Object.assign(st, { installed: false, missing: true, bolts: st.bolts.map(() => 0), connected: false });
   }
   // Seltene Tuningteile

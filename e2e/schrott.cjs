@@ -107,6 +107,15 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   expect(rep && rep.compression.length === 6 && rep.oilPressure > 3, `Motorprüfstand: 6 Zylinder, Kompression ${rep && rep.compression.join('/')} bar, Öldruck ${rep && rep.oilPressure} bar`);
   await G(() => window.__gk.getState().setPanel(null));
 
+  // ---------- Motor am Ständer drehen und zurückdrehen: das Bild folgt beide Male ----------
+  const vcY = () => G(() => { let y = null; const v = new window.__gkCamera.position.constructor(); window.__gkScene.traverse((o) => { if (y === null && o.userData && typeof o.userData.label === 'string' && o.userData.label.startsWith('Schraube – Ventildeckel')) { o.getWorldPosition(v); y = v.y; } }); return y; });
+  const y0 = await vcY();
+  await G(() => window.__gk.getState().flipEngine()); await p.waitForTimeout(500);
+  const y1 = await vcY();
+  await G(() => window.__gk.getState().flipEngine()); await p.waitForTimeout(500);
+  const y2 = await vcY();
+  expect(y0 !== null && Math.abs(y1 - y0) > 0.1 && Math.abs(y2 - y0) < 0.005, `Motor gedreht und wieder zurückgedreht – Ventildeckel-Schraube auf Höhe ${y0 && y0.toFixed(2)} → ${y1 && y1.toFixed(2)} → ${y2 && y2.toFixed(2)} m`);
+
   // ---------- 6/7/8: Vierzylinder-Limousine bekommt den Sechszylinder ----------
   await G(() => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar('bavaria_318', [], Math.random, { year: 2008 }); c.purchasePrice = 4000; c.testDriven = true; const cars = [...s.cars]; cars[0] = c; g.setState({ cars }); });
   const before = await G(() => { const p = window.__gkLib.perf(window.__gk.getState().cars[0]); return { ps: p.ps, accel: p.accel, vmax: p.vmax, weight: p.weight }; });
@@ -163,15 +172,24 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   const again = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.cars[0].motor.uid, sw: s.cars[0].swap, v: s.cars[0].visual, e: s.engines.map((u) => u.motor.uid), used: s.used.map((u) => u.id), stand: !!s.cars[15], ecu: s.cars[0].ecu }); });
   expect(keep === again, 'Nach Neuladen: Motor im Auto, Umbauteile, Optik, Motorlager, Gebrauchtteile, Steuergerät erhalten');
 
+  // ---------- Motor ohne Öl starten: Warnung, nach Sekunden Lagerschaden ----------
+  await G(() => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; const c = window.__gkLib.createCar('bavaria_320', [], Math.random, {}); c.hoodOpen = true; c.fluids.oil.level = 0; cars[1] = c; g.setState({ cars, panel: null }); g.getState().toggleEngine(1); });
+  const warn = await G(() => ({ bay: window.__gk.getState().engineBay, toast: window.__gk.getState().toast && window.__gk.getState().toast.text }));
+  expect(warn.bay === 1 && /Öldruckleuchte/.test(warn.toast), 'Motor ohne Öl springt an, Öldruckleuchte warnt: ' + warn.toast);
+  await p.waitForTimeout(5200);
+  const dry = await G(() => { const s = window.__gk.getState(); const c = s.cars[1].components; return { bearing: c.bearing.condition, cam: c.camshaft.condition, toast: s.toast && s.toast.text }; });
+  expect(dry.bearing === 'defect' && dry.cam === 'defect', 'Nach Sekunden ohne Öl: Pleuellager und Nockenwelle beschädigt – ' + dry.toast);
+  await G(() => window.__gk.getState().toggleEngine(1));
+
   // ---------- 17: Alter Einzelspieler-Spielstand (Version 5, 15 Stellplätze) ----------
   await G(() => {
     const car = window.__gkLib.createCar('bavaria_320', ['coil'], Math.random, {}); car.purchasePrice = 3000;
-    for (const k of ['harness', 'mounts', 'downpipe', 'fuel_pump', 'intake_manifold', 'exhaust_manifold', 'timing_chain', 'camshaft', 'oil_pump', 'mainbrg', 'crank', 'piston1', 'piston2', 'piston3', 'piston4']) delete car.components[k];
+    for (const k of ['wheel_rl', 'caliper_rl', 'pads_rl', 'disc_rl', 'wheel_rr', 'caliper_rr', 'pads_rr', 'disc_rr', 'harness', 'mounts', 'downpipe', 'fuel_pump', 'intake_manifold', 'exhaust_manifold', 'timing_chain', 'camshaft', 'oil_pump', 'mainbrg', 'crank', 'piston1', 'piston2', 'piston3', 'piston4']) delete car.components[k];
     const cars = Array(15).fill(null); cars[0] = car;
     localStorage.setItem('garage-kings-save-v1', JSON.stringify({ version: 5, state: { money: 7777, cars, started: true, screen: 'garage', upgrades: [], inventory: { 'spark_plug@R4': 2 }, day: 9 } }));
   });
   await p.reload(); await p.waitForTimeout(1500);
-  const old = await G(() => { const s = window.__gk.getState(); return { money: s.money, len: s.cars.length, junk: s.cars.slice(16).filter(Boolean).length, coil: Object.keys(s.cars[0].components).filter((k) => /^coil/.test(k)).length, harness: s.cars[0].components.harness && s.cars[0].components.harness.installed, def: window.__gkLib.defsOf(s.cars[0]).length === Object.keys(s.cars[0].components).length, engines: s.engines.length }; });
+  const old = await G(() => { const s = window.__gk.getState(); return { money: s.money, len: s.cars.length, junk: s.cars.slice(16).filter(Boolean).length, coil: Object.keys(s.cars[0].components).filter((k) => /^coil/.test(k)).length, harness: s.cars[0].components.harness && s.cars[0].components.harness.installed && s.cars[0].components.pads_rr && s.cars[0].components.pads_rr.installed, def: window.__gkLib.defsOf(s.cars[0]).length === Object.keys(s.cars[0].components).length, engines: s.engines.length }; });
   expect(old.money === 7777 && old.len === 22 && old.junk === 6 && old.harness && old.def && old.engines === 0, `Alter Spielstand übernommen: Geld, Auto mit neuen Teilen ergänzt, Schrottplatz gefüllt (${JSON.stringify(old)})`);
 
   console.log('errors:', JSON.stringify(errs));

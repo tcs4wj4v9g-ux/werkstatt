@@ -142,6 +142,18 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
     id: 'discs', name: 'Verschlissene Bremsscheiben vorne', components: ['disc_fl', 'disc_fr'], pick: 'all',
     penalty: 700, symptoms: ['brake_look', 'brake_judder'], labor: 150, category: 'Bremsen',
   },
+  tires_rear: {
+    id: 'tires_rear', name: 'Überalterte Reifen hinten', components: ['wheel_rl', 'wheel_rr'], pick: 'all',
+    penalty: 330, symptoms: ['tire_look'], labor: 50, category: 'Wartung', weight: 0.6,
+  },
+  brakes_rear: {
+    id: 'brakes_rear', name: 'Verschlissene Bremsbeläge hinten', components: ['pads_rl', 'pads_rr'], pick: 'all',
+    penalty: 480, symptoms: ['brake_look', 'brake_grind'], labor: 110, category: 'Bremsen', lamp: '🛑 Bremse', weight: 0.6,
+  },
+  discs_rear: {
+    id: 'discs_rear', name: 'Verschlissene Bremsscheiben hinten', components: ['disc_rl', 'disc_rr'], pick: 'all',
+    penalty: 560, symptoms: ['brake_look'], labor: 150, category: 'Bremsen', weight: 0.6,
+  },
 };
 
 export const DEFECT_LIST = Object.values(DEFECTS);

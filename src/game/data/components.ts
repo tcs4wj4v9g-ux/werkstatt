@@ -69,10 +69,10 @@ const cylinder = (n: number, diesel: boolean): ComponentDef[] =>
 export const topId = (engine: EngineDef, n: number) => `${engine.fuel === 'diesel' ? 'inj' : 'coil'}${n}`;
 export const plugId = (engine: EngineDef, n: number) => `${engine.fuel === 'diesel' ? 'glow' : 'plug'}${n}`;
 
-const corner = (s: 'fl' | 'fr', label: string): ComponentDef[] => [
+const corner = (s: 'fl' | 'fr' | 'rl' | 'rr', label: string, axle = s[0] === 'r' ? 'hinten' : 'vorne'): ComponentDef[] => [
   {
     id: `wheel_${s}`,
-    name: `Rad vorne ${label}`,
+    name: `Rad ${axle} ${label}`,
     bolts: 5,
     fastener: { ...S17, torque: true },
     blockedBy: [],
@@ -84,7 +84,7 @@ const corner = (s: 'fl' | 'fr', label: string): ComponentDef[] => [
   },
   {
     id: `caliper_${s}`,
-    name: `Bremssattel vorne ${label}`,
+    name: `Bremssattel ${axle} ${label}`,
     bolts: 2,
     fastener: S17,
     blockedBy: [`wheel_${s}`],
@@ -95,7 +95,7 @@ const corner = (s: 'fl' | 'fr', label: string): ComponentDef[] => [
   },
   {
     id: `pads_${s}`,
-    name: `Bremsbeläge vorne ${label}`,
+    name: `Bremsbeläge ${axle} ${label}`,
     bolts: 0,
     blockedBy: [`caliper_${s}`],
     access: 'lifted',
@@ -105,7 +105,7 @@ const corner = (s: 'fl' | 'fr', label: string): ComponentDef[] => [
   },
   {
     id: `disc_${s}`,
-    name: `Bremsscheibe vorne ${label}`,
+    name: `Bremsscheibe ${axle} ${label}`,
     bolts: 1,
     fastener: { driver: 'screwdriver' },
     blockedBy: [`pads_${s}`],
@@ -349,6 +349,8 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
   },
   ...corner('fl', 'links'),
   ...corner('fr', 'rechts'),
+  ...corner('rl', 'links'),
+  ...corner('rr', 'rechts'),
   ];
   if (v) {
     out.push(

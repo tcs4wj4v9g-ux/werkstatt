@@ -180,7 +180,7 @@ describe('Reparatur', () => {
 
   it('alle Defekte zusammen: abzugsfrei erst nach Reparatur und Probefahrt', () => {
     const all = applicableDefects('bavaria_320').filter((d) => !standOnly(d));
-    expect(all.length).toBe(19);
+    expect(all.length).toBe(22);
     expect(applicableDefects('bavaria_320').filter((d) => standOnly(d)).sort()).toEqual(['camshaft', 'main_bearing', 'oil_pump', 'rings', 'timing_chain']);
     const car = mk('bavaria_320', all);
     const i = inv(8);

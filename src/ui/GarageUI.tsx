@@ -23,6 +23,7 @@ import { eur, Modal, TopBar } from './common';
 import { CoopCabinet } from './CoopUI';
 import { useCoop } from '../net/coop';
 import { Joystick } from './Joystick';
+import { BODY_SPECS } from '../three/carGeometry';
 import { CranePanel, EnginesPanel, EngineTestPanel, JunkPanel, PartChoice, TuningPanel, UsedPartsList } from './EngineUI';
 import { engineOf } from '../game/data/components';
 
@@ -39,7 +40,8 @@ export function GarageUI() {
     setWork(null);
   };
   const enter = (view: WorkView, bay: number) => {
-    player.work = workPose(view, bay);
+    const c = useGame.getState().cars[bay];
+    player.work = workPose(view, bay, c ? BODY_SPECS[CAR_MODELS[c.modelId].body].rearAxle : undefined);
     setWork(player.work.id);
   };
   // Motor wird warm; die Arbeitsansicht endet, wenn das Auto dafür nicht mehr passt.
@@ -52,7 +54,7 @@ export function GarageUI() {
   const near = nearBay >= 0 ? s.cars[nearBay] : null;
   const running = nearBay >= 0 && s.engineBay === nearBay;
   const kind = nearBay >= 0 ? SLOTS[nearBay].kind : null;
-  const views: WorkView[] = !near || kind !== 'lift' ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
+  const views: WorkView[] = !near || kind !== 'lift' ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'rear_left', 'rear_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
   // Am Waschplatz und in der Lackierkabine liegen andere Geräte bereit als am Werkzeuggürtel.
   const station: ToolId[] = kind === 'wash' ? WASH_TOOLS : kind === 'paint' ? PAINT_TOOLS : [];
   useEffect(() => {

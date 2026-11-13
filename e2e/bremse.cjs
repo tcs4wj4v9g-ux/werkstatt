@@ -44,6 +44,41 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.getByText('Entlüften vorne links').click(); await p.getByText('Entlüften vorne rechts').click(); await p.waitForTimeout(200);
   s = await st();
   expect(!s.brake.air, 'Knöpfe im Flüssigkeiten-Fenster funktionieren mit Schlüssel am Gürtel');
+  // ---------- Hinterachse: Rad, Sattel, Beläge hinten links wechseln ----------
+  await p.evaluate(() => { const g = window.__gk; g.getState().setPanel(null); const s = g.getState(); const car = JSON.parse(JSON.stringify(s.cars[0])); car.lifted = true; car.components.pads_rl.condition = 'defect'; car.components.pads_rr.condition = 'defect'; g.setState({ cars: [car, ...s.cars.slice(1)], liftUp: [true, false], tool: 'ratchet', carried: ['ratchet', 'socket17', 'torque'], money: 6000 }); });
+  await p.waitForTimeout(800);
+  await p.evaluate(() => Object.assign(window.__gkPlayer, { x: -0.5, z: -5.2, yaw: 0 }));
+  await p.waitForTimeout(600);
+  const labels = await p.$$eval('.car-actions button', (b) => b.map((x) => x.textContent));
+  expect(labels.some((t) => t.includes('Rad hinten links')) && labels.some((t) => t.includes('Rad hinten rechts')), 'Arbeitsansichten für die Hinterräder: ' + labels.filter((t) => t.includes('🎯')).join(', '));
+  await p.locator('.car-actions button', { hasText: 'Rad hinten links' }).click(); await p.waitForTimeout(800);
+  // Schrauben im Bild suchen (Beschriftung nennt das Werkzeug) und eine echte Schraube antippen
+  const findBolts = (prefix) => p.evaluate((prefix) => {
+    const out = []; const cam = window.__gkCamera; const v = new cam.position.constructor();
+    window.__gkScene.traverse((o) => { if (o.userData && typeof o.userData.label === 'string' && o.userData.label.startsWith(prefix)) { o.getWorldPosition(v); v.project(cam); out.push({ label: o.userData.label, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }); } });
+    return out;
+  }, prefix);
+  let bolts = await findBolts('Schraube – Rad hinten links');
+  expect(bolts.length === 5 && bolts[0].label.includes('Ratsche + 17er Nuss') && bolts[0].label.includes('Drehmomentschlüssel'), 'Fünf Radschrauben hinten links, Beschriftung nennt das Werkzeug: ' + (bolts[0] && bolts[0].label));
+  const onScreen = bolts.filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+  if (onScreen[0]) { await p.mouse.click(onScreen[0].x, onScreen[0].y); await p.waitForTimeout(300); }
+  const rl = () => p.evaluate(() => window.__gk.getState().cars[0].components);
+  expect((await rl()).wheel_rl.bolts.includes(1), 'Radschraube hinten links per Antippen im Bild gelöst');
+  await p.screenshot({ path: S + '/rad-hinten.png' });
+  // Rest über die Spielaktionen: Rad, Sattel, Beläge ab, neue Beläge rein, alles fest
+  const done = await p.evaluate(() => {
+    const g = window.__gk; const use = (t) => g.setState({ tool: t });
+    const strip = (id) => { const c = () => g.getState().cars[0].components[id]; c().bolts.forEach((b, i) => { if (b === 2) { use('ratchet'); g.getState().tapBolt(0, id, i); } if (c().bolts[i] === 1) { use('hand'); g.getState().tapBolt(0, id, i); } }); use('hand'); g.getState().tapComponent(0, id); return !c().installed; };
+    const out = { wheel: strip('wheel_rl'), caliper: strip('caliper_rl'), pads: strip('pads_rl') };
+    g.getState().buyPart('brake_pads', 0); use('hand'); g.getState().tapComponent(0, 'pads_rl');
+    if (g.getState().partPrompt) g.getState().resolvePrompt?.('new');
+    const fit = (id) => { use('hand'); g.getState().tapComponent(0, id); g.getState().cars[0].components[id].bolts.forEach((_, i) => { use('hand'); g.getState().tapBolt(0, id, i); use(id.startsWith('wheel') ? 'torque' : 'ratchet'); g.getState().tapBolt(0, id, i); }); };
+    fit('caliper_rl'); fit('wheel_rl');
+    const c = g.getState().cars[0].components;
+    return { ...out, padsOk: c.pads_rl.installed && c.pads_rl.condition === 'ok', back: c.caliper_rl.bolts.every((b) => b === 2) && c.wheel_rl.bolts.every((b) => b === 2), prompt: g.getState().partPrompt, toast: g.getState().toast && g.getState().toast.text };
+  });
+  expect(done.wheel && done.caliper && done.pads, 'Rad, Bremssattel und Beläge hinten links ausgebaut');
+  expect(done.padsOk && done.back, 'Neue Beläge hinten links eingebaut, Sattel und Rad festgezogen – ' + JSON.stringify(done));
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

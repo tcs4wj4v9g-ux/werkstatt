@@ -91,6 +91,9 @@ export type PartId =
 
 export type DefectId =
   | 'coil'
+  | 'tires_rear'
+  | 'brakes_rear'
+  | 'discs_rear'
   | 'plugs'
   | 'brakes'
   | 'discs'

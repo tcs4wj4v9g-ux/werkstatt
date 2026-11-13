@@ -93,8 +93,8 @@ export function toggleHood(car: CarInstance): ActionResult {
 
 export function toggleLift(car: CarInstance): ActionResult {
   if (car.lifted) {
-    const loose = ['wheel_fl', 'wheel_fr'].find((w) => !isComplete(car, w));
-    if (loose) return fail('Erst beide Vorderräder montieren und alle Radschrauben festziehen.');
+    const loose = WHEELS.find((w) => car.components[w] && !isComplete(car, w));
+    if (loose) return fail('Erst alle Räder montieren und alle Radschrauben festziehen.');
   }
   car.lifted = !car.lifted;
   return done(car.lifted ? 'Auto angehoben.' : 'Auto abgelassen.');
@@ -277,6 +277,8 @@ export function componentAction(
   return done(`${def.name} eingebaut.${next}`);
 }
 
+export const WHEELS = ['wheel_fl', 'wheel_fr', 'wheel_rl', 'wheel_rr'];
+
 export function activeDefects(car: CarInstance): DefectId[] {
   return DEFECT_LIST.filter((d) => defectComponents(car, d).some((c) => car.components[c].condition === 'defect')).map((d) => d.id);
 }
@@ -292,9 +294,10 @@ export const isAssembled = (car: CarInstance) => defsOf(car).every((c) => isComp
 
 export function driveBlocker(car: CarInstance): string | null {
   if (!isAssembled(car)) return 'Das Auto ist nicht komplett zusammengebaut.';
+  if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Die Öldruckleuchte leuchtet – ohne Öl fährst du nicht los.';
   const engine = engineBlocker(car);
   if (engine) return engine;
-  if (['wheel_fl', 'wheel_fr'].some((w) => car.components[w].condition === 'defect')) return 'Mit diesen uralten Reifen fährst du keinen Meter – erst neue montieren.';
+  if (WHEELS.some((w) => car.components[w]?.condition === 'defect')) return 'Mit diesen uralten Reifen fährst du keinen Meter – erst neue montieren.';
   if (car.lifted) return 'Das Auto steht noch auf der Hebebühne.';
   return null;
 }
@@ -307,6 +310,5 @@ export function engineBlocker(car: CarInstance): string | null {
   if (car.components.battery.condition === 'defect' && car.components.battery.installed) return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
   const open = defsOf(car).find((c) => (c.access === 'hood' || c.access === 'stand' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf' || c.id === 'gearbox') && !isComplete(car, c.id));
   if (open) return `Der Motor startet so nicht – erst fertig montieren: ${open.name}.`;
-  if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
   return null;
 }

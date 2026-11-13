@@ -72,6 +72,7 @@ export function obdScan(car: CarInstance): string[] {
   if (bad('dpf')) codes.push('P2002 – Partikelfilter: Wirkungsgrad unter Schwellenwert');
   if (bad('intake_hose')) codes.push('P0171 – Gemisch zu mager (Bank 1)');
   if (['pads_fl', 'pads_fr'].some(bad)) codes.push('5E20 – Bremsbelagverschleiß Vorderachse, Verschleißgrenze erreicht');
+  if (['pads_rl', 'pads_rr'].some(bad)) codes.push('5E21 – Bremsbelagverschleiß Hinterachse, Verschleißgrenze erreicht');
   if (bad('alternator') || !car.components.alternator.connected) codes.push('P0562 – Bordnetzspannung zu niedrig');
   else if (bad('belt')) codes.push('P0562 – Bordnetzspannung zu niedrig (sporadisch)');
   if (bad('thermostat')) codes.push('P0128 – Kühlmitteltemperatur unter Thermostat-Regeltemperatur');
