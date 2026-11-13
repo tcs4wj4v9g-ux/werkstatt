@@ -11,6 +11,8 @@ import { CAR_MODELS } from '../game/data/cars';
 import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
 import { useGfxSettings } from './gfx';
+import { bayMaterials, beltGeometry, engineDecor, V_PIVOT, V_TILT } from './engineBay';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { create } from 'zustand';
 
 // Selbst gebautes Fahrzeug (keine Markenlogos, kein Fremdmodell). Fahrtrichtung = +X.
@@ -103,6 +105,36 @@ const Hit = ({ r = 0.046 }: { r?: number }) => (
   </mesh>
 );
 
+const rbCache = new Map<string, THREE.BufferGeometry>();
+/** Quader mit gerundeten Kanten (Geometrie wird je Abmessung nur einmal erzeugt). */
+function RB({ s, r = 0.012, p, rot, children }: { s: V3; r?: number; p?: V3; rot?: V3; children: ReactNode }) {
+  const key = `${s.join()}:${r}`;
+  let g = rbCache.get(key);
+  if (!g) rbCache.set(key, (g = new RoundedBoxGeometry(s[0], s[1], s[2], 2, Math.max(0.001, Math.min(r, Math.min(...s) / 2 - 0.0005)))));
+  return (
+    <mesh geometry={g} position={p} rotation={rot}>
+      {children}
+    </mesh>
+  );
+}
+const noRay = () => null;
+/** Unsichtbarer Körper, der Tipps abfängt (hinter fest verbauten Motorteilen). */
+const Proxy = ({ s, p }: { s: V3; p: V3 }) => (
+  <mesh position={p}>
+    <boxGeometry args={s} />
+    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+  </mesh>
+);
+/** Geneigte Zylinderbank eines V-Motors. */
+function Bank({ bank, children }: { bank: number; children: ReactNode }) {
+  if (!bank) return <>{children}</>;
+  return (
+    <group position={[0, V_PIVOT, 0]} rotation={[bank * V_TILT, 0, 0]}>
+      <group position={[0, -V_PIVOT, 0]}>{children}</group>
+    </group>
+  );
+}
+
 /** Schraube: 2 = fest, 1 = gelöst (steht sichtbar heraus), 0 = entfernt (grüne Markierung am Gewinde). */
 function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: Axis; state: number; live?: string; label: string; onTap?: () => void }) {
   const text = `${label} (${state === 2 ? 'fest' : state === 1 ? 'gelöst' : 'entfernt'})`;
@@ -111,8 +143,12 @@ function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: 
       {state > 0 ? (
         <group position={[0, state === 1 ? 0.03 : 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
           <mesh>
-            <cylinderGeometry args={[0.02, 0.02, 0.03, 6]} />
+            <cylinderGeometry args={[0.019, 0.02, 0.03, 6]} />
             <meshStandardMaterial color={state === 1 ? '#e8c35a' : '#d9dde2'} metalness={0.9} roughness={0.25} />
+          </mesh>
+          <mesh position={[0, -0.012, 0]}>
+            <cylinderGeometry args={[0.026, 0.027, 0.006, 12]} />
+            <meshStandardMaterial color={state === 1 ? '#c9a440' : '#aeb3ba'} metalness={0.9} roughness={0.3} />
           </mesh>
           {state === 1 && (
             <mesh position={[0, -0.025, 0]}>
@@ -137,9 +173,17 @@ function Connector({ pos, off, connected, label, onTap }: { pos: V3; off: V3; co
   const p: V3 = connected ? pos : [pos[0] + off[0], pos[1] + off[1], pos[2] + off[2]];
   return (
     <group position={p} userData={{ label: onTap ? `Stecker ${label} (${connected ? 'verbunden' : 'abgezogen'})` : undefined }} onClick={onTap && tap(onTap)}>
-      <mesh>
-        <boxGeometry args={[0.045, 0.03, 0.04]} />
+      <RB s={[0.045, 0.03, 0.04]} r={0.007}>
         <meshStandardMaterial color={connected ? '#3a3f46' : '#e3a81c'} roughness={0.6} />
+      </RB>
+      <mesh position={[0, 0.018, 0]}>
+        <boxGeometry args={[0.02, 0.008, 0.026]} />
+        <meshStandardMaterial color={connected ? '#5a6068' : '#f0c040'} roughness={0.5} />
+      </mesh>
+      {/* Kabelschwanz */}
+      <mesh position={[0, -0.03, 0]} raycast={noRay}>
+        <cylinderGeometry args={[0.006, 0.006, 0.04, 5]} />
+        <meshStandardMaterial color="#111214" roughness={0.9} />
       </mesh>
       {onTap && <Hit r={0.04} />}
     </group>
@@ -443,6 +487,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     const scored = st(`disc_${s}`)?.condition === 'defect';
     const padT = worn ? 0.008 : 0.022;
     const cy = WY + 0.125;
+    const caliperColor = model?.cls === 'sport' || body === 'sport' ? '#b3261e' : model?.cls === 'luxury' ? '#2a2c30' : '#8a9097';
     return (
       <group key={s}>
         <mesh position={[WX, WY, z(0.69)]} rotation={[Math.PI / 2, 0, 0]} material={mats.dark}>
@@ -451,9 +496,16 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         {part(
           `disc_${s}`,
           <>
+            {/* Innenbelüftete Scheibe: zwei Reibringe mit dunklem Luftspalt */}
+            {[-0.009, 0.009].map((o) => (
+              <mesh key={o} position={[WX, WY, z(0.72) + o]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.17, 0.17, 0.007, 32]} />
+                <Mat color={scored ? '#6e5a4a' : '#a9aeb4'} metal={0.9} rough={scored ? 0.7 : 0.3} />
+              </mesh>
+            ))}
             <mesh position={[WX, WY, z(0.72)]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.17, 0.17, 0.024, 32]} />
-              <Mat color={scored ? '#6e5a4a' : '#a9aeb4'} metal={0.9} rough={scored ? 0.7 : 0.3} />
+              <cylinderGeometry args={[0.166, 0.166, 0.012, 32]} />
+              <Mat color="#3a3d42" metal={0.7} rough={0.6} />
             </mesh>
             <mesh position={[WX, WY, z(0.735)]} rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.08, 0.08, 0.04, 20]} />
@@ -480,10 +532,14 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         )}
         {part(
           `caliper_${s}`,
-          <mesh position={[WX, cy, z(0.725)]}>
-            <boxGeometry args={[0.2, 0.12, 0.11]} />
-            <Mat color="#8a9097" metal={0.7} rough={0.45} />
-          </mesh>,
+          <>
+            <RB s={[0.2, 0.12, 0.11]} r={0.028} p={[WX, cy, z(0.725)]}>
+              <Mat color={caliperColor} metal={0.55} rough={0.42} />
+            </RB>
+            <RB s={[0.12, 0.05, 0.03]} r={0.01} p={[WX, cy + 0.01, z(0.785)]}>
+              <Mat color={caliperColor} metal={0.55} rough={0.42} />
+            </RB>
+          </>,
         )}
         {bolts(`caliper_${s}`, [[WX - 0.06, cy, z(0.78)], [WX + 0.06, cy, z(0.78)]], axis)}
         {/* Entlüfternippel oben am Bremssattel; nach dem Entlüften steckt ein Schlauch mit Auffangflasche daran */}
@@ -592,38 +648,27 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
-            {/* Motorblock; der Zylinderkopf darüber ist ein eigenes, ausbaubares Teil (beim V-Motor der Kopf der Bank 1) */}
-            <mesh position={[1.3, 0.535, 0]}>
-              <boxGeometry args={[0.7, 0.17, 0.36 + wide * 2]} />
-              <meshStandardMaterial color={diesel ? '#5d6166' : '#70767d'} metalness={0.6} roughness={0.55} />
-            </mesh>
+            {/* Fest verbaute Teile (Block, Krümmer, Saugrohr, Kühler, Dome …) als ein Netz; Tipps fangen unsichtbare Körper ab */}
+            <mesh geometry={engineDecor(engine, G.detail)} material={bayMaterials()} raycast={noRay} />
+            <Proxy s={[0.7, 0.17, 0.36 + wide * 2]} p={[1.3, 0.535, 0]} />
+            <Proxy s={[0.66, 0.09, 0.32]} p={[1.3, 0.405, 0]} />
+            <Proxy s={[0.3, 0.16, 0.2]} p={[1.28, 0.6, 0.44]} />
+            <Proxy s={[0.05, 0.34, 1.2]} p={[1.95, 0.6, 0]} />
+            {/* Zylinderkopf der zweiten Bank (der ausbaubare Kopf ist beim V-Motor der der Bank 1) */}
             {vee && (
-              <mesh position={[1.3, 0.65, 0.115]}>
-                <boxGeometry args={[0.7, 0.06, 0.23]} />
-                <meshStandardMaterial color="#8a9097" metalness={0.65} roughness={0.5} />
+              <Bank bank={1}>
+                <RB s={[0.7, 0.06, 0.23]} r={0.012} p={[1.3, 0.65, 0.115]}>
+                  <meshStandardMaterial color="#8a9097" metalness={0.65} roughness={0.5} />
+                </RB>
+              </Bank>
+            )}
+            {/* Haubenstütze */}
+            {hoodOpen && (
+              <mesh position={[1.585, 1.305, 0.62]} rotation={[0, 0, 0.658]} raycast={noRay}>
+                <cylinderGeometry args={[0.006, 0.006, 1.23, 5]} />
+                <meshStandardMaterial color="#b9bec5" metalness={0.9} roughness={0.3} />
               </mesh>
             )}
-            {vee && (
-              <mesh position={[1.3, 0.72, 0]}>
-                <boxGeometry args={[0.66, 0.05, 0.036]} />
-                <meshStandardMaterial color="#3a3d42" metalness={0.5} roughness={0.6} />
-              </mesh>
-            )}
-            <mesh position={[1.3, 0.405, 0]} material={mats.dark}>
-              <boxGeometry args={[0.66, 0.09, 0.32]} />
-            </mesh>
-            <mesh position={[1.28, 0.6, 0.44]}>
-              <boxGeometry args={[0.3, 0.16, 0.2]} />
-              <meshStandardMaterial color="#1b1c1f" roughness={0.7} />
-            </mesh>
-            <mesh position={[1.95, 0.6, 0]}>
-              <boxGeometry args={[0.05, 0.34, 1.2]} />
-              <meshStandardMaterial color="#2a2c30" metalness={0.5} roughness={0.6} />
-            </mesh>
-            <mesh position={[1.69, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.065, 0.065, 0.03, 20]} />
-              <meshStandardMaterial color="#8d9399" metalness={0.8} roughness={0.4} />
-            </mesh>
             {/* Sichtbare Spuren von Lecks */}
             {(['gasket', 'gasket_b'] as const).map(
               (g) =>
@@ -676,12 +721,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             'coolant',
             'Kühlmittel-Ausgleichsbehälter',
             <>
-              <mesh position={[1.82, 0.58, -0.52]}>
-                <boxGeometry args={[0.16, 0.2, 0.16]} />
-                <meshStandardMaterial color="#e9e6d8" roughness={0.5} transparent opacity={0.9} />
+              <RB s={[0.16, 0.2, 0.16]} r={0.04} p={[1.82, 0.58, -0.52]}>
+                <meshStandardMaterial color="#e9e6d8" roughness={0.35} transparent opacity={0.72} />
+              </RB>
+              <mesh position={[1.82, 0.545, -0.52]} raycast={noRay}>
+                <boxGeometry args={[0.135, 0.1, 0.135]} />
+                <meshStandardMaterial color="#3fae6a" roughness={0.3} />
               </mesh>
               <mesh position={[1.82, 0.695, -0.52]}>
-                <cylinderGeometry args={[0.035, 0.035, 0.03, 12]} />
+                <cylinderGeometry args={[0.035, 0.038, 0.03, 14]} />
                 <meshStandardMaterial color="#1f6fb2" roughness={0.5} />
               </mesh>
             </>,
@@ -690,12 +738,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             'brake',
             'Bremsflüssigkeitsbehälter',
             <>
-              <mesh position={[0.92, 0.72, -0.46]}>
-                <boxGeometry args={[0.13, 0.1, 0.11]} />
-                <meshStandardMaterial color="#ece9da" roughness={0.5} transparent opacity={0.92} />
+              <RB s={[0.13, 0.1, 0.11]} r={0.02} p={[0.92, 0.72, -0.46]}>
+                <meshStandardMaterial color="#ece9da" roughness={0.35} transparent opacity={0.78} />
+              </RB>
+              <mesh position={[0.92, 0.7, -0.46]} raycast={noRay}>
+                <boxGeometry args={[0.11, 0.05, 0.09]} />
+                <meshStandardMaterial color="#b98a2a" roughness={0.3} />
               </mesh>
               <mesh position={[0.92, 0.78, -0.46]}>
-                <cylinderGeometry args={[0.032, 0.032, 0.025, 12]} />
+                <cylinderGeometry args={[0.032, 0.035, 0.025, 14]} />
                 <meshStandardMaterial color="#e3a81c" roughness={0.5} />
               </mesh>
             </>,
@@ -704,13 +755,27 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'battery',
             <>
-              <mesh position={[0.98, 0.57, 0.5]}>
-                <boxGeometry args={[0.28, 0.22, 0.2]} />
-                <Mat color="#15161a" rough={0.6} />
+              <RB s={[0.28, 0.2, 0.2]} r={0.012} p={[0.98, 0.56, 0.5]}>
+                <Mat color="#15161a" rough={0.55} />
+              </RB>
+              <RB s={[0.286, 0.03, 0.206]} r={0.01} p={[0.98, 0.665, 0.5]}>
+                <Mat color="#2a2d33" rough={0.5} />
+              </RB>
+              {/* Aufkleber, Pluspol mit roter Kappe, Minuspol */}
+              <mesh position={[0.98, 0.57, 0.602]}>
+                <boxGeometry args={[0.2, 0.09, 0.003]} />
+                <Mat color="#d9dde2" rough={0.6} />
               </mesh>
-              <mesh position={[0.9, 0.69, 0.5]}>
-                <cylinderGeometry args={[0.016, 0.016, 0.03, 8]} />
+              <mesh position={[0.98, 0.59, 0.604]}>
+                <boxGeometry args={[0.2, 0.03, 0.003]} />
+                <Mat color="#c8501e" rough={0.6} />
+              </mesh>
+              <RB s={[0.05, 0.035, 0.05]} r={0.012} p={[0.89, 0.692, 0.44]}>
                 <Mat color="#b3261e" rough={0.5} />
+              </RB>
+              <mesh position={[0.89, 0.69, 0.56]}>
+                <cylinderGeometry args={[0.014, 0.017, 0.03, 8]} />
+                <Mat color="#8d9399" metal={0.8} rough={0.4} />
               </mesh>
             </>,
           )}
@@ -730,19 +795,22 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           )}
           {part(
             'head_gasket',
-            <mesh position={[1.3, 0.624, vee ? -0.115 : 0]}>
-              <boxGeometry args={[0.68, 0.008, vee ? 0.21 : 0.34]} />
-              <Mat color={st('head_gasket')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
-            </mesh>,
+            <Bank bank={vee ? -1 : 0}>
+              <mesh position={[1.3, 0.624, vee ? -0.115 : 0]}>
+                <boxGeometry args={[0.68, 0.008, vee ? 0.21 : 0.34]} />
+                <Mat color={st('head_gasket')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
+              </mesh>
+            </Bank>,
           )}
           {part(
             'cyl_head',
-            <mesh position={[1.3, 0.65, vee ? -0.115 : 0]}>
-              <boxGeometry args={[0.7, 0.06, vee ? 0.23 : 0.36]} />
-              <Mat color="#8a9097" metal={0.65} rough={0.5} />
-            </mesh>,
+            <Bank bank={vee ? -1 : 0}>
+              <RB s={[0.7, 0.06, vee ? 0.23 : 0.36]} r={0.012} p={[1.3, 0.65, vee ? -0.115 : 0]}>
+                <Mat color="#8a9097" metal={0.65} rough={0.5} />
+              </RB>
+            </Bank>,
           )}
-          {!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => [-0.07, 0.07].map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}
+          <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => [-0.07, 0.07].map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
           {/* Getriebe hinter dem Motor – nur von unten und nur mit dem Getriebeheber */}
           {part(
             'gearbox',
@@ -761,7 +829,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {bolts('gearbox', [[0.58, 0.122, -0.11], [0.78, 0.122, -0.03], [0.58, 0.122, 0.11], [0.78, 0.122, 0.03]], 'y-')}
           {/* Zylinderkopf: Reihenmotor ein Ventildeckel, V-Motor je Bank einer */}
           {(vee ? ([['valve_cover', 'gasket', -1], ['valve_cover_b', 'gasket_b', 1]] as const) : ([['valve_cover', 'gasket', 0]] as const)).map(([cover, gasket, bank]) => (
-            <group key={cover}>
+            <Bank key={cover} bank={bank}>
               {part(
                 gasket,
                 <mesh position={[1.3, 0.69, bank * 0.105]}>
@@ -771,31 +839,69 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               )}
               {part(
                 cover,
-                <mesh position={[1.3, 0.74, bank * 0.105]}>
-                  <boxGeometry args={[0.7, 0.08, bank ? 0.17 : 0.36]} />
-                  <Mat color={diesel ? '#23252a' : '#2b2e33'} metal={0.5} rough={0.5} />
-                </mesh>,
+                <>
+                  <RB s={[0.7, 0.08, bank ? 0.17 : 0.36]} r={0.022} p={[1.3, 0.74, bank * 0.105]}>
+                    <Mat color={diesel ? '#23252a' : '#2b2e33'} metal={0.5} rough={0.45} />
+                  </RB>
+                  {/* Versteifungsrippen und Öleinfülldeckel */}
+                  {[1.06, 1.3, 1.54].map((x) => (
+                    <RB key={x} s={[0.02, 0.012, bank ? 0.13 : 0.3]} r={0.005} p={[x + 0.06, 0.781, bank * 0.105]}>
+                      <Mat color={diesel ? '#2b2e33' : '#34383e'} metal={0.5} rough={0.45} />
+                    </RB>
+                  ))}
+                  {bank <= 0 && (
+                    <group position={[1.15, 0.79, bank ? -0.165 : -0.135]}>
+                      <mesh>
+                        <cylinderGeometry args={[0.03, 0.034, 0.022, 12]} />
+                        <Mat color="#0e0f11" rough={0.6} />
+                      </mesh>
+                      <mesh position={[0, 0.012, 0]}>
+                        <boxGeometry args={[0.05, 0.008, 0.012]} />
+                        <Mat color="#e3b21c" rough={0.6} />
+                      </mesh>
+                    </group>
+                  )}
+                </>,
               )}
               {bolts(cover, bank ? bankBolts(bank, engine.cylinders) : COVER_BOLTS)}
-            </group>
+            </Bank>
           ))}
           {/* Ventiltrieb unter dem Ventildeckel (beim V-Motor unter dem der Bank 1) */}
-          {!installed('valve_cover') &&
-            part(
-              'rocker',
-              <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]}>
-                <boxGeometry args={[0.62, 0.04, 0.07]} />
-                <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#aeb3ba'} metal={0.85} rough={0.35} />
-              </mesh>,
-            )}
-          {!installed('valve_cover') && bolts('rocker', [[1.12, 0.74, vee ? -0.105 : 0.1], [1.48, 0.74, vee ? -0.105 : 0.1]])}
+          <Bank bank={vee ? -1 : 0}>
+            {!installed('valve_cover') &&
+              part(
+                'rocker',
+                <>
+                  <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]} rotation={[0, 0, Math.PI / 2]}>
+                    <cylinderGeometry args={[0.016, 0.016, 0.62, 8]} />
+                    <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#aeb3ba'} metal={0.85} rough={0.35} />
+                  </mesh>
+                  {/* Nocken und Lagerböcke */}
+                  {slots.filter((c) => c.bank <= 0).map((c) => (
+                    <RB key={c.n} s={[0.04, 0.045, 0.05]} r={0.012} p={[c.x + 0.04, 0.72, vee ? -0.105 : 0.1]}>
+                      <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#c2c7cd'} metal={0.9} rough={0.3} />
+                    </RB>
+                  ))}
+                  <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]}>
+                    <boxGeometry args={[0.62, 0.04, 0.07]} />
+                    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                  </mesh>
+                </>,
+              )}
+            {!installed('valve_cover') && bolts('rocker', [[1.12, 0.74, vee ? -0.105 : 0.1], [1.48, 0.74, vee ? -0.105 : 0.1]])}
+          </Bank>
           {part(
             'engine_cover',
             <>
-              <mesh position={[1.28, 0.862, 0]}>
-                <boxGeometry args={[0.66, 0.02, vee ? 0.46 : 0.34]} />
-                <Mat color="#1c1e22" rough={0.55} />
-              </mesh>
+              <RB s={[0.66, 0.024, vee ? 0.46 : 0.34]} r={0.011} p={[1.28, 0.862, 0]}>
+                <Mat color="#1c1e22" rough={0.5} />
+              </RB>
+              {/* Eine Sicke je Zylinder */}
+              {slots.map((c) => (
+                <RB key={c.n} s={[0.05, 0.01, vee ? 0.15 : 0.12]} r={0.004} p={[c.x - 0.02, 0.875, vee ? c.bank * 0.14 : 0.105 * (c.n % 2 ? 1 : -1)]}>
+                  <Mat color="#25282d" rough={0.45} />
+                </RB>
+              ))}
               {/* Zierleisten verraten die Bauart: eine je Zylinderbank, beim Diesel blau, beim Turbo rot abgesetzt */}
               {(vee ? [-0.12, 0.12] : [0]).map((z) => (
                 <mesh key={z} position={[1.28, 0.874, z]}>
@@ -844,7 +950,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             // Ohne Zylinderkopf gibt es an dieser Bank nichts einzusetzen.
             if (bank <= 0 && !installed('cyl_head')) return null;
             return (
-              <group key={n}>
+              <Bank key={n} bank={bank}>
                 {!installed(top) &&
                   part(
                     low,
@@ -857,6 +963,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                         <cylinderGeometry args={diesel ? [0.016, 0.016, 0.022, 6] : [0.022, 0.022, 0.025, 6]} />
                         <Mat color="#b9bec5" metal={0.9} rough={0.3} />
                       </mesh>
+                      {!diesel && (
+                        <mesh position={[x, 0.825, z]}>
+                          <cylinderGeometry args={[0.006, 0.008, 0.02, 6]} />
+                          <Mat color="#8d9399" metal={0.9} rough={0.3} />
+                        </mesh>
+                      )}
                       <group position={[x, 0.79, z]}>
                         <Hit r={0.032} />
                       </group>
@@ -883,19 +995,22 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                   ) : (
                     <>
                       <mesh position={[x, 0.8, z]}>
-                        <cylinderGeometry args={[0.036, 0.036, 0.06, 12]} />
+                        <cylinderGeometry args={[0.034, 0.036, 0.06, 14]} />
                         <Mat color="#101113" rough={0.5} />
                       </mesh>
-                      <mesh position={[x, 0.835, z + out * 0.02]}>
-                        <boxGeometry args={[0.06, 0.03, 0.11]} />
-                        <Mat color="#c8501e" rough={0.6} />
+                      <RB s={[0.06, 0.03, 0.11]} r={0.009} p={[x, 0.835, z + out * 0.02]}>
+                        <Mat color="#c8501e" rough={0.55} />
+                      </RB>
+                      <mesh position={[x, 0.851, z + out * 0.005]}>
+                        <boxGeometry args={[0.04, 0.003, 0.05]} />
+                        <Mat color="#1b1d21" rough={0.6} />
                       </mesh>
                     </>
                   ),
                 )}
                 {bolts(top, [boltPos])}
                 {connector(top, [x, 0.838, z + out * 0.095], [0, 0.03, out * 0.06])}
-              </group>
+              </Bank>
             );
           })}
 
@@ -919,17 +1034,32 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'turbo',
               <>
-                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.085, 0.085, 0.07, 18]} />
+                {/* Verdichter (Alu) mit Schneckengehäuse und Ansaugstutzen */}
+                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, Math.PI / 2, 0]}>
+                  <torusGeometry args={[0.058, 0.03, 8, 20]} />
                   <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
                 </mesh>
-                <mesh position={[1.73, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.07, 0.07, 0.07, 18]} />
+                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.06, 0.06, 0.06, 16]} />
+                  <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
+                </mesh>
+                {/* Turbine (Guss) und Lagergehäuse */}
+                <mesh position={[1.72, 0.66, 0.46]} rotation={[0, Math.PI / 2, 0]}>
+                  <torusGeometry args={[0.048, 0.027, 8, 18]} />
+                  <Mat color="#5a4a3c" metal={0.7} rough={0.65} />
+                </mesh>
+                <mesh position={[1.74, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.045, 0.045, 0.09, 14]} />
                   <Mat color="#5a4a3c" metal={0.7} rough={0.6} />
                 </mesh>
                 <mesh position={[1.85, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.035, 0.035, 0.04, 14]} />
+                  <cylinderGeometry args={[0.035, 0.04, 0.04, 14]} />
                   <Mat color="#1b1d21" rough={0.5} />
+                </mesh>
+                {/* Ladedruckdose */}
+                <mesh position={[1.8, 0.6, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.03, 0.03, 0.035, 10]} />
+                  <Mat color="#c9a54a" metal={0.8} rough={0.4} />
                 </mesh>
               </>,
             )}
@@ -973,16 +1103,16 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'belt',
             <>
-              <mesh position={[1.69, 0.627, -0.015]}>
-                <boxGeometry args={[0.028, 0.012, 0.58]} />
+              <mesh geometry={beltGeometry()} position={[1.69, 0, 0]}>
                 <Mat color={beltBad ? '#3b332b' : '#0d0d0e'} rough={0.95} />
               </mesh>
-              {[-1, 1].map((k) => (
-                <mesh key={k} position={[1.69, 0.495, k * 0.165]} rotation={[k * 0.42, 0, 0]}>
-                  <boxGeometry args={[0.028, 0.012, 0.27]} />
-                  <Mat color={beltBad ? '#3b332b' : '#0d0d0e'} rough={0.95} />
-                </mesh>
-              ))}
+              {beltBad &&
+                [-0.18, -0.05, 0.1, 0.21].map((z) => (
+                  <mesh key={z} position={[1.69, 0.636, z]}>
+                    <boxGeometry args={[0.03, 0.004, 0.006]} />
+                    <meshStandardMaterial color="#8a7f70" roughness={1} />
+                  </mesh>
+                ))}
               <mesh position={[1.7, 0.55, 0]}>
                 <boxGeometry args={[0.05, 0.2, 0.56]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -996,10 +1126,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 <cylinderGeometry args={[0.075, 0.075, 0.15, 18]} />
                 <Mat color="#b4b9bf" metal={0.8} rough={0.45} />
               </mesh>
-              <mesh position={[1.58, 0.665, 0.27]}>
-                <boxGeometry args={[0.16, 0.03, 0.09]} />
+              {[-0.05, -0.025, 0, 0.025, 0.05].map((dx) => (
+                <mesh key={dx} position={[1.58 + dx, 0.58, 0.27]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.079, 0.079, 0.008, 18]} />
+                  <Mat color="#8a9097" metal={0.8} rough={0.5} />
+                </mesh>
+              ))}
+              <RB s={[0.16, 0.03, 0.09]} r={0.01} p={[1.58, 0.665, 0.27]}>
                 <Mat color="#8a9097" metal={0.7} rough={0.5} />
-              </mesh>
+              </RB>
               <mesh position={[1.69, 0.58, 0.27]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.042, 0.042, 0.03, 16]} />
                 <Mat color="#6f757c" metal={0.8} rough={0.4} />
@@ -1011,9 +1146,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'water_pump',
             <>
-              <mesh position={[1.58, 0.58, -0.3]}>
-                <boxGeometry args={[0.14, 0.16, 0.16]} />
+              <RB s={[0.14, 0.16, 0.16]} r={0.035} p={[1.58, 0.58, -0.3]}>
                 <Mat color="#9aa0a7" metal={0.7} rough={0.5} />
+              </RB>
+              <mesh position={[1.645, 0.58, -0.3]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.062, 0.07, 0.03, 16]} />
+                <Mat color="#aeb3ba" metal={0.75} rough={0.45} />
               </mesh>
               <mesh position={[1.69, 0.58, -0.3]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.048, 0.048, 0.03, 16]} />
@@ -1024,10 +1162,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {bolts('water_pump', [[1.53, 0.66, -0.35], [1.63, 0.66, -0.35], [1.53, 0.66, -0.25], [1.63, 0.66, -0.25]])}
           {part(
             'thermostat',
-            <mesh position={[1.3, 0.6, -0.235 - wide]}>
-              <boxGeometry args={[0.17, 0.1, 0.1]} />
-              <Mat color="#a7adb4" metal={0.75} rough={0.45} />
-            </mesh>,
+            <>
+              <RB s={[0.17, 0.1, 0.1]} r={0.03} p={[1.3, 0.6, -0.235 - wide]}>
+                <Mat color="#a7adb4" metal={0.75} rough={0.45} />
+              </RB>
+              <mesh position={[1.32, 0.63, -0.3 - wide]} rotation={[0.9, 0, 0]}>
+                <cylinderGeometry args={[0.028, 0.028, 0.09, 10]} />
+                <Mat color="#a7adb4" metal={0.75} rough={0.45} />
+              </mesh>
+            </>,
           )}
           {bolts('thermostat', [[1.235, 0.65, -0.235 - wide], [1.365, 0.65, -0.235 - wide]])}
           {part(
@@ -1037,10 +1180,21 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 <cylinderGeometry args={[0.03, 0.03, 0.47, 12]} />
                 <Mat color="#151517" rough={0.85} />
               </mesh>
-              <mesh position={[1.34, 0.675, -0.375]}>
-                <boxGeometry args={[0.06, 0.06, 0.2]} />
+              <mesh position={[1.34, 0.675, -0.375]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.03, 0.03, 0.2, 10]} />
                 <Mat color="#151517" rough={0.85} />
               </mesh>
+              <mesh position={[1.335, 0.69, -0.45]}>
+                <sphereGeometry args={[0.031, 10, 8]} />
+                <Mat color="#151517" rough={0.85} />
+              </mesh>
+              {/* Schlauchschellen */}
+              {[1.4, 1.76].map((x) => (
+                <mesh key={x} position={[x, 0.69, -0.45]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.033, 0.033, 0.014, 12]} />
+                  <Mat color="#c9cdd2" metal={0.9} rough={0.3} />
+                </mesh>
+              ))}
             </>,
           )}
           {bolts('hose', [[1.42, 0.72, -0.45]])}
@@ -1064,10 +1218,18 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {!installed('oil_pan') && bolts('bearing', [[1.3, 0.23, -0.06], [1.3, 0.23, 0.06]], 'y-')}
           {part(
             'oil_pan',
-            <mesh position={[1.3, 0.235, 0]}>
-              <boxGeometry args={[0.5, 0.066, 0.3]} />
-              <Mat color={oilLeak ? '#3d3a35' : '#7b8188'} metal={0.7} rough={oilLeak ? 0.25 : 0.5} />
-            </mesh>,
+            <>
+              <RB s={[0.5, 0.066, 0.3]} r={0.02} p={[1.3, 0.235, 0]}>
+                <Mat color={oilLeak ? '#3d3a35' : '#7b8188'} metal={0.7} rough={oilLeak ? 0.25 : 0.5} />
+              </RB>
+              {/* Kühlrippen an der Unterseite */}
+              {[1.16, 1.23, 1.3].map((x) => (
+                <mesh key={x} position={[x, 0.2, -0.02]}>
+                  <boxGeometry args={[0.012, 0.01, 0.2]} />
+                  <Mat color={oilLeak ? '#3d3a35' : '#70767d'} metal={0.7} rough={0.5} />
+                </mesh>
+              ))}
+            </>,
           )}
           {bolts('oil_pan', [[1.1, 0.202, -0.12], [1.5, 0.202, -0.12], [1.1, 0.202, 0.12], [1.5, 0.202, 0.12]], 'y-')}
           {installed('oil_pan') &&

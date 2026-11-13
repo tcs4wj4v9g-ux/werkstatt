@@ -32,12 +32,14 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   };
   const shot = async (name, from, to) => { await p.evaluate(([from, to, EYE]) => { const pl = window.__gkPlayer; pl.work = null; pl.x = from[0]; pl.z = from[1]; const dx = to[0] - from[0], dz = to[2] - from[1]; pl.yaw = Math.atan2(-dx, -dz); pl.pitch = Math.atan2(to[1] - EYE, Math.hypot(dx, dz)); pl.zoom = true; }, [from, to, EYE]); await p.waitForTimeout(500); await p.screenshot({ path: `${S}/eng-${name}.png` }); };
   const sound = async () => { await p.evaluate(() => window.__gk.getState().toggleEngine(0)); await p.waitForTimeout(400); const pr = await p.evaluate(() => window.__gkAudio.profile()); const obs = await p.evaluate(() => window.__gk.getState().cars[0].observed); await p.evaluate(() => window.__gk.getState().toggleEngine(0)); return { pr, obs }; };
+  /** Die Bänke eines V-Motors sind um 0,2 rad geneigt (Drehpunkt in 0,62 m Höhe) – Punkt aus Bank-Koordinaten umrechnen. */
+  const tilt = (q, bank) => { if (!bank) return q; const a = bank * 0.2, dy = q[1] - 0.62; return [q[0], 0.62 + dy * Math.cos(a) - q[2] * Math.sin(a), dy * Math.sin(a) + q[2] * Math.cos(a)]; };
   /** Zylinderteil tauschen: Schraube, Stecker, oberes Teil, unteres Teil prüfen. */
   const cylinder = async (label, top, low, x, z, bank, lowSocket) => {
-    const bolt = bank ? [x + 0.05, 0.795, z - bank * 0.06] : [x, 0.795, -0.085];
+    const bolt = tilt(bank ? [x + 0.05, 0.795, z - bank * 0.06] : [x, 0.795, -0.085], bank);
     const out = bank || 1;
-    const con = [x, 0.845, z + out * 0.095];
-    const body = [x, 0.85, z + out * 0.03];
+    const con = tilt([x, 0.845, z + out * 0.095], bank);
+    const body = tilt([x, 0.85, z + out * 0.03], bank);
     await kit('ratchet'); await aimTap(front, W(...bolt));
     expect((await comp(top)).bolts[0] === 1, `${label}: Schraube gelöst (${await focus()})`);
     await kit('hand'); await aimTap(front, W(...bolt));
@@ -46,7 +48,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
     expect(!(await comp(top)).connected, `${label}: Stecker abgezogen (${await focus()})`);
     await aimTap(front, W(...body));
     expect(!(await comp(top)).installed, `${label}: ausgebaut – ${await toast()}`);
-    return { bolt, con: [con[0], con[1] + 0.03, con[2] + out * 0.06], body, low: [x, 0.81, z] };
+    return { bolt, con: tilt([x, 0.875, z + out * 0.155], bank), body, low: tilt([x, 0.81, z], bank) };
   };
 
   await p.goto(URL); await p.waitForTimeout(2000);
@@ -106,9 +108,9 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   cc = await comp('coil8');
   expect(cc.installed && cc.condition === 'ok' && cc.connected && cc.bolts[0] === 2, 'V8: neue Spule 8 montiert');
   // Erste Bank: Spule 1 Schraube erreichbar
-  await aimTap(front, W(1.06 + 0.05, 0.795, -0.045));
+  await aimTap(front, W(...tilt([1.06 + 0.05, 0.795, -0.045], -1)));
   expect((await comp('coil1')).bolts[0] === 1, 'V8: Schraube der Spule 1 auf Bank 1 erreichbar – ' + (await focus()));
-  await aimTap(front, W(1.06 + 0.05, 0.795, -0.045));
+  await aimTap(front, W(...tilt([1.06 + 0.05, 0.795, -0.045], -1)));
 
   }
   if (ONLY.includes('diesel')) {
