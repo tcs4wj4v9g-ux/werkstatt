@@ -9,6 +9,8 @@ Wünsche des Projektinhabers an Claude:
 ## Testen
 
 - Zuerst `npm test` (Logiktests, wenige Sekunden).
-- Browser-Durchläufe: `e2e/run.sh` (alle, ca. 12 Minuten) oder nur die betroffenen Bereiche, z. B. `e2e/run.sh motoren markt` – Zuordnung in `e2e/README.md`. Nicht mehr als zwei bis drei gleichzeitig (`JOBS`), sonst gibt es Zeitüberschreitungen.
+- Browser-Durchläufe: `e2e/run.sh` (alle, ca. 6 Minuten) oder nur die betroffenen Bereiche, z. B. `e2e/run.sh motoren markt` – Zuordnung in `e2e/README.md`. Nicht mehr als drei gleichzeitig (`JOBS`), sonst gibt es Zeitüberschreitungen.
+- Sparsam testen: während der Arbeit nur `npm test` und die betroffenen Durchläufe; den vollen Satz genau einmal auf dem Endstand, nicht nach jedem Zwischenschritt.
+- Bilder in voller Grafik (`e2e/galerie.cjs`) sind langsam: nur die betroffenen Modelle und Ansichten aufnehmen (`GK_VIEWS`, Modellnamen als Argumente).
 - Alle Durchläufe einmal vor jedem Pull Request. Nie einen echten iPad-Test behaupten.
 - Grafikänderungen zusätzlich ansehen: `e2e/galerie.cjs` nimmt Bilder in voller Grafik auf (siehe `e2e/README.md`). Ein grüner Build sagt nichts über das Aussehen.

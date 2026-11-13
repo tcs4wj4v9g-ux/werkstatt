@@ -2,7 +2,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect } from 'react';
 import { useGame } from './game/store';
 import { Perf } from './three/Env';
-import { GFX, TEST_MODE, useGfx } from './three/gfx';
+import { GFX, TEST_DPR, TEST_MODE, useGfx } from './three/gfx';
 import { GarageScene } from './three/GarageScene';
 import { MarketScene } from './three/MarketScene';
 import { TrackScene } from './three/TrackScene';
@@ -29,7 +29,7 @@ export function App() {
   const level = useGfx((s) => s.level);
   const scale = useGfx((s) => s.scale);
   const G = GFX[level];
-  const dpr = TEST_MODE ? 0.5 : Math.max(0.6, Math.min(window.devicePixelRatio || 1, G.dpr) * scale);
+  const dpr = TEST_MODE ? TEST_DPR : Math.max(0.6, Math.min(window.devicePixelRatio || 1, G.dpr) * scale);
   // Auktionen laufen in Echtzeit – auch die Zeit, in der das Spiel geschlossen war, wird beim Start nachgeholt.
   useEffect(() => {
     const tick = () => useGame.getState().tickAuctions(Date.now());

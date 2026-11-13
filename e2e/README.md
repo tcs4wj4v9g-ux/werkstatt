@@ -13,13 +13,14 @@ Echte Tipps im laufenden Spiel (Playwright, Chromium mit Software-Grafik). Vorau
 | `karriere` | Version-4-Spielstand, Standorte, Getriebe mit Heber, Prüfstand, Showroom, Wettbewerb, Treffen | Karriere, Standorte, Spielstand |
 
 ```
-e2e/run.sh                  # alle, zwei gleichzeitig
+e2e/run.sh                  # alle, drei gleichzeitig (rund 5½ Minuten)
 e2e/run.sh motoren markt    # nur betroffene Bereiche
-JOBS=3 e2e/run.sh           # mehr gleichzeitig (ab vier Prozessorkernen)
+JOBS=2 e2e/run.sh           # weniger gleichzeitig (bei weniger als vier Prozessorkernen)
+TEST_DPR=0.5 e2e/run.sh     # höhere Auflösung, wenn die Bildschirmfotos der Tests gebraucht werden
 ```
 
 Ergebnisse und Bildschirmfotos landen in `e2e/out/` (nicht im Repository). Die Seite läuft dabei im Testmodus
-(`?test`): halbe Auflösung, keine Schatten, keine Kantenglättung. Spiellogik und Tipp-Erkennung sind dieselben.
+(`?test`): ein Viertel der Auflösung, keine Schatten, keine Kantenglättung. Gemessen: halbe Auflösung 11 Minuten, Viertel-Auflösung 5½ Minuten. Spiellogik und Tipp-Erkennung sind dieselben.
 
 ## Bildergalerie in voller Grafik
 

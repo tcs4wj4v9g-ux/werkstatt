@@ -2,16 +2,18 @@
 # Browser-Durchläufe (Playwright, Chromium ohne Grafikkarte).
 #   e2e/run.sh                 alle Durchläufe
 #   e2e/run.sh motoren markt   nur die genannten
-#   JOBS=3 e2e/run.sh          Anzahl gleichzeitiger Durchläufe (Standard 2)
+#   JOBS=2 e2e/run.sh          Anzahl gleichzeitiger Durchläufe (Standard 3)
+#   TEST_DPR=0.5 e2e/run.sh    höhere Auflösung, falls Bildschirmfotos der Tests gebraucht werden
 #   SKIP_BUILD=1 e2e/run.sh    vorhandenes dist/ verwenden
-# Die Seite läuft im Testmodus (?test): halbe Auflösung, keine Schatten – deutlich schneller, gleiche Logik.
+# Die Seite läuft im Testmodus (?test): ein Viertel der Auflösung, keine Schatten – deutlich schneller, gleiche Logik.
 cd "$(dirname "$0")/.."
-ALL="diagnose mechanik werkstatt bremse motoren markt karriere"
+# Die längsten zuerst, damit die Gesamtzeit nicht an einem späten langen Lauf hängt.
+ALL="werkstatt diagnose motoren mechanik karriere markt bremse"
 TESTS="${*:-$ALL}"
-JOBS="${JOBS:-2}"
+JOBS="${JOBS:-3}"
 PORT="${PORT:-4173}"
 export NODE_PATH="${NODE_PATH:-$(npm root -g)}"
-export GK_URL="http://localhost:$PORT/?test"
+export GK_URL="http://localhost:$PORT/?test${TEST_DPR:+=$TEST_DPR}"
 export GK_OUT="$PWD/e2e/out"
 mkdir -p "$GK_OUT"
 [ -n "$SKIP_BUILD" ] || npm run build > "$GK_OUT/build.log" 2>&1 || { echo "Build fehlgeschlagen – siehe e2e/out/build.log"; exit 1; }

@@ -28,8 +28,10 @@ export const GFX_LABEL: Record<GfxLevel, string> = { low: 'Niedrig', medium: 'Mi
 
 const KEY = 'garage-kings-gfx';
 const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-/** Testmodus (`?test`): niedrigste Stufe mit halber Auflösung – nur für automatisierte Browser-Tests ohne Grafikkarte. */
+/** Testmodus (`?test`): niedrigste Stufe mit einem Viertel der Auflösung – nur für automatisierte Browser-Tests ohne Grafikkarte. */
 export const TEST_MODE = params.has('test');
+/** Pixeldichte im Testmodus (`?test=0.3`); Tipps werden unabhängig von der Auflösung berechnet. */
+export const TEST_DPR = Number(params.get('test')) || 0.25;
 
 function load(): { level: GfxLevel; auto: boolean } {
   const forced = params.get('gfx');
