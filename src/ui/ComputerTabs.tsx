@@ -6,10 +6,10 @@ import { defsOf, engineOf } from '../game/data/components';
 import { PART_LIST, PARTS } from '../game/data/parts';
 import { fitOf, stockOf } from '../game/fitment';
 import { availableSlots, SLOTS, STAND_SLOT, UPGRADES, isJunk } from '../game/data/workshop';
-import { fromStand, swapPlan, type EngineUnit } from '../game/motor';
+import { fromStand, swapPlan, withRemovedEngine, type EngineUnit } from '../game/motor';
 import { ENGINES } from '../game/data/engines';
 import { RARITY_NAMES } from '../game/market';
-import { fluidPrice, partPrice, useGame } from '../game/store';
+import { fluidPrice, partPrice, removedEngines, useGame } from '../game/store';
 import { eur } from './common';
 
 const clock = (ms: number) => {
@@ -134,7 +134,10 @@ export function ShopList() {
   const slot = s.cars[s.shopSlot] ? s.shopSlot : slots[0] ?? -1;
   const car = slot >= 0 ? s.cars[slot]! : null;
   // Nur Teile, die dieses Auto überhaupt hat (ein Diesel braucht keine Zündkerzen).
-  const fitted = car ? new Set(defsOf(car).flatMap((d) => [d.partId, ...(d.variants ?? [])]).filter(Boolean)) : new Set();
+  // Ausgebauter Motor zählt mit; ist er nicht auffindbar, gelten die Teile des Werksmotors.
+  const withEngine = car && car.motor === null ? withRemovedEngine(car, removedEngines(s)) : car;
+  const partsCar = withEngine && withEngine.motor === null ? { ...withEngine, motor: undefined } : withEngine;
+  const fitted = partsCar ? new Set(defsOf(partsCar).flatMap((d) => [d.partId, ...(d.variants ?? [])]).filter(Boolean)) : new Set();
   if (car && car.motor !== null && !engineOf(car).turbo && !car.motor?.turboKit) fitted.add('turbo_kit');
   const [dept, setDept] = useState<'parts' | 'revision' | 'tuning' | 'swap'>('parts');
   const motors = [s.crane, ...s.engines, ...(s.cars[STAND_SLOT] ? [fromStand(s.cars[STAND_SLOT]!)] : [])].filter((u): u is EngineUnit => !!u);
@@ -194,13 +197,13 @@ export function ShopList() {
         </>
       )}
       {car && dept !== 'swap' && PART_LIST.filter((p) => fitted.has(p.id) && (dept === 'parts' ? !p.kind : p.kind === dept)).map((p) => {
-        const price = partPrice(s, p.id, car);
+        const price = partPrice(s, p.id, partsCar!);
         const list = partPrice({ events: [], upgrades: s.upgrades, day: s.day }, p.id, car);
         return (
           <div key={p.id} className="shop-row">
             <div>
               <b>{p.name}</b>
-              <div className="meta">{p.desc} · passend für {fitOf(car, p.id)} · im Regal: {stockOf(s.inventory, car, p.id)}</div>
+              <div className="meta">{p.desc} · passend für {fitOf(partsCar!, p.id)} · im Regal: {stockOf(s.inventory, partsCar!, p.id)}</div>
             </div>
             <button className="btn primary" data-testid={`buy-${p.id}`} disabled={s.money < price} onClick={() => s.buyPart(p.id, slot)}>
               Bestellen {eur(price)}{price < list ? ` statt ${list.toLocaleString('de-DE')}` : ''}

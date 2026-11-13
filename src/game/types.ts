@@ -259,6 +259,8 @@ export interface CarInstance {
   junk?: JunkInfo;
   /** Verbaute Umbauteile eines Motorumbaus. */
   swap?: { from: string; parts: PartId[] };
+  /** Kennung des ausgebauten Motors (Kran, Ständer oder Lager), damit Akte und Teileshop ihn weiter kennen. */
+  motorOut?: string;
   ecu?: EcuTune;
   visual?: VisualTune;
   uid: string;
