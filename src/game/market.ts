@@ -23,9 +23,9 @@ export const CLASS_TARGETS: Record<CarClass, number> = { budget: 8, mid: 7, spor
 /** Zünd- und Einspritzteile haben einen messbaren Restzustand in Prozent. */
 export const HEALTH_PARTS: PartId[] = ['ignition_coil', 'spark_plug', 'injector', 'glow_plug'];
 
-export function freshComponents(modelId = 'bavaria_320'): CarInstance['components'] {
+export function freshComponents(car: string | Pick<CarInstance, 'modelId' | 'motor' | 'bare'> = 'bavaria_320'): CarInstance['components'] {
   const components: CarInstance['components'] = {};
-  for (const c of defsOf({ modelId })) {
+  for (const c of defsOf(typeof car === 'string' ? { modelId: car } : car)) {
     components[c.id] = { installed: true, bolts: Array(c.bolts).fill(2), connected: true, condition: 'ok', known: false };
     if (c.partId && HEALTH_PARTS.includes(c.partId)) components[c.id].health = 100;
   }

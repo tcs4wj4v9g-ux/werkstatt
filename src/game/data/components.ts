@@ -1,4 +1,4 @@
-import type { CarInstance, ComponentDef, ToolNeed } from '../types';
+import type { CarInstance, ComponentDef, MotorMeta, ToolNeed } from '../types';
 import { CAR_MODELS } from './cars';
 import { cylinderSlots, ENGINES, isV, type EngineDef } from './engines';
 
@@ -22,6 +22,7 @@ const cylinder = (n: number, diesel: boolean): ComponentDef[] =>
     blockedBy: ['engine_cover'],
     access: 'hood',
     partId: 'injector',
+    variants: ['injector_hp'],
     okText: 'Spritzbild sauber, Düse dicht – in Ordnung.',
     defectText: 'Düsennadel hängt, verkokt und tropft nach – defekt!',
   },
@@ -115,7 +116,7 @@ const corner = (s: 'fl' | 'fr', label: string): ComponentDef[] => [
   },
 ];
 
-function build(engine: EngineDef): ComponentDef[] {
+function build(engine: EngineDef, turboKit = false): ComponentDef[] {
   const slots = cylinderSlots(engine);
   const diesel = engine.fuel === 'diesel';
   const v = isV(engine);
@@ -225,6 +226,7 @@ function build(engine: EngineDef): ComponentDef[] {
   {
     id: 'intake_hose',
     name: 'Ansaugschlauch',
+    variants: ['intake_sport'],
     bolts: 1,
     fastener: { driver: 'screwdriver' },
     blockedBy: [],
@@ -360,14 +362,14 @@ function build(engine: EngineDef): ComponentDef[] {
       },
     );
   }
-  if (engine.turbo) {
+  if (engine.turbo || turboKit) {
     out.push(
       {
-        id: 'charge_pipe', name: 'Ladeluftrohr', bolts: 1, fastener: { driver: 'screwdriver' }, blockedBy: [], access: 'hood', partId: 'charge_pipe',
+        id: 'charge_pipe', name: turboKit && !engine.turbo ? 'Ladeluftrohr (Nachrüstsatz)' : 'Ladeluftrohr', bolts: 1, fastener: { driver: 'screwdriver' }, blockedBy: [], access: 'hood', partId: 'charge_pipe', variants: ['intercooler'],
         okText: 'Rohr und Muffen dicht, Schelle fest.', defectText: 'Muffe eingerissen und ölig – hier entweicht Ladedruck!',
       },
       {
-        id: 'turbo', name: 'Turbolader', bolts: 3, fastener: S13, blockedBy: ['charge_pipe'], access: 'hood', partId: 'turbo', hidden: true,
+        id: 'turbo', name: 'Turbolader', bolts: 3, fastener: S13, blockedBy: ['charge_pipe'], access: 'hood', partId: 'turbo', hidden: true, variants: ['turbo_big'],
         okText: 'Welle spielfrei, Verdichterrad sauber – in Ordnung.', defectText: 'Welle hat fühlbares Spiel, Verdichterrad schleift am Gehäuse – defekt!',
       },
     );
@@ -384,30 +386,138 @@ function build(engine: EngineDef): ComponentDef[] {
       },
     );
   }
+  // ---------- Fahrzeugseite rund um den Motor: muss für einen Motorausbau gelöst werden ----------
+  out.push(
+    {
+      id: 'harness', name: 'Motorkabelbaum (Hauptstecker)', bolts: 0, connector: true, blockedBy: [], access: 'hood', partId: 'harness',
+      okText: 'Steckverbindung sauber, Verriegelung intakt.', defectText: 'Kontakte korrodiert – Wackelkontakt!',
+    },
+    {
+      id: 'mounts', name: 'Motorlager und Getriebeglocke', bolts: 4, fastener: S17, blockedBy: [], access: 'hood', partId: 'engine_mount',
+      okText: 'Gummilager ohne Risse.', defectText: 'Gummilager gerissen – der Motor schlägt beim Lastwechsel!',
+    },
+    {
+      id: 'downpipe', name: 'Hosenrohr (Abgasanlage)', bolts: 2, fastener: S13, blockedBy: [], access: 'lifted', partId: 'downpipe', variants: ['exhaust_sport'],
+      okText: 'Flansch dicht, Rohr ohne Durchrostung.', defectText: 'Durchgerostet – die Abgasanlage bläst ab!',
+    },
+    {
+      id: 'fuel_pump', name: 'Kraftstoffpumpe', bolts: 2, fastener: S10, connector: true, blockedBy: [], access: 'lifted', partId: 'fuel_pump', variants: ['fuelpump_hp'],
+      okText: 'Fördermenge im Soll.', defectText: 'Pumpe singt und fördert zu wenig – defekt!',
+    },
+  );
+
+  // ---------- Motorinneres: nur am ausgebauten Motor auf dem Motorständer zugänglich ----------
+  const mains = Math.min(10, (engine.cylinders / (v ? 2 : 1) + 1) * 2);
+  out.push(
+    {
+      id: 'intake_manifold', name: 'Ansaugkrümmer', bolts: 4, fastener: S13, blockedBy: [], access: 'stand', partId: 'intake_manifold',
+      okText: 'Flansch plan, Dichtungen sauber.', defectText: 'Dichtflansch verzogen – zieht Falschluft!',
+    },
+    {
+      id: 'exhaust_manifold', name: 'Abgaskrümmer', bolts: 4, fastener: S13, blockedBy: engine.turbo || turboKit ? ['turbo'] : [], access: 'stand', partId: 'exhaust_manifold', variants: ['manifold_sport'],
+      okText: 'Krümmer ohne Risse.', defectText: 'Haarriss am Sammelrohr – bläst ab!',
+    },
+    {
+      id: 'timing_chain', name: 'Steuerkette mit Rädern', bolts: 0, blockedBy: ['chain_tensioner', ...(v ? ['valve_cover', 'valve_cover_b'] : ['valve_cover'])], access: 'stand', partId: 'timing_chain', hidden: true,
+      okText: 'Kette ohne Längung, Gleitschienen glatt.', defectText: 'Kette deutlich gelängt, Gleitschiene eingelaufen – verschlissen!',
+    },
+    {
+      id: 'camshaft', name: v ? 'Nockenwellen Bank 1' : 'Nockenwellen', bolts: 4, fastener: S10, blockedBy: ['timing_chain', 'rocker'], access: 'stand', partId: 'camshaft', hidden: true, variants: ['camshaft_sport'],
+      okText: 'Nocken glatt, Lagerstellen ohne Riefen.', defectText: 'Nocken eingelaufen, Laufbahnen mit Pittings – verschlissen!',
+    },
+    ...(v
+      ? [
+          {
+            id: 'camshaft_b', name: 'Nockenwellen Bank 2', bolts: 4, fastener: S10, blockedBy: ['timing_chain', 'gasket_b'], access: 'stand' as const, partId: 'camshaft' as const, hidden: true, variants: ['camshaft_sport' as const],
+            okText: 'Nocken glatt, Lagerstellen ohne Riefen.', defectText: 'Nocken eingelaufen – verschlissen!',
+          },
+          {
+            id: 'cyl_head_b', name: 'Zylinderkopf Bank 2', bolts: 6, fastener: S13, blockedBy: ['camshaft_b', 'intake_manifold', 'exhaust_manifold'], access: 'stand' as const,
+            okText: 'Kopf plan, keine Risse.', defectText: '',
+          },
+          {
+            id: 'head_gasket_b', name: 'Zylinderkopfdichtung Bank 2', bolts: 0, blockedBy: ['cyl_head_b'], access: 'stand' as const, partId: 'head_gasket' as const, hidden: true,
+            okText: 'Dichtung sauber – in Ordnung.', defectText: 'Durchgebrannt – defekt!',
+          },
+        ]
+      : []),
+    {
+      id: 'oil_pump', name: 'Ölpumpe', bolts: 3, fastener: S10, blockedBy: ['oil_pan'], access: 'stand', under: true, partId: 'oil_pump', hidden: true,
+      okText: 'Zahnräder ohne Laufspuren, Druckventil gängig.', defectText: 'Zahnräder eingelaufen, Spiel viel zu groß – fördert zu wenig Druck!',
+    },
+    {
+      id: 'mainbrg', name: 'Hauptlager (Lagerdeckel)', bolts: mains, fastener: S17, blockedBy: ['oil_pump', 'bearing'], access: 'stand', under: true, partId: 'main_bearing', hidden: true,
+      okText: 'Lagerschalen gleichmäßig tragend – in Ordnung.', defectText: 'Lagerschalen bis aufs Kupfer durchgelaufen – verschlissen!',
+    },
+    ...slots.map((c) => ({
+      id: `piston${c.n}`,
+      name: `Kolben mit Pleuel Zyl. ${c.n}`,
+      bolts: 0,
+      blockedBy: [v && c.bank > 0 ? 'head_gasket_b' : 'head_gasket', 'bearing'],
+      access: 'stand' as const,
+      partId: 'piston_kit' as const,
+      hidden: true,
+      variants: ['piston_forged' as const],
+      okText: 'Kolbenringe mit Spannung, Laufbild sauber.',
+      defectText: 'Kolbenringe verkokt und ohne Spannung, Riefen am Kolbenhemd – Ölverbrauch und Kompressionsverlust!',
+    })),
+    {
+      id: 'crank', name: 'Kurbelwelle', bolts: 0, blockedBy: ['mainbrg', 'timing_chain'], access: 'stand', under: true, partId: 'crankshaft', hidden: true,
+      okText: 'Lagerzapfen glatt und rund – in Ordnung.', defectText: 'Riefen an den Lagerzapfen – muss getauscht werden!',
+    },
+  );
+  // Was gehört zum Motor? Alles außer Rädern, Bremsen, Batterie, Getriebe, Abgasanlage und den Anschlüssen am Fahrzeug.
+  for (const d of out) d.engine = !CAR_SIDE.test(d.id);
   return out;
 }
 
+/** Bauteile der Karosserie bzw. des Fahrwerks: bleiben beim Motorausbau im Auto. */
+const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|battery$|gearbox$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
+
 const cache = new Map<string, { list: ComponentDef[]; map: Record<string, ComponentDef> }>();
-function forEngine(engineId: string) {
-  let c = cache.get(engineId);
+function forEngine(engineId: string, turboKit = false) {
+  const key = engineId + (turboKit ? '+t' : '');
+  let c = cache.get(key);
   if (!c) {
-    const list = build(ENGINES[engineId] ?? ENGINES.r4_20);
+    const list = build(ENGINES[engineId] ?? ENGINES.r4_20, turboKit && !ENGINES[engineId]?.turbo);
     c = { list, map: Object.fromEntries(list.map((d) => [d.id, d])) };
-    cache.set(engineId, c);
+    cache.set(key, c);
   }
   return c;
 }
 
-export const engineOf = (car: Pick<CarInstance, 'modelId'>): EngineDef => ENGINES[CAR_MODELS[car.modelId]?.engineId] ?? ENGINES.r4_20;
-/** Alle Bauteile, die es an diesem Auto gibt. */
-export const defsOf = (car: Pick<CarInstance, 'modelId'>): ComponentDef[] => forEngine(engineOf(car).id).list;
-export const defOf = (car: Pick<CarInstance, 'modelId'>, id: string): ComponentDef => forEngine(engineOf(car).id).map[id] ?? COMPONENT_MAP[id];
-export const engineComponents = (engineId: string): ComponentDef[] => forEngine(engineId).list;
+type CarLike = Pick<CarInstance, 'modelId'> & Partial<Pick<CarInstance, 'motor' | 'bare'>>;
+
+/** Werksmotor des Modells. */
+export const modelEngine = (car: Pick<CarInstance, 'modelId'>): EngineDef => ENGINES[CAR_MODELS[car.modelId]?.engineId] ?? ENGINES.r4_20;
+/** Eingebauter (bzw. am Motorständer liegender) Motor. Ohne Motor: der Werksmotor (für Anzeigen). */
+export const engineOf = (car: CarLike): EngineDef => (car.motor ? ENGINES[car.motor.engineId] ?? modelEngine(car) : modelEngine(car));
+/** Hat das Auto einen Motor? */
+export const hasEngine = (car: CarLike) => car.motor !== null;
+/** Motordaten des Autos – beim Werksmotor aus Modell und Fahrzeug abgeleitet. */
+export const motorOf = (car: Pick<CarInstance, 'modelId' | 'uid' | 'km'> & Partial<Pick<CarInstance, 'motor'>>): MotorMeta | null =>
+  car.motor === null ? null : car.motor ?? { uid: `${car.uid}-m`, engineId: modelEngine(car).id, km: car.km, donor: car.modelId, history: [] };
+
+function defsFor(car: CarLike) {
+  const e = engineOf(car);
+  const all = forEngine(e.id, !!car.motor?.turboKit);
+  // Nur der Motor: Fahrzeugteile gibt es nicht. Auto ohne Motor: nur die Fahrzeugteile (vom Werksmotor abgeleitet).
+  if (car.bare) return { list: all.list.filter((d) => d.engine), map: all.map };
+  if (car.motor === null) {
+    const base = forEngine(modelEngine(car).id);
+    return { list: base.list.filter((d) => !d.engine), map: base.map };
+  }
+  return all;
+}
+/** Alle Bauteile, die es an diesem Auto bzw. Motor gibt. */
+export const defsOf = (car: CarLike): ComponentDef[] => defsFor(car).list;
+export const defOf = (car: CarLike, id: string): ComponentDef => defsFor(car).map[id] ?? COMPONENT_MAP[id];
+export const engineComponents = (engineId: string, turboKit = false): ComponentDef[] => forEngine(engineId, turboKit).list;
 
 /**
  * Alle Bauteile über alle Motoren hinweg – nur für Namen und feste
  * Eigenschaften. Was vor einem Bauteil sitzt, hängt vom Motor ab: dafür `defOf`.
  */
 export const COMPONENT_MAP: Record<string, ComponentDef> = Object.fromEntries(
-  Object.keys(ENGINES).flatMap((id) => forEngine(id).list.map((d) => [d.id, d] as const)).reverse(),
+  Object.keys(ENGINES).flatMap((id) => [...forEngine(id).list, ...forEngine(id, true).list].map((d) => [d.id, d] as const)).reverse(),
 );

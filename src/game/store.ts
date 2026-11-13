@@ -189,8 +189,9 @@ export function normalizeCar(car: CarInstance | null): CarInstance | null {
   const modelId = CAR_MODELS[car.modelId] ? car.modelId : 'bavaria_320';
   // Fehlende Felder bekommen feste, aus der Fahrzeug-ID abgeleitete Standardwerte (kein Würfeln bei jedem Laden).
   const rng = seeded(hash(car.uid ?? 'auto'));
-  const fresh = freshComponents(modelId);
-  const defs = defsOf({ modelId });
+  const shape = { modelId, motor: car.motor, bare: car.bare };
+  const fresh = freshComponents(shape);
+  const defs = defsOf(shape);
   const components: CarInstance['components'] = {};
   const added: string[] = [];
   for (const id of Object.keys(fresh)) {
@@ -206,7 +207,10 @@ export function normalizeCar(car: CarInstance | null): CarInstance | null {
       const b = old.bolts?.[i];
       return b === true || b === 2 || b === undefined ? 2 : b === 1 ? 1 : 0;
     });
-    components[id] = { installed: !!old.installed, bolts, connected: old.connected ?? true, condition: old.condition === 'defect' ? 'defect' : 'ok', known: !!old.known, ...(health === undefined ? {} : { health }) };
+    components[id] = {
+      installed: !!old.installed, bolts, connected: old.connected ?? true, condition: old.condition === 'defect' ? 'defect' : 'ok', known: !!old.known,
+      ...(health === undefined ? {} : { health }), ...(old.variant ? { variant: old.variant } : {}), ...(old.missing ? { missing: true } : {}),
+    };
   }
   // Ein neu hinzugekommenes Teil darf nichts versperren, was der Spieler schon ausgebaut hat:
   // liegt ein Teil darunter draußen, liegt auch das neue ausgebaut (und heil) daneben.
@@ -522,7 +526,7 @@ export const useGame = create<GameState>()(
           const day = s.day + 1;
           // Undichte Autos verlieren über Nacht Öl und Kühlmittel.
           const cars = s.cars.map((c) => {
-            if (!c) return c;
+            if (!c || c.bare || c.junk) return c;
             const car = clone(c);
             fluids.dailyLeaks(car);
             return car;

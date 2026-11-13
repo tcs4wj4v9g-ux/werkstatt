@@ -60,7 +60,7 @@ export interface ContestView {
 
 /** Was der Spieler im Wettbewerb gerade auf die Waage bringt. */
 export function contestScore(c: Contest, v: ContestView): number {
-  const own = v.cars.filter((x): x is CarInstance => !!x && !x.job);
+  const own = v.cars.filter((x): x is CarInstance => !!x && !x.job && !x.junk && !x.bare);
   if (c.type === 'restoration') return own.length ? Math.max(...own.map(conditionScore)) : 0;
   if (c.type === 'dealer') return Math.max(0, Math.round(v.totalProfit - c.baseline));
   return collection(v.cars, v.marketIndex).reduce((s, e) => s + e.prestige, 0);

@@ -5,7 +5,7 @@ import { FLUID_LIST } from '../game/data/fluids';
 import { defsOf, engineOf } from '../game/data/components';
 import { PART_LIST } from '../game/data/parts';
 import { fitOf, stockOf } from '../game/fitment';
-import { availableSlots, SLOTS, UPGRADES } from '../game/data/workshop';
+import { availableSlots, SLOTS, UPGRADES, isJunk } from '../game/data/workshop';
 import { RARITY_NAMES } from '../game/market';
 import { fluidPrice, partPrice, useGame } from '../game/store';
 import { eur } from './common';
@@ -128,7 +128,7 @@ export function EventsTab() {
 /** Teile und Flüssigkeiten bestellen – mit Sonderangeboten und Großhandelsrabatt. */
 export function ShopList() {
   const s = useGame();
-  const slots = s.cars.map((c, i) => (c ? i : -1)).filter((i) => i >= 0);
+  const slots = s.cars.map((c, i) => (c && !isJunk(i) ? i : -1)).filter((i) => i >= 0);
   const slot = s.cars[s.shopSlot] ? s.shopSlot : slots[0] ?? -1;
   const car = slot >= 0 ? s.cars[slot]! : null;
   // Nur Teile, die dieses Auto überhaupt hat (ein Diesel braucht keine Zündkerzen).

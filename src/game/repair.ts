@@ -4,7 +4,7 @@ import { DEFECT_LIST, defectComponents } from './data/defects';
 import { basePartPrice, fitOf, partKey } from './fitment';
 import { PARTS } from './data/parts';
 import { toolName } from './data/tools';
-import { TIGHT, type ActionResult, type CarInstance, type DefectId, type Inventory, type ToolNeed, type Toolset } from './types';
+import { TIGHT, type ActionResult, type CarInstance, type DefectId, type Inventory, type PartId, type ToolNeed, type Toolset } from './types';
 
 // Reine Reparaturlogik. Alle Funktionen verändern das übergebene (zuvor
 // geklonte) Fahrzeug und liefern ein Ergebnis mit Meldung für die UI.
@@ -37,6 +37,17 @@ export const installReady = (car: CarInstance, id: string) => dependents(car, id
 
 function checkAccess(car: CarInstance, id: string): string | null {
   const def = defOf(car, id);
+  if (def.access === 'stand') {
+    if (!car.bare) return `${def.name}: Dafür muss der Motor ausgebaut auf dem Motorständer sitzen.`;
+    if (!!def.under !== car.lifted) return def.under ? 'Das liegt an der Unterseite – erst den Motor auf dem Ständer drehen.' : 'Das liegt oben am Motor – erst den Motor zurückdrehen.';
+    return null;
+  }
+  if (car.bare) {
+    // Am Motorständer: „angehoben“ heißt gedreht (Unterseite oben).
+    if (def.access === 'hood' && car.lifted) return 'Das liegt oben am Motor – erst den Motor zurückdrehen.';
+    if (def.access === 'lifted' && !car.lifted) return 'Das liegt an der Unterseite – erst den Motor auf dem Ständer drehen.';
+    return null;
+  }
   if (def.access === 'hood') {
     if (car.lifted) return 'Für Arbeiten im Motorraum das Auto ablassen.';
     if (!car.hoodOpen) return 'Erst die Motorhaube öffnen.';
@@ -164,7 +175,7 @@ export function componentAction(
   inv: Inventory,
   id: string,
   tools: Toolset,
-  opts: { useOldPart?: boolean } = {},
+  opts: { useOldPart?: boolean; source?: { condition: 'ok' | 'defect'; known: boolean; health?: number; variant?: PartId; cost: number; label: string } } = {},
 ): ActionResult {
   const def = defOf(car, id);
   const st = car.components[id];
@@ -223,6 +234,20 @@ export function componentAction(
   const missing = dependents(car, id).find((d) => !isComplete(car, d));
   if (missing) return fail(`Erst fertig montieren: ${defOf(car, missing).name}.`);
   const next = def.bolts ? ' Jetzt Schrauben ansetzen und festziehen.' : def.connector ? ' Stecker nicht vergessen.' : '';
+  if (st.missing) return fail('Dieses Teil fehlt am Fahrzeug ganz.');
+  if (opts.source) {
+    // Ein bestimmtes Teil wird eingesetzt: Gebrauchtteil, Tuningteil oder Neuteil aus dem Lager.
+    const src = opts.source;
+    st.installed = true;
+    st.condition = src.condition;
+    st.known = src.known;
+    if (src.variant) st.variant = src.variant;
+    else delete st.variant;
+    if (st.health !== undefined || src.health !== undefined) st.health = src.health ?? 100;
+    if (id === 'oil_filter') car.fluids.oil.filterFresh = true;
+    car.partsSpent += src.cost;
+    return done(`Eingebaut: ${src.label}.${next}`);
+  }
   if (def.partId && st.condition === 'defect' && !opts.useOldPart) {
     const key = partKey(car, def.partId);
     if ((inv[key] ?? 0) > 0) {
@@ -265,9 +290,11 @@ export function driveBlocker(car: CarInstance): string | null {
 
 /** Der Motor läuft nur, wenn am Motor nichts demontiert ist (Räder dürfen ab sein). */
 export function engineBlocker(car: CarInstance): string | null {
+  if (car.motor === null) return 'In diesem Auto ist kein Motor eingebaut.';
+  if (car.bare) return 'Der Motor sitzt auf dem Motorständer – starten kannst du ihn erst im Auto.';
   // Eine tote Batterie bemerkt man vor allem anderen: Es klackt nur das Relais.
   if (car.components.battery.condition === 'defect' && car.components.battery.installed) return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
-  const open = defsOf(car).find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf' || c.id === 'gearbox') && !isComplete(car, c.id));
+  const open = defsOf(car).find((c) => (c.access === 'hood' || c.access === 'stand' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf' || c.id === 'gearbox') && !isComplete(car, c.id));
   if (open) return `Der Motor startet so nicht – erst fertig montieren: ${open.name}.`;
   if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
   return null;

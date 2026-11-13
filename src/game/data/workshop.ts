@@ -1,7 +1,7 @@
 // Stellplätze und Ausbaustufen der Werkstatt. Positionen in Weltkoordinaten
 // (Halle: x von -4,8 bis 6,4; der Hof liegt davor in Richtung -x).
 
-export type SlotKind = 'lift' | 'wash' | 'paint' | 'park' | 'show';
+export type SlotKind = 'lift' | 'wash' | 'paint' | 'park' | 'show' | 'stand' | 'junk';
 export interface SlotDef {
   id: number;
   kind: SlotKind;
@@ -34,9 +34,23 @@ export const SLOTS: SlotDef[] = [
   { id: 12, kind: 'show', label: 'Showroom 1', x: 4.2, z: 10.1, rot: R, needs: 'loc_hq' },
   { id: 13, kind: 'show', label: 'Showroom 2', x: 1.0, z: 10.1, rot: R, needs: 'loc_hq' },
   { id: 14, kind: 'show', label: 'Showroom 3', x: -2.2, z: 10.1, rot: R, needs: 'loc_hq' },
+  // Motorständer in der Stammhalle: hier sitzt ein ausgebauter Motor zur Revision.
+  { id: 15, kind: 'stand', label: 'Motorständer', x: 3.1, z: -0.55, rot: 0 },
+  // Schrottplatz: eigener Ort, mit dem Lieferwagen erreichbar. Die Fahrzeuge gehören dem Platz, nicht der Werkstatt.
+  { id: 16, kind: 'junk', label: 'Schrottplatz Reihe A1', x: -60, z: -5.5, rot: R },
+  { id: 17, kind: 'junk', label: 'Schrottplatz Reihe A2', x: -65, z: -5.5, rot: R },
+  { id: 18, kind: 'junk', label: 'Schrottplatz Reihe A3', x: -70, z: -5.5, rot: R },
+  { id: 19, kind: 'junk', label: 'Schrottplatz Reihe B1', x: -60, z: 5.5, rot: -R },
+  { id: 20, kind: 'junk', label: 'Schrottplatz Reihe B2', x: -65, z: 5.5, rot: -R },
+  { id: 21, kind: 'junk', label: 'Schrottplatz Reihe B3', x: -70, z: 5.5, rot: -R },
 ];
 export const SLOT_COUNT = SLOTS.length;
 export const isLift = (slot: number) => SLOTS[slot]?.kind === 'lift';
+/** Platz für eigene Fahrzeuge (nicht Motorständer, nicht Schrottplatz). */
+export const isFleet = (slot: number) => !!SLOTS[slot] && SLOTS[slot].kind !== 'stand' && SLOTS[slot].kind !== 'junk';
+export const STAND_SLOT = 15;
+export const JUNK_SLOTS = SLOTS.filter((s) => s.kind === 'junk').map((s) => s.id);
+export const isJunk = (slot: number) => SLOTS[slot]?.kind === 'junk';
 /** Aufschlag beim Verkauf aus dem Showroom heraus. */
 export const SHOWROOM_BONUS = 0.04;
 
@@ -68,4 +82,5 @@ export const UPGRADES: UpgradeDef[] = [
 ];
 
 export const slotAvailable = (slot: SlotDef, upgrades: string[]) => !slot.needs || upgrades.includes(slot.needs);
-export const availableSlots = (upgrades: string[]) => SLOTS.filter((s) => slotAvailable(s, upgrades));
+/** Gekaufte Stellplätze für eigene Fahrzeuge (ohne Motorständer und Schrottplatz). */
+export const availableSlots = (upgrades: string[]) => SLOTS.filter((s) => isFleet(s.id) && slotAvailable(s, upgrades));

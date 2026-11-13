@@ -7,7 +7,7 @@ import { MarketTab } from './MarketTab';
 import { AchievementsTab, CollectionTab, ContestResultModal, ContestsTab, DynoModal, UnlockedModal } from './CareerTabs';
 import { DEFECTS } from '../game/data/defects';
 import { PARTS } from '../game/data/parts';
-import { availableSlots, SLOTS } from '../game/data/workshop';
+import { availableSlots, SLOTS, isFleet, isJunk } from '../game/data/workshop';
 import { PAINT_COLORS, PAINT_TOOLS, WASH_TOOLS } from '../game/detail';
 import { CABINET_TOOLS, MAX_CARRIED, TOOL_MAP } from '../game/data/tools';
 import { marketLabel, RARITY_NAMES, valuate } from '../game/market';
@@ -287,7 +287,7 @@ function BenchModal() {
       {stock.length === 0 && <p className="meta">Keine Ersatzteile vorrätig.</p>}
       {stock.map((k) => <div key={k} className="meta">{s.inventory[k]}× {PARTS[splitKey(k).part].name} – passend für {splitKey(k).fit}</div>)}
       {s.cars.map((car, i) =>
-        car ? (
+        car && !isJunk(i) ? (
           <div key={i}>
             <h4>{SLOTS[i].label}: {carName(car)}{car.job ? ` – Kunde ${car.job.customer}` : ''}</h4>
             {knownDefects(car).length === 0 && <p className="meta">Noch kein Schaden am Bauteil bestätigt.</p>}
@@ -307,12 +307,12 @@ function BenchModal() {
 
 function DriveModal() {
   const s = useGame();
-  const any = s.cars.some(Boolean);
+  const any = s.cars.some((c, i) => c && isFleet(i));
   return (
     <Modal title="Probefahrt" onClose={() => s.setPanel(null)}>
       {!any && <p className="meta">Du besitzt noch kein Auto. Am Computer findest du den Gebrauchtwagenmarkt.</p>}
       {s.cars.map((car, i) => {
-        if (!car) return null;
+        if (!car || !isFleet(i)) return null;
         const blocker = driveBlocker(car);
         return (
           <div key={i} className="shop-row">
@@ -373,8 +373,8 @@ function ComputerModal() {
 
       {tab === 'mine' && (
         <>
-          {s.cars.every((c) => !c || c.job) && <p className="meta">Du besitzt gerade kein eigenes Auto. Kundenfahrzeuge stehen unter „Aufträge“ und können nicht verkauft werden.</p>}
-          {s.cars.map((car, i) => (car && !car.job ? <SellCard key={car.uid} bay={i} car={car} /> : null))}
+          {s.cars.every((c, i) => !c || c.job || !isFleet(i)) && <p className="meta">Du besitzt gerade kein eigenes Auto. Kundenfahrzeuge stehen unter „Aufträge“ und können nicht verkauft werden.</p>}
+          {s.cars.map((car, i) => (car && !car.job && isFleet(i) ? <SellCard key={car.uid} bay={i} car={car} /> : null))}
           <p className="meta">Verkaufte Autos: {s.carsSold} · Gesamtgewinn: {eur(s.totalProfit)}</p>
         </>
       )}

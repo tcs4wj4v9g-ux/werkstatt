@@ -53,7 +53,41 @@ export type PartId =
   | 'egr'
   | 'dpf'
   | 'head_gasket'
-  | 'gearbox';
+  | 'gearbox'
+  // Motorrevision (nur am ausgebauten Motor)
+  | 'piston_kit'
+  | 'main_bearing'
+  | 'crankshaft'
+  | 'oil_pump'
+  | 'camshaft'
+  | 'timing_chain'
+  | 'exhaust_manifold'
+  | 'intake_manifold'
+  // Fahrzeugseite rund um den Motor
+  | 'engine_mount'
+  | 'downpipe'
+  | 'fuel_pump'
+  | 'harness'
+  // Motorumbau
+  | 'swap_mounts'
+  | 'swap_adapter'
+  | 'swap_harness'
+  | 'swap_ecu'
+  | 'swap_radiator'
+  | 'swap_fuel'
+  | 'swap_exhaust'
+  | 'clutch_hd'
+  // Leistungstuning (Teile mit eigenem Einbau)
+  | 'turbo_kit'
+  | 'turbo_big'
+  | 'injector_hp'
+  | 'piston_forged'
+  | 'camshaft_sport'
+  | 'intake_sport'
+  | 'exhaust_sport'
+  | 'manifold_sport'
+  | 'intercooler'
+  | 'fuelpump_hp';
 
 export type DefectId =
   | 'coil'
@@ -80,9 +114,15 @@ export type DefectId =
   | 'egr'
   | 'dpf'
   | 'head_gasket'
-  | 'gearbox';
+  | 'gearbox'
+  | 'rings'
+  | 'main_bearing'
+  | 'oil_pump'
+  | 'camshaft'
+  | 'timing_chain';
 
-export type Access = 'hood' | 'lifted';
+/** hood = Motorraum (Auto unten), lifted = von unten (Auto angehoben), stand = nur am ausgebauten Motor auf dem Motorständer. */
+export type Access = 'hood' | 'lifted' | 'stand';
 export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
@@ -120,6 +160,12 @@ export interface ComponentDef {
   inspectReveals?: string[];
   /** Spezialgerät, ohne das dieses Bauteil weder aus- noch eingebaut werden kann (z. B. Motor- und Getriebeheber). */
   equipment?: string;
+  /** Am Motorständer: liegt an der Unterseite (Motor muss gedreht sein). */
+  under?: boolean;
+  /** Gehört zum Motor (wandert mit ihm beim Ausbau) – sonst zur Karosserie. */
+  engine?: boolean;
+  /** Tuning-Ausführungen, die statt des Serienteils eingebaut werden können. */
+  variants?: PartId[];
 }
 
 /** Schraubenzustand: 0 = entfernt, 1 = gelöst/angesetzt, 2 = fest. */
@@ -136,11 +182,82 @@ export interface ComponentState {
   known: boolean;
   /** Restzustand in Prozent (bei Zünd- und Einspritzteilen). */
   health?: number;
+  /** Eingebaute Tuning-Ausführung (Teilenummer), sonst Serie. */
+  variant?: PartId;
+  /** Am Schrottauto: fehlt ganz (bereits ausgebaut oder nie vorhanden). */
+  missing?: boolean;
+}
+
+/** Ein Motor mit eigener Identität: bleibt beim Ausbau erhalten und kann in ein anderes Auto wandern. */
+export interface MotorMeta {
+  uid: string;
+  engineId: string;
+  km: number;
+  /** Aus welchem Fahrzeug er stammt. */
+  donor: string;
+  /** Turbo-Nachrüstsatz montiert (Saugmotor bekommt Turbolader und Ladeluftrohr). */
+  turboKit?: boolean;
+  history: string[];
+}
+
+/** Abstimmung des Motorsteuergeräts (gehört zum Auto). */
+export interface EcuTune {
+  /** 0 = Serie, 1 = Stufe 1, 2 = Stufe 2. */
+  map: number;
+  /** Ladedruck-Zielwert in bar (nur mit Turbolader). */
+  boost: number;
+  /** Drehzahlbegrenzer. */
+  limiter: number;
+}
+
+/** Optisches Tuning – alles davon ist am 3D-Modell zu sehen. */
+export interface VisualTune {
+  rim?: string;
+  /** 0 = Serie, 1 = +1 Zoll, 2 = +2 Zoll. */
+  rimSize?: number;
+  rimColor?: string;
+  /** Tieferlegung in Zentimetern (0 = Serie). */
+  drop?: number;
+  /** Fahrwerk: Serie, Tieferlegungsfedern, Sportfahrwerk, Gewindefahrwerk. */
+  suspension?: 'stock' | 'springs' | 'sport' | 'coilover';
+  front?: number;
+  rear?: number;
+  skirts?: boolean;
+  spoiler?: number;
+  hood?: number;
+  flares?: boolean;
+  finish?: 'metallic' | 'solid' | 'matte';
+  wrap?: 'none' | 'stripes' | 'twotone' | 'side';
+  wrapColor?: string;
+  lamps?: 'stock' | 'smoked' | 'clear';
+  tips?: 'stock' | 'dual' | 'quad' | 'oval';
+  seats?: 'stock' | 'sport';
+  wheel?: 'stock' | 'sport';
+}
+
+/** Am Schrottplatz: Preise und Zustand des Spenderfahrzeugs. */
+export interface JunkInfo {
+  /** Preis des ganzen Autos (zum Abschleppen). */
+  price: number;
+  /** Unfall- bzw. Zustandsbeschreibung. */
+  story: string;
+  /** Tag, bis zu dem es auf dem Platz steht. */
+  until: number;
 }
 
 export interface CarInstance {
   /** Geöffnete Vordertüren [links, rechts]. */
   doors?: boolean[];
+  /** Eingebauter Motor; undefined = Werksmotor des Modells, null = kein Motor eingebaut. */
+  motor?: MotorMeta | null;
+  /** Nur der Motor (auf dem Motorständer), ohne Fahrzeug. `lifted` heißt dort: gedreht, Unterseite oben. */
+  bare?: boolean;
+  /** Schrottplatzfahrzeug. */
+  junk?: JunkInfo;
+  /** Verbaute Umbauteile eines Motorumbaus. */
+  swap?: { from: string; parts: PartId[] };
+  ecu?: EcuTune;
+  visual?: VisualTune;
   uid: string;
   modelId: string;
   color: string;

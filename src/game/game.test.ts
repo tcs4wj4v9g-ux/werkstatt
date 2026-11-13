@@ -613,7 +613,7 @@ describe('Werkstattausbau und Scheunenfunde', () => {
     expect(lifts(['loc_pro'])).toBe(3);
     expect(lifts(['loc_pro', 'loc_center'])).toBe(4);
     expect(availableSlots(['loc_pro', 'loc_center', 'loc_hq']).filter((s) => s.kind === 'show').length).toBe(3);
-    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.length);
+    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.filter((s) => s.kind !== 'stand' && s.kind !== 'junk').length);
     expect(UPGRADES.find((u) => u.id === 'loc_center')!.grants).toEqual(['wash', 'paint', 'dyno']);
     expect(UPGRADES.filter((u) => u.location).map((u) => u.price)).toEqual([75000, 200000, 500000]);
     // Keine zwei Stellplätze überlappen
