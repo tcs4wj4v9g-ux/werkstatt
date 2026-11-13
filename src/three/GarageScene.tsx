@@ -13,6 +13,8 @@ import { BAY_Z, setSite, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, neares
 import { Yard } from './Yard';
 import { textTexture } from './textures';
 import { Workshop } from './Workshop';
+import { decoMaterials, liftCarriage, liftFrame } from './workshopDecor';
+import { useGfxSettings } from './gfx';
 
 const SPEED = 2.7;
 const FOV = 64;
@@ -202,26 +204,14 @@ function Bay({ index }: { index: number }) {
 
   return (
     <group position={[0, 0, z]}>
+      {/* Säulen, Fußplatten, Quertraverse und Hydraulikaggregat als ein Netz */}
+      <mesh name="lift" geometry={liftFrame(inner)} material={decoMaterials()} castShadow receiveShadow />
       {[-1.5, 1.5].map((o) => (
-        <group key={o} position={[0, 0, o]}>
-          <mesh position={[0, 1.95, 0]} castShadow>
-            <boxGeometry args={[0.24, 3.9, 0.3]} />
-            <meshStandardMaterial color="#e3a81c" metalness={0.4} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 0.02, 0]}>
-            <boxGeometry args={[0.6, 0.04, 0.5]} />
-            <meshStandardMaterial color="#3f4650" metalness={0.6} roughness={0.5} />
-          </mesh>
-          <mesh position={[0.125, 2.9, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[0.28, 0.1]} />
-            <meshStandardMaterial map={label} roughness={0.7} />
-          </mesh>
-        </group>
+        <mesh key={o} position={[0.134, 2.9, o]} rotation={[0, Math.PI / 2, 0]}>
+          <planeGeometry args={[0.28, 0.1]} />
+          <meshStandardMaterial map={label} roughness={0.7} />
+        </mesh>
       ))}
-      <mesh position={[0, 3.86, 0]}>
-        <boxGeometry args={[0.16, 0.1, 3.0]} />
-        <meshStandardMaterial color="#e3a81c" metalness={0.4} roughness={0.5} />
-      </mesh>
 
       <Interactable
         id={`lift${index}`}
@@ -278,20 +268,7 @@ function Bay({ index }: { index: number }) {
       )}
 
       <group ref={carriage}>
-        {[-1.5, 1.5].map((o) => (
-          <group key={o} position={[0, 0.2, o]}>
-            <mesh>
-              <boxGeometry args={[0.3, 0.3, 0.36]} />
-              <meshStandardMaterial color="#3f4650" metalness={0.6} roughness={0.5} />
-            </mesh>
-            {[-1, 1].map((k) => (
-              <mesh key={k} position={[k * 0.55, -0.06, -Math.sign(o) * 0.42]} rotation={[0, k * Math.sign(o) * 0.5, 0]} castShadow>
-                <boxGeometry args={[1.25, 0.07, 0.12]} />
-                <meshStandardMaterial color="#e3a81c" metalness={0.4} roughness={0.5} />
-              </mesh>
-            ))}
-          </group>
-        ))}
+        <mesh geometry={liftCarriage()} material={decoMaterials()} castShadow />
         {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} lod={detailed ? 'full' : 'simple'} hoodTap />}
       </group>
       <Blob />
@@ -356,18 +333,19 @@ function Bays() {
 }
 
 export function GarageScene() {
+  const G = useGfxSettings();
   return (
     <>
       <color attach="background" args={['#9fc4e8']} />
-      <Env intensity={0.45} />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[-14, 16, 6]} intensity={1.1} />
-      <hemisphereLight args={['#f4f8ff', '#3a3d42', 0.55]} />
+      <Env intensity={0.8} />
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[-14, 16, 6]} intensity={1.0} />
+      <hemisphereLight args={['#f4f8ff', '#4a4d52', 0.5]} />
       <directionalLight
         position={[2.5, 9, 1.5]}
         intensity={1.5}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
+        castShadow={G.shadows}
+        shadow-mapSize={[G.shadowMap, G.shadowMap]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
         shadow-camera-left={-8}
@@ -377,8 +355,9 @@ export function GarageScene() {
         shadow-camera-near={1}
         shadow-camera-far={20}
       />
-      {BAY_Z.map((z) => (
-        <pointLight key={z} position={[2.6, 3.6, z]} intensity={14} distance={9} decay={1.7} color="#f4f8ff" />
+      {/* Hallenlicht: je nach Grafikstufe ein bis vier Punktlichter */}
+      {(G.lights === 1 ? [[2.6, 0, 24]] : G.lights === 2 ? BAY_Z.map((z) => [2.6, z, 14]) : [...BAY_Z.map((z) => [2.6, z, 12]), ...BAY_Z.map((z) => [-1.8, z, 7])]).map(([x, z, power]) => (
+        <pointLight key={`${x}${z}`} position={[x, 3.6, z]} intensity={power} distance={9.5} decay={1.7} color="#f4f8ff" />
       ))}
       <FirstPerson />
       <Workshop />

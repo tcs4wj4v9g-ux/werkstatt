@@ -29,7 +29,7 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
     <>
       <color attach="background" args={['#9fc4e8']} />
       <fog attach="fog" args={['#9fc4e8', 30, 90]} />
-      <Env intensity={0.8} />
+      <Env intensity={0.9} kind="sky" />
       <ambientLight intensity={0.7} />
       <hemisphereLight args={['#ffffff', '#6b6f58', 0.8]} />
       <directionalLight

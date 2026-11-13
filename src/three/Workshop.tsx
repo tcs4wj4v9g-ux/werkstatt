@@ -4,7 +4,9 @@ import { useGame } from '../game/store';
 import { Interactable } from './Interactable';
 import { BAY_Z, ROOM } from './player';
 import { GapWall } from './Annex';
-import { concreteTexture, screenTexture, textTexture, wallTexture } from './textures';
+import { concreteTexture, floorRoughTexture, screenTexture, shadeTexture, textTexture, wallTexture } from './textures';
+import { decoMaterials, hallDecor } from './workshopDecor';
+import { useGfxSettings } from './gfx';
 
 type V3 = [number, number, number];
 const W = ROOM.maxX - ROOM.minX;
@@ -38,13 +40,21 @@ export function Workshop() {
   const hq = useGame((s) => s.upgrades.includes('loc_hq'));
   const tex = useMemo(() => {
     const floor = concreteTexture().clone();
-    floor.repeat.set(W / 2.8, D / 2.8);
+    floor.repeat.set(W / 5.6, D / 5.6);
     floor.needsUpdate = true;
+    const rough = floorRoughTexture().clone();
+    rough.repeat.set(W / 7.3, D / 7.3);
+    rough.needsUpdate = true;
     const wall = wallTexture().clone();
     wall.repeat.set(5, 2);
     wall.needsUpdate = true;
-    return { floor, wall, screen: screenTexture() };
+    return { floor, rough, wall, screen: screenTexture(), shade: shadeTexture() };
   }, []);
+  const center = useGame((s) => s.upgrades.includes('loc_center'));
+  /** Ausbaustufe des Standorts: größere Betriebe haben einen glänzend beschichteten Boden und mehr Ausstattung. */
+  const tier = (pro ? 1 : 0) + (center ? 1 : 0) + (hq ? 1 : 0);
+  const G = useGfxSettings();
+  const decor = useMemo(() => hallDecor(tier, !pro, true, G.decor), [tier, pro, G.decor]);
 
   const walls: { p: V3; r: number; w: number }[] = [
     { p: [ROOM.maxX, H / 2, 0], r: -Math.PI / 2, w: D },
@@ -58,8 +68,26 @@ export function Workshop() {
       {/* Boden, Wände, Decke */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[CX, 0, 0]} receiveShadow>
         <planeGeometry args={[W, D]} />
-        <meshStandardMaterial map={tex.floor} roughness={0.5} metalness={0.08} />
+        <meshStandardMaterial map={tex.floor} roughnessMap={tex.rough} roughness={0.78 - tier * 0.1} metalness={0.05} color={tier >= 2 ? '#dfe6ee' : '#ffffff'} envMapIntensity={0.7 + tier * 0.15} />
       </mesh>
+      {/* Ausstattung: Decke, Leitungen, Reifenregal, Fässer, Kleinteile */}
+      <mesh geometry={decor} material={decoMaterials()} castShadow receiveShadow raycast={() => null} />
+      {/* Weiche Schatten an den Wandfüßen */}
+      {([[CX, ROOM.minZ, -Math.PI / 2, W], [CX, ROOM.maxZ, Math.PI / 2, W], [ROOM.maxX, 0, Math.PI, D], [ROOM.minX, 0, 0, D]] as const).map(([x, z, ry, len], i) => (
+        <group key={i} position={[x, 0.007, z]} rotation={[0, ry, 0]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0.45, 0, 0]} raycast={() => null}>
+            <planeGeometry args={[0.9, len]} />
+            <meshBasicMaterial map={tex.shade} transparent depthWrite={false} />
+          </mesh>
+        </group>
+      ))}
+      {/* Größere Standorte: grün markierter Fußweg entlang der Stationen */}
+      {tier >= 2 && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[4.55, 0.005, 0]} raycast={() => null}>
+          <planeGeometry args={[1.1, D - 2.4]} />
+          <meshStandardMaterial color="#2f7d4a" roughness={0.5} transparent opacity={0.55} />
+        </mesh>
+      )}
       {pro && <GapWall z={ROOM.minZ - 0.1} />}
       {hq && <GapWall z={ROOM.maxZ + 0.1} />}
       {walls.map((w, i) => (
@@ -238,6 +266,8 @@ export function Workshop() {
           <meshStandardMaterial color="#23262b" />
         </mesh>
       </Interactable>
+      <Sign text="ÖLSERVICE" sub="Altöl nur in das grüne Fass" p={[-3.9, 2.0, ROOM.maxZ - 0.02]} rot={[0, Math.PI, 0]} size={[1.5, 0.5]} bg="#1f5f9c" fg="#f2f3f5" />
+      <Sign text="ARBEITSSCHUTZ" sub="Schutzbrille · Handschuhe · Gehörschutz" p={[ROOM.maxX - 0.02, 2.75, -2.95]} rot={[0, -Math.PI / 2, 0]} size={[2.0, 0.4]} bg="#2f6b3a" fg="#f2f3f5" />
       {!hq && <Sign text="GARAGE KINGS" sub="Kfz-Meisterbetrieb" p={[2.2, 2.75, ROOM.maxZ - 0.02]} rot={[0, Math.PI, 0]} size={[2.6, 0.7]} bg="#16181d" fg="#ff7a1a" />}
 
       {/* Kleinkram, der die Halle lebendig macht */}

@@ -210,3 +210,8 @@ h3.small { font-size: 15px; }
 
 .unlock-banner { position: absolute; top: calc(64px + var(--sat)); left: 50%; transform: translateX(-50%); z-index: 40; pointer-events: none; background: rgba(22, 24, 29, 0.94); border: 1px solid #ffd23f; color: #fff; border-radius: 12px; padding: 10px 16px; font-size: 15px; text-align: center; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
 .unlock-banner b { color: #ffd23f; }
+
+/* Grafikstufen */
+.gfx { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 14px; }
+.gfx-label { font-weight: 800; margin-right: 4px; }
+.gfx-fps { opacity: 0.7; font-size: 14px; margin-left: 4px; }

@@ -177,7 +177,7 @@ export class Shape {
     for (let i = 1; i <= 4; i++) {
       const a = (i / 4) * (Math.PI / 2);
       const y = y08 - sh * (1 - Math.cos(a));
-      pts.push([0.8 * w + 0.185 * w * Math.sin(a) + this.flare(x, y) * (i / 4), y]);
+      pts.push([0.8 * w + 0.185 * w * Math.sin(a) + this.flare(x, y) * (i / 4) ** 2, y]);
     }
     const ys = y08 - sh;
     const yr = bot + bc;
@@ -374,7 +374,8 @@ function finish(positions: number[], groups: number[][], offset: [number, number
 /** Stützstellen entlang x: an Bug, Heck und Radläufen verdichtet. */
 function stations(S: Shape, step: number, arch: number) {
   const B = S.B;
-  const xs = [...range(B.tail + 0.02, B.nose - 0.02, step), HOOD_X0, HOOD_X1, B.x0 + B.bowR, CABIN_X1, ...B.seams];
+  const inArch = (x: number) => [WHEEL_X, B.rearAxle].some((xc) => Math.abs(x - xc) < ARCH_R + 0.02);
+  const xs = [...range(B.tail + 0.02, B.nose - 0.02, step).filter((x) => !inArch(x) && x < HOOD_X1 + 0.02 && x > B.tail + B.tailLen - 0.02), HOOD_X0, HOOD_X1, B.x0 + B.bowR, CABIN_X1, ...B.seams];
   const n = Math.round(arch * 0.7);
   for (let k = 0; k <= n; k++) {
     const f = 1 - k / n;
@@ -385,6 +386,7 @@ function stations(S: Shape, step: number, arch: number) {
     add(B.tail + 0.78, B.tail, B.planP + 0.4);
   }
   for (const xc of [WHEEL_X, B.rearAxle]) {
+    // Gleichmäßig im Bogenmaß, an den steilen Enden zusätzlich verdichtet
     for (let k = 0; k <= arch; k++) xs.push(xc + ARCH_R * Math.cos((k / arch) * Math.PI));
     xs.push(xc - ARCH_R - 0.03, xc + ARCH_R + 0.03);
   }

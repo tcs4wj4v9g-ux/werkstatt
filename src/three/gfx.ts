@@ -15,16 +15,14 @@ export interface GfxSettings {
   clearcoat: boolean;
   /** Zusätzliche Dekoration in der Werkstatt. */
   decor: boolean;
-  /** Auflösung des Spiegelbilds der Umgebung. */
-  envSize: number;
   /** Anzahl der Punktlichter in der Halle. */
   lights: number;
 }
 
 export const GFX: Record<GfxLevel, GfxSettings> = {
-  low: { dpr: 1, shadows: false, shadowMap: 512, antialias: false, detail: 0, clearcoat: false, decor: false, envSize: 128, lights: 1 },
-  medium: { dpr: 1.5, shadows: true, shadowMap: 1024, antialias: true, detail: 1, clearcoat: true, decor: true, envSize: 256, lights: 2 },
-  high: { dpr: 2, shadows: true, shadowMap: 2048, antialias: true, detail: 1, clearcoat: true, decor: true, envSize: 512, lights: 4 },
+  low: { dpr: 1, shadows: false, shadowMap: 512, antialias: false, detail: 0, clearcoat: false, decor: false, lights: 1 },
+  medium: { dpr: 1.5, shadows: true, shadowMap: 1024, antialias: true, detail: 1, clearcoat: true, decor: true, lights: 2 },
+  high: { dpr: 2, shadows: true, shadowMap: 2048, antialias: true, detail: 1, clearcoat: true, decor: true, lights: 4 },
 };
 export const GFX_LABEL: Record<GfxLevel, string> = { low: 'Niedrig', medium: 'Mittel', high: 'Hoch' };
 

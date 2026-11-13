@@ -2,7 +2,7 @@
 // Dient dem Vorher-Nachher-Vergleich; prüft nur, dass keine Seitenfehler auftreten.
 //   GK_TAG=vorher node e2e/galerie.cjs [modell …]
 const { chromium } = require('playwright');
-const S = process.env.GK_OUT || __dirname + '/out'; const URL = (process.env.GK_URL || 'http://localhost:4173/?test').replace('?test', process.env.GK_GFX ? '?gfx=' + process.env.GK_GFX : '');
+const S = process.env.GK_OUT || __dirname + '/out'; const URL = (process.env.GK_URL || 'http://localhost:4173/?test').replace('?test', '?gfx=' + (process.env.GK_GFX || 'medium'));
 const TAG = process.env.GK_TAG || 'galerie';
 const MODELS = process.argv.slice(2).length ? process.argv.slice(2) : ['bavaria_330', 'bavaria_320_kombi', 'tanaka_piccolo', 'bavaria_335_coupe', 'veloce_stradale', 'kaiser_600', 'bavaria_30cs'];
 (async () => {
@@ -37,14 +37,27 @@ const MODELS = process.argv.slice(2).length ? process.argv.slice(2) : ['bavaria_
     await p.waitForTimeout(2500);
     await look([4.3, BZ + 2.6], [0.2, 0.7, BZ]); await shot(`${model}-halle`);
     await p.evaluate(() => { const b = [...document.querySelectorAll('button')]; });
-    await look([-0.3, BZ + 1.75], [0.1, 0.95, BZ], true); await shot(`${model}-innen`);
+    await p.evaluate(() => { const uid = window.__gk.getState().cars[0].uid; window.__gkDoors.setState({ [uid + ':1']: true }); });
+    await p.waitForTimeout(1500);
+    await look([-0.9, BZ + 2.5], [0.25, 0.75, BZ - 0.1]); await shot(`${model}-innen`);
+    await look([-0.35, BZ + 1.7], [0.45, 0.8, BZ - 0.2], true); await shot(`${model}-cockpit`);
+    await p.evaluate(() => { const uid = window.__gk.getState().cars[0].uid; window.__gkDoors.setState({ [uid + ':1']: false }); });
     await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const cars = s.cars.slice(); cars[0] = { ...cars[0], hoodOpen: true }; g.setState({ cars }); });
     await p.waitForTimeout(1200);
     await look([2.95, BZ + 0.5], [1.4, 0.75, BZ], true); await shot(`${model}-motor`);
     await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const cars = s.cars.slice(); const c = structuredClone(cars[0]); c.components.engine_cover.installed = false; cars[0] = c; g.setState({ cars }); });
     await look([2.95, BZ], [1.3, 0.8, BZ], true); await shot(`${model}-motor-offen`);
   }
-  await look([6.2, 4.2], [0, 1.2, 0]); await shot('halle');
+  if (VIEWS.includes('halle')) {
+    await p.evaluate(`(() => { const g = window.__gk; const s = g.getState(); const cars = s.cars.map(() => null); cars[0] = window.__gkLib.createCar('bavaria_330', [], Math.random, { year: 2010 }); cars[1] = window.__gkLib.createCar('veloce_stradale', [], Math.random, { year: 2015 }); cars[1].lifted = true; g.setState({ screen: 'garage', cars, liftUp: [false, true], panel: null }); })()`);
+    await p.waitForTimeout(3000);
+    await look([6.0, 4.6], [0, 1.1, -0.5]); await shot('halle-1');
+    console.log('Halle mit zwei Autos:', JSON.stringify(await p.evaluate(() => { const i = window.__gkGL.info; return { aufrufe: i.render.calls, dreiecke: i.render.triangles, geometrien: i.memory.geometries, texturen: i.memory.textures }; })));
+    await look([-4.2, -4.6], [2.5, 1.2, 1.5]); await shot('halle-2');
+    await look([5.4, 0], [0, 1.3, -2.7]); await shot('halle-3');
+    await look([3.4, 2.7], [0.5, 1.2, 2.7]); await shot('halle-buehne');
+    await look([-3.0, 4.2], [-4.2, 0.9, 5.4]); await shot('halle-ecke');
+  }
   console.log(errs.length ? errs.join('\n') : 'keine Seitenfehler');
   await b.close();
 })();

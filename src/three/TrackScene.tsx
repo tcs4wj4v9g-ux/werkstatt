@@ -186,7 +186,7 @@ export function TrackScene() {
     <>
       <color attach="background" args={['#9fc4e8']} />
       <fog attach="fog" args={['#9fc4e8', 60, 220]} />
-      <Env intensity={0.7} />
+      <Env intensity={0.85} kind="sky" />
       <ambientLight intensity={1.1} />
       <hemisphereLight args={['#ffffff', '#6b6f58', 0.9]} />
       <directionalLight position={[30, 50, 20]} intensity={2} />

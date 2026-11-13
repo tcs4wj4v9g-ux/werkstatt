@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { marketLabel } from '../game/market';
 import { useGame } from '../game/store';
+import { GFX_LABEL, useGfx, type GfxLevel } from '../three/gfx';
 
 export const eur = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
 
@@ -58,10 +59,31 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
   );
 }
 
+/** Wahl der Grafikstufe (wird getrennt vom Spielstand auf dem Gerät gemerkt). */
+export function GfxPicker() {
+  const level = useGfx((s) => s.level);
+  const auto = useGfx((s) => s.auto);
+  const fps = useGfx((s) => s.fps);
+  const set = useGfx((s) => s.set);
+  return (
+    <div className="gfx" data-testid="gfx">
+      <span className="gfx-label">Grafik</span>
+      <button className={`btn ${auto ? 'primary' : ''}`} onClick={() => set(auto ? level : 'medium', !auto)}>Automatisch</button>
+      {(['low', 'medium', 'high'] as GfxLevel[]).map((l) => (
+        <button key={l} className={`btn ${!auto && level === l ? 'primary' : ''}`} onClick={() => set(l, false)}>
+          {GFX_LABEL[l]}
+        </button>
+      ))}
+      <span className="gfx-fps">{auto ? `${GFX_LABEL[level]} · ` : ''}{fps ? `${fps} Bilder/s` : ''}</span>
+    </div>
+  );
+}
+
 export function HelpModal() {
   const setPanel = useGame((s) => s.setPanel);
   return (
     <Modal title="So wird gespielt" onClose={() => setPanel(null)} wide>
+      <GfxPicker />
       <ol className="help">
         <li><b>Laufen & Umsehen:</b> Joystick links, überall sonst wischen. 🔍 zoomt. Stationen leuchten gelb – antippen oder „Benutzen“.</li>
         <li><b>Computer:</b> Gebrauchtwagen besichtigen und verhandeln, eigene Autos verkaufen, Kundenaufträge annehmen und abrechnen, Teile bestellen.</li>
@@ -79,6 +101,8 @@ export function HelpModal() {
         <li><b>Markt:</b> 25 Inserate, die mehrere Tage stehen bleiben. Am Computer filtern und sortieren; beim Händler mit ◀ ▶ blättern.</li>
         <li><b>Karriere:</b> Erfolge bringen einmalige Prämien. Privatfahrzeuge bilden deine Sammlung. Wettbewerbe und Fahrzeugtreffen findest du am Computer unter „Wettbewerbe“.</li>
         <li><b>Spezialgeräte & Standorte:</b> Motor- und Getriebeheber, Leistungsprüfstand (📈 am Auto), Halle 2 mit weiteren Hebebühnen und der Showroom – alles unter „Ausbau“. In die neuen Hallen führt ein Durchgang in der Seitenwand.</li>
+        <li><b>Türen:</b> Mit der ✋ Hand am Türgriff öffnest und schließt du die Vordertüren.</li>
+        <li><b>Grafik:</b> Oben in dieser Hilfe und im Menü wählst du Niedrig, Mittel oder Hoch. „Automatisch“ senkt Auflösung und Stufe von selbst, wenn das Bild ruckelt.</li>
         <li><b>Ton:</b> 🔊 oben schaltet alle Geräusche ein oder aus.</li>
       </ol>
       <button className="btn primary big" onClick={() => setPanel(null)}>Los geht's</button>

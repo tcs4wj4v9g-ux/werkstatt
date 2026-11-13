@@ -1,5 +1,5 @@
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { COMPONENT_MAP, defOf, engineOf } from '../game/data/components';
 import { cylinderSlots, ENGINES, isV } from '../game/data/engines';
@@ -10,7 +10,7 @@ import type { BodyStyle, CarInstance, FluidId, ToolId, ZoneId } from '../game/ty
 import { CAR_MODELS } from '../game/data/cars';
 import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
-import { useGfxSettings } from './gfx';
+import { TEST_MODE, useGfxSettings } from './gfx';
 import { bayMaterials, beltGeometry, engineDecor, V_PIVOT, V_TILT } from './engineBay';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { create } from 'zustand';
@@ -138,10 +138,22 @@ function Bank({ bank, children }: { bank: number; children: ReactNode }) {
 /** Schraube: 2 = fest, 1 = gelöst (steht sichtbar heraus), 0 = entfernt (grüne Markierung am Gewinde). */
 function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: Axis; state: number; live?: string; label: string; onTap?: () => void }) {
   const text = `${label} (${state === 2 ? 'fest' : state === 1 ? 'gelöst' : 'entfernt'})`;
+  const head = useRef<THREE.Group>(null);
+  const targetY = state === 1 ? 0.03 : 0.012;
+  // Lösen und Festziehen: die Schraube dreht sich sichtbar heraus bzw. hinein.
+  useFrame((_, dt) => {
+    const h = head.current;
+    if (!h) return;
+    const d = targetY - h.position.y;
+    if (Math.abs(d) < 0.0004) return;
+    const step = TEST_MODE ? d : d * Math.min(1, dt * 9);
+    h.position.y += step;
+    h.rotation.y -= step * 260;
+  });
   return (
     <group position={pos} rotation={AXIS_ROT[axis]} userData={{ liveId: live, label: onTap ? text : undefined }} onClick={onTap && tap(onTap)}>
       {state > 0 ? (
-        <group position={[0, state === 1 ? 0.03 : 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
+        <group ref={head} position={[0, 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
           <mesh>
             <cylinderGeometry args={[0.019, 0.02, 0.03, 6]} />
             <meshStandardMaterial color={state === 1 ? '#e8c35a' : '#d9dde2'} metalness={0.9} roughness={0.25} />
@@ -171,8 +183,21 @@ function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: 
 /** Elektrischer Stecker: aufgesteckt sitzt er am Bauteil, abgezogen hängt er sichtbar daneben. */
 function Connector({ pos, off, connected, label, onTap }: { pos: V3; off: V3; connected: boolean; label: string; onTap?: () => void }) {
   const p: V3 = connected ? pos : [pos[0] + off[0], pos[1] + off[1], pos[2] + off[2]];
+  const ref = useRef<THREE.Group>(null);
+  const start = useRef(true);
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g) return;
+    if (start.current || TEST_MODE) {
+      g.position.set(...p);
+      start.current = false;
+      return;
+    }
+    if (Math.abs(g.position.x - p[0]) + Math.abs(g.position.y - p[1]) + Math.abs(g.position.z - p[2]) < 0.0005) return;
+    g.position.lerp(tmpV.set(...p), Math.min(1, dt * 10));
+  });
   return (
-    <group position={p} userData={{ label: onTap ? `Stecker ${label} (${connected ? 'verbunden' : 'abgezogen'})` : undefined }} onClick={onTap && tap(onTap)}>
+    <group ref={ref} position={p} userData={{ label: onTap ? `Stecker ${label} (${connected ? 'verbunden' : 'abgezogen'})` : undefined }} onClick={onTap && tap(onTap)}>
       <RB s={[0.045, 0.03, 0.04]} r={0.007}>
         <meshStandardMaterial color={connected ? '#3a3f46' : '#e3a81c'} roughness={0.6} />
       </RB>
@@ -190,6 +215,41 @@ function Connector({ pos, off, connected, label, onTap }: { pos: V3; off: V3; co
   );
 }
 
+const tmpV = new THREE.Vector3();
+const UNDER = new Set(['oil_pan', 'oil_pan_gasket', 'bearing', 'drain_plug', 'gearbox', 'dpf']);
+/** Richtung, in die ein Teil beim Ausbau herausgenommen wird. */
+const pullAxis = (id: string): V3 => (id.endsWith('_fl') ? [0, 0, -1] : id.endsWith('_fr') ? [0, 0, 1] : id === 'belt' ? [1, 0, 0] : UNDER.has(id) ? [0, -1, 0] : [0, 1, 0]);
+const DURATION = 0.26;
+
+/**
+ * Weicher Übergang beim Aus- und Einbau: Das Teil wird sichtbar herausgezogen bzw. eingesetzt,
+ * statt schlagartig zu verschwinden oder aufzutauchen.
+ */
+function PartAnim({ installed, axis, real, ghost }: { installed: boolean; axis: V3; real: ReactNode; ghost: ReactNode }) {
+  const [st, setSt] = useState({ installed, leaving: false });
+  const ref = useRef<THREE.Group>(null);
+  const t = useRef(1);
+  if (st.installed !== installed) {
+    t.current = TEST_MODE ? 1 : 0;
+    setSt({ installed, leaving: !installed && !TEST_MODE });
+  }
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g || t.current >= 1) return;
+    t.current = Math.min(1, t.current + dt / DURATION);
+    const k = t.current * t.current * (3 - 2 * t.current);
+    const d = st.leaving ? k * 0.2 : (1 - k) * 0.16;
+    g.position.set(axis[0] * d, axis[1] * d, axis[2] * d);
+    g.scale.setScalar(st.leaving ? 1 - k * 0.2 : 1);
+    if (t.current >= 1) {
+      g.position.set(0, 0, 0);
+      g.scale.setScalar(1);
+      if (st.leaving) setSt({ installed, leaving: false });
+    }
+  });
+  return <group ref={ref}>{st.leaving || installed ? real : ghost}</group>;
+}
+
 const COVER_BOLTS: V3[] = [1.0, 1.3, 1.6].flatMap((x) => [-0.15, 0.15].map((z) => [x, 0.78, z] as V3));
 /** Ventildeckelschrauben einer Bank beim V-Motor (vier je Deckel). */
 const bankBolts = (bank: number, cylinders: number): V3[] => [[0.975, 0.18], [1.635, 0.18], [0.985, 0.03], [cylinders === 8 ? 1.35 : 1.25, 0.03]].map(([x, z]) => [x, 0.78, bank * z] as V3);
@@ -202,6 +262,7 @@ const FOAM = new THREE.Color('#f4f6f8');
 
 /** Geöffnete Vordertüren (nur Anzeige, nicht Teil des Spielstands): Schlüssel `uid:0|1`. */
 const useDoors = create<Record<string, boolean>>(() => ({}));
+(window as any).__gkDoors = useDoors;
 
 /** Karosseriebereich zu einem Punkt in Fahrzeugkoordinaten. */
 export function zoneAt(x: number, y: number, z: number): ZoneId {
@@ -328,8 +389,13 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   }, [G.clearcoat]);
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
   // Pflegezustand wirkt auf Glanz und Spiegelung.
-  mats.paint.roughness = 0.3 + dirt * 0.52 - shine * 0.14;
-  mats.paint.envMapIntensity = 1.15 - dirt * 0.6;
+  // Weiß und kräftiges Rot sind Uni-Lacke, alles andere Metallic.
+  const hsl = useMemo(() => new THREE.Color(color).getHSL({ h: 0, s: 0, l: 0 }), [color]);
+  const metallic = hsl.l > 0.78 ? 0.12 : hsl.s > 0.6 && (hsl.h < 0.06 || hsl.h > 0.94) ? 0.3 : 0.68;
+  mats.paint.metalness = metallic * (1 - dirt * 0.7);
+  mats.solid.metalness = metallic;
+  mats.paint.roughness = 0.26 + (0.68 - metallic) * 0.12 + dirt * 0.52 - shine * 0.14;
+  mats.paint.envMapIntensity = 1.2 - dirt * 0.7;
   if (mats.paint instanceof THREE.MeshPhysicalMaterial) {
     mats.paint.clearcoat = (1 - dirt) * (0.3 + 0.7 * shine);
     mats.paint.clearcoatRoughness = 0.04 + (1 - shine) * 0.3;
@@ -405,29 +471,26 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const part = (id: string, children: ReactNode) => {
     const s = st(id);
     const name = def(id).name;
-    if (!s || s.installed) {
-      const defect = !!s && s.known && s.condition === 'defect';
-      const live = interactive && removable(car!, id) && toolFitsPart(id) ? id : undefined;
-      return (
-        <GhostCtx.Provider value={defect ? 'defect' : 'normal'}>
-          <group userData={{ liveId: live, label: interactive ? name : undefined }} onClick={interactive ? tap(() => handlers!.onComponent(id)) : undefined}>
-            {children}
-          </group>
-        </GhostCtx.Provider>
-      );
-    }
-    if (!interactive || !installReady(car!, id) || !blockersRemoved(car!, id)) return null;
-    return (
-      <GhostCtx.Provider value="ghost">
-        <group
-          position={[0, GHOST_LIFT[id] ?? 0, 0]}
-          userData={{ label: `${name} einbauen` }}
-          onClick={ghostTap(car!, id, () => handlers!.onComponent(id))}
-        >
+    const isIn = !s || s.installed;
+    const defect = !!s && s.known && s.condition === 'defect';
+    const live = interactive && isIn && removable(car!, id) && toolFitsPart(id) ? id : undefined;
+    const real = (
+      <GhostCtx.Provider value={defect ? 'defect' : 'normal'}>
+        <group userData={{ liveId: live, label: interactive ? name : undefined }} onClick={interactive ? tap(() => handlers!.onComponent(id)) : undefined}>
           {children}
         </group>
       </GhostCtx.Provider>
     );
+    const ghost =
+      isIn || !interactive || !installReady(car!, id) || !blockersRemoved(car!, id) ? null : (
+        <GhostCtx.Provider value="ghost">
+          <group position={[0, GHOST_LIFT[id] ?? 0, 0]} userData={{ label: `${name} einbauen` }} onClick={ghostTap(car!, id, () => handlers!.onComponent(id))}>
+            {children}
+          </group>
+        </GhostCtx.Provider>
+      );
+    if (!s) return real;
+    return <PartAnim installed={isIn} axis={pullAxis(id)} real={real} ghost={ghost} />;
   };
 
   const bolts = (id: string, positions: V3[], axis: Axis = 'y') =>
@@ -581,6 +644,19 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     );
   };
 
+  // Beim Herausdrehen der Ablassschraube läuft das Öl sichtbar in die Wanne.
+  const plugIn = installed('drain_plug');
+  const [draining, setDraining] = useState(false);
+  const plugWas = useRef(plugIn);
+  useEffect(() => {
+    if (plugWas.current && !plugIn && !TEST_MODE) {
+      setDraining(true);
+      const t = setTimeout(() => setDraining(false), 3200);
+      plugWas.current = plugIn;
+      return () => clearTimeout(t);
+    }
+    plugWas.current = plugIn;
+  }, [plugIn]);
   const oilLeak = st('oil_pan_gasket')?.condition === 'defect';
   const pumpLeak = st('water_pump')?.condition === 'defect';
   const beltBad = st('belt')?.condition === 'defect';
@@ -1199,6 +1275,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           )}
           {bolts('hose', [[1.42, 0.72, -0.45]])}
 
+          {draining && (
+            <mesh position={[1.4, 0.185 - 0.84, 0.08]} raycast={noRay}>
+              <cylinderGeometry args={[0.009, 0.005, 1.68, 6]} />
+              <meshStandardMaterial color="#0d0905" metalness={0.9} roughness={0.08} />
+            </mesh>
+          )}
           {/* Unter dem Motor – nur von der Hebebühne aus erreichbar */}
           {part(
             'oil_pan_gasket',
