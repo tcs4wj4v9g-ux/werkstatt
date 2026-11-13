@@ -48,6 +48,11 @@ function checkAccess(car: CarInstance, id: string): string | null {
     if (def.access === 'lifted' && !car.lifted) return 'Das liegt an der Unterseite – erst den Motor auf dem Ständer drehen.';
     return null;
   }
+  if (car.junk) {
+    // Schrottautos stehen aufgebockt: Motorraum und Unterboden sind zugleich erreichbar.
+    if (def.access === 'hood' && !car.hoodOpen) return 'Erst die Motorhaube öffnen.';
+    return null;
+  }
   if (def.access === 'hood') {
     if (car.lifted) return 'Für Arbeiten im Motorraum das Auto ablassen.';
     if (!car.hoodOpen) return 'Erst die Motorhaube öffnen.';

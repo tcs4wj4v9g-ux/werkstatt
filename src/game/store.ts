@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
 import { engineAudio, setMuted, sfx } from './audio';
 import { advanceAuction, createAuction, heldMoney, MAX_AUCTIONS, placeBid, seeded } from './auctions';
-import { COMPONENT_MAP, defsOf } from './data/components';
+import { COMPONENT_MAP, defOf, defsOf, engineOf } from './data/components';
 import { ACHIEVEMENTS, countRepair, emptyCareer, newlyAchieved, type Career } from './career';
 import { performance } from './performance';
 import { createContest, createMeet, enterMeet, meetBlocker, resolveContest, type Contest, type ContestResult, type Meet } from './contests';
@@ -12,7 +12,7 @@ import { CAR_MODELS } from './data/cars';
 import { DEFECTS } from './data/defects';
 import { FLUID_PRODUCTS } from './data/fluids';
 import { PARTS } from './data/parts';
-import { availableSlots, isLift, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
+import { availableSlots, isJunk, isLift, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, UPGRADES, type UpgradeId } from './data/workshop';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
 import * as fluids from './fluids';
@@ -22,13 +22,17 @@ import { obdScan, observe, soundProfile, type Observation } from './diagnosis';
 import { billJob, fillJobs, refreshJobs } from './jobs';
 import { BARN_TRANSPORT, fillListings, freshComponents, inspectListing, makeOffer, nextMarketIndex, refreshListings, valuate } from './market';
 import * as repair from './repair';
-import type { ActionResult, Auction, BoltState, CarInstance, DefectId, FluidId, FluidProduct, FluidStock, GameEvent, Inventory, JobOffer, Listing, PartId, Screen, ToolId, ZoneId } from './types';
+import type { ActionResult, Auction, BoltState, CarInstance, DefectId, EcuTune, FluidId, FluidProduct, FluidStock, GameEvent, Inventory, JobOffer, Listing, PartId, Screen, ToolId, VisualTune, ZoneId } from './types';
+import { tuningDamage, asStand, engineTest, engineValue, extractEngine, fromStand, insertEngine, junkEnginePrice, junkPartPrice, motorLabel, removalSteps, swapPlan, unitComplete, type EngineUnit, type UsedPart } from './motor';
+import { refreshJunk } from './junkyard';
+import { VISUAL_MAP, mountedId } from './data/visual';
+import { ENGINES } from './data/engines';
 
 export const START_MONEY = 6000;
 const noSlots = (): boolean[] => Array(SLOT_COUNT).fill(false);
 /** Sekunden, bis der Motor im Stand warm ist. */
 export const WARM_AFTER = 9;
-export type Panel = 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
+export type Panel = 'crane' | 'engines' | 'junk' | 'tuning' | 'enginetest' | 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
 
 interface Toast {
   id: number;
@@ -54,6 +58,14 @@ export interface GameState {
   events: GameEvent[];
   /** Höhe der Hebebühnen ohne Auto. Mit Auto zählt car.lifted. */
   liftUp: boolean[];
+  /** Motorlager: ausgebaute Motoren als eigenständige Objekte. */
+  engines: EngineUnit[];
+  /** Motor, der gerade am Motorkran hängt. */
+  crane: EngineUnit | null;
+  /** Gebrauchtteile mit eigener Kennung (Schrottplatz, Umbauten). */
+  used: UsedPart[];
+  /** Optik-Lager: Anzahl je optischem Tuningteil. */
+  visualStock: Record<string, number>;
   /** Werkzeuge am Mann (max. 3). */
   carried: ToolId[];
   tool: ToolId;
@@ -94,7 +106,9 @@ export interface GameState {
   engineSince: number;
   engineWarm: boolean;
   toast: Toast | null;
-  partPrompt: { bay: number; compId: string; partId: PartId } | null;
+  partPrompt: { bay: number; compId: string; partId: PartId; choose?: boolean } | null;
+  /** Letzte Messung am Motorprüfstand. */
+  engineReport: { title: string; compression: number[]; nominal: number; oilPressure: number; findings: string[] } | null;
   /** Für welches Auto der Teileshop gerade Teile anzeigt (Stellplatz). */
   shopSlot: number;
   setShopSlot(slot: number): void;
@@ -153,12 +167,53 @@ export interface GameState {
   viewAuction(i: number): void;
   bid(i: number, amount: number): void;
   tickAuctions(now: number): void;
+  /** Bauteil mit einem bestimmten Teil einbauen (Neu-, Tuning-, Gebraucht- oder Altteil). */
+  installWith(bay: number, compId: string, choice: InstallChoice): void;
+  /** Motor mit dem Kran aus dem Auto heben (Werkstatt) bzw. am Schrottplatz kaufen und ausbauen. */
+  liftEngine(slot: number): void;
+  craneToStand(): void;
+  standToCrane(): void;
+  craneToStorage(): void;
+  storageToCrane(uid: string): void;
+  /** Motor vom Kran in das Auto auf dieser Hebebühne einsetzen (Motorumbau). */
+  installEngine(slot: number): void;
+  flipEngine(): void;
+  testEngine(): void;
+  sellEngine(uid: string): void;
+  sellUsed(id: string): void;
+  /** Gebrauchtteil an der Werkbank prüfen (zeigt versteckte Defekte). */
+  checkUsed(id: string): void;
+  buyJunkCar(slot: number): void;
+  /** Optisches Teil an einem Schrottauto abbauen und kaufen. */
+  junkVisual(slot: number, field: keyof VisualTune): void;
+  fitTurboKit(slot: number): void;
+  setEcu(slot: number, ecu: Partial<EcuTune>, buyMap?: number): void;
+  buyVisual(id: string): void;
+  mountVisual(slot: number, id: string): void;
+  unmountVisual(slot: number, field: keyof VisualTune): void;
+  setDrop(slot: number, cm: number): void;
   claimWaiting(): void;
   acceptEvent(id: string): void;
   dismissEvent(id: string): void;
 }
 
 /** Aktueller Preis eines Ersatzteils inklusive Sonderangebot und Großhandelsrabatt. */
+export type InstallChoice = { kind: 'new' } | { kind: 'variant'; part: PartId } | { kind: 'used'; id: string } | { kind: 'old' };
+
+/** Was zum Einbau eines Bauteils gerade bereitliegt (Neuteil, Tuningteile, passende Gebrauchtteile). */
+export function installOptions(s: Pick<GameState, 'inventory' | 'used'>, car: CarInstance, compId: string) {
+  const def = defOf(car, compId);
+  const st = car.components[compId];
+  if (!def.partId || !st || st.installed) return null;
+  const parts = [def.partId, ...(def.variants ?? [])];
+  return {
+    newStock: s.inventory[partKey(car, def.partId)] ?? 0,
+    variants: (def.variants ?? []).map((v) => ({ part: v, stock: s.inventory[partKey(car, v)] ?? 0 })).filter((v) => v.stock > 0),
+    used: s.used.filter((u) => parts.includes(u.part) && u.fit === fitOf(car, u.part)),
+    old: !st.missing,
+  };
+}
+
 export function partPrice(s: Pick<GameState, 'events' | 'upgrades' | 'day'>, id: PartId, car?: CarInstance | null): number {
   const sale = s.events.find((e) => e.type === 'parts_sale' && e.sale?.partId === id && e.expiresDay >= s.day);
   const factor = (sale ? 1 - sale.sale!.pct / 100 : 1) * (s.upgrades.includes('expansion') ? 0.9 : 1);
@@ -301,6 +356,57 @@ export const useGame = create<GameState>()(
         set({ engineBay: -1, engineWarm: false });
       };
 
+      /** Schrottplatz: Was man ausbaut, kauft man – als Gebrauchtteil mit eigener Kennung. Eingebaut wird hier nichts. */
+      const junkComponent = (bay: number, compId: string) => {
+        const s = get();
+        const cur = s.cars[bay];
+        if (!cur) return;
+        const was = cur.components[compId];
+        if (!was) return;
+        if (!was.installed && s.tool !== 'lamp') {
+          sfx.error();
+          return s.say(was.missing ? 'Dieses Teil fehlt schon – das hat jemand anderes ausgebaut.' : 'Am Schrottauto wird nichts eingebaut.', true);
+        }
+        const car = clone(cur);
+        const r = repair.componentAction(car, clone(s.inventory), compId, tools());
+        if (!r.ok || car.components[compId].installed) {
+          if (!r.ok) sfx.error();
+          return void (r.message && s.say(r.message, !r.ok));
+        }
+        const def = defOf(cur, compId);
+        if (!def.partId) {
+          const cars = [...s.cars];
+          cars[bay] = car;
+          sfx.clunk();
+          set({ cars });
+          return s.say(`${def.name} abgebaut und zur Seite gelegt.`);
+        }
+        const price = junkPartPrice(cur, compId);
+        if (s.money - heldMoney(s.auctions) < price) {
+          sfx.error();
+          return s.say(`${def.name} kostet ${price} € – dafür reicht das Geld nicht.`, true);
+        }
+        const st = car.components[compId];
+        const part = was.variant ?? def.partId;
+        const item: UsedPart = {
+          id: `u-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`,
+          part,
+          fit: fitOf(cur, part),
+          condition: was.condition,
+          known: was.known,
+          ...(was.health !== undefined ? { health: was.health } : {}),
+          km: cur.motor?.km ?? cur.km,
+          from: `${CAR_MODELS[cur.modelId].name} (Schrottplatz)`,
+          price,
+        };
+        Object.assign(st, { missing: true, known: was.known });
+        const cars = [...s.cars];
+        cars[bay] = car;
+        sfx.cash();
+        set({ cars, money: s.money - price, used: [...s.used, item] });
+        s.say(`Ausgebaut und gekauft: ${PARTS[part].name} für ${price} €${was.known ? '' : ' – Zustand ungeprüft'}. Liegt im Gebrauchtteile-Lager.`);
+      };
+
       /** Spieler nimmt das Auto über bestimmte Kanäle wahr; Ergebnis landet in der Fahrzeugakte. */
       const perceive = (bay: number, channels: Channel[], warm: boolean, quiet: string) => {
         const s = get();
@@ -326,6 +432,11 @@ export const useGame = create<GameState>()(
         waiting: [],
         events: [],
         liftUp: noSlots(),
+        engines: [],
+        crane: null,
+        used: [],
+        visualStock: {},
+        engineReport: null,
         carried: [],
         tool: 'hand',
         inventory: emptyInventory(),
@@ -381,7 +492,10 @@ export const useGame = create<GameState>()(
           if (s.engineBay !== null) stopEngine();
           const p = performance(car);
           const cars = [...s.cars];
-          cars[slot] = { ...car, dyno: { ps: p.ps, nm: p.nm, ratedPs: p.ratedPs, day: s.day } };
+          const measured = clone(car);
+          const damage = tuningDamage(measured, p.output.risks, Math.random);
+          cars[slot] = { ...measured, dyno: { ps: p.ps, nm: p.nm, ratedPs: p.ratedPs, day: s.day } };
+          if (damage.length) setTimeout(() => get().say(`Prüfstand: ${damage.join(' ')}`, true), 300);
           set({ cars, career: { ...s.career, dynoRuns: s.career.dynoRuns + 1 }, panel: 'dyno', panelBay: slot });
           // Volllast auf der Rolle ist wie eine Probefahrt: man hört und sieht, was der Motor macht.
           engineAudio.demo(soundProfile(car), true);
@@ -409,7 +523,11 @@ export const useGame = create<GameState>()(
           stopEngine();
           set({
             money: START_MONEY,
-            cars: Array(SLOT_COUNT).fill(null),
+            cars: refreshJunk(Array(SLOT_COUNT).fill(null), Math.random, 1),
+            engines: [],
+            crane: null,
+            used: [],
+            visualStock: {},
             upgrades: [],
             fluidStock: emptyStock(),
             drainPan: noSlots(),
@@ -558,7 +676,7 @@ export const useGame = create<GameState>()(
             meet,
             day,
             marketIndex,
-            cars,
+            cars: refreshJunk(cars, Math.random, day),
             events,
             auctions,
             listings: refreshListings(s.listings, money, Math.random, marketIndex, day),
@@ -686,6 +804,16 @@ export const useGame = create<GameState>()(
         },
         tapComponent: (bay, compId, useOldPart) => {
           if (engineGuard(bay, compId)) return;
+          if (isJunk(bay)) return junkComponent(bay, compId);
+          {
+            // Einbau: liegen Tuning- oder Gebrauchtteile bereit, darf der Spieler wählen.
+            const s0 = get();
+            const car0 = s0.cars[bay];
+            const opt = car0 && s0.tool === 'hand' && !useOldPart ? installOptions(s0, car0, compId) : null;
+            if (opt && (opt.variants.length || opt.used.length) && repair.blockersRemoved(car0!, compId)) {
+              return set({ partPrompt: { bay, compId, partId: defOf(car0!, compId).partId!, choose: true }, shopSlot: bay });
+            }
+          }
           const before = get().cars[bay];
           if (compId === 'drain_plug' && before?.components.drain_plug.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
             sfx.error();
@@ -775,6 +903,8 @@ export const useGame = create<GameState>()(
           // Wer mit fast leerem Ölstand fährt, ruiniert die Lager.
           const oilDamage = fluids.fill(car, 'oil') < 0.3 && car.components.bearing.condition === 'ok';
           if (oilDamage) car.components.bearing.condition = 'defect';
+          const tuning = tuningDamage(car, performance(current).output.risks, Math.random);
+          if (car.motor) car.motor = { ...car.motor, km: car.motor.km + 12 };
           for (const z of Object.values(car.zones)) z.dirt = Math.min(1, z.dirt + 0.12);
           const drove: Channel[] = ['idle', 'sound', 'dash', 'rev', 'drive'];
           observe(car, drove, true);
@@ -788,7 +918,7 @@ export const useGame = create<GameState>()(
             screen: 'garage',
             panel: 'report',
             panelBay: s.driveBay,
-            driveReport: [...report.map((id) => SYMPTOMS[id].text), ...(oilDamage ? ['Mit viel zu wenig Öl gefahren: Unter Last klackert es jetzt aus dem Motor.'] : [])],
+            driveReport: [...report.map((id) => SYMPTOMS[id].text), ...(oilDamage ? ['Mit viel zu wenig Öl gefahren: Unter Last klackert es jetzt aus dem Motor.'] : []), ...tuning],
           });
         },
 
@@ -929,6 +1059,289 @@ export const useGame = create<GameState>()(
           set({ auctions });
           s.say(r.message, !r.ok);
         },
+        installWith: (bay, compId, choice) => {
+          const s = get();
+          const cur = s.cars[bay];
+          if (!cur) return;
+          const car = clone(cur);
+          const def = defOf(car, compId);
+          const inventory = { ...s.inventory };
+          let used = s.used;
+          let source: Parameters<typeof repair.componentAction>[4] = {};
+          if (choice.kind === 'old') source = { useOldPart: true };
+          else if (choice.kind === 'variant') {
+            const key = partKey(car, choice.part);
+            if (!(inventory[key] > 0)) return s.say('Dieses Tuningteil liegt nicht im Lager.', true);
+            inventory[key] -= 1;
+            source = { source: { condition: 'ok', known: true, health: 100, variant: choice.part, cost: basePartPrice(car, choice.part), label: `${PARTS[choice.part].name} (Tuning)` } };
+          } else if (choice.kind === 'used') {
+            const u = s.used.find((x) => x.id === choice.id);
+            if (!u) return s.say('Das Gebrauchtteil ist nicht mehr da.', true);
+            used = s.used.filter((x) => x.id !== u.id);
+            source = { source: { condition: u.condition, known: u.known, health: u.health, variant: u.part !== def.partId ? u.part : undefined, cost: u.price, label: `${PARTS[u.part].name} (gebraucht, ${u.km.toLocaleString('de-DE')} km, aus ${u.from})` } };
+          }
+          const r = repair.componentAction(car, inventory, compId, tools(), source);
+          if (!r.ok) {
+            set({ partPrompt: r.needsPart ? { bay, compId, partId: r.needsPart } : null });
+            sfx.error();
+            return s.say(r.message ?? 'Geht so nicht.', true);
+          }
+          sfx.clunk();
+          const cars = [...s.cars];
+          cars[bay] = car;
+          set({ cars, inventory, used, partPrompt: null });
+          if (r.message) s.say(r.message);
+        },
+
+        liftEngine: (slot) => {
+          const s = get();
+          const cur = s.cars[slot];
+          if (!cur || cur.bare) return;
+          if (cur.motor === null) return s.say('In diesem Auto ist kein Motor.', true);
+          const junk = isJunk(slot);
+          if (!junk && !isLift(slot)) return s.say('Motoren baust du auf einer Hebebühne aus.', true);
+          if (!junk && !s.upgrades.includes('hoist')) return s.say('Dafür brauchst du den Motorkran (Werkstatt-Computer → Ausbau: Motor- und Getriebeheber).', true);
+          if (!junk && s.crane) return s.say('Am Kran hängt schon ein Motor – erst absetzen.', true);
+          if (s.engineBay === slot) return s.say('Erst den Motor abstellen.', true);
+          const open = removalSteps(cur).find((x) => !x.done);
+          if (open) return s.say(`Noch nicht bereit zum Herausheben: ${open.label}.`, true);
+          const car = clone(cur);
+          const unit = extractEngine(car);
+          unit.motor.history = [...unit.motor.history, `Tag ${s.day}: ausgebaut aus ${CAR_MODELS[car.modelId].name}${junk ? ' (Schrottplatz)' : ''}`];
+          const cars = [...s.cars];
+          cars[slot] = car;
+          sfx.clunk();
+          if (junk) {
+            const price = junkEnginePrice(unit) + 40;
+            if (s.money - heldMoney(s.auctions) < price) return s.say(`Motor kostet ${price.toLocaleString('de-DE')} € (inkl. Kranmiete) – dafür reicht das Geld nicht.`, true);
+            set({ cars, money: s.money - price, engines: [...s.engines, unit] });
+            return s.say(`Motor gekauft und ausgebaut: ${motorLabel(unit.motor)} für ${price.toLocaleString('de-DE')} € (inkl. 40 € Kranmiete). Er wird ins Motorlager der Werkstatt geliefert.`);
+          }
+          set({ cars, crane: unit });
+          s.say(`Motor hängt am Kran: ${motorLabel(unit.motor)}. Jetzt auf den Motorständer setzen oder ins Lager stellen.`);
+        },
+
+        craneToStand: () => {
+          const s = get();
+          if (!s.crane) return s.say('Am Kran hängt kein Motor.', true);
+          if (s.cars[STAND_SLOT]) return s.say('Auf dem Motorständer sitzt schon ein Motor.', true);
+          const cars = [...s.cars];
+          cars[STAND_SLOT] = asStand(s.crane, 'bavaria_320');
+          sfx.clunk();
+          set({ cars, crane: null });
+          s.say('Motor sitzt auf dem Motorständer. Mit „Motor drehen“ kommst du an die Unterseite.');
+        },
+        standToCrane: () => {
+          const s = get();
+          const car = s.cars[STAND_SLOT];
+          if (!car) return s.say('Auf dem Motorständer sitzt kein Motor.', true);
+          if (s.crane) return s.say('Am Kran hängt schon ein Motor.', true);
+          const cars = [...s.cars];
+          cars[STAND_SLOT] = null;
+          sfx.clunk();
+          set({ cars, crane: fromStand(clone(car)) });
+          s.say('Motor hängt am Kran.');
+        },
+        craneToStorage: () => {
+          const s = get();
+          if (!s.crane) return s.say('Am Kran hängt kein Motor.', true);
+          if (s.engines.length >= 8) return s.say('Das Motorlager ist voll (8 Paletten) – erst einen Motor verkaufen.', true);
+          sfx.clunk();
+          set({ engines: [...s.engines, s.crane], crane: null });
+          s.say('Motor auf einer Palette im Motorlager abgestellt.');
+        },
+        storageToCrane: (uid) => {
+          const s = get();
+          const unit = s.engines.find((u) => u.motor.uid === uid);
+          if (!unit) return;
+          if (s.crane) return s.say('Am Kran hängt schon ein Motor.', true);
+          sfx.clunk();
+          set({ engines: s.engines.filter((u) => u.motor.uid !== uid), crane: unit });
+          s.say(`Motor am Kran: ${motorLabel(unit.motor)}.`);
+        },
+        installEngine: (slot) => {
+          const s = get();
+          const cur = s.cars[slot];
+          const unit = s.crane;
+          if (!unit) return s.say('Erst einen Motor an den Kran hängen.', true);
+          if (!cur || !isLift(slot)) return s.say('Motoren setzt du in ein Auto auf einer Hebebühne ein.', true);
+          if (cur.motor !== null) return s.say('In diesem Auto ist noch ein Motor – erst ausbauen.', true);
+          if (cur.lifted || !cur.hoodOpen) return s.say('Auto ablassen und Motorhaube öffnen.', true);
+          if (!unitComplete(unit)) return s.say('Der Motor ist nicht komplett montiert – erst auf dem Ständer fertig zusammenbauen.', true);
+          const plan = swapPlan(cur, unit.motor.engineId);
+          if (!plan.possible) return s.say(plan.reasons.join(' '), true);
+          const missing = plan.needs.filter((n) => !(s.inventory[n.key] > 0));
+          if (missing.length) return s.say(`Für diesen Umbau fehlen: ${missing.map((n) => PARTS[n.part].name).join(', ')} (Teileshop → Umbau).`, true);
+          const inventory = { ...s.inventory };
+          for (const n of plan.needs) inventory[n.key] -= 1;
+          const car = clone(cur);
+          insertEngine(car, unit, plan.needs.map((n) => n.part), s.day);
+          car.partsSpent += plan.needs.reduce((sum, n) => sum + PARTS[n.part].price, 0);
+          const cars = [...s.cars];
+          cars[slot] = car;
+          sfx.clunk();
+          set({ cars, inventory, crane: null });
+          s.say(`${motorLabel(unit.motor)} eingesetzt (${plan.label}). Jetzt Motorlager, Kabelbaum, Hosenrohr, Schläuche und Batterie wieder anschließen, Öl und Kühlmittel auffüllen.`);
+        },
+        flipEngine: () => {
+          const s = get();
+          const car = s.cars[STAND_SLOT];
+          if (!car) return;
+          const cars = [...s.cars];
+          cars[STAND_SLOT] = { ...car, lifted: !car.lifted };
+          sfx.clunk();
+          set({ cars });
+          s.say(car.lifted ? 'Motor zurückgedreht – Oberseite oben.' : 'Motor gedreht – die Unterseite (Ölwanne, Lager, Kurbelwelle) liegt jetzt oben.');
+        },
+        testEngine: () => {
+          const s = get();
+          const car = s.cars[STAND_SLOT];
+          if (!car) return;
+          if (!repair.isAssembled(car)) return s.say('Für Kompressions- und Öldruckprüfung muss der Motor komplett montiert sein.', true);
+          const t = engineTest(fromStand(car));
+          const cars = [...s.cars];
+          cars[STAND_SLOT] = { ...car, motor: { ...car.motor!, history: [...car.motor!.history, `Tag ${s.day}: Prüfstand – Kompression ${t.compression.join('/')} bar, Öldruck ${t.oilPressure} bar`] } };
+          set({ cars, engineReport: { title: motorLabel(car.motor!), ...t }, panel: 'enginetest' });
+        },
+        sellEngine: (uid) => {
+          const s = get();
+          const unit = s.engines.find((u) => u.motor.uid === uid);
+          if (!unit) return;
+          const price = engineValue(unit);
+          sfx.cash();
+          set({ engines: s.engines.filter((u) => u.motor.uid !== uid), money: s.money + price });
+          s.say(`Motor verkauft: ${motorLabel(unit.motor)} für ${price.toLocaleString('de-DE')} €.`);
+        },
+        sellUsed: (id) => {
+          const s = get();
+          const u = s.used.find((x) => x.id === id);
+          if (!u) return;
+          const price = Math.max(5, Math.round((u.condition === 'defect' ? 0.05 : 0.3) * PARTS[u.part].price / 5) * 5);
+          sfx.cash();
+          set({ used: s.used.filter((x) => x.id !== id), money: s.money + price });
+          s.say(`Gebrauchtteil verkauft: ${PARTS[u.part].name} für ${price} €.`);
+        },
+        checkUsed: (id) => {
+          const s = get();
+          const u = s.used.find((x) => x.id === id);
+          if (!u) return;
+          set({ used: s.used.map((x) => (x.id === id ? { ...x, known: true } : x)) });
+          s.say(`${PARTS[u.part].name} geprüft: ${u.condition === 'defect' ? 'defekt – so nicht einbauen!' : `in Ordnung${u.health !== undefined ? `, Restzustand ${u.health} %` : ''}.`}`, u.condition === 'defect');
+        },
+        buyJunkCar: (slot) => {
+          const s = get();
+          const car = s.cars[slot];
+          if (!car?.junk) return;
+          const to = freeSlot(s, 'park');
+          if (to < 0) return s.say('Kein freier Stellplatz in der Werkstatt für das Schrottauto.', true);
+          const price = car.junk.price + 150;
+          if (s.money - heldMoney(s.auctions) < price) return s.say('Dafür reicht das Geld nicht.', true);
+          const cars = [...s.cars];
+          const mine: CarInstance = { ...clone(car), purchasePrice: price, hoodOpen: false, lifted: false, origin: 'market' };
+          delete mine.junk;
+          cars[to] = mine;
+          cars[slot] = null;
+          sfx.cash();
+          set({ cars, money: s.money - price });
+          s.say(`Schrottauto gekauft und abgeschleppt (${car.junk.price.toLocaleString('de-DE')} € + 150 € Abschleppen) – steht auf ${SLOTS[to].label}.`);
+        },
+        junkVisual: (slot, field) => {
+          const s = get();
+          const car = s.cars[slot];
+          const id = car?.junk ? mountedId(car.visual, field) : null;
+          if (!car || !id) return;
+          if (s.tool !== 'ratchet') return s.say('Anbauteile schraubst du mit der Ratsche ab.', true);
+          const price = Math.round((VISUAL_MAP[id].price * 0.35) / 10) * 10;
+          if (s.money - heldMoney(s.auctions) < price) return s.say('Dafür reicht das Geld nicht.', true);
+          const cars = [...s.cars];
+          cars[slot] = { ...car, visual: { ...car.visual, [field]: undefined } };
+          sfx.cash();
+          set({ cars, money: s.money - price, visualStock: { ...s.visualStock, [id]: (s.visualStock[id] ?? 0) + 1 } });
+          s.say(`Abgebaut und gekauft: ${VISUAL_MAP[id].name} für ${price} € – liegt im Optik-Lager.`);
+        },
+        fitTurboKit: (slot) => {
+          const s = get();
+          const cur = s.cars[slot];
+          if (!cur || cur.motor === null) return;
+          const e = engineOf(cur);
+          if (e.turbo || cur.motor?.turboKit) return s.say('Dieser Motor hat schon einen Turbolader.', true);
+          const key = 'turbo_kit@alle';
+          if (!(s.inventory[key] > 0)) return s.say('Erst den Turbo-Nachrüstsatz bestellen (Teileshop → Tuning).', true);
+          if (!cur.bare && (!cur.hoodOpen || cur.lifted)) return s.say('Motorhaube öffnen, Auto ablassen.', true);
+          const car = clone(cur);
+          const motor = { ...(car.motor ?? { uid: `${car.uid}-m`, engineId: e.id, km: car.km, donor: car.modelId, history: [] }) };
+          motor.turboKit = true;
+          motor.history = [...motor.history, `Tag ${s.day}: Turbo-Nachrüstsatz vorbereitet`];
+          car.motor = motor;
+          // Neue Bauteile liegen eingebaut bereit? Nein: sie werden einzeln montiert (Lader und Ladeluftrohr).
+          for (const id of ['turbo', 'charge_pipe']) {
+            const d = defOf(car, id);
+            car.components[id] = { installed: false, bolts: Array(d.bolts).fill(0), connected: false, condition: 'ok', known: true };
+          }
+          car.partsSpent += PARTS.turbo_kit.price;
+          const cars = [...s.cars];
+          cars[slot] = car;
+          sfx.clunk();
+          set({ cars, inventory: { ...s.inventory, [key]: s.inventory[key] - 1 } });
+          s.say('Halter und Ölleitungen für den Turbo montiert. Jetzt Turbolader und Ladeluftrohr einbauen – und das Steuergerät abstimmen.');
+        },
+        setEcu: (slot, ecu, buyMap) => {
+          const s = get();
+          const cur = s.cars[slot];
+          if (!cur || cur.bare || cur.junk) return;
+          const now = cur.ecu ?? { map: 0, boost: 0, limiter: 0 };
+          let cost = 0;
+          if (buyMap !== undefined && buyMap > now.map) cost = buyMap === 1 ? 450 : 950;
+          if (cost && s.money - heldMoney(s.auctions) < cost) return s.say('Dafür reicht das Geld nicht.', true);
+          const cars = [...s.cars];
+          cars[slot] = { ...cur, ecu: { ...now, ...ecu, ...(cost ? { map: buyMap! } : {}) }, dyno: undefined, testDriven: false };
+          set({ cars, money: s.money - cost });
+          s.say(cost ? `Kennfeld Stufe ${buyMap} aufgespielt (${cost} €).` : 'Abstimmung gespeichert.');
+        },
+        buyVisual: (id) => {
+          const s = get();
+          const v = VISUAL_MAP[id];
+          if (!v) return;
+          if (s.money - heldMoney(s.auctions) < v.price) return s.say('Dafür reicht das Geld nicht.', true);
+          sfx.cash();
+          set({ money: s.money - v.price, visualStock: { ...s.visualStock, [id]: (s.visualStock[id] ?? 0) + 1 } });
+          s.say(`Bestellt: ${v.name} (−${v.price.toLocaleString('de-DE')} €). Liegt im Optik-Lager – montieren an der Tuning-Werkbank.`);
+        },
+        mountVisual: (slot, id) => {
+          const s = get();
+          const cur = s.cars[slot];
+          const v = VISUAL_MAP[id];
+          if (!cur || !v || cur.bare || cur.junk) return;
+          if (!(s.visualStock[id] > 0)) return s.say('Dieses Teil liegt nicht im Optik-Lager.', true);
+          const stock = { ...s.visualStock, [id]: s.visualStock[id] - 1 };
+          const old = mountedId(cur.visual, v.field);
+          if (old) stock[old] = (stock[old] ?? 0) + 1;
+          const cars = [...s.cars];
+          cars[slot] = { ...cur, visual: { ...cur.visual, [v.field]: v.value }, partsSpent: cur.partsSpent + Math.round(v.price * 0.5), dyno: undefined };
+          sfx.clunk();
+          set({ cars, visualStock: stock });
+          s.say(`Montiert: ${v.name}${old ? ` – ${VISUAL_MAP[old].name} liegt im Optik-Lager` : ''}.`);
+        },
+        unmountVisual: (slot, field) => {
+          const s = get();
+          const cur = s.cars[slot];
+          const old = cur ? mountedId(cur.visual, field) : null;
+          if (!cur || !old) return;
+          const cars = [...s.cars];
+          cars[slot] = { ...cur, visual: { ...cur.visual, [field]: undefined } };
+          sfx.clunk();
+          set({ cars, visualStock: { ...s.visualStock, [old]: (s.visualStock[old] ?? 0) + 1 } });
+          s.say(`Serienteil wieder montiert, ${VISUAL_MAP[old].name} liegt im Optik-Lager.`);
+        },
+        setDrop: (slot, cm) => {
+          const s = get();
+          const cur = s.cars[slot];
+          if (!cur || cur.visual?.suspension !== 'coilover') return;
+          const cars = [...s.cars];
+          cars[slot] = { ...cur, visual: { ...cur.visual, drop: Math.min(7, Math.max(2, Math.round(cm))) } };
+          set({ cars });
+        },
+
         tickAuctions: (now) => {
           const s = get();
           if (!s.auctions.some((a) => !a.settled && (a.result || now >= a.simulatedTo + 8000))) return;
@@ -1063,6 +1476,12 @@ export const useGame = create<GameState>()(
         merged.events = (p.events ?? []).filter((e: GameEvent) => e && e.id && e.type);
         merged.auctions = (p.auctions ?? []).filter((a: Auction) => a && a.car && a.bidders).map((a: Auction) => ({ ...a, car: normalizeCar(a.car)! }));
         merged.inventory = migrateInventory(p.inventory);
+        merged.engines = (p.engines ?? []).filter((u: EngineUnit) => u?.motor?.uid && ENGINES[u.motor.engineId]);
+        merged.crane = p.crane?.motor?.uid ? p.crane : null;
+        merged.used = (p.used ?? []).filter((u: UsedPart) => u?.id && PARTS[u.part]);
+        merged.visualStock = { ...(p.visualStock ?? {}) };
+        // Schrottplatz beim ersten Laden eines älteren Spielstands füllen
+        if (merged.started && SLOTS.some((x) => x.kind === 'junk' && !merged.cars[x.id])) merged.cars = refreshJunk(merged.cars, Math.random, merged.day ?? 1);
         merged.carried = (p.carried ?? []).filter((t: ToolId) => TOOL_MAP[t] && ['driver', 'socket', 'device'].includes(TOOL_MAP[t].kind)).slice(0, MAX_CARRIED);
         if (!TOOL_MAP[merged.tool] || (TOOL_MAP[merged.tool].kind !== 'builtin' && !merged.carried.includes(merged.tool))) merged.tool = 'hand';
         merged.listings = (p.listings ?? [])
@@ -1097,6 +1516,10 @@ export const useGame = create<GameState>()(
         events: s.events,
         liftUp: s.liftUp,
         carried: s.carried,
+        engines: s.engines,
+        crane: s.crane,
+        used: s.used,
+        visualStock: s.visualStock,
         tool: s.tool,
         inventory: s.inventory,
         listings: s.listings,

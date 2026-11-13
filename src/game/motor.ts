@@ -330,4 +330,27 @@ export function junkify(car: CarInstance, rng: Rng, day: number): CarInstance {
 /** Defekte, die nur am ausgebauten Motor zu beheben sind. */
 export const standOnly = (id: keyof typeof DEFECTS) => DEFECTS[id].components.every((c) => COMPONENT_MAP[c.replace('*', '1')]?.access === 'stand');
 
+/**
+ * Folgen von zu starkem Tuning unter Volllast (Probefahrt, Prüfstand): Wer ein Risiko deutlich überschreitet,
+ * beschädigt das zugehörige Bauteil. Unterhalb der Schwelle bleibt es bei der Warnung.
+ */
+export function tuningDamage(car: CarInstance, risks: { id: string; level: number }[], rng: () => number): string[] {
+  const out: string[] = [];
+  const hit = (id: string, text: string) => {
+    const c = car.components[id];
+    if (!c || c.condition === 'defect') return;
+    c.condition = 'defect';
+    out.push(text);
+  };
+  for (const r of risks) {
+    if (r.level < 1 || rng() > Math.min(0.9, r.level * 0.6)) continue;
+    const pistons = Object.keys(car.components).filter((k) => /^piston\d$/.test(k));
+    if (r.id === 'knock') hit(pistons[Math.floor(rng() * pistons.length)] ?? 'head_gasket', 'Klopfen unter Volllast hat einen Kolben beschädigt – Kompression weg, Ölverbrauch.');
+    if (r.id === 'heat') hit('head_gasket', 'Überhitzt: Die Zylinderkopfdichtung ist durchgebrannt.');
+    if (r.id === 'mech') hit('bearing', 'Zu viel Drehmoment: Ein Pleuellager hat gefressen – es klopft.');
+    if (r.id === 'turbo') hit('turbo', 'Der Turbolader hat den Druck nicht überlebt.');
+  }
+  return out;
+}
+
 export const motorLabel = (m: MotorMeta) => `${ENGINES[m.engineId]?.name ?? m.engineId}`;
