@@ -174,6 +174,13 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   const again = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.cars[0].motor.uid, sw: s.cars[0].swap, v: s.cars[0].visual, e: s.engines.map((u) => u.motor.uid), used: s.used.map((u) => u.id), stand: !!s.cars[15], ecu: s.cars[0].ecu }); });
   expect(keep === again, 'Nach Neuladen: Motor im Auto, Umbauteile, Optik, Motorlager, Gebrauchtteile, Steuergerät erhalten');
 
+  // ---------- Akte bei ausgebautem Motor: Motorursachen bleiben sichtbar ----------
+  await G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; const c = L.createCar('bavaria_330', [], Math.random, {}); c.observed = ['blue_smoke']; const u = L.motor.extractEngine(c); c.motorOut = u.motor.uid; cars[1] = c; g.setState({ cars, crane: u, panel: null }); g.getState().setPanel('file', 1); });
+  await p.waitForTimeout(400);
+  const akte = await p.evaluate(() => document.querySelector('.modal') && document.querySelector('.modal').textContent);
+  expect(/Kolbenringe/.test(akte) && /Motor ist ausgebaut/.test(akte), 'Akte mit Motor am Kran: Kolbenringe weiter als mögliche Ursache, Hinweis auf ausgebauten Motor');
+  await G(() => { window.__gk.setState({ crane: null }); window.__gk.getState().setPanel(null); });
+
   // ---------- Motor ohne Öl starten: Warnung, nach Sekunden Lagerschaden ----------
   await G(() => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; const c = window.__gkLib.createCar('bavaria_320', [], Math.random, {}); c.hoodOpen = true; c.fluids.oil.level = 0; cars[1] = c; g.setState({ cars, panel: null }); g.getState().toggleEngine(1); });
   const warn = await G(() => ({ bay: window.__gk.getState().engineBay, toast: window.__gk.getState().toast && window.__gk.getState().toast.text }));

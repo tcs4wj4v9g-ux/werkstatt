@@ -23,7 +23,7 @@ import { billJob, fillJobs, refreshJobs } from './jobs';
 import { BARN_TRANSPORT, fillListings, freshComponents, inspectListing, makeOffer, nextMarketIndex, refreshListings, valuate } from './market';
 import * as repair from './repair';
 import type { ActionResult, Auction, BoltState, CarInstance, DefectId, EcuTune, FluidId, FluidProduct, FluidStock, GameEvent, Inventory, JobOffer, Listing, PartId, Screen, ToolId, VisualTune, ZoneId } from './types';
-import { tuningDamage, asStand, engineTest, engineValue, extractEngine, fromStand, insertEngine, junkEnginePrice, junkPartPrice, motorLabel, removalSteps, swapPlan, unitComplete, type EngineUnit, type UsedPart } from './motor';
+import { tuningDamage, asStand, engineTest, engineValue, extractEngine, fromStand, insertEngine, junkEnginePrice, junkPartPrice, motorLabel, removalSteps, swapPlan, unitComplete, withRemovedEngine, type EngineUnit, type UsedPart } from './motor';
 import { refreshJunk } from './junkyard';
 import { VISUAL_MAP, mountedId } from './data/visual';
 import { ENGINES } from './data/engines';
@@ -214,6 +214,12 @@ export function installOptions(s: Pick<GameState, 'inventory' | 'used'>, car: Ca
     used: s.used.filter((u) => parts.includes(u.part) && u.fit === fitOf(car, u.part)),
     old: !st.missing,
   };
+}
+
+/** Alle ausgebauten Motoren der Werkstatt: am Kran, auf dem Ständer, im Lager. */
+export function removedEngines(s: Pick<GameState, 'crane' | 'engines' | 'cars'>): EngineUnit[] {
+  const stand = s.cars[STAND_SLOT];
+  return [s.crane, ...s.engines, ...(stand ? [fromStand(stand)] : [])].filter((u): u is EngineUnit => !!u);
 }
 
 export function partPrice(s: Pick<GameState, 'events' | 'upgrades' | 'day'>, id: PartId, car?: CarInstance | null): number {
@@ -831,8 +837,10 @@ export const useGame = create<GameState>()(
           const s = get();
           // Ohne Angabe: das im Shop gewählte Auto, sonst das erste vorhandene.
           const at = slot ?? (s.cars[s.shopSlot] ? s.shopSlot : s.cars.findIndex(Boolean));
-          const car = at >= 0 ? s.cars[at] : null;
-          if (!car) return s.say('Wähle zuerst das Auto, für das du bestellst.', true);
+          const car0 = at >= 0 ? s.cars[at] : null;
+          if (!car0) return s.say('Wähle zuerst das Auto, für das du bestellst.', true);
+          // Ausgebauter Motor: Passform nach dem Motor, der zu diesem Auto gehört.
+          const car = car0.motor === null ? withRemovedEngine(car0, removedEngines(s)) : car0;
           const p = PARTS[id];
           const price = partPrice(s, id, car);
           const key = partKey(car, id);
@@ -1133,6 +1141,7 @@ export const useGame = create<GameState>()(
           const car = clone(cur);
           const unit = extractEngine(car);
           unit.motor.history = [...unit.motor.history, `Tag ${s.day}: ausgebaut aus ${CAR_MODELS[car.modelId].name}${junk ? ' (Schrottplatz)' : ''}`];
+          if (!junk) car.motorOut = unit.motor.uid;
           const cars = [...s.cars];
           cars[slot] = car;
           sfx.clunk();

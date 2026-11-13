@@ -9,7 +9,8 @@ import { DEFECTS } from '../game/data/defects';
 import { SYMPTOMS } from '../game/data/symptoms';
 import { causeStatus, possibleCauses } from '../game/diagnosis';
 import { knownDefects } from '../game/repair';
-import { useGame } from '../game/store';
+import { removedEngines, useGame } from '../game/store';
+import { withRemovedEngine } from '../game/motor';
 import { Modal } from './common';
 
 const STATUS = { confirmed: ['bestätigt', 'bad'], ruled_out: ['ausgeschlossen', 'good'], open: ['ungeprüft', ''] } as const;
@@ -21,8 +22,11 @@ const STATUS = { confirmed: ['bestätigt', 'bad'], ruled_out: ['ausgeschlossen',
  */
 export function FileModal() {
   const s = useGame();
-  const car = s.cars[s.panelBay];
-  if (!car) return null;
+  const real = s.cars[s.panelBay];
+  if (!real) return null;
+  // Ausgebauter Motor gehört für die Fehlersuche weiter zum Auto.
+  const car = withRemovedEngine(real, removedEngines(s));
+  const out = real.motor === null;
   const removed = Object.keys(car.components).filter((c) => !car.components[c].installed);
   const loose = Object.keys(car.components).filter((c) => car.components[c].installed && (car.components[c].bolts.some((b) => b < 2) || (COMPONENT_MAP[c].connector && !car.components[c].connected)));
   const symptoms = car.observed.filter((id) => SYMPTOMS[id]);
@@ -41,6 +45,11 @@ export function FileModal() {
         <div className="note">
           <b>Kundenauftrag von {car.job.customer}:</b> „{car.job.complaint}“
         </div>
+      )}
+      {out && (
+        <p className="meta">
+          {car.motor ? 'Der Motor ist ausgebaut (am Kran, auf dem Ständer oder im Lager) – seine Teile zählen hier weiter mit.' : 'In diesem Auto ist kein Motor. Motorursachen lassen sich erst wieder mit Motor prüfen.'}
+        </p>
       )}
       <h4>Beobachtete Symptome und mögliche Ursachen</h4>
       {symptoms.length === 0 && (

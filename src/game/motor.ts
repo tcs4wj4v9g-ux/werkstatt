@@ -151,6 +151,18 @@ export function insertEngine(car: CarInstance, unit: EngineUnit, swapParts: Part
   }
   car.dyno = undefined;
   car.testDriven = false;
+  delete car.motorOut;
+}
+
+/**
+ * Auto mit seinem ausgebauten Motor zusammengedacht (für Akte und Teileshop): Hängt der Motor am Kran,
+ * steht auf dem Ständer oder im Lager, zählen seine Teile weiter zum Auto. Ohne auffindbaren Motor bleibt das Auto, wie es ist.
+ */
+export function withRemovedEngine(car: CarInstance, units: EngineUnit[]): CarInstance {
+  if (car.motor !== null) return car;
+  const uid = car.motorOut ?? `${car.uid}-m`;
+  const unit = units.find((u) => u.motor.uid === uid);
+  return unit ? { ...car, motor: unit.motor, components: { ...car.components, ...unit.components } } : car;
 }
 
 /** Motor komplett montiert? (Voraussetzung für den Einbau ins Auto.) */

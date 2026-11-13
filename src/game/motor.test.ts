@@ -213,3 +213,22 @@ describe('Öl und Motorschaden', () => {
     expect(oilHarm(mk('bavaria_330'), 60000)).toBeNull();
   });
 });
+
+describe('Ausgebauter Motor gehört weiter zum Auto', () => {
+  it('Akte und Teileshop kennen die Motorteile, solange der Motor am Kran, Ständer oder im Lager ist', async () => {
+    const { withRemovedEngine } = await import('./motor');
+    const { possibleCauses } = await import('./diagnosis');
+    const car = mk('bavaria_330');
+    const unit = extractEngine(car);
+    car.motorOut = unit.motor.uid;
+    expect(car.motor).toBeNull();
+    expect(possibleCauses('blue_smoke', car).map((d) => d.id)).not.toContain('rings');
+    const both = withRemovedEngine(car, [unit]);
+    expect(possibleCauses('blue_smoke', both).map((d) => d.id)).toContain('rings');
+    expect(defsOf(both).some((d) => d.partId === 'spark_plug')).toBe(true);
+    expect(withRemovedEngine(car, [])).toBe(car);
+    // Auf den Ständer gesetzt: gleicher Motor, gleiche Teile
+    const stand = asStand(unit, 'bavaria_330');
+    expect(Object.keys(withRemovedEngine(car, [fromStand(stand)]).components)).toContain('piston1');
+  });
+});
