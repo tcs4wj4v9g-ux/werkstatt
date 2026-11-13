@@ -301,7 +301,13 @@ begin
       end if;
     end if;
     aft := coalesce(p->'after', 'null'::jsonb);
-    st := jsonb_set(st, path, aft, true);
+    -- "null" in einem Objekt heißt: Feld entfernen (sonst unterschiede sich das gespeicherte Auto vom Stand im Spiel).
+    -- In Listen (Stellplätze, Hebebühnen) bleibt null als leerer Platz stehen.
+    if aft = 'null'::jsonb and array_length(path, 1) > 1 and jsonb_typeof(st #> path[1:array_length(path, 1) - 1]) = 'object' then
+      st := st #- path;
+    else
+      st := jsonb_set(st, path, aft, true);
+    end if;
     if coalesce(st #> path, 'null'::jsonb) is distinct from aft then raise exception 'pfad_nicht_vorhanden %', path; end if;
     if not k = any (touched) then touched := touched || k; end if;
   end loop;

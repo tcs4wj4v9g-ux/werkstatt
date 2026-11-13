@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "e2e": "e2e/run.sh",
-    "test:sql": "supabase/test/db.sh start && node --test supabase/test/sql.test.mjs; r=$?; supabase/test/db.sh stop; exit $r"
+    "test:sql": "supabase/test/db.sh start && node --test supabase/test/sql-test.mjs; r=$?; supabase/test/db.sh stop; exit $r"
   },
   "dependencies": {
     "@react-three/fiber": "^8.17.10",

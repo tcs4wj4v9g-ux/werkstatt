@@ -14,7 +14,6 @@ import { TEST_MODE, useGfxSettings } from './gfx';
 import { Mesher } from './mesher';
 import { bayMaterials, beltGeometry, engineDecor, V_PIVOT, V_TILT } from './engineBay';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { create } from 'zustand';
 
 // Selbst gebautes Fahrzeug (keine Markenlogos, kein Fremdmodell). Fahrtrichtung = +X.
 // Mit `handlers` wird das Modell interaktiv (Werkstatt), sonst reine Anzeige.
@@ -29,6 +28,8 @@ export interface CarHandlers {
   onFluid(id: FluidId): void;
   /** Entlüfternippel am Bremssattel. */
   onBleed(side: 'fl' | 'fr'): void;
+  /** Vordertür am Griff öffnen/schließen (0 = links, 1 = rechts). */
+  onDoor?(side: number): void;
 }
 
 interface Props {
@@ -268,10 +269,6 @@ const DIRT = new THREE.Color('#5b4a36');
 const RUST = new THREE.Color('#6a3414');
 const FOAM = new THREE.Color('#f4f6f8');
 
-/** Geöffnete Vordertüren (nur Anzeige, nicht Teil des Spielstands): Schlüssel `uid:0|1`. */
-const useDoors = create<Record<string, boolean>>(() => ({}));
-(window as any).__gkDoors = useDoors;
-
 /** Karosseriebereich zu einem Punkt in Fahrzeugkoordinaten. */
 export function zoneAt(x: number, y: number, z: number): ZoneId {
   if (y > 1.02 && x < 0.85 && x > -2.25) return 'top';
@@ -358,8 +355,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const wheelFR = useRef<THREE.Group>(null);
   const doorL = useRef<THREE.Group>(null);
   const doorR = useRef<THREE.Group>(null);
-  const doorKey = car?.uid ?? '';
-  const doorsOpen = [useDoors((d) => !!d[`${doorKey}:0`]), useDoors((d) => !!d[`${doorKey}:1`])];
+  const doorsOpen = [!!car?.doors?.[0], !!car?.doors?.[1]];
   const hoodOpen = car?.hoodOpen ?? false;
   const full = lod === 'full';
   const dirt = car ? dirtLevel(car) : 0;
@@ -698,13 +694,13 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               <mesh geometry={geo.doors[k]} material={cabinMats} castShadow />
               <mesh geometry={doorTrim[k]} material={trimMats} />
             </group>
-            {car && handlers && (
+            {car && handlers?.onDoor && (
               <group
                 position={[hx - hinge[0], hy, s * (S.sideZ(hx, hy) + 0.02 - hinge[1])]}
                 userData={{ label: doorsOpen[k] ? 'Tür schließen' : 'Tür öffnen' }}
                 onClick={tap(() => {
                   if (useGame.getState().tool !== 'hand') return handlers.onBody(k ? 'right' : 'left');
-                  useDoors.setState({ [`${doorKey}:${k}`]: !doorsOpen[k] });
+                  handlers.onDoor!(k);
                 })}
               >
                 <Hit r={0.075} />

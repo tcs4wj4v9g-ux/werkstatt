@@ -37,11 +37,11 @@ const MODELS = process.argv.slice(2).length ? process.argv.slice(2) : ['bavaria_
     await p.waitForTimeout(2500);
     await look([4.3, BZ + 2.6], [0.2, 0.7, BZ]); await shot(`${model}-halle`);
     await p.evaluate(() => { const b = [...document.querySelectorAll('button')]; });
-    await p.evaluate(() => { const uid = window.__gk.getState().cars[0].uid; window.__gkDoors.setState({ [uid + ':1']: true }); });
+    await p.evaluate(() => window.__gk.getState().toggleDoor(0, 1));
     await p.waitForTimeout(1500);
     await look([-0.9, BZ + 2.5], [0.25, 0.75, BZ - 0.1]); await shot(`${model}-innen`);
     await look([-0.35, BZ + 1.7], [0.45, 0.8, BZ - 0.2], true); await shot(`${model}-cockpit`);
-    await p.evaluate(() => { const uid = window.__gk.getState().cars[0].uid; window.__gkDoors.setState({ [uid + ':1']: false }); });
+    await p.evaluate(() => window.__gk.getState().toggleDoor(0, 1));
     await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const cars = s.cars.slice(); cars[0] = { ...cars[0], hoodOpen: true }; g.setState({ cars }); });
     await p.waitForTimeout(1200);
     await look([2.95, BZ + 0.5], [1.4, 0.75, BZ], true); await shot(`${model}-motor`);

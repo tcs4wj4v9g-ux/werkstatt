@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { marketLabel } from '../game/market';
 import { useGame } from '../game/store';
 import { GFX_LABEL, useGfx, type GfxLevel } from '../three/gfx';
+import { CoopChip } from './CoopUI';
 
 export const eur = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
 
@@ -49,6 +50,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <button className="btn ghost" onClick={() => goto('menu')}>☰ Menü</button>
       {back && <button className="btn" onClick={back.onClick}>{back.label}</button>}
       <div className="title">{title}</div>
+      <CoopChip />
       <div className="daychip" title={marketLabel(index)}>
         Tag {day} · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
@@ -101,6 +103,7 @@ export function HelpModal() {
         <li><b>Markt:</b> 25 Inserate, die mehrere Tage stehen bleiben. Am Computer filtern und sortieren; beim Händler mit ◀ ▶ blättern.</li>
         <li><b>Karriere:</b> Erfolge bringen einmalige Prämien. Privatfahrzeuge bilden deine Sammlung. Wettbewerbe und Fahrzeugtreffen findest du am Computer unter „Wettbewerbe“.</li>
         <li><b>Spezialgeräte & Standorte:</b> Motor- und Getriebeheber, Leistungsprüfstand (📈 am Auto), Halle 2 mit weiteren Hebebühnen und der Showroom – alles unter „Ausbau“. In die neuen Hallen führt ein Durchgang in der Seitenwand.</li>
+        <li><b>Koop:</b> Im Menü eine gemeinsame Werkstatt erstellen oder mit Einladungscode beitreten. Autos, Geld, Lager und Ausbau gehören beiden; jeder hat seine eigene Werkzeugleiste und holt Werkzeug aus den Kisten an den Hebebühnen, dem Werkzeugschrank oder dem Spezialwerkzeugschrank. Oben zeigt 🟢 Koop, wer online ist.</li>
         <li><b>Türen:</b> Mit der ✋ Hand am Türgriff öffnest und schließt du die Vordertüren.</li>
         <li><b>Grafik:</b> Oben in dieser Hilfe und im Menü wählst du Niedrig, Mittel oder Hoch. „Automatisch“ senkt Auflösung und Stufe von selbst, wenn das Bild ruckelt.</li>
         <li><b>Ton:</b> 🔊 oben schaltet alle Geräusche ein oder aus.</li>

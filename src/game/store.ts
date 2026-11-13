@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { gatedStorage, saveGate } from './saveGate';
 import { engineAudio, setMuted, sfx } from './audio';
 import { advanceAuction, createAuction, heldMoney, MAX_AUCTIONS, placeBid, seeded } from './auctions';
 import { COMPONENT_MAP, defsOf } from './data/components';
@@ -27,7 +28,7 @@ export const START_MONEY = 6000;
 const noSlots = (): boolean[] => Array(SLOT_COUNT).fill(false);
 /** Sekunden, bis der Motor im Stand warm ist. */
 export const WARM_AFTER = 9;
-export type Panel = 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
+export type Panel = 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
 
 interface Toast {
   id: number;
@@ -120,6 +121,8 @@ export interface GameState {
   acceptJob(i: number): void;
   returnJob(bay: number, unrepaired?: boolean): void;
   tapHood(bay: number): void;
+  /** Vordertür öffnen/schließen (0 = links, 1 = rechts). */
+  toggleDoor(slot: number, side: number): void;
   tapLift(bay: number): void;
   tapBody(bay: number, zone?: ZoneId): void;
   tapBolt(bay: number, compId: string, index: number): void;
@@ -617,6 +620,17 @@ export const useGame = create<GameState>()(
           if (s.tool !== 'hand') return s.say('Die Haube öffnest du mit der Hand.', true);
           act(bay, (car) => repair.toggleHood(car), 'clunk');
         },
+        toggleDoor: (slot, side) => {
+          const s = get();
+          const car = s.cars[slot];
+          if (!car) return;
+          const doors = [!!car.doors?.[0], !!car.doors?.[1]];
+          doors[side] = !doors[side];
+          const cars = [...s.cars];
+          cars[slot] = { ...car, doors };
+          sfx.clunk();
+          set({ cars });
+        },
         tapLift: (bay) => {
           const s = get();
           if (!isLift(bay)) return;
@@ -998,6 +1012,8 @@ export const useGame = create<GameState>()(
     },
     {
       name: 'garage-kings-save-v1',
+      // Im Koop wird nicht in den lokalen Einzelspielstand geschrieben (siehe saveGate.ts).
+      storage: createJSONStorage(() => gatedStorage),
       version: 5,
       migrate: (old: any, version) => {
         if (!old) return old;
@@ -1101,7 +1117,8 @@ export const useGame = create<GameState>()(
 
 // Erfolge: nach jeder Änderung prüfen, ob etwas neu erreicht ist – Belohnung gibt es genau einmal.
 function checkAchievements(s: GameState) {
-  if (!s.started) return;
+  // Stände, die gerade vom Koop-Server eingespielt werden, lösen keine eigene Belohnung aus (sonst doppelt).
+  if (!s.started || saveGate.remote) return;
   const fresh = newlyAchieved(s, s.achieved);
   if (!fresh.length) return;
   sfx.cash();

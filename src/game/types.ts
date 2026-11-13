@@ -139,6 +139,8 @@ export interface ComponentState {
 }
 
 export interface CarInstance {
+  /** Geöffnete Vordertüren [links, rechts]. */
+  doors?: boolean[];
   uid: string;
   modelId: string;
   color: string;
