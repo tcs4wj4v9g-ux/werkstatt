@@ -78,7 +78,7 @@ export const useCoop = create<CoopState>(() => ({ status: 'off', ws: null, name:
 export const coopActive = () => useCoop.getState().status !== 'off';
 
 /** Letzte bekannte Lage der Mitspieler (für die Figuren in der Halle). */
-export const remotePlayers = new Map<string, Presence & { name: string; at: number }>();
+export const remotePlayers = new Map<string, Presence & { name: string; at: number; rt?: boolean }>();
 
 const SESSION_KEY = 'garage-kings-koop';
 const TEXT: Record<string, string> = {
@@ -167,9 +167,10 @@ function setMembers(members: Member[]) {
   for (const m of members) {
     if (m.id === me) continue;
     const known = remotePlayers.get(m.id);
-    // Frischere Lagedaten aus Realtime nicht mit dem langsameren Abgleich überschreiben
+    // Lagedaten aus Realtime sind frischer als die des Abgleichs: der Abgleich füllt nur aus, wenn Realtime länger schweigt.
     if (!m.online) remotePlayers.delete(m.id);
-    else if (typeof m.presence.x === 'number' && (!known || now - known.at > 900)) remotePlayers.set(m.id, { ...(m.presence as Presence), name: m.name, at: now });
+    else if (typeof m.presence.x === 'number' && (!known || (known.rt ? now - known.at > 6000 : now - known.at > 900))) remotePlayers.set(m.id, { ...(m.presence as Presence), name: m.name, at: now });
+    else if (known && known.name !== m.name) known.name = m.name;
   }
   useCoop.setState({ members });
 }
@@ -322,7 +323,8 @@ function sendPosition() {
   const p = presence();
   const key = JSON.stringify(p);
   const now = performance.now();
-  if (key === lastPos || now - lastPosAt < 110) return;
+  // Bei Stillstand alle zwei Sekunden ein Lebenszeichen, sonst höchstens etwa neunmal pro Sekunde.
+  if ((key === lastPos && now - lastPosAt < 2000) || now - lastPosAt < 110) return;
   lastPos = key;
   lastPosAt = now;
   try {
@@ -338,7 +340,7 @@ function openChannel(ws: string) {
     channel
       .on('broadcast', { event: 'pos' }, ({ payload }) => {
         const m = useCoop.getState().members.find((x) => x.id === payload.id);
-        if (m) remotePlayers.set(payload.id, { ...(payload as Presence), name: m.name, at: performance.now() });
+        if (m) remotePlayers.set(payload.id, { ...(payload as Presence), name: m.name, at: performance.now(), rt: true });
       })
       .on('broadcast', { event: 'poke' }, () => {
         lastSync = 0;
@@ -511,4 +513,4 @@ export const openBox = (box: string) => {
   useGame.getState().setPanel('cabinet');
 };
 
-if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, remotePlayers, takeTool, returnTool, buyTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject }) };
+if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, remotePlayers, takeTool, returnTool, buyTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };

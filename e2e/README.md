@@ -27,7 +27,7 @@ Ergebnisse und Bildschirmfotos landen in `e2e/out/` (nicht im Repository). Die S
 
 - `npm run test:sql` – 12 Tests direkt gegen eine lokale PostgreSQL-Instanz mit `supabase/schema.sql` (Zugriffsschutz, gleichzeitige Käufe, Werkzeugexemplare …). Braucht ein installiertes PostgreSQL.
 - `e2e/run.sh koop` startet dieselbe Datenbank und `e2e/coop-server.cjs`, einen Nachbau der Supabase-Schnittstelle (Anmeldung und Funktionsaufrufe, kein Realtime). Das Spiel wird mit `?koop=<Adresse>|<Schlüssel>` darauf gerichtet.
-- Nicht abgedeckt: das echte Supabase (Anmeldung, Realtime-Kanal). Das lässt sich erst mit einem eingerichteten Projekt prüfen.
+- Gegen das echte Supabase-Projekt: `npm run test:live` (Server direkt) und `node e2e/koop-live.cjs` (zwei Spieler im Spiel, braucht `vite preview` auf Port 4173). Beide legen eine Test-Werkstatt an und schließen danach deren Einladung. Die Cloud-Umgebung braucht dafür die Projektadresse in ihrer Netzwerkliste.
 
 ## Bildergalerie in voller Grafik
 
