@@ -4,6 +4,7 @@ import { DEFECTS, DEFECT_LIST, defectComponents } from './data/defects';
 import { ENGINES, isV, type EngineDef } from './data/engines';
 import { PARTS } from './data/parts';
 import { isComplete } from './repair';
+import { createZones } from './detail';
 import type { BoltState, CarInstance, ComponentState, MotorMeta, PartId } from './types';
 
 // Motoren als eigenständige Objekte: Ausbau, Lagerung, Motorständer, Einbau in ein anderes Fahrzeug.
@@ -183,7 +184,7 @@ export function asStand(unit: EngineUnit, fallbackModel: string): CarInstance {
       brake: { level: 0, quality: 1, bled: { fl: true, fr: true } } as any,
     },
     checked: {},
-    zones: {} as any,
+    zones: createZones(0, 0.6, 0, () => 0.5),
     interior: { seats: 0, dash: 0, floor: 0 },
     rarity: 0,
     origin: 'market',

@@ -145,6 +145,8 @@ export interface GameState {
   closePartPrompt(): void;
   /** Bestellt ein Teil in der Passform des Autos auf diesem Stellplatz. */
   buyPart(id: PartId, slot?: number): void;
+  /** Umbauteil für einen bestimmten Motor bestellen (Lagerschlüssel aus dem Umbauplan). */
+  buySwapPart(id: PartId, key: string): void;
   scanObd(bay: number): void;
   toggleEngine(bay: number): void;
   engineTick(): void;
@@ -815,7 +817,7 @@ export const useGame = create<GameState>()(
             }
           }
           const before = get().cars[bay];
-          if (compId === 'drain_plug' && before?.components.drain_plug.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
+          if (compId === 'drain_plug' && before?.components.drain_plug?.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
             sfx.error();
             return get().say('Erst die Auffangwanne unter den Motor stellen – sonst läuft das Altöl auf den Boden.', true);
           }
@@ -840,6 +842,14 @@ export const useGame = create<GameState>()(
           s.say(`Bestellt: ${p.name} für ${fitOf(car, id)} (−${price.toLocaleString('de-DE')} €). Liegt im Ersatzteilregal.`);
         },
 
+        buySwapPart: (id, key) => {
+          const s = get();
+          const price = Math.round(PARTS[id].price * (s.upgrades.includes('expansion') ? 0.9 : 1));
+          if (s.money - heldMoney(s.auctions) < price) return s.say('Dafür reicht das freie Geld nicht.', true);
+          sfx.cash();
+          set({ money: s.money - price, inventory: { ...s.inventory, [key]: (s.inventory[key] ?? 0) + 1 } });
+          s.say(`Bestellt: ${PARTS[id].name} (−${price.toLocaleString('de-DE')} €). Liegt im Ersatzteilregal.`);
+        },
         scanObd: (bay) => void act(bay, (car) => ({ ok: true, message: obdScan(car).length ? undefined : 'OBD: keine Fehler gespeichert.' })),
 
         toggleEngine: (bay) => {
@@ -1036,7 +1046,7 @@ export const useGame = create<GameState>()(
         togglePan: (bay) => {
           const s = get();
           const car = s.cars[bay];
-          if (s.drainPan[bay] && car && !car.components.drain_plug.installed) return s.say('Die Wanne bleibt stehen, solange die Ablassschraube draußen ist.', true);
+          if (s.drainPan[bay] && car && car.components.drain_plug?.installed === false) return s.say('Die Wanne bleibt stehen, solange die Ablassschraube draußen ist.', true);
           sfx.clunk();
           const drainPan = [...s.drainPan];
           drainPan[bay] = !drainPan[bay];

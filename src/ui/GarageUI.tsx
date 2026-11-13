@@ -23,6 +23,8 @@ import { eur, Modal, TopBar } from './common';
 import { CoopCabinet } from './CoopUI';
 import { useCoop } from '../net/coop';
 import { Joystick } from './Joystick';
+import { CranePanel, EnginesPanel, EngineTestPanel, JunkPanel, PartChoice, TuningPanel, UsedPartsList } from './EngineUI';
+import { engineOf } from '../game/data/components';
 
 const carName = (c: CarInstance) => `${CAR_MODELS[c.modelId].name} (${c.year})`;
 
@@ -73,9 +75,26 @@ export function GarageUI() {
           <div className="crosshair" />
           {focus.label && <div className="focus-label">{focus.label}</div>}
           {!work && <Joystick />}
-          {near && (
+          {near && kind === 'stand' && (
+            <div className="car-actions">
+              <button className="btn primary" data-testid="standpanel" onClick={() => s.setPanel('crane')}>🛠 Motorständer</button>
+              <button className="btn" onClick={() => s.flipEngine()}>↻ Drehen</button>
+              <button className="btn" onClick={() => s.testEngine()}>📊 Prüfen</button>
+            </div>
+          )}
+          {near && kind === 'junk' && (
+            <div className="car-actions">
+              <button className="btn primary" onClick={() => s.setPanel('junk')}>🏷 Preise & Kauf</button>
+              {near.motor !== null && <button className="btn" data-testid="junk-engine" onClick={() => s.liftEngine(nearBay)}>🏗 Motor ausbauen lassen</button>}
+            </div>
+          )}
+          {near && kind !== 'stand' && kind !== 'junk' && (
             <div className="car-actions">
               <button className="btn" data-testid="file" onClick={() => s.setPanel('file', nearBay)}>📋 Akte</button>
+              <button className="btn" data-testid="tuning" onClick={() => s.setPanel('tuning', nearBay)}>🛠 Tuning</button>
+              {kind === 'lift' && !near.lifted && near.hoodOpen && s.upgrades.includes('hoist') && (
+                <button className="btn" data-testid="cranepanel" onClick={() => s.setPanel('crane')}>🏗 {near.motor === null ? 'Motor einsetzen' : 'Motor ausbauen'}</button>
+              )}
               {kind === 'lift' && <button className="btn" data-testid="fluids" onClick={() => s.setPanel('fluids', nearBay)}>🛢 Flüssigkeiten</button>}
               <button className="btn" data-testid="move" onClick={() => s.setPanel('move', nearBay)}>🅿 Umparken</button>
               {!near.lifted && kind !== 'wash' && kind !== 'paint' && (
@@ -132,7 +151,23 @@ export function GarageUI() {
         </>
       )}
 
-      {near && !open && (
+      {near && !open && kind === 'stand' && (
+        <div className="panel left">
+          <h3 className="small">Motorständer: {engineOf(near).name}</h3>
+          <div className="meta">{near.motor?.km.toLocaleString('de-DE')} km · aus {CAR_MODELS[near.modelId].name}</div>
+          <div className="meta">{near.lifted ? '↻ gedreht – Unterseite oben' : 'Oberseite oben'}</div>
+          <div className="meta">{isAssembled(near) ? '✓ komplett montiert' : '✗ teilweise zerlegt'}</div>
+          {knownDefects(near).map((d) => <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>)}
+        </div>
+      )}
+      {near && !open && kind === 'junk' && near.junk && (
+        <div className="panel left">
+          <h3 className="small">{CAR_MODELS[near.modelId].name} ({near.year})</h3>
+          <div className="meta">{near.junk.story} · {near.motor === null ? 'ohne Motor' : engineOf(near).name}</div>
+          <div className="meta">Ausgebaute Teile werden sofort bezahlt. Preis steht beim Anvisieren.</div>
+        </div>
+      )}
+      {near && !open && kind !== 'stand' && kind !== 'junk' && (
         <div className="panel left">
           <h3 className="small">{SLOTS[nearBay].label}: {CAR_MODELS[near.modelId].name}</h3>
           <div className="meta">{near.job ? `Kundenfahrzeug von ${near.job.customer}` : 'Dein Fahrzeug'}</div>
@@ -226,7 +261,13 @@ export function GarageUI() {
         </Modal>
       )}
 
-      {s.partPrompt && (
+      {s.partPrompt?.choose && <PartChoice />}
+      {s.panel === 'crane' && <CranePanel />}
+      {s.panel === 'engines' && <EnginesPanel />}
+      {s.panel === 'junk' && <JunkPanel />}
+      {s.panel === 'tuning' && <TuningPanel />}
+      {s.panel === 'enginetest' && <EngineTestPanel />}
+      {s.partPrompt && !s.partPrompt.choose && (
         <Modal title="Neuteil fehlt" onClose={s.closePartPrompt}>
           <p>
             {COMPONENT_MAP[s.partPrompt.compId].name} ist defekt. Du hast kein passendes Neuteil „{PARTS[s.partPrompt.partId].name}“
@@ -283,6 +324,8 @@ function BenchModal() {
   const stock = Object.keys(s.inventory).filter((k) => s.inventory[k] > 0 && PARTS[splitKey(k).part]);
   return (
     <Modal title="Werkbank" onClose={() => s.setPanel(null)} wide>
+      <h4>Gebrauchtteile (mit eigener Kennung)</h4>
+      <UsedPartsList />
       <h4>Teile im Regal</h4>
       {stock.length === 0 && <p className="meta">Keine Ersatzteile vorrätig.</p>}
       {stock.map((k) => <div key={k} className="meta">{s.inventory[k]}× {PARTS[splitKey(k).part].name} – passend für {splitKey(k).fit}</div>)}

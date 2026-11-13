@@ -4,7 +4,7 @@ import { TOOL_MAP } from '../game/data/tools';
 import { saveGate } from '../game/saveGate';
 import { useGame } from '../game/store';
 import type { ToolId } from '../game/types';
-import { player, useFocus } from '../three/player';
+import { place, player, useFocus } from '../three/player';
 import { COOP_CONFIGURED, REALTIME, SUPABASE_KEY, SUPABASE_URL } from './config';
 import { apply, cleanShared, diff, pickShared, SHARED_KEYS, type Patch, type Shared } from './diff';
 
@@ -30,6 +30,8 @@ export interface Presence {
   pitch: number;
   tool: ToolId;
   scene: string;
+  /** Werkstatt oder Schrottplatz. */
+  place?: string;
   car: string | null;
 }
 export interface Member {
@@ -51,6 +53,7 @@ export const BOXES: Record<string, { name: string; cap: number }> = {
   kiste_b: { name: 'Werkzeugkiste B – Hebebühne 2', cap: 6 },
   schrank: { name: 'Werkzeugschrank', cap: 14 },
   spezial: { name: 'Spezialwerkzeugschrank', cap: 4 },
+  schrott: { name: 'Werkzeugregal Schrottplatz', cap: 8 },
 };
 /** Preise für ein weiteres Exemplar (muss zu gk_tool_price im SQL passen); Spezialwerkzeug ist nicht käuflich. */
 export const TOOL_PRICE: Partial<Record<ToolId, number>> = { ratchet: 60, screwdriver: 15, wrench: 25, socket10: 8, socket13: 8, socket16: 12, socket17: 10 };
@@ -158,7 +161,7 @@ function presence(): Presence {
   const near = useFocus.getState().nearBay;
   const car = g.screen === 'track' ? g.cars[g.driveBay]?.uid : g.screen === 'garage' && near >= 0 ? g.cars[near]?.uid : null;
   const r = (v: number) => Math.round(v * 100) / 100;
-  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, car: car ?? null };
+  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null };
 }
 
 function setMembers(members: Member[]) {
