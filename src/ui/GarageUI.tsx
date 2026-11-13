@@ -90,6 +90,8 @@ export function GarageUI() {
           )}
           {near && kind !== 'stand' && kind !== 'junk' && (
             <div className="car-actions">
+              {/* Ganz oben, damit er nie aus der scrollbaren Leiste rutscht (z. B. mit Prüfstand und „Gas geben“). */}
+              {work && <button className="btn primary leave" data-testid="leave" onClick={leave}>✕ Ansicht verlassen</button>}
               <button className="btn" data-testid="file" onClick={() => s.setPanel('file', nearBay)}>📋 Akte</button>
               <button className="btn" data-testid="tuning" onClick={() => s.setPanel('tuning', nearBay)}>🛠 Tuning</button>
               {kind === 'lift' && !near.lifted && near.hoodOpen && s.upgrades.includes('hoist') && (
@@ -127,7 +129,6 @@ export function GarageUI() {
                   🎯 {WORK_LABELS[v]}
                 </button>
               ))}
-              {work && <button className="btn primary" data-testid="leave" onClick={leave}>✕ Ansicht verlassen</button>}
             </div>
           )}
           <div className="fp-buttons">
