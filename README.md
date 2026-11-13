@@ -131,6 +131,14 @@ Marken und Motoren sind frei erfunden.
 
 Alles ist weiterhin prozedural erzeugt – keine fremden 3D-Modelle, keine Bilddateien, keine Lizenzpflichten. Einzelheiten: `docs/GRAFIKPLAN.md`.
 
+## Koop – gemeinsame Online-Werkstatt
+
+- Im Menü: **Koop-Werkstatt erstellen** (Einladungscode entsteht), **beitreten** (Code eingeben), **bestehende öffnen**. Bis zu vier Mitglieder; niemand muss online sein, damit die anderen spielen können.
+- Gemeinsam: Autos, Reparaturstand, Hebebühnen, Lager, Flüssigkeiten, Geld, Markt, Aufträge, Ausbau. Persönlich: Figur, Kamera, Werkzeugleiste.
+- Werkzeuge sind einzelne Exemplare in vier Kisten (Kiste A und B an den Hebebühnen, Werkzeugschrank, Spezialwerkzeugschrank mit Drehmomentschlüssel und OBD-Gerät, die es nur einmal gibt).
+- Der Einzelspielstand bleibt unberührt; im Koop wird nichts lokal gespeichert.
+- Server: Supabase (kostenloser Tarif). Einrichtung: `docs/KOOP_EINRICHTUNG.md`. Architektur, Stand und Grenzen: `DEVELOPMENT_PROGRESS.md`.
+
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
 1. In Safari `github.com` öffnen, anmelden, dieses Repository öffnen.

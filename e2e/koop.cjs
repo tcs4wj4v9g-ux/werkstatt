@@ -29,6 +29,10 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   /** Vergleich ohne Rücksicht auf die Reihenfolge der Schlüssel (die Datenbank sortiert sie um). */
   const norm = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().filter((y) => x[y] !== null).map((y) => [y, x[y]])) : x));
   const reject = (p) => G(p, () => JSON.stringify(window.__gkCoop.state().lastReject));
+  /** Felder des Einzelspielstands, die sich gegenüber dem Stand vor dem Koop geändert haben (Auktionen laufen in Echtzeit weiter und zählen nicht). */
+  let saveBefore = null;
+  const unchanged = (now) => { const s1 = JSON.parse(saveBefore).state, s2 = JSON.parse(now).state; return Object.keys(s1).filter((k) => k !== 'auctions' && norm(s1[k]) !== norm(s2[k])); };
+  const sees = (p, name, car) => until(p, ([name, car]) => { const m = window.__gkCoop.useCoop.getState().members.find((x) => x.name === name); return m && (m.presence.car || null) === car; }, [name, car]);
   const toolOf = (c, type, box) => c.tools.find((t) => t.type === type && t.box === box);
 
   // ---------- Vorbereitung: Spieler 1 hat einen Einzelspielstand ----------
@@ -36,7 +40,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await A.getByText('Neues Spiel').click(); await A.getByText("Los geht's").click(); await A.waitForTimeout(600);
   await G(A, () => window.__gk.setState({ money: 12345 })); await A.waitForTimeout(400);
   await G(A, () => window.__gk.getState().goto('menu')); await A.waitForTimeout(400);
-  const saveBefore = await save(A);
+  saveBefore = await save(A);
   expect(JSON.parse(saveBefore).state.money === 12345, 'Einzelspieler: Spielstand mit 12.345 € liegt im Gerätespeicher');
   expect(await A.getByText('Einzelspieler fortsetzen').isVisible(), 'Menü: „Einzelspieler fortsetzen“ vorhanden');
   expect(await A.getByText('Koop-Werkstatt erstellen').isVisible() && await A.getByText('Koop-Werkstatt beitreten').isVisible() && await A.getByText('Bestehende Koop-Werkstatt öffnen').isVisible(), 'Menü: Koop erstellen, beitreten, öffnen');
@@ -49,7 +53,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(await until(A, () => window.__gkCoop.useCoop.getState().status === 'online' && window.__gk.getState().screen === 'garage'), 'Spieler 1 erstellt die Werkstatt und steht in der Halle');
   let ca = await coop(A);
   expect(/^[A-Z2-9]{6}$/.test(ca.code), 'Einladungscode erzeugt: ' + ca.code);
-  expect((await game(A)).money !== 12345 && (await save(A)) === saveBefore, 'Koop startet mit eigenem Spielstand; der Einzelspielstand im Gerätespeicher ist unverändert');
+  expect((await game(A)).money !== 12345 && unchanged(await save(A)).length === 0, 'Koop startet mit eigenem Spielstand; der Einzelspielstand im Gerätespeicher ist unverändert');
 
   const B = await open('B');
   await B.getByText('Koop-Werkstatt beitreten').click();
@@ -160,6 +164,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(await until(B, (m) => window.__gk.getState().money === m - 60 && window.__gkCoop.useCoop.getState().tools.filter((t) => t.type === 'ratchet').length === 4, m0), 'Vierte Ratsche gekauft: eigenes Exemplar, 60 € vom gemeinsamen Konto, bei beiden sichtbar');
 
   // ---------- Gemeinsames Lager ----------
+  await until(A, (m) => window.__gk.getState().money === m - 60, m0); await settled(A);
   await G(A, () => window.__gk.getState().buyPart('spark_plug', 0)); await both(A, B);
   const inv = (await game(B)).inventory; const key = Object.keys(inv).find((k) => k.startsWith('spark_plug'));
   expect(inv[key] > 0 && (await game(A)).money === (await game(B)).money, `Teilekauf von Spieler 1 liegt im gemeinsamen Lager: ${inv[key]}× ${key}`);
@@ -184,11 +189,11 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   // ---------- Verkauf: gesperrt, solange der Partner am Auto steht; kein Doppelverkauf ----------
   const slot = ga.cars.findIndex((c, i) => c && i >= 2);
   await G(B, (BZ) => Object.assign(window.__gkPlayer, { x: 2.9, z: BZ, work: null }), BZ); // Spieler 2 steht an Bühne 1
-  await B.waitForTimeout(1500);
+  expect(await sees(A, 'Ben', ga.cars[0].uid), 'Spieler 1 sieht, dass Spieler 2 am Auto auf Bühne 1 steht');
   await G(A, () => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; cars[0] = null; g.setState({ cars, money: s.money + 5000 }); });
   await both(A, B);
   expect(!!(await game(A)).cars[0] && (await game(A)).money === 1000, 'Verkauf des Autos, an dem der Partner steht, wird vom Server abgelehnt');
-  await G(B, () => Object.assign(window.__gkPlayer, { x: 5.5, z: 4.5 })); await B.waitForTimeout(1500);
+  await G(B, () => Object.assign(window.__gkPlayer, { x: 5.5, z: 4.5 })); await sees(A, 'Ben', null);
   await Promise.all([A, B].map((p) => G(p, (slot) => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; cars[slot] = null; g.setState({ cars, money: s.money + 7000 }); }, slot)));
   await both(A, B);
   expect((await game(A)).money === 8000 && (await game(B)).money === 8000 && !(await game(B)).cars[slot], `Beide verkaufen gleichzeitig dasselbe Auto: Erlös nur einmal gutgeschrieben (${(await game(A)).money} / ${(await game(B)).money}, ${await reject(A)} ${await reject(B)})`);
@@ -231,8 +236,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(JSON.parse(before.tools).find((t) => t.id === ratA.id).holder === ca.me, 'Ratsche A ist weiterhin Spieler 1 zugeordnet (nicht dupliziert, nicht verschwunden)');
 
   // ---------- Test 8: Einzelspieler ----------
-  const s1 = JSON.parse(saveBefore).state, s2 = JSON.parse(await save(A)).state;
-  const changed = Object.keys(s1).filter((k) => norm(s1[k]) !== norm(s2[k]));
+  const changed = unchanged(await save(A));
   expect(changed.length === 0, 'Einzelspielstand von Spieler 1 ist inhaltlich unverändert' + (changed.length ? ' – abweichend: ' + changed : ''));
   expect((await game(A)).money === 12345 && (await game(A)).started, 'Im Menü steht wieder der Einzelspielstand');
   await A.getByText('Einzelspieler fortsetzen').click(); await A.waitForTimeout(600);

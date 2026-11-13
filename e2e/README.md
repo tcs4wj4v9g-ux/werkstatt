@@ -11,6 +11,7 @@ Echte Tipps im laufenden Spiel (Playwright, Chromium mit Software-Grafik). Vorau
 | `motoren` | R6, V8, Diesel, Turbo: Zylinderteile, Passform, Klangbild | Motoren, Teile, 3D-Motorraum |
 | `markt` | 25 Inserate, Filter, Blättern, Teileshop je Auto, Akte, Karosserie-Bilder | Markt, Shop, Karosserien |
 | `karriere` | Version-4-Spielstand, Standorte, Getriebe mit Heber, Prüfstand, Showroom, Wettbewerb, Treffen | Karriere, Standorte, Spielstand |
+| `koop` | Zwei Spieler in getrennten Browser-Profilen gegen das echte SQL-Schema: die acht Pflichtszenarien (Zugang, Reparatur, Ratschen, Spezialwerkzeug, Geld, Verbindungsabbruch, Wiederbeitritt, Einzelspieler) | Koop (`src/net`, `supabase/schema.sql`), Spielstand, Werkzeuge |
 
 ```
 e2e/run.sh                  # alle, drei gleichzeitig (rund 5½ Minuten)
@@ -21,6 +22,12 @@ TEST_DPR=0.5 e2e/run.sh     # höhere Auflösung, wenn die Bildschirmfotos der T
 
 Ergebnisse und Bildschirmfotos landen in `e2e/out/` (nicht im Repository). Die Seite läuft dabei im Testmodus
 (`?test`): ein Viertel der Auflösung, keine Schatten, keine Kantenglättung. Gemessen: halbe Auflösung 11 Minuten, Viertel-Auflösung 5½ Minuten. Spiellogik und Tipp-Erkennung sind dieselben.
+
+## Koop-Tests
+
+- `npm run test:sql` – 12 Tests direkt gegen eine lokale PostgreSQL-Instanz mit `supabase/schema.sql` (Zugriffsschutz, gleichzeitige Käufe, Werkzeugexemplare …). Braucht ein installiertes PostgreSQL.
+- `e2e/run.sh koop` startet dieselbe Datenbank und `e2e/coop-server.cjs`, einen Nachbau der Supabase-Schnittstelle (Anmeldung und Funktionsaufrufe, kein Realtime). Das Spiel wird mit `?koop=<Adresse>|<Schlüssel>` darauf gerichtet.
+- Nicht abgedeckt: das echte Supabase (Anmeldung, Realtime-Kanal). Das lässt sich erst mit einem eingerichteten Projekt prüfen.
 
 ## Bildergalerie in voller Grafik
 

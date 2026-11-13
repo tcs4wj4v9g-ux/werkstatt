@@ -180,8 +180,8 @@ function Avatar({ id, index }: { id: string; index: number }) {
       <mesh ref={tool} position={[0.28, 1.13, 0.4]} rotation={[0.5, 0, 0]} material={mats[FIG.tool]} raycast={() => null}>
         <boxGeometry args={[0.03, 0.03, 0.26]} />
       </mesh>
-      <sprite position={[0, 1.98, 0]} scale={[0.62, 0.155, 1]} material={label} raycast={() => null} />
-      <sprite ref={toolSprite} position={[0, 1.82, 0]} scale={[0.5, 0.125, 1]} raycast={() => null} />
+      <sprite position={[0, 1.95, 0]} scale={[0.4, 0.1, 1]} material={label} raycast={() => null} />
+      <sprite ref={toolSprite} position={[0, 1.84, 0]} scale={[0.32, 0.08, 1]} raycast={() => null} />
     </group>
   );
 }

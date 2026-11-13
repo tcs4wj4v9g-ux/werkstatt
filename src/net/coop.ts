@@ -459,7 +459,9 @@ async function toolCall(fn: string, args: Record<string, unknown>, done?: (r: an
     setTools(r.tools, r.toolsRev);
     if (!r.ok) useGame.getState().say(text(r.reason), true);
     else done?.(r);
+    // Sofort abgleichen: ein Werkzeugkauf ändert das gemeinsame Konto auf dem Server.
     lastSync = 0;
+    await step();
   } catch (e) {
     useGame.getState().say(e instanceof NetError ? 'Keine Verbindung – Werkzeuge lassen sich gerade nicht holen oder zurücklegen.' : text(String((e as Error).message)), true);
   }

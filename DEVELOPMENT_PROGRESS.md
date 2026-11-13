@@ -23,16 +23,27 @@ Arbeitsbranch `claude/garage-kings-pwa-7nyohs`. ☑ erledigt, ◐ in Arbeit, ☐
 ## Phasen
 
 - ☑ 1 Analyse und Architektur
-- ☑ 2 Online-Backend (Schema, Zugriffsschutz, Einladung, Transaktionen, Werkzeugexemplare) – 12 Datenbanktests grün
-- ☐ 3 Gemeinsame Werkstatt im Spiel (anlegen, beitreten, laden, speichern)
-- ☐ 4 Spielerbewegungen und Figuren
-- ☐ 5 Gemeinsame Fahrzeuge (inkl. Türen)
-- ☐ 6 Gemeinsame Reparaturen, Sperren
-- ☐ 7 Werkzeugkisten und persönliche Leisten
-- ☐ 8 Wirtschaft, Lager, Kontobuch
-- ☐ 9 Menüs, Verbindungsstatus, Wiederverbindung
-- ☐ 10 Zwei-Spieler-Tests (acht Pflichtszenarien), Abschluss
+- ☑ 2 Online-Backend (Schema, Zugriffsschutz, Einladung, Transaktionen, Werkzeugexemplare) – 12 Datenbanktests
+- ☑ 3 Gemeinsame Werkstatt im Spiel: `src/net/coop.ts` (anlegen, beitreten, öffnen, verlassen), Speicherschutz `src/game/saveGate.ts`
+- ☑ 4 Spielerbewegungen und Figuren: `src/three/CoopScene.tsx` (`Avatars`), Position über Abgleich, zusätzlich Realtime-Broadcast
+- ☑ 5 Gemeinsame Fahrzeuge: alle Fahrzeugfelder, Haube, Türen (`car.doors`, `toggleDoor`), Hebebühnen
+- ☑ 6 Gemeinsame Reparaturen: Bauteile einzeln abgeglichen, Verkaufssperre über Anwesenheit
+- ☑ 7 Werkzeugkisten (`ToolBoxes`, `CoopCabinet`) und persönliche Leisten
+- ☑ 8 Geld, Lager, Kontobuch (`CoopModal`)
+- ☑ 9 Menü, Statusanzeige, Wiederverbindung, Verlassen
+- ☑ 10 Zwei-Spieler-Test `e2e/koop.cjs`: 59 Prüfpunkte, alle acht Pflichtszenarien, gegen das echte SQL über den Schnittstellen-Nachbau
+- ☐ Echtes Supabase-Projekt eintragen (`src/net/config.ts`) und dagegen prüfen: Anmeldung, Realtime-Kanal
+
+## Bekannte Grenzen
+
+- Gegen das echte Supabase ist noch nichts gelaufen (kein Projekt vorhanden). Getestet sind das SQL (echtes PostgreSQL) und das Spiel über einen Nachbau der Schnittstelle ohne Realtime.
+- Reparaturregeln prüft das Spiel, nicht der Server. Ein manipulierter Client eines Mitglieds könnte Bauteile beliebig setzen – aber weder Geld erzeugen, das die Regeln oben verletzt, noch fremde Werkstätten erreichen.
+- Motorlauf, Probefahrt und Verhandlung des Partners sind nicht sichtbar (nur das Ergebnis). Waschplatz- und Lackiergeräte sind keine Exemplare.
+- Die Verkaufssperre beruht auf der gemeldeten Anwesenheit (bis etwa eine Sekunde alt).
+- Offline gemachte Schritte werden beim Wiederverbinden übertragen; widersprechen sie dem, was der Partner inzwischen getan hat, gilt der Serverstand und die eigenen Schritte verfallen.
+- Künftige Änderungen am Spielstand-Format brauchen eine Umstellung der gespeicherten Koop-Werkstätten (noch nicht vorhanden).
+- Kisten für Bühne 3 und 4 (größere Standorte) gibt es nicht; dort holt man Werkzeug aus den vorhandenen Kisten.
 
 ## Was der Projektinhaber einrichten muss
 
-Supabase-Projekt anlegen, `supabase/schema.sql` ausführen, anonyme Anmeldung einschalten, Projekt-URL und öffentlichen Schlüssel („anon“) nennen. Genaue Anleitung folgt in `docs/KOOP_EINRICHTUNG.md`.
+Supabase-Projekt anlegen, `supabase/schema.sql` ausführen, anonyme Anmeldung einschalten, Projekt-URL und öffentlichen Schlüssel („anon“) nennen. Genaue Anleitung: `docs/KOOP_EINRICHTUNG.md`.
