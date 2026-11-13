@@ -5,7 +5,7 @@ import { TOOL_MAP } from '../game/data/tools';
 import { openBox, remotePlayers, useCoop } from '../net/coop';
 import { Interactable } from './Interactable';
 import { mat, Mesher } from './mesher';
-import type { Box } from './player';
+import { place, type Box } from './player';
 import { textTexture } from './textures';
 import { DECO, decoMaterials } from './workshopDecor';
 
@@ -142,7 +142,7 @@ function Avatar({ id, index }: { id: string; index: number }) {
     const p = remotePlayers.get(id);
     if (!g) return;
     // Nur in der Halle sichtbar (auf Probefahrt oder beim Händler ist der Partner woanders).
-    g.visible = !!p && p.scene === 'garage';
+    g.visible = !!p && p.scene === 'garage' && (p.place ?? 'werkstatt') === place.at;
     if (!p || !g.visible) return;
     const s = shown.current;
     if (!s.init) Object.assign(s, { x: p.x, z: p.z, yaw: p.yaw, init: true });

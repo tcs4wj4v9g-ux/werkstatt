@@ -6,14 +6,15 @@
 export const SHARED_KEYS = [
   'money', 'cars', 'upgrades', 'fluidStock', 'drainPan', 'auctions', 'waiting', 'events', 'liftUp', 'inventory',
   'listings', 'jobs', 'day', 'marketIndex', 'carsSold', 'totalProfit', 'jobsDone', 'career', 'achieved', 'contest', 'meet', 'jobEarnings',
+  'engines', 'crane', 'used', 'visualStock',
 ] as const;
 export type SharedKey = (typeof SHARED_KEYS)[number];
 export type Shared = Record<SharedKey, any>;
 
 /** Große Listen: statt des alten Werts wird nur die erwartete Versionsnummer des Feldes mitgeschickt. */
-const BY_VERSION = new Set<string>(['listings', 'auctions', 'jobs', 'events', 'waiting']);
+const BY_VERSION = new Set<string>(['listings', 'auctions', 'jobs', 'events', 'waiting', 'engines', 'used']);
 /** Felder, deren Einträge einzeln abgeglichen werden. */
-const PER_ENTRY = new Set<string>(['inventory', 'fluidStock', 'drainPan', 'liftUp']);
+const PER_ENTRY = new Set<string>(['inventory', 'fluidStock', 'drainPan', 'liftUp', 'visualStock']);
 /** Felder eines Autos, deren Einträge einzeln abgeglichen werden (Bauteile, Karosseriebereiche, Flüssigkeiten). */
 const CAR_PER_ENTRY = new Set<string>(['components', 'zones', 'fluids']);
 

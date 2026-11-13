@@ -33,7 +33,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const cc = s.car.components;
   expect(s.car.uid === 'v4car' && cc.coil5 && cc.coil6 && cc.plug6 && cc.coil5.installed && !cc.coil2.installed && cc.coil2.condition === 'defect' && cc.coil2.known, 'Alter Sechszylinder: Zylinder 5 und 6 ergänzt, ausgebaute defekte Spule 2 unverändert');
   expect(cc.cyl_head.installed && cc.gearbox.installed && cc.head_gasket.condition === 'ok' && s.car.partsSpent === 49 && s.car.observed.join() === 'rough_idle', 'Neue Bauteile (Kopf, Getriebe) heil ergänzt, Reparaturstand und Beobachtungen erhalten');
-  expect(s.listings === 25 && s.n === 15 && s.liftUp === 15, 'Markt auf 25 Inserate gefüllt, Stellplatzliste auf neue Größe gebracht');
+  expect(s.listings === 25 && s.n === 22 && s.liftUp === 22, 'Markt auf 25 Inserate gefüllt, Stellplatzliste auf neue Größe gebracht');
   expect(s.achieved.includes('first_sale') && s.money > 31337, 'Bereits erreichte Erfolge werden einmalig nachgetragen (Geld ' + s.money + ', Erfolge ' + s.achieved.join(',') + ')');
   const moneyAfter = s.money;
   await p.reload(); await p.waitForTimeout(2500);

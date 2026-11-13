@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COMPONENT_MAP, defOf, defsOf } from './data/components';
 import { applicableDefects, CLASS_TARGETS, randomDefects, randomListing } from './market';
+import { standOnly } from './motor';
 import { basePartPrice, defectLabor, defectPenalty, migrateInventory, partKey } from './fitment';
 import { cylinderSlots, ENGINES } from './data/engines';
 import { firingHz, VOICES } from './audio';
@@ -163,7 +164,8 @@ describe('Schrauben, Stecker, Werkzeuge', () => {
 
 describe('Reparatur', () => {
   it('jeder Defekt lässt sich einzeln beheben und das Auto wieder komplett montieren', () => {
-    for (const model of ['bavaria_320', 'bavaria_320d', 'bavaria_335_coupe', 'nordwind_s6', 'bavaria_550']) for (const id of applicableDefects(model)) {
+    // Schäden im Motorinneren (Kolbenringe, Hauptlager …) behebt man am ausgebauten Motor – eigener Test unten.
+    for (const model of ['bavaria_320', 'bavaria_320d', 'bavaria_335_coupe', 'nordwind_s6', 'bavaria_550']) for (const id of applicableDefects(model).filter((d) => !standOnly(d))) {
       const d = DEFECTS[id];
       const car = mk(model, [d.id]);
       const i = inv(4);
@@ -177,8 +179,9 @@ describe('Reparatur', () => {
   });
 
   it('alle Defekte zusammen: abzugsfrei erst nach Reparatur und Probefahrt', () => {
-    const all = applicableDefects('bavaria_320');
+    const all = applicableDefects('bavaria_320').filter((d) => !standOnly(d));
     expect(all.length).toBe(19);
+    expect(applicableDefects('bavaria_320').filter((d) => standOnly(d)).sort()).toEqual(['camshaft', 'main_bearing', 'oil_pump', 'rings', 'timing_chain']);
     const car = mk('bavaria_320', all);
     const i = inv(8);
     expect(valuate(car).deductions.filter((d) => d.defect).length).toBe(all.length);
@@ -242,7 +245,7 @@ describe('Diagnose', () => {
   it('ein Symptom hat mehrere mögliche Ursachen, die der Spieler eingrenzt', () => {
     expect(possibleCauses('rough_idle', mk('bavaria_320', [])).map((d) => d.id).sort()).toEqual(['coil', 'plugs', 'vacuum']);
     expect(possibleCauses('rough_idle', mk('bavaria_320d', [])).map((d) => d.id).sort()).toEqual(['egr', 'glow', 'injector', 'vacuum']);
-    expect(possibleCauses('metal_noise').map((d) => d.id).sort()).toEqual(['bearing', 'chain', 'lifters']);
+    expect(possibleCauses('metal_noise').map((d) => d.id).sort()).toEqual(['bearing', 'chain', 'lifters', 'timing_chain']);
     expect(possibleCauses('coolant_wet').map((d) => d.id).sort()).toEqual(['coolant_hose', 'water_pump']);
     DEFECT_LIST.forEach((d) => d.symptoms.forEach((s) => expect(SYMPTOMS[s], `${d.id}:${s}`).toBeTruthy()));
 
@@ -613,7 +616,7 @@ describe('Werkstattausbau und Scheunenfunde', () => {
     expect(lifts(['loc_pro'])).toBe(3);
     expect(lifts(['loc_pro', 'loc_center'])).toBe(4);
     expect(availableSlots(['loc_pro', 'loc_center', 'loc_hq']).filter((s) => s.kind === 'show').length).toBe(3);
-    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.length);
+    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.filter((s) => s.kind !== 'stand' && s.kind !== 'junk').length);
     expect(UPGRADES.find((u) => u.id === 'loc_center')!.grants).toEqual(['wash', 'paint', 'dyno']);
     expect(UPGRADES.filter((u) => u.location).map((u) => u.price)).toEqual([75000, 200000, 500000]);
     // Keine zwei Stellplätze überlappen

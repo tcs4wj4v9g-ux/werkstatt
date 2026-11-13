@@ -42,6 +42,26 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
     id: 'lifters', name: 'Verschlissene Hydrostößel', components: ['rocker'], pick: 'all',
     penalty: 900, symptoms: ['metal_noise', 'tick_top'], labor: 260, category: 'Motor',
   },
+  rings: {
+    id: 'rings', name: 'Verschlissene Kolbenringe', components: ['piston*'], pick: 'one',
+    penalty: 1800, symptoms: ['blue_smoke', 'power_loss'], labor: 900, category: 'Motor', weight: 0.35,
+  },
+  main_bearing: {
+    id: 'main_bearing', name: 'Verschlissene Hauptlager', components: ['mainbrg'], pick: 'all',
+    penalty: 2800, symptoms: ['knock_load', 'oil_lamp'], labor: 1100, category: 'Motor', weight: 0.2, lamp: '🛢️ Öldruck',
+  },
+  oil_pump: {
+    id: 'oil_pump', name: 'Schwache Ölpumpe', components: ['oil_pump'], pick: 'all',
+    penalty: 1400, symptoms: ['oil_lamp', 'tick_top'], labor: 420, category: 'Motor', weight: 0.3, lamp: '🛢️ Öldruck',
+  },
+  camshaft: {
+    id: 'camshaft', name: 'Eingelaufene Nockenwellen', components: ['camshaft', 'camshaft_b'], pick: 'one',
+    penalty: 1300, symptoms: ['tick_top', 'power_loss'], labor: 520, category: 'Motor', weight: 0.3,
+  },
+  timing_chain: {
+    id: 'timing_chain', name: 'Gelängte Steuerkette', components: ['timing_chain'], pick: 'all',
+    penalty: 1500, symptoms: ['rattle_start', 'metal_noise'], labor: 640, category: 'Motor', weight: 0.3,
+  },
   chain: {
     id: 'chain', name: 'Defekter Steuerkettenspanner', components: ['chain_tensioner'], pick: 'all',
     penalty: 1200, symptoms: ['metal_noise', 'rattle_start'], labor: 140, category: 'Motor',

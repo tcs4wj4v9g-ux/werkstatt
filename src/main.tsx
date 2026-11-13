@@ -1,3 +1,6 @@
+import { defOf, defsOf } from './game/data/components';
+import { performance } from './game/performance';
+import * as motor from './game/motor';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
@@ -21,10 +24,10 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 // Für automatisierte Tests und Fehlersuche.
 import { useGame } from './game/store';
 (window as any).__gk = useGame;
-import { player } from './three/player';
+import { player, travel } from './three/player';
 (window as any).__gkPlayer = player;
 import { engineAudio } from './game/audio';
 (window as any).__gkAudio = engineAudio;
 import { createCar } from './game/market';
 import { movePlayer } from './three/player';
-(window as any).__gkLib = { createCar, movePlayer };
+(window as any).__gkLib = { createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance };

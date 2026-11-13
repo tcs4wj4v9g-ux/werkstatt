@@ -49,7 +49,7 @@ export interface Achievement {
   progress(v: CareerView): [number, number];
 }
 
-const kept = (v: CareerView) => v.cars.filter((c): c is CarInstance => !!c && c.keep && !c.job);
+const kept = (v: CareerView) => v.cars.filter((c): c is CarInstance => !!c && c.keep && !c.job && !c.junk && !c.bare);
 const count = (n: number, of: number): [number, number] => [Math.min(n, of), of];
 const flag = (ok: boolean): [number, number] => [ok ? 1 : 0, 1];
 

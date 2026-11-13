@@ -1,5 +1,6 @@
 import { CAR_MODELS, COLLECTOR_MODELS, modelsOfClass, RARE_MODELS } from './data/cars';
-import { defsOf } from './data/components';
+import { defsOf, engineOf, modelEngine } from './data/components';
+import { performance } from './performance';
 import { DEFECTS, DEFECT_LIST, defectApplies, defectComponents } from './data/defects';
 import { costFactor, defectPenalty } from './fitment';
 import { SELLER_LIST, SELLER_NAMES, SELLERS, type SellerProfile } from './data/sellers';
@@ -23,9 +24,9 @@ export const CLASS_TARGETS: Record<CarClass, number> = { budget: 8, mid: 7, spor
 /** Zünd- und Einspritzteile haben einen messbaren Restzustand in Prozent. */
 export const HEALTH_PARTS: PartId[] = ['ignition_coil', 'spark_plug', 'injector', 'glow_plug'];
 
-export function freshComponents(modelId = 'bavaria_320'): CarInstance['components'] {
+export function freshComponents(car: string | Pick<CarInstance, 'modelId' | 'motor' | 'bare'> = 'bavaria_320'): CarInstance['components'] {
   const components: CarInstance['components'] = {};
-  for (const c of defsOf({ modelId })) {
+  for (const c of defsOf(typeof car === 'string' ? { modelId: car } : car)) {
     components[c.id] = { installed: true, bolts: Array(c.bolts).fill(2), connected: true, condition: 'ok', known: false };
     if (c.partId && HEALTH_PARTS.includes(c.partId)) components[c.id].health = 100;
   }
@@ -342,7 +343,16 @@ export interface Valuation {
 export function valuate(car: CarInstance, index = 1): Valuation {
   const cleanValue = round50(car.cleanValue * index);
   const deductions: Valuation['deductions'] = activeDefects(car).map((d) => ({ label: DEFECTS[d].name, amount: defectPenalty(car, d), defect: d }));
+  if (car.motor === null) deductions.push({ label: 'Kein Motor eingebaut', amount: round50(cleanValue * 0.45) });
   if (!isAssembled(car)) deductions.push({ label: 'Nicht fahrbereit (Teile demontiert)', amount: round50(1500 * costFactor(car)) });
+  // Umbau und Tuning: Liebhaber wollen Originalzustand, andere zahlen für saubere Mehrleistung.
+  const model = CAR_MODELS[car.modelId];
+  const purist = !!(model.collector || model.rare || model.body === 'classic');
+  const visualCount = Object.values(car.visual ?? {}).filter((v) => v !== undefined && v !== false && v !== 0 && v !== 'stock' && v !== 'none').length;
+  const perf = car.motor !== null ? performance(car) : null;
+  const tuned = !!car.swap || !!car.motor?.turboKit || (car.ecu?.map ?? 0) > 0 || Object.values(car.components).some((c) => c.variant);
+  if (purist && (tuned || visualCount)) deductions.push({ label: 'Nicht mehr im Originalzustand', amount: round50(cleanValue * Math.min(0.25, 0.08 + 0.03 * visualCount)) });
+  if (perf && perf.output.risks.some((r) => r.level >= 0.5)) deductions.push({ label: 'Tuning nicht sauber abgestimmt', amount: round50(cleanValue * 0.08) });
   const clean = deductions.length === 0;
   if (!car.testDriven) deductions.push({ label: 'Keine Probefahrt nach Reparatur', amount: round50(cleanValue * 0.06) });
   // Wartungszustand der Flüssigkeiten
@@ -362,6 +372,14 @@ export function valuate(car: CarInstance, index = 1): Valuation {
   if (car.rarity > 0 && clean) {
     const kept = dirtLevel(car) < 0.2 && rustLevel(car) < 0.05;
     extras.push({ label: kept ? `Sammlerzustand (${RARITY_NAMES[car.rarity]})` : `Liebhaberfahrzeug (${RARITY_NAMES[car.rarity]}), Pflege mäßig`, amount: round50(cleanValue * (car.rarity === 2 ? 0.07 : 0.05) * (kept ? 1 : 0.3)) });
+  }
+  if (!purist && clean && perf && perf.ps > perf.ratedPs * 1.05 && !perf.output.risks.length) {
+    extras.push({ label: `Leistungssteigerung (${perf.ps} PS, sauber abgestimmt)`, amount: round50(cleanValue * Math.min(0.3, (perf.ps / perf.ratedPs - 1) * 0.35)) });
+  }
+  if (!purist && visualCount && clean) extras.push({ label: `Optisches Tuning (${visualCount} Teile)`, amount: round50(cleanValue * Math.min(0.08, visualCount * 0.012)) });
+  if (car.swap && clean && perf) {
+    const orig = modelEngine(car);
+    if (perf.ratedPs > orig.ps) extras.push({ label: `Motorumbau auf ${engineOf(car).name}`, amount: round50(cleanValue * (purist ? 0 : Math.min(0.25, (perf.ratedPs / orig.ps - 1) * 0.25))) });
   }
   // Ein aktuelles Prüfstandsprotokoll mit voller Leistung überzeugt Käufer.
   if (car.dyno && clean && car.dyno.ps >= car.dyno.ratedPs * 0.97) extras.push({ label: `Leistungsprotokoll (${car.dyno.ps} PS gemessen)`, amount: round50(cleanValue * 0.015) });

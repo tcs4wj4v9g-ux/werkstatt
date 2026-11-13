@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
 import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
 import { engineOf } from '../game/data/components';
-import { SLOTS } from '../game/data/workshop';
+import { SLOTS, isFleet } from '../game/data/workshop';
 import { RARITY_NAMES } from '../game/market';
 import { performance, powerCurve } from '../game/performance';
 import { contestScore, meetBlocker, meetScore } from '../game/contests';
@@ -151,7 +151,7 @@ export function ContestsTab() {
   const s = useGame();
   const c = s.contest;
   const m = s.meet;
-  const own = s.cars.map((car, slot) => ({ car, slot })).filter((x) => x.car && !x.car.job);
+  const own = s.cars.map((car, slot) => ({ car, slot })).filter((x) => x.car && !x.car.job && isFleet(x.slot));
   return (
     <>
       <h4>Händler-Wettbewerb</h4>

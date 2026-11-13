@@ -3,9 +3,11 @@ import { heldMoney, minBid } from '../game/auctions';
 import { CAR_MODELS } from '../game/data/cars';
 import { FLUID_LIST } from '../game/data/fluids';
 import { defsOf, engineOf } from '../game/data/components';
-import { PART_LIST } from '../game/data/parts';
+import { PART_LIST, PARTS } from '../game/data/parts';
 import { fitOf, stockOf } from '../game/fitment';
-import { availableSlots, SLOTS, UPGRADES } from '../game/data/workshop';
+import { availableSlots, SLOTS, STAND_SLOT, UPGRADES, isJunk } from '../game/data/workshop';
+import { fromStand, swapPlan, type EngineUnit } from '../game/motor';
+import { ENGINES } from '../game/data/engines';
 import { RARITY_NAMES } from '../game/market';
 import { fluidPrice, partPrice, useGame } from '../game/store';
 import { eur } from './common';
@@ -128,11 +130,14 @@ export function EventsTab() {
 /** Teile und Flüssigkeiten bestellen – mit Sonderangeboten und Großhandelsrabatt. */
 export function ShopList() {
   const s = useGame();
-  const slots = s.cars.map((c, i) => (c ? i : -1)).filter((i) => i >= 0);
+  const slots = s.cars.map((c, i) => (c && !isJunk(i) ? i : -1)).filter((i) => i >= 0);
   const slot = s.cars[s.shopSlot] ? s.shopSlot : slots[0] ?? -1;
   const car = slot >= 0 ? s.cars[slot]! : null;
   // Nur Teile, die dieses Auto überhaupt hat (ein Diesel braucht keine Zündkerzen).
-  const fitted = car ? new Set(defsOf(car).map((d) => d.partId).filter(Boolean)) : new Set();
+  const fitted = car ? new Set(defsOf(car).flatMap((d) => [d.partId, ...(d.variants ?? [])]).filter(Boolean)) : new Set();
+  if (car && car.motor !== null && !engineOf(car).turbo && !car.motor?.turboKit) fitted.add('turbo_kit');
+  const [dept, setDept] = useState<'parts' | 'revision' | 'tuning' | 'swap'>('parts');
+  const motors = [s.crane, ...s.engines, ...(s.cars[STAND_SLOT] ? [fromStand(s.cars[STAND_SLOT]!)] : [])].filter((u): u is EngineUnit => !!u);
   return (
     <>
       <h4>Betriebsflüssigkeiten</h4>
@@ -160,7 +165,35 @@ export function ShopList() {
           <p className="meta"><b>{CAR_MODELS[car.modelId].name}</b> · {engineOf(car).name} · Teilefamilie {engineOf(car).family}</p>
         </>
       )}
-      {car && PART_LIST.filter((p) => fitted.has(p.id)).map((p) => {
+      {car && (
+        <div className="chips">
+          {([['parts', 'Ersatzteile'], ['revision', 'Motorrevision'], ['tuning', 'Tuning'], ['swap', 'Umbau']] as const).map(([d, l]) => (
+            <button key={d} className={`btn small${dept === d ? ' primary' : ''}`} data-testid={`dept-${d}`} onClick={() => setDept(d)}>{l}</button>
+          ))}
+        </div>
+      )}
+      {car && dept === 'swap' && (
+        <>
+          <p className="meta">Umbauteile hängen davon ab, welcher Motor in welches Auto soll. Motoren am Kran, auf dem Ständer und im Lager:</p>
+          {motors.length === 0 && <p className="meta">Kein ausgebauter Motor vorhanden – erst einen Motor ausbauen oder vom Schrottplatz holen.</p>}
+          {motors.map((u) => {
+            const plan = swapPlan(car, u.motor.engineId);
+            return (
+              <div key={u.motor.uid} className="shop-row col">
+                <b>{ENGINES[u.motor.engineId]?.name} → {CAR_MODELS[car.modelId].name}: {plan.label}</b>
+                <div className="meta">{plan.reasons.join(' ')}</div>
+                {plan.needs.map((n) => (
+                  <div key={n.key} className="shop-row">
+                    <div>{PARTS[n.part].name} <span className="meta">– {PARTS[n.part].desc} · im Lager: {s.inventory[n.key] ?? 0}</span></div>
+                    <button className="btn primary" data-testid={`swap-${n.part}`} onClick={() => s.buySwapPart(n.part, n.key)}>Bestellen {eur(PARTS[n.part].price)}</button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </>
+      )}
+      {car && dept !== 'swap' && PART_LIST.filter((p) => fitted.has(p.id) && (dept === 'parts' ? !p.kind : p.kind === dept)).map((p) => {
         const price = partPrice(s, p.id, car);
         const list = partPrice({ events: [], upgrades: [], day: s.day }, p.id, car);
         return (
@@ -169,7 +202,7 @@ export function ShopList() {
               <b>{p.name}</b>
               <div className="meta">{p.desc} · passend für {fitOf(car, p.id)} · im Regal: {stockOf(s.inventory, car, p.id)}</div>
             </div>
-            <button className="btn primary" disabled={s.money < price} onClick={() => s.buyPart(p.id, slot)}>
+            <button className="btn primary" data-testid={`buy-${p.id}`} disabled={s.money < price} onClick={() => s.buyPart(p.id, slot)}>
               Bestellen {eur(price)}{price < list ? ` statt ${list.toLocaleString('de-DE')}` : ''}
             </button>
           </div>

@@ -30,8 +30,12 @@ export function bayMaterials() {
 const cache = new Map<string, THREE.BufferGeometry>();
 const Z90: V3 = [0, 0, Math.PI / 2];
 
-export function engineDecor(e: EngineDef, detail: number) {
-  const key = `${e.layout}${e.fuel}${+!!e.turbo}${detail}`;
+/**
+ * Feste Teile des Motorraums. `car` = Motor im Auto, `bare` = nur der Motor (Motorständer, Lager),
+ * `empty` = Motorraum ohne Motor (nach dem Ausbau). Krümmer sind eigene, ausbaubare Teile (siehe unten).
+ */
+export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' | 'empty' = 'car') {
+  const key = `${e.layout}${e.fuel}${+!!e.turbo}${detail}${mode}`;
   let g = cache.get(key);
   if (g) return g;
   const m = new Mesher(8);
@@ -41,6 +45,7 @@ export function engineDecor(e: EngineDef, detail: number) {
   const slots = cylinderSlots(e);
   const xs = [...new Set(slots.map((s) => s.x))];
   const seg = detail ? 14 : 8;
+  if (mode !== 'bare') {
 
   // ---- Vorderwagen: Längsträger, Federbeindome, Spritzwand, Schlossträger ----
   for (const s of [-1, 1]) {
@@ -81,64 +86,169 @@ export function engineDecor(e: EngineDef, detail: number) {
   for (const dx of [-0.11, 0.11]) m.box(BAY.steel, [0.02, 0.035, 0.008], [1.28 + dx, 0.61, 0.545]);
   m.tube(BAY.plastic, [[1.43, 0.6, 0.47], [1.58, 0.585, 0.6], [1.76, 0.57, 0.66], [1.93, 0.56, 0.62]], 0.034, 7);
 
+  }
+  if (mode === 'empty') {
+    // Leerer Motorraum: Getriebeglocke und Motorlagerkonsolen bleiben sichtbar.
+    m.cyl(BAY.alu, 0.13, 0.15, 0.1, [0.9, 0.36, 0], Z90, seg);
+    for (const s of [-1, 1]) m.rbox(BAY.painted, [0.12, 0.08, 0.1], 0.01, [1.3, 0.45, s * 0.36]);
+    g = m.build();
+    cache.set(key, g);
+    return g;
+  }
   // ---- Motorblock ----
   const blockColor = BAY.alu;
   if (vee) {
-    // V-förmiger Block: Kurbelgehäuse unten, zwei geneigte Zylinderbänke
     const sh = new THREE.Shape();
     const pts: [number, number][] = [[-0.15, 0.43], [0.15, 0.43], [0.245, 0.545], [0.235, 0.585], [0.035, 0.625], [0, 0.6], [-0.035, 0.625], [-0.235, 0.585], [-0.245, 0.545]];
     pts.forEach(([z, y], i) => (i ? sh.lineTo(z, y) : sh.moveTo(z, y)));
     m.add(blockColor, new THREE.ExtrudeGeometry(sh, { depth: 0.7, bevelEnabled: false }), mat([0.95, 0, 0], [0, Math.PI / 2, 0]));
-    // Ansaugbrücke im V mit Saugrohren zu beiden Bänken
-    m.rbox(diesel ? BAY.alu : BAY.plastic, [0.6, 0.075, 0.085], 0.03, [1.3, 0.685, 0], undefined, 3);
-    for (const x of xs) for (const s of [-1, 1]) m.tube(diesel ? BAY.alu : BAY.plastic, [[x, 0.705, s * 0.02], [x, 0.71, s * 0.055], [x, 0.685, s * 0.08]], 0.02, 5);
-    m.cyl(BAY.alu, 0.036, 0.036, 0.05, [1.625, 0.69, 0], Z90, 10);
-    // Abgaskrümmer an beiden Bänken
-    for (const s of [-1, 1]) {
-      for (const x of xs) m.tube(BAY.iron, [[x, 0.545, s * 0.24], [x - 0.02, 0.5, s * 0.285], [x - 0.06, 0.47, s * 0.3]], 0.019, 5);
-      m.tube(BAY.iron, [[xs[xs.length - 1] - 0.04, 0.47, s * 0.3], [xs[0] - 0.06, 0.46, s * 0.3], [0.9, 0.36, s * 0.26], [0.78, 0.27, s * 0.22]], 0.03, 6);
-    }
   } else {
     m.rbox(blockColor, [0.7, 0.17, 0.36], 0.015, [1.3, 0.535, 0]);
-    // Verstärkungsrippen und Froststopfen
     for (const s of [-1, 1]) {
       for (const x of [1.05, 1.22, 1.39, 1.56]) m.box(blockColor, [0.015, 0.13, 0.012], [x, 0.53, s * 0.184]);
       m.box(blockColor, [0.66, 0.014, 0.012], [1.3, 0.5, s * 0.184]);
     }
-    // Saugrohr auf der Ansaugseite: Sammler mit einem Rohr je Zylinder
-    const plast = diesel ? BAY.alu : BAY.plastic;
-    m.rbox(plast, [Math.min(0.5, xs.length * 0.11 + 0.06), 0.07, 0.075], 0.03, [1.215, 0.548, 0.262], undefined, 3);
-    for (const x of xs) {
-      const xr = 0.98 + ((x - xs[0]) / (xs[xs.length - 1] - xs[0])) * 0.47;
-      m.tube(plast, [[x, 0.63, 0.182], [(x + xr) / 2, 0.615, 0.235], [xr, 0.575, 0.262]], 0.021, 5);
-    }
-    // Abgaskrümmer auf der Gegenseite, darunter das Hosenrohr
-    for (const x of xs) m.tube(BAY.iron, [[x, 0.505, -0.18], [x - 0.015, 0.47, -0.235], [x - 0.05, 0.43, -0.26]], 0.02, 5);
-    m.tube(BAY.iron, [[xs[xs.length - 1] - 0.04, 0.43, -0.26], [xs[0] - 0.05, 0.425, -0.26], [0.9, 0.34, -0.24], [0.78, 0.27, -0.2]], 0.032, 6);
   }
   // Kurbelgehäuse-Unterteil, Steuergehäusedeckel, Schwingungsdämpfer, Motorlager
   m.rbox(BAY.painted, [0.66, 0.09, 0.32], 0.012, [1.3, 0.405, 0]);
-  m.rbox(BAY.alu, [0.03, 0.25, 0.3 + wide * 2], 0.012, [1.662, 0.55, 0]);
+  if (mode === 'car') m.rbox(BAY.alu, [0.03, 0.25, 0.3 + wide * 2], 0.012, [1.662, 0.55, 0]);
   m.cyl(BAY.painted, 0.07, 0.07, 0.028, [1.69, 0.5, 0], Z90, detail ? 20 : 12);
   m.cyl(BAY.steel, 0.03, 0.03, 0.036, [1.692, 0.5, 0], Z90, 10);
   m.cyl(BAY.steel, 0.012, 0.012, 0.044, [1.694, 0.5, 0], Z90, 6);
   for (const s of [-1, 1]) {
     m.rbox(BAY.painted, [0.11, 0.04, 0.13], 0.01, [1.3, 0.47, s * (0.235 + wide)]);
-    m.cyl(BAY.rubber, 0.04, 0.045, 0.05, [1.3, 0.43, s * (0.28 + wide)], undefined, 10);
+    if (mode === 'car') m.cyl(BAY.rubber, 0.04, 0.045, 0.05, [1.3, 0.43, s * (0.28 + wide)], undefined, 10);
   }
-  // Klimakompressor mit Leitungen
+  // Klimakompressor
   m.cyl(BAY.alu, 0.052, 0.052, 0.14, [1.58, 0.435, 0.25 + wide], Z90, seg);
   m.cyl(BAY.painted, 0.05, 0.05, 0.022, [1.69, 0.435, 0.25 + wide], Z90, seg);
-  m.tube(BAY.steel, [[1.5, 0.46, 0.3 + wide], [1.2, 0.47, 0.62], [0.98, 0.7, 0.67], [0.84, 0.76, 0.62]], 0.008, 4);
+  if (mode === 'car') m.tube(BAY.steel, [[1.5, 0.46, 0.3 + wide], [1.2, 0.47, 0.62], [0.98, 0.7, 0.67], [0.84, 0.76, 0.62]], 0.008, 4);
   // Diesel: Hochdruckleitung (Common Rail) neben den Einspritzdüsen
   if (diesel) {
     if (vee) for (const s of [-1, 1]) m.cyl(BAY.steel, 0.009, 0.009, xs[xs.length - 1] - xs[0] + 0.08, [(xs[0] + xs[xs.length - 1]) / 2, 0.745, s * 0.045], Z90, 6);
     else m.cyl(BAY.steel, 0.01, 0.01, xs[xs.length - 1] - xs[0] + 0.08, [(xs[0] + xs[xs.length - 1]) / 2, 0.815, -0.125], Z90, 6);
   }
+  // Motorständer: Bohrungen in der Zylinderlaufbahn sind von oben zu sehen, wenn der Kopf ab ist (dunkle Ringe)
+  if (mode === 'bare') for (const c of slots) if (!vee) m.cyl(BAY.core, 0.046, 0.046, 0.004, [c.x, 0.622, 0], undefined, 16, true);
   g = m.build();
   cache.set(key, g);
   return g;
 }
+
+// ---------------------------------------------------------------- Ausbaubare Motorteile mit eigener Form
+
+const geos = new Map<string, THREE.BufferGeometry>();
+const once = (key: string, make: (m: Mesher) => void) => {
+  let g = geos.get(key);
+  if (!g) {
+    const m = new Mesher(8);
+    make(m);
+    geos.set(key, (g = m.build()));
+  }
+  return g;
+};
+const xsOf = (e: EngineDef) => [...new Set(cylinderSlots(e).map((s) => s.x))];
+
+/** Ansaugkrümmer: beim Reihenmotor Sammler mit Saugrohren seitlich, beim V-Motor die Brücke im V. */
+export const intakeGeometry = (e: EngineDef) =>
+  once(`in${e.layout}${e.fuel}`, (m) => {
+    const xs = xsOf(e);
+    const plast = e.fuel === 'diesel' ? BAY.alu : BAY.plastic;
+    if (isV(e)) {
+      m.rbox(plast, [0.6, 0.075, 0.085], 0.03, [1.3, 0.685, 0], undefined, 3);
+      for (const x of xs) for (const s of [-1, 1]) m.tube(plast, [[x, 0.705, s * 0.02], [x, 0.71, s * 0.055], [x, 0.685, s * 0.08]], 0.02, 5);
+      m.cyl(BAY.alu, 0.036, 0.036, 0.05, [1.625, 0.69, 0], Z90, 10);
+      return;
+    }
+    m.rbox(plast, [Math.min(0.5, xs.length * 0.11 + 0.06), 0.07, 0.075], 0.03, [1.215, 0.548, 0.262], undefined, 3);
+    for (const x of xs) {
+      const xr = 0.98 + ((x - xs[0]) / (xs[xs.length - 1] - xs[0])) * 0.47;
+      m.tube(plast, [[x, 0.63, 0.182], [(x + xr) / 2, 0.615, 0.235], [xr, 0.575, 0.262]], 0.021, 5);
+    }
+  });
+
+/** Abgaskrümmer (Guss bzw. Fächerkrümmer aus Edelstahl) mit Anschluss zum Hosenrohr. */
+export const exhaustGeometry = (e: EngineDef, sport: boolean) =>
+  once(`ex${e.layout}${+sport}`, (m) => {
+    const xs = xsOf(e);
+    const slot = sport ? BAY.steel : BAY.iron;
+    const r = sport ? 0.017 : 0.02;
+    const sides = isV(e) ? [-1, 1] : [-1];
+    for (const s of sides) {
+      const z0 = isV(e) ? 0.24 : 0.18;
+      for (const x of xs) {
+        if (sport) m.tube(slot, [[x, 0.545 - (isV(e) ? 0 : 0.04), s * z0], [x + 0.02, 0.49, s * (z0 + 0.06)], [x - 0.02, 0.44, s * (z0 + 0.08)], [xs[0] - 0.08, 0.4, s * (z0 + 0.07)]], r, 6);
+        else m.tube(slot, [[x, 0.545 - (isV(e) ? 0 : 0.04), s * z0], [x - 0.015, 0.47, s * (z0 + 0.055)], [x - 0.05, 0.43, s * (z0 + 0.08)]], r, 5);
+      }
+      m.tube(slot, [[xs[xs.length - 1] - 0.04, 0.43, s * (z0 + 0.08)], [xs[0] - 0.06, 0.425, s * (z0 + 0.08)], [0.9, 0.36, s * (z0 + 0.06)], [0.82, 0.3, s * (z0 + 0.03)]], sport ? 0.034 : 0.032, 6);
+    }
+  });
+
+/** Kolben mit Pleuel (Ursprung: Kolbenboden in der Zylindermitte). */
+export const pistonGeometry = (forged: boolean) =>
+  once(`pi${+forged}`, (m) => {
+    m.cyl(forged ? BAY.steel : BAY.alu, 0.042, 0.041, 0.06, [0, -0.03, 0], undefined, 18);
+    for (const y of [-0.008, -0.016, -0.024]) m.torus(BAY.painted, 0.0415, 0.0025, [0, y, 0], [Math.PI / 2, 0, 0], 18);
+    m.cyl(BAY.steel, 0.012, 0.012, 0.09, [0, -0.04, 0], Z90, 8);
+    m.rbox(forged ? BAY.steel : BAY.iron, [0.024, 0.2, 0.016], 0.006, [0, -0.16, 0]);
+    m.cyl(forged ? BAY.steel : BAY.iron, 0.03, 0.03, 0.026, [0, -0.27, 0], [Math.PI / 2, 0, 0], 12);
+  });
+
+/** Kurbelwelle mit Hubzapfen und Gegengewichten (liegt längs unter dem Block). */
+export const crankGeometry = (e: EngineDef) =>
+  once(`cr${e.layout}`, (m) => {
+    const xs = xsOf(e);
+    const x0 = xs[0] - 0.09;
+    const x1 = xs[xs.length - 1] + 0.12;
+    m.cyl(BAY.steel, 0.026, 0.026, x1 - x0, [(x0 + x1) / 2, 0.34, 0], Z90, 12);
+    xs.forEach((x, i) => {
+      const a = (i % 2 ? 1 : -1) * (isV(e) ? 0.6 : 1);
+      for (const dx of [-0.04, 0.04]) m.rbox(BAY.iron, [0.02, 0.11, 0.09], 0.02, [x + dx, 0.34 - a * 0.03, 0], [a > 0 ? 0 : Math.PI, 0, 0]);
+      m.cyl(BAY.steel, 0.022, 0.022, 0.06, [x, 0.34 + a * 0.045, 0], Z90, 10);
+    });
+    m.cyl(BAY.steel, 0.05, 0.05, 0.02, [x0 - 0.01, 0.34, 0], Z90, 16);
+  });
+
+/** Hauptlagerdeckel (je Lagerstelle einer). */
+export const mainCapsGeometry = (e: EngineDef) =>
+  once(`mc${e.layout}`, (m) => {
+    const xs = xsOf(e);
+    const pts = [xs[0] - 0.08, ...xs.slice(0, -1).map((x, i) => (x + xs[i + 1]) / 2), xs[xs.length - 1] + 0.08];
+    for (const x of pts) m.rbox(BAY.iron, [0.035, 0.035, 0.17], 0.008, [x, 0.302, 0]);
+  });
+
+/** Ölpumpe mit Ansaugrohr. */
+export const oilPumpGeometry = () =>
+  once('op', (m) => {
+    m.rbox(BAY.alu, [0.1, 0.05, 0.08], 0.012, [1.56, 0.3, 0.09]);
+    m.tube(BAY.steel, [[1.52, 0.29, 0.09], [1.45, 0.27, 0.05], [1.4, 0.245, 0.02]], 0.012, 6);
+    m.cyl(BAY.steel, 0.028, 0.028, 0.008, [1.4, 0.24, 0.02], undefined, 12);
+  });
+
+/** Steuerkette mit Kurbel- und Nockenwellenrädern an der Stirnseite. */
+export const chainGeometry = (e: EngineDef) =>
+  once(`ch${e.layout}`, (m) => {
+    const tops: [number, number][] = isV(e) ? [[0.72, -0.13], [0.72, 0.13]] : [[0.74, -0.06], [0.74, 0.06]];
+    const x = 1.664;
+    m.cyl(BAY.steel, 0.032, 0.032, 0.012, [x, 0.34, 0], Z90, 16);
+    for (const [y, z] of tops) m.cyl(BAY.steel, 0.05, 0.05, 0.012, [x, y, z], Z90, 18);
+    const loop: [number, number][] = [[0.34, -0.035], ...tops.map(([y, z]): [number, number] => [y + 0.04, z]), [0.34, 0.035]];
+    const pts = loop.map(([y, z]): [number, number, number] => [x + 0.004, y, z]);
+    m.tube(BAY.core, [...pts, pts[0]], 0.008, 4);
+    m.rbox(BAY.plastic, [0.012, 0.25, 0.02], 0.005, [x + 0.004, 0.52, 0.07]);
+  });
+
+/** Nockenwelle mit Nocken (eine Bank). */
+export const camGeometry = (e: EngineDef, sport: boolean) =>
+  once(`ca${e.layout}${+sport}`, (m) => {
+    const xs = xsOf(e);
+    const x0 = xs[0] - 0.08;
+    const x1 = xs[xs.length - 1] + 0.1;
+    for (const dz of [-0.035, 0.035]) {
+      m.cyl(sport ? BAY.yellow : BAY.steel, 0.012, 0.012, x1 - x0, [(x0 + x1) / 2, 0, dz], Z90, 8);
+      for (const x of xs) for (const o of [-0.02, 0.02]) m.sphere(sport ? BAY.yellow : BAY.steel, 0.018, [x + o, 0.004, dz], [0.5, 1.2, 1], 8);
+    }
+  });
 
 let beltGeo: THREE.BufferGeometry | null = null;
 /** Keilrippenriemen als geschlossene Schleife um Kurbelwelle, Lichtmaschine und Wasserpumpe (liegt in der Ebene x = 0). */

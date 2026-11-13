@@ -13,6 +13,21 @@ export const PASSAGE = { minX: -2.9, maxX: 1.4, height: 2.5 };
 /** Halle 2: mit dem Performance-Center um eine Bühne verlängert. */
 export const hall2 = (center: boolean) => ({ minX: ROOM.minX, maxX: ROOM.maxX, minZ: center ? -16.4 : -11.0, maxZ: ROOM.minZ });
 export const SHOWROOM = { minX: ROOM.minX, maxX: ROOM.maxX, minZ: ROOM.maxZ, maxZ: 14.6 };
+/** Schrottplatz: eigener Ort, mit dem Lieferwagen erreichbar. */
+export const JUNK = { minX: -78, maxX: -51, minZ: -12, maxZ: 12 };
+export type Place = 'werkstatt' | 'schrott';
+/** Wo sich der Spieler gerade befindet (Werkstatt mit Hof oder Schrottplatz). */
+export const place = { at: 'werkstatt' as Place };
+export const usePlace = create<{ at: Place }>(() => ({ at: 'werkstatt' }));
+/** Hindernisse auf dem Schrottplatz (Büro, Regale, Container, Kran). */
+export const JUNK_BOXES: Box[] = [];
+export function travel(to: Place) {
+  place.at = to;
+  usePlace.setState({ at: to });
+  player.work = null;
+  if (to === 'schrott') Object.assign(player, { x: -53.2, z: 0, yaw: Math.PI / 2, pitch: -0.1 });
+  else Object.assign(player, { x: -19.5, z: 2.2, yaw: -Math.PI / 2, pitch: -0.1 });
+}
 /** Welche Gebäudeteile es gibt – wird aus den gekauften Standorten gesetzt. */
 export const site = { pro: false, center: false, hq: false, hoist: false };
 export function setSite(upgrades: string[]) {
@@ -87,6 +102,7 @@ export const STATIC_BOXES: Box[] = [
   box(-3.65, 5.1, 0.7, 0.7), // zweites Ölfass
   box(-3.0, 5.2, 0.6, 0.7), // Kanister
   box(5.2, -5.15, 1.5, 0.6), // Rangierwagenheber
+  box(3.1, -0.55, 1.3, 0.9), // Motorständer
   ...BAY_Z.flatMap((z) => [box(0, z - 1.5, 0.3, 0.36), box(0, z + 1.5, 0.3, 0.36)]),
 ];
 
@@ -108,6 +124,7 @@ function siteBoxes(): Box[] {
 /** Fahrzeuge blockieren nur, solange sie am Boden stehen. Quer geparkte Autos sind entsprechend gedreht. */
 export const carBox = (slot: number): Box => {
   const s = SLOTS[slot];
+  if (s.kind === 'stand') return box(s.x, s.z, 1.3, 0.9);
   return Math.abs(s.rot) < 0.1 ? box(s.x, s.z, 4.8, 2.0) : box(s.x, s.z, 2.0, 4.8);
 };
 
@@ -131,6 +148,7 @@ const hits = (x: number, z: number, b: Box) => x > b.minX - RADIUS && x < b.maxX
 
 /** Darf man hier stehen? Halle, Hof oder eines der beiden offenen Tore. */
 function inBounds(x: number, z: number) {
+  if (place.at === 'schrott') return x > JUNK.minX + RADIUS && x < JUNK.maxX - RADIUS && z > JUNK.minZ + RADIUS && z < JUNK.maxZ - RADIUS;
   const inRoom = x > ROOM.minX + RADIUS && x < ROOM.maxX - RADIUS && z > ROOM.minZ + RADIUS && z < ROOM.maxZ - RADIUS;
   const inYard = x > YARD.minX + RADIUS && x < YARD.maxX - RADIUS && z > YARD.minZ + RADIUS && z < YARD.maxZ - RADIUS;
   const inDoor = x >= YARD.maxX - RADIUS - 0.02 && x <= ROOM.minX + RADIUS + 0.02 && BAY_Z.some((d) => Math.abs(z - d) < DOOR_HALF - RADIUS);
@@ -151,7 +169,7 @@ function inBounds(x: number, z: number) {
 
 /** Bewegt den Spieler und lässt ihn an Wänden und Hindernissen entlanggleiten. */
 export function movePlayer(dx: number, dz: number, dynamic: Box[]) {
-  const boxes = [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
+  const boxes = place.at === 'schrott' ? [...JUNK_BOXES, ...dynamic] : [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
   const free = (x: number, z: number) => inBounds(x, z) && !boxes.some((b) => hits(x, z, b));
   // Steckt der Spieler (z. B. nach dem Ablassen der Bühne) in einem Hindernis, darf er heraus.
   const stuck = inBounds(player.x, player.z) && boxes.some((b) => hits(player.x, player.z, b));

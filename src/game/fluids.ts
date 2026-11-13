@@ -66,6 +66,7 @@ export function addFluid(car: CarInstance, stock: FluidStock, id: FluidId, produ
   if ((id === 'oil') !== isOil || (id === 'coolant' && product !== 'coolant') || (id === 'brake' && product !== 'brake_fluid')) {
     return fail(`${FLUID_PRODUCTS[product].name} gehört nicht in diesen Behälter.`);
   }
+  if (id === 'oil' && !car.components.drain_plug) return fail('Ohne Motor gibt es kein Motoröl einzufüllen.');
   if (id === 'oil' && !car.components.drain_plug.installed) return fail('Die Ölablassschraube ist noch draußen – das Öl liefe unten wieder heraus.');
   if (id === 'oil' && !isComplete(car, 'oil_pan')) return fail('Erst die Ölwanne montieren.');
   if (id === 'oil' && !car.components.oil_filter.installed) return fail('Erst einen Ölfilter einsetzen.');
@@ -139,7 +140,7 @@ export function fluidSymptoms(car: CarInstance): string[] {
 
 /** Über Nacht verlieren undichte Autos Flüssigkeit. */
 export function dailyLeaks(car: CarInstance) {
-  const bad = (id: string) => car.components[id].condition === 'defect' && car.components[id].installed;
+  const bad = (id: string) => car.components[id]?.condition === 'defect' && car.components[id]?.installed;
   const oilLoss = (bad('gasket') ? 0.2 : 0) + (bad('oil_pan_gasket') ? 0.3 : 0);
   const coolantLoss = (bad('water_pump') ? 0.5 : 0) + (bad('hose') ? 0.4 : 0);
   car.fluids.oil.level = r1(Math.max(0, car.fluids.oil.level - oilLoss));

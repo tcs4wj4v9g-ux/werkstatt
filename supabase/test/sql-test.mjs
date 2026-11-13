@@ -210,7 +210,7 @@ test('Werkzeugkiste voll; weiteres Exemplar kaufen; Spezialwerkzeug nicht käufl
   assert.equal((await a.rpc('gk_buy_tool', ws, 'obd', 'schrank')).reason, 'nicht_kaeuflich');
   const s = await b.rpc('gk_get_state', ws);
   assert.equal(s.state.money, 10000 - 120);
-  assert.equal(s.tools.filter((t) => t.type === 'ratchet').length, 5);
+  assert.equal(s.tools.filter((t) => t.type === 'ratchet').length, 6, 'drei Kisten + Schrottplatz-Regal + zwei gekaufte');
   assert.equal(new Set(s.tools.map((t) => t.id)).size, s.tools.length);
   // Ben holt den Schlüssel aus Kiste B und will ihn in die volle Kiste A legen
   const wrench = tools.find((t) => t.type === 'wrench' && t.box === 'kiste_b').id;
@@ -235,4 +235,27 @@ test('Lange Abwesenheit: Werkzeug kehrt als dasselbe Exemplar zurück', async ()
   assert.equal(back.find((t) => t.id === rat).holder, null);
   assert.equal(back.length, tools.length);
   assert.equal((await b.rpc('gk_take_tool', ws, rat)).ok, true);
+});
+
+test('Mega-Update: Motoren, Kran und Gebrauchtteile sind gemeinsame Felder – nichts doppelt', async () => {
+  const { a, b, ws } = await workshop();
+  const unit = (uid) => ({ motor: { uid, engineId: 'r6_30', km: 1000, donor: 'bavaria_330', history: [] }, components: {}, oil: 6 });
+  const r1 = await commit(a, ws, [{ path: ['engines'], ver: 0, after: [unit('m-1')] }]);
+  assert.equal(r1.ok, true);
+  // Derselbe Motor gleichzeitig ans Lager und an den Kran: abgelehnt
+  const dup = await commit(b, ws, [P(['crane'], null, unit('m-1'))]);
+  assert.equal(dup.reason, 'doppelt');
+  // Vom Lager an den Kran (eine Änderung): erlaubt
+  assert.equal((await commit(b, ws, [{ path: ['engines'], ver: 1, after: [] }, P(['crane'], null, unit('m-1'))])).ok, true);
+  // Gebrauchtteile mit eindeutiger Kennung
+  assert.equal((await commit(a, ws, [{ path: ['used'], ver: 0, after: [{ id: 'u1', part: 'turbo' }] }])).ok, true);
+  assert.equal((await commit(a, ws, [{ path: ['used'], ver: 1, after: [{ id: 'u1', part: 'turbo' }, { id: 'u1', part: 'turbo' }] }])).reason, 'doppelt');
+  // Stellplatzliste darf wachsen (neue Spielversion), nicht schrumpfen
+  const s = (await a.rpc('gk_get_state', ws)).state;
+  assert.equal((await commit(a, ws, [P(['cars'], s.cars, [...s.cars, null, null])])).ok, true);
+  await assert.rejects(commit(a, ws, [P(['cars'], [...s.cars, null, null], [null])]), /ungueltige_stellplaetze/);
+  // Optik-Lager nie negativ
+  assert.equal((await commit(a, ws, [P(['visualStock'], null, { 'rim:five': -1 })])).reason, 'bestand');
+  // Schrottplatz-Regal hat eigene Werkzeugexemplare
+  assert.equal((await a.rpc('gk_get_state', ws)).tools.filter((t) => t.home === 'schrott').length, 6);
 });

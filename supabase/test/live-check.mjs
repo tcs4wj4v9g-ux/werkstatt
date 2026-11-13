@@ -50,7 +50,7 @@ ok(both.filter((r) => r.ok).length === 1, 'Gleichzeitiger Kauf: nur einer wird a
 const tools = (await call(A, 'gk_get_state', { p_ws: ws })).tools;
 const ratA = tools.find((t) => t.type === 'ratchet' && t.box === 'kiste_a');
 const obd = tools.find((t) => t.type === 'obd');
-ok(tools.length === 17 && !!obd, '17 Werkzeugexemplare, ein OBD-Gerät');
+ok(tools.length === 23 && !!obd, '23 Werkzeugexemplare (inkl. Schrottplatz-Regal), ein OBD-Gerät');
 ok((await call(A, 'gk_take_tool', { p_ws: ws, p_tool: ratA.id })).ok, 'A nimmt Ratsche A');
 ok((await call(B, 'gk_take_tool', { p_ws: ws, p_tool: ratA.id })).reason === 'vergeben', 'B bekommt Ratsche A nicht');
 const grab = await Promise.all([A, B].map((c) => call(c, 'gk_take_tool', { p_ws: ws, p_tool: obd.id })));

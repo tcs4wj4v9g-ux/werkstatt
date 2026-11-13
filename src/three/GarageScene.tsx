@@ -9,10 +9,14 @@ import { CarModel } from './CarModel';
 import { Env } from './Env';
 import { Interactable } from './Interactable';
 import { availableSlots, SLOTS, slotAvailable } from '../game/data/workshop';
-import { BAY_Z, setSite, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box } from './player';
+import { BAY_Z, setSite, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box, place, travel, usePlace } from './player';
 import { Yard } from './Yard';
 import { textTexture } from './textures';
 import { Workshop } from './Workshop';
+import { EnginePallets, EngineShop, engineShopBoxes } from './EngineShop';
+import { Junkyard } from './Junkyard';
+import { Mesher } from './mesher';
+import { DECO } from './workshopDecor';
 import { decoMaterials, liftCarriage, liftFrame } from './workshopDecor';
 import { useGfxSettings } from './gfx';
 import { Avatars, coopBoxes, ToolBoxes } from './CoopScene';
@@ -98,7 +102,8 @@ function FirstPerson() {
         const dx = (-sin * moveInput.y + cos * moveInput.x) * k;
         const dz = (-cos * moveInput.y - sin * moveInput.x) * k;
         // Autos am Boden sind Hindernisse; unter angehobenen kann man durchlaufen.
-        const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted ? [carBox(i)] : []));
+        const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted && SLOTS[i].kind !== 'stand' ? [carBox(i)] : []));
+        dynamic.push(...engineShopBoxes(s.upgrades.includes('hoist')), { minX: -21.3, maxX: -17.7, minZ: 1.2, maxZ: 3.3 });
         if (s.upgrades.includes('expansion')) dynamic.push({ minX: -22.9, maxX: -21.3, minZ: 0.1, maxZ: 3.9 });
         if (s.upgrades.includes('paint')) dynamic.push({ minX: -22.9, maxX: -16, minZ: 8.6, maxZ: 9 });
         if (coopActive()) dynamic.push(...coopBoxes());
@@ -148,7 +153,7 @@ function FirstPerson() {
         break;
       }
       const st = useGame.getState();
-      const nearBay = nearestSlot(player.x, player.z, (i) => slotAvailable(SLOTS[i], st.upgrades));
+      const nearBay = nearestSlot(player.x, player.z, (i) => slotAvailable(SLOTS[i], st.upgrades) && (SLOTS[i].kind === 'junk') === (place.at === 'schrott'));
       const f = useFocus.getState();
       if (f.id !== id || f.label !== label || f.nearBay !== nearBay) f.set({ id, label, nearBay });
     }
@@ -190,7 +195,7 @@ function Bay({ index }: { index: number }) {
   const useLift = useMemo(() => () => useGame.getState().tapLift(index), [index]);
   const usePan = useMemo(() => () => useGame.getState().togglePan(index), [index]);
   const pan = useGame((s) => s.drainPan[index]);
-  const drained = !!car && !car.components.drain_plug.installed;
+  const drained = !!car && car.components.drain_plug?.installed === false;
 
   useEffect(() => {
     // Beim Ablassen niemanden unter dem Auto einklemmen.
@@ -202,8 +207,8 @@ function Bay({ index }: { index: number }) {
     if (carriage.current) carriage.current.position.y += (target - carriage.current.position.y) * Math.min(1, dt * 2.6);
   });
 
-  const leak = car && car.components.oil_pan_gasket.condition === 'defect';
-  const coolant = car && (car.components.water_pump.condition === 'defect' || car.components.hose.condition === 'defect');
+  const leak = car && car.components.oil_pan_gasket?.condition === 'defect';
+  const coolant = car && (car.components.water_pump?.condition === 'defect' || car.components.hose?.condition === 'defect');
   const label = textTexture(`BÜHNE ${number}`, { bg: '#e3a81c', fg: '#16181d', w: 256, h: 64, font: 44 });
 
   return (
@@ -280,6 +285,21 @@ function Bay({ index }: { index: number }) {
   );
 }
 
+let vanGeo: THREE.BufferGeometry | null = null;
+/** Lieferwagen im Hof: fährt zum Schrottplatz. Front zeigt in −x. */
+function Van() {
+  if (!vanGeo) {
+    const m = new Mesher(10);
+    m.rbox(DECO.white, [3.4, 1.7, 1.9], 0.14, [0, 1.15, 0]);
+    m.rbox(DECO.white, [0.9, 1.1, 1.85], 0.2, [-2.05, 0.85, 0]);
+    m.rbox(DECO.steelDark, [0.05, 0.55, 1.6], 0.02, [-2.48, 1.1, 0], [0, 0, 0.35]);
+    m.box(DECO.yellow, [3.0, 0.25, 0.02], [0, 1.25, 0.96]);
+    for (const x of [-1.9, 1.1]) for (const z of [-0.85, 0.85]) m.cyl(DECO.black, 0.33, 0.33, 0.22, [x, 0.33, z], [Math.PI / 2, 0, 0], 16);
+    vanGeo = m.build();
+  }
+  return <mesh geometry={vanGeo} material={decoMaterials()} castShadow />;
+}
+
 /** Weicher Kontaktschatten unter einem Auto – billig und macht viel aus. */
 function Blob() {
   const tex = useMemo(() => {
@@ -338,6 +358,18 @@ function Bays() {
 
 export function GarageScene() {
   const G = useGfxSettings();
+  const at = usePlace((p) => p.at);
+  if (at === 'schrott') {
+    return (
+      <>
+        <color attach="background" args={['#a9c6e3']} />
+        <Env intensity={0.9} kind="sky" />
+        <FirstPerson />
+        <Junkyard />
+        <Avatars />
+      </>
+    );
+  }
   return (
     <>
       <color attach="background" args={['#9fc4e8']} />
@@ -370,7 +402,12 @@ export function GarageScene() {
       <Bays />
       <ToolBoxes />
       <Avatars />
-      {SLOTS.filter((x) => x.kind !== 'lift').map((x) => (
+      <EngineShop />
+      <EnginePallets />
+      <Interactable id="van" label="Lieferwagen – zum Schrottplatz fahren" onUse={() => travel('schrott')} position={[-19.5, 0, 2.25]} halo={[3.6, 2.2, 2.1]} haloPos={[0, 1.1, 0]}>
+        <Van />
+      </Interactable>
+      {SLOTS.filter((x) => x.kind !== 'lift' && x.kind !== 'stand' && x.kind !== 'junk').map((x) => (
         <Parked key={x.id} slot={x.id} />
       ))}
     </>
