@@ -237,7 +237,7 @@ export class Shape {
     let lo = dir > 0 ? B.nose - 1.0 : B.tail + 1.0;
     let hi = dir > 0 ? B.nose : B.tail;
     if (!this.inside(lo, y, z)) return lo;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 14; i++) {
       const m = (lo + hi) / 2;
       if (this.inside(m, y, z)) lo = m;
       else hi = m;
@@ -252,7 +252,7 @@ export class Shape {
     const uz = Math.sin(a);
     let lo = 0;
     let hi = 2.4;
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < 15; i++) {
       const m = (lo + hi) / 2;
       if (this.inside(cx + ux * m, y, uz * m)) lo = m;
       else hi = m;

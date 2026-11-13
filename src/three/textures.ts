@@ -80,6 +80,47 @@ export function concreteTexture() {
   return t;
 }
 
+/** Asphalt für Hof und Händlerplatz: feine Körnung, hellere Flickstellen, einzelne Risse. */
+export function asphaltTexture() {
+  const t = canvasTexture('asphalt', [512, 512], (c, w, h) => {
+    const r = rng(31);
+    c.fillStyle = '#8a8d92';
+    c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26000; i++) {
+      const v = 95 + Math.floor(r() * 90);
+      c.fillStyle = `rgba(${v},${v},${v + 3},0.4)`;
+      c.fillRect(r() * w, r() * h, 1 + r() * 1.5, 1 + r() * 1.5);
+    }
+    for (let i = 0; i < 14; i++) {
+      const sx = r() * w;
+      const sy = r() * h;
+      const g = c.createRadialGradient(sx, sy, 4, sx, sy, 40 + r() * 90);
+      const v = r() > 0.5 ? 200 : 40;
+      g.addColorStop(0, `rgba(${v},${v},${v},0.1)`);
+      g.addColorStop(1, `rgba(${v},${v},${v},0)`);
+      c.fillStyle = g;
+      c.fillRect(0, 0, w, h);
+    }
+    c.strokeStyle = 'rgba(30,30,32,0.35)';
+    c.lineWidth = 1.2;
+    for (let i = 0; i < 4; i++) {
+      let x = r() * w;
+      let y = r() * h;
+      c.beginPath();
+      c.moveTo(x, y);
+      for (let k = 0; k < 9; k++) {
+        x += (r() - 0.5) * 50;
+        y += (r() - 0.3) * 40;
+        c.lineTo(x, y);
+      }
+      c.stroke();
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
 /** Glanzverteilung des Bodens: blanke Laufwege, stumpfe Fugen und Flecken. */
 export function floorRoughTexture() {
   const t = canvasTexture('floor-rough', [256, 256], (c, w, h) => {

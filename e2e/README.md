@@ -21,4 +21,18 @@ JOBS=3 e2e/run.sh           # mehr gleichzeitig (ab vier Prozessorkernen)
 Ergebnisse und Bildschirmfotos landen in `e2e/out/` (nicht im Repository). Die Seite läuft dabei im Testmodus
 (`?test`): halbe Auflösung, keine Schatten, keine Kantenglättung. Spiellogik und Tipp-Erkennung sind dieselben.
 
+## Bildergalerie in voller Grafik
+
+`e2e/galerie.cjs` ist kein Test, sondern nimmt Bilder für den Vorher-Nachher-Vergleich auf (ohne Testmodus, deutlich langsamer):
+
+```
+SKIP_BUILD=1 … vite preview läuft auf Port 4173
+GK_TAG=neu node e2e/galerie.cjs                       # alle sieben Karosserieformen rundum + Motorraum
+GK_TAG=neu GK_VIEWS=halle node e2e/galerie.cjs x      # nur die Halle (gibt auch Zeichenaufrufe und Dreiecke aus)
+GK_GFX=low GK_VIEWS=karosserie node e2e/galerie.cjs bavaria_330
+```
+
+Hinweis für Tipps auf V-Motoren: Die Zylinderbänke sind um 0,2 rad geneigt (Drehpunkt in 0,62 m Höhe). `motoren.cjs` rechnet Bank-Koordinaten mit `tilt()` um.
+Animationen (Schrauben, Stecker, Ausbau) sind im Testmodus abgeschaltet, damit Tipps nicht in eine laufende Bewegung fallen.
+
 Regel: Nach einer Änderung zuerst `npm test` (Sekunden), dann nur die betroffenen Durchläufe; alle zusammen einmal vor dem Pull Request.

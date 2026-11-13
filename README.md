@@ -119,6 +119,18 @@ Bewusste Grenzen: Die Standorte erweitern dasselbe Gelände (kein getrennter zwe
 zerlegbar. Biturbo-Motoren haben ein Lader-Bauteil. Die Glühkerze sitzt spielmechanisch unter der Einspritzdüse. Alle Fahrzeuge,
 Marken und Motoren sind frei erfunden.
 
+## Grafik-Update
+
+- **Karosserien:** Jede der sieben Formen (Limousine, Kombi, Kompakt, Coupé, Sportwagen, Oberklasse, Klassiker) hat eigene Länge, Breite, Radstand, Spur, Dachlinie, Bug- und Heckform. Die Außenhaut ist durchgehend gerundet, mit Charakterlinie und ausgestellten Radläufen. Leuchten, Grill, Kennzeichen und Stoßfänger folgen der Karosserieform.
+- **Türen und Innenraum:** Die Vordertüren öffnen sich mit der ✋ Hand am Türgriff. Innen: Sitze mit Wangen und Kopfstützen, Armaturenbrett mit Instrumenten und Bildschirm, Lenkrad, Mittelkonsole, Pedale, Türverkleidungen.
+- **Motorraum:** Motorblock, Ansaugbrücke, Abgaskrümmer, Kühlerpaket mit Lüfter, Federbeindome, Bremskraftverstärker, Klimakompressor, Schläuche. V-Motoren haben zwei geneigte Zylinderbänke mit der Ansaugbrücke im V. Alle ausbaubaren Teile sitzen an derselben Stelle wie bisher.
+- **Werkstatt:** Beschichteter Boden, gemauerte Wände, Kabelpritschen, Lüftungsrohr, Abgasabsaugung, Druckluftleitung mit Schlauchaufrollern, Reifenregal, Fässer, Hebebühnen mit Fußplatten, Tragarmen und Hydraulikaggregat. Größere Standorte haben einen glänzenderen Boden und mehr Ausstattung.
+- **Material und Licht:** Metallic- und Uni-Lack mit Klarlack, Spiegelungen der Hallenbeleuchtung bzw. des Himmels, Chrom, Glas, Gummi. Schmutz, Waschen und Polieren bleiben sichtbar.
+- **Animationen:** Schrauben drehen sich heraus, Stecker gleiten ab, Teile werden herausgezogen und eingesetzt, beim Ölablassen läuft ein Strahl in die Wanne.
+- **Grafikstufen:** Niedrig, Mittel, Hoch und Automatisch – im Menü und oben in der Hilfe. Die Automatik senkt bei dauerhaft unter 27 Bildern pro Sekunde zuerst die Auflösung, dann die Stufe. Die Wahl wird getrennt vom Spielstand gemerkt.
+
+Alles ist weiterhin prozedural erzeugt – keine fremden 3D-Modelle, keine Bilddateien, keine Lizenzpflichten. Einzelheiten: `docs/GRAFIKPLAN.md`.
+
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
 1. In Safari `github.com` öffnen, anmelden, dieses Repository öffnen.

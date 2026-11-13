@@ -11,6 +11,7 @@ import { CAR_MODELS } from '../game/data/cars';
 import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
+import { Mesher } from './mesher';
 import { bayMaterials, beltGeometry, engineDecor, V_PIVOT, V_TILT } from './engineBay';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { create } from 'zustand';
@@ -97,13 +98,28 @@ const AXIS_ROT: Record<Axis, V3> = {
   'x+': [0, 0, -Math.PI / 2],
 };
 
+/** Unsichtbares Material: wird nicht gezeichnet, bleibt aber antippbar. */
+const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
+const HIT_GEO = new THREE.SphereGeometry(1, 8, 6);
+let boltGeo: THREE.BufferGeometry | null = null;
+/** Sechskantkopf mit Bund als ein Netz. */
+function boltGeometry() {
+  if (!boltGeo) {
+    const m = new Mesher(1);
+    m.cyl(0, 0.019, 0.02, 0.03, [0, 0, 0], undefined, 6);
+    m.cyl(0, 0.026, 0.027, 0.006, [0, -0.012, 0], undefined, 12);
+    boltGeo = m.build();
+  }
+  return boltGeo;
+}
+const BOLT_MATS = {
+  tight: new THREE.MeshStandardMaterial({ color: '#d9dde2', metalness: 0.9, roughness: 0.25 }),
+  loose: new THREE.MeshStandardMaterial({ color: '#e8c35a', metalness: 0.9, roughness: 0.25 }),
+  shaft: new THREE.MeshStandardMaterial({ color: '#8d9399', metalness: 0.9, roughness: 0.4 }),
+};
+
 /** Unsichtbare Trefferfläche für kleine Teile. */
-const Hit = ({ r = 0.046 }: { r?: number }) => (
-  <mesh>
-    <sphereGeometry args={[r, 8, 6]} />
-    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-  </mesh>
-);
+const Hit = ({ r = 0.046 }: { r?: number }) => <mesh geometry={HIT_GEO} material={HIT_MAT} scale={r} />;
 
 const rbCache = new Map<string, THREE.BufferGeometry>();
 /** Quader mit gerundeten Kanten (Geometrie wird je Abmessung nur einmal erzeugt). */
@@ -122,7 +138,7 @@ const noRay = () => null;
 const Proxy = ({ s, p }: { s: V3; p: V3 }) => (
   <mesh position={p}>
     <boxGeometry args={s} />
-    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    <primitive object={HIT_MAT} attach="material" />
   </mesh>
 );
 /** Geneigte Zylinderbank eines V-Motors. */
@@ -154,18 +170,10 @@ function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: 
     <group position={pos} rotation={AXIS_ROT[axis]} userData={{ liveId: live, label: onTap ? text : undefined }} onClick={onTap && tap(onTap)}>
       {state > 0 ? (
         <group ref={head} position={[0, 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
-          <mesh>
-            <cylinderGeometry args={[0.019, 0.02, 0.03, 6]} />
-            <meshStandardMaterial color={state === 1 ? '#e8c35a' : '#d9dde2'} metalness={0.9} roughness={0.25} />
-          </mesh>
-          <mesh position={[0, -0.012, 0]}>
-            <cylinderGeometry args={[0.026, 0.027, 0.006, 12]} />
-            <meshStandardMaterial color={state === 1 ? '#c9a440' : '#aeb3ba'} metalness={0.9} roughness={0.3} />
-          </mesh>
+          <mesh geometry={boltGeometry()} material={state === 1 ? BOLT_MATS.loose : BOLT_MATS.tight} />
           {state === 1 && (
-            <mesh position={[0, -0.025, 0]}>
+            <mesh position={[0, -0.025, 0]} material={BOLT_MATS.shaft}>
               <cylinderGeometry args={[0.009, 0.009, 0.03, 6]} />
-              <meshStandardMaterial color="#8d9399" metalness={0.9} roughness={0.4} />
             </mesh>
           )}
         </group>
@@ -960,7 +968,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                   ))}
                   <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]}>
                     <boxGeometry args={[0.62, 0.04, 0.07]} />
-                    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                    <primitive object={HIT_MAT} attach="material" />
                   </mesh>
                 </>,
               )}
@@ -1191,7 +1199,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 ))}
               <mesh position={[1.7, 0.55, 0]}>
                 <boxGeometry args={[0.05, 0.2, 0.56]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                <primitive object={HIT_MAT} attach="material" />
               </mesh>
             </>,
           )}

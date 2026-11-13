@@ -17,11 +17,20 @@ Arbeitsbranch `claude/garage-kings-pwa-7nyohs`. ☑ = erledigt, ☐ = offen.
 - ☑ Phase 6 – Licht: eigene Spiegelumgebungen (Halle mit Lichtbändern, Himmel), Punktlichter je Grafikstufe.
 - ☑ Phase 7 – Animationen: Schrauben drehen sich heraus, Stecker gleiten, Teile werden herausgezogen/eingesetzt, Ölstrahl beim Ablassen, Türen.
 - ☑ Grafikstufen Niedrig/Mittel/Hoch und Automatik (`gfx.ts`, `Env.tsx` → `Perf`).
-- ☐ Phase 8 – Abschlusstests, Vorher-Nachher-Bilder, Pull Request.
+- ☑ Phase 8 – Tests, Vorher-Nachher-Bilder (`docs/bilder/`), Messung.
 
 ## Technische Hinweise
 
 - Alle Positionen der ausbaubaren Teile sind unverändert; nur die Bänke der V-Motoren sind um 0,2 rad geneigt (Tests rechnen das um).
 - Feste Motorraumteile fangen keine Tipps ab (`raycast` aus); unsichtbare Körper an Block, Luftfilter und Kühler übernehmen das.
-- Ein Auto besteht in der einfachen Darstellung aus rund 25 Zeichenaufrufen (vorher rund 150).
+- Messung (Halle mit zwei Autos, eines in voller Darstellung auf der Bühne, Desktop-Chromium): vorher 669 Zeichenaufrufe und 47.000 Dreiecke, jetzt 551 Zeichenaufrufe und 168.000 Dreiecke. Unsichtbare Trefferflächen werden nicht mehr gezeichnet, Räder, Anbauteile, Innenraum und Schrauben sind je ein Netz.
+- Die Bildrate auf dem iPad ist nicht gemessen – dafür gibt es die Automatik und die Anzeige der Bilder pro Sekunde neben der Grafikwahl.
 - `e2e/galerie.cjs` nimmt Bilder in voller Grafik auf (`GK_TAG`, `GK_VIEWS=karosserie,motor,halle`, `GK_GFX`).
+
+## Bekannte Grenzen
+
+- Die Karosserien sind weiterhin erzeugte Formen, keine von Hand modellierten Fahrzeuge: Sicken, Lichtkanten und Stoßfänger sind einfacher als bei einem echten Vorbild; Fugen von Haube und Heckklappe sind nicht ausgeformt.
+- Vorderwagen (Haubenhöhe, Lage der Vorderachse) ist bei allen Karosserien gleich, weil dort die ausbaubaren Motor- und Bremsenteile sitzen.
+- Nur die Vordertüren öffnen sich; Heckklappe und hintere Türen nicht.
+- Kein Umgebungsverdeckungs-Effekt in Echtzeit (zu teuer für das iPad) – stattdessen weiche Schatten unter den Autos und an den Wandfüßen.
+- Hof, Halle 2 und Showroom haben die neuen Texturen, Hebebühnen und das neue Licht, aber weniger neue Ausstattung als die Stammhalle.

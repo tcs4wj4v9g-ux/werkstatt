@@ -1,11 +1,12 @@
 import { useThree } from '@react-three/fiber';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { useGame } from '../game/store';
 import { CarModel } from './CarModel';
 import { Env } from './Env';
 import { OrbitRig } from './OrbitRig';
+import { asphaltTexture } from './textures';
 
 
 /** Händlerhof: hier werden Angebote vor Ort besichtigt. `showroom` = Hintergrund des Hauptmenüs. */
@@ -19,6 +20,12 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
   // Bei 25 Inseraten wird nur das gerade besichtigte Auto in 3D geladen – das schont iPad-Speicher und Bildrate.
   const shown = listings[Math.min(selected, listings.length - 1)];
   const z = 0;
+  const asphalt = useMemo(() => {
+    const t = asphaltTexture().clone();
+    t.repeat.set(4, 6.5);
+    t.needsUpdate = true;
+    return t;
+  }, []);
 
   useEffect(() => {
     camera.fov = 45;
@@ -51,7 +58,7 @@ export function MarketScene({ showroom = false }: { showroom?: boolean }) {
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
         <planeGeometry args={[16, 26]} />
-        <meshStandardMaterial color="#4b4e53" roughness={0.95} />
+        <meshStandardMaterial map={asphalt} color="#6c6f74" roughness={0.92} />
       </mesh>
       {/* Verkaufsbüro + Wimpelmasten */}
       <mesh position={[-6.5, 1.4, 0]}>

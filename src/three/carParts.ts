@@ -227,7 +227,7 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   endPatch(m, SLOT.dark, S, 1, 0, yPlate, 0.47, 0.115, 0.2, 0.006, N(8), 3);
   endPatch(m, SLOT.plate, S, 1, 0, yPlate, 0.43, 0.09, 0.1, 0.009, N(8), 3);
   wrapPatch(m, SLOT.dark, S, 1, 0, 1.1, B.ground + 0.085, 0.04, 0.5, 0.006, N(16), 2);
-  if (look.blackBumper) for (const d of [1, -1] as const) wrapPatch(m, SLOT.dark, S, d, 0, 2.5, 0.52, 0.06, 0.1, 0.006, N(30), 2);
+  if (look.blackBumper) for (const d of [1, -1] as const) wrapPatch(m, SLOT.dark, S, d, 0, 1.9, 0.52, 0.06, 0.4, 0.006, N(26), 2);
   if (look.chromeBumper) {
     for (const d of [1, -1] as const) {
       const pts: V3[] = [];

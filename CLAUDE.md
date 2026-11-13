@@ -11,3 +11,4 @@ Wünsche des Projektinhabers an Claude:
 - Zuerst `npm test` (Logiktests, wenige Sekunden).
 - Browser-Durchläufe: `e2e/run.sh` (alle, ca. 12 Minuten) oder nur die betroffenen Bereiche, z. B. `e2e/run.sh motoren markt` – Zuordnung in `e2e/README.md`. Nicht mehr als zwei bis drei gleichzeitig (`JOBS`), sonst gibt es Zeitüberschreitungen.
 - Alle Durchläufe einmal vor jedem Pull Request. Nie einen echten iPad-Test behaupten.
+- Grafikänderungen zusätzlich ansehen: `e2e/galerie.cjs` nimmt Bilder in voller Grafik auf (siehe `e2e/README.md`). Ein grüner Build sagt nichts über das Aussehen.

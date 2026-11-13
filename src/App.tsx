@@ -18,6 +18,7 @@ function TestHook() {
   const gl = useThree((s) => s.gl);
   (window as any).__gkCamera = camera;
   (window as any).__gkGL = gl;
+  (window as any).__gkScene = useThree((s) => s.scene);
   return null;
 }
 
