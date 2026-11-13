@@ -195,7 +195,7 @@ export function ShopList() {
       )}
       {car && dept !== 'swap' && PART_LIST.filter((p) => fitted.has(p.id) && (dept === 'parts' ? !p.kind : p.kind === dept)).map((p) => {
         const price = partPrice(s, p.id, car);
-        const list = partPrice({ events: [], upgrades: [], day: s.day }, p.id, car);
+        const list = partPrice({ events: [], upgrades: s.upgrades, day: s.day }, p.id, car);
         return (
           <div key={p.id} className="shop-row">
             <div>

@@ -161,6 +161,7 @@ h3.small { font-size: 15px; }
 .car-actions { position: absolute; right: calc(22px + var(--sar)); top: calc(70px + var(--sat)); display: flex; flex-direction: column; gap: 8px; width: 190px; }
 .car-actions .btn { background: var(--bg); min-height: 48px; text-align: left; }
 .car-actions .btn.primary { background: var(--accent); }
+.car-actions .btn.leave { position: sticky; top: 0; z-index: 1; flex-shrink: 0; }
 .car-actions .btn.gas { background: rgba(34, 139, 70, 0.75); text-align: center; touch-action: none; }
 .seg4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
 .seg4 .btn { padding: 8px 4px; font-size: 14px; }
