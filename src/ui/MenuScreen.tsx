@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGame } from '../game/store';
 import { eur, GfxPicker } from './common';
+import { CoopMenu } from './CoopUI';
 
 export function MenuScreen() {
   const s = useGame();
@@ -12,7 +13,7 @@ export function MenuScreen() {
         <p className="sub">Kaufen · Schrauben · Probefahren · Verkaufen</p>
         {s.started && (
           <button className="btn primary big" onClick={() => s.goto('garage')}>
-            Weiterspielen
+            Einzelspieler fortsetzen
           </button>
         )}
         {!confirm ? (
@@ -30,6 +31,7 @@ export function MenuScreen() {
             Kontostand {eur(s.money)} · Verkaufte Autos {s.carsSold} · Gesamtgewinn {eur(s.totalProfit)}
           </p>
         )}
+        <CoopMenu />
         <GfxPicker />
         <p className="fine">Spielstand wird automatisch auf diesem Gerät gespeichert.</p>
       </div>

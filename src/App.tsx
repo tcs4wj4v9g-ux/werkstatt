@@ -1,12 +1,14 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect } from 'react';
 import { useGame } from './game/store';
+import { isLeader } from './net/coop';
 import { Perf } from './three/Env';
 import { GFX, TEST_DPR, TEST_MODE, useGfx } from './three/gfx';
 import { GarageScene } from './three/GarageScene';
 import { MarketScene } from './three/MarketScene';
 import { TrackScene } from './three/TrackScene';
 import { HelpModal, Toast } from './ui/common';
+import { CoopModal } from './ui/CoopUI';
 import { GarageUI } from './ui/GarageUI';
 import { MarketUI } from './ui/MarketUI';
 import { MenuScreen } from './ui/MenuScreen';
@@ -32,7 +34,8 @@ export function App() {
   const dpr = TEST_MODE ? TEST_DPR : Math.max(0.6, Math.min(window.devicePixelRatio || 1, G.dpr) * scale);
   // Auktionen laufen in Echtzeit – auch die Zeit, in der das Spiel geschlossen war, wird beim Start nachgeholt.
   useEffect(() => {
-    const tick = () => useGame.getState().tickAuctions(Date.now());
+    // Im Koop rechnet nur ein Gerät die Auktionsuhr, sonst würden beide dieselbe Abwicklung doppelt übertragen.
+    const tick = () => isLeader() && useGame.getState().tickAuctions(Date.now());
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
@@ -58,6 +61,7 @@ export function App() {
         {screen === 'garage' && <GarageUI />}
         {screen === 'track' && <TrackUI />}
         {panel === 'help' && screen !== 'menu' && <HelpModal />}
+        {panel === 'coop' && screen !== 'menu' && <CoopModal />}
         <Toast />
       </div>
       <div className="rotate">

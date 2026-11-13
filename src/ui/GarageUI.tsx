@@ -20,12 +20,15 @@ import { FileModal } from './FileModal';
 import { FluidModal } from './FluidModal';
 import { JobsTab } from './JobsTab';
 import { eur, Modal, TopBar } from './common';
+import { CoopCabinet } from './CoopUI';
+import { useCoop } from '../net/coop';
 import { Joystick } from './Joystick';
 
 const carName = (c: CarInstance) => `${CAR_MODELS[c.modelId].name} (${c.year})`;
 
 export function GarageUI() {
   const s = useGame();
+  const coop = useCoop((c) => c.status !== 'off');
   const focus = useFocus();
   const [zoom, setZoom] = useState(player.zoom);
   const [work, setWork] = useState<string | null>(player.work?.id ?? null);
@@ -187,7 +190,7 @@ export function GarageUI() {
         ))}
       </div>
 
-      {s.panel === 'cabinet' && <CabinetModal />}
+      {s.panel === 'cabinet' && (coop ? <CoopCabinet /> : <CabinetModal />)}
       {s.panel === 'computer' && <ComputerModal />}
       {s.panel === 'shop' && (
         <Modal title="Ersatzteilregal" onClose={() => s.setPanel(null)} wide>

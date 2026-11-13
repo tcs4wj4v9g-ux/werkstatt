@@ -7,6 +7,7 @@ import { GapWall } from './Annex';
 import { concreteTexture, floorRoughTexture, screenTexture, shadeTexture, textTexture, wallTexture } from './textures';
 import { decoMaterials, hallDecor } from './workshopDecor';
 import { useGfxSettings } from './gfx';
+import { coopActive, openBox } from '../net/coop';
 
 type V3 = [number, number, number];
 const W = ROOM.maxX - ROOM.minX;
@@ -160,7 +161,7 @@ export function Workshop() {
       </mesh>
 
       {/* Werkzeugschrank */}
-      <Interactable id="cabinet" label="Werkzeugschrank" onUse={() => setPanel('cabinet')} position={[6.05, 0, 0]} halo={[0.76, 2.0, 1.36]} haloPos={[0, 1.0, 0]}>
+      <Interactable id="cabinet" label="Werkzeugschrank" onUse={() => (coopActive() ? openBox('schrank') : setPanel('cabinet'))} position={[6.05, 0, 0]} halo={[0.76, 2.0, 1.36]} haloPos={[0, 1.0, 0]}>
         <Box p={[0, 0.5, 0]} s={[0.68, 1.0, 1.3]} c="#b3261e" m={0.5} r={0.4} shadow />
         <Box p={[0.08, 1.45, 0]} s={[0.5, 0.86, 1.3]} c="#b3261e" m={0.5} r={0.4} shadow />
         <Box p={[0, 1.02, 0]} s={[0.7, 0.04, 1.32]} c="#23262b" m={0.6} r={0.5} />

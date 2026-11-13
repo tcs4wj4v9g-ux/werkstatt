@@ -8,7 +8,7 @@
 # Die Seite läuft im Testmodus (?test): ein Viertel der Auflösung, keine Schatten – deutlich schneller, gleiche Logik.
 cd "$(dirname "$0")/.."
 # Die längsten zuerst, damit die Gesamtzeit nicht an einem späten langen Lauf hängt.
-ALL="werkstatt diagnose motoren mechanik karriere markt bremse"
+ALL="werkstatt diagnose koop motoren mechanik karriere markt bremse"
 TESTS="${*:-$ALL}"
 JOBS="${JOBS:-3}"
 PORT="${PORT:-4173}"
@@ -22,6 +22,14 @@ npx vite preview --port "$PORT" > /dev/null 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 for i in $(seq 1 30); do curl -s -o /dev/null "http://localhost:$PORT/" && break; sleep 0.5; done
+# Koop: lokale Datenbank mit dem echten Schema und der Nachbau der Supabase-Schnittstelle
+case " $TESTS " in *" koop "*)
+  supabase/test/db.sh start > "$GK_OUT/koop-db.log" 2>&1 || { echo "Datenbank für den Koop-Test ließ sich nicht starten – siehe e2e/out/koop-db.log"; exit 1; }
+  node e2e/coop-server.cjs > "$GK_OUT/koop-server.log" 2>&1 &
+  COOPSRV=$!
+  trap 'kill $SERVER $COOPSRV 2>/dev/null; supabase/test/db.sh stop' EXIT
+  sleep 1;;
+esac
 START=$(date +%s)
 echo "$TESTS" | tr ' ' '\n' | xargs -P "$JOBS" -I{} sh -c 't0=$(date +%s); timeout 1500 node e2e/{}.cjs > "$GK_OUT/{}.txt" 2>&1; echo "{}: $(grep -c "^ok" "$GK_OUT/{}.txt") ok, $(grep -c "^FAIL" "$GK_OUT/{}.txt") Abweichungen, $(( $(date +%s) - t0 )) s – $(tail -1 "$GK_OUT/{}.txt" | cut -c1-60)"'
 echo "Gesamt: $(( $(date +%s) - START )) s"

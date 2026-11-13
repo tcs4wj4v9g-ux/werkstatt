@@ -15,6 +15,8 @@ import { textTexture } from './textures';
 import { Workshop } from './Workshop';
 import { decoMaterials, liftCarriage, liftFrame } from './workshopDecor';
 import { useGfxSettings } from './gfx';
+import { Avatars, coopBoxes, ToolBoxes } from './CoopScene';
+import { coopActive } from '../net/coop';
 
 const SPEED = 2.7;
 const FOV = 64;
@@ -99,6 +101,7 @@ function FirstPerson() {
         const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted ? [carBox(i)] : []));
         if (s.upgrades.includes('expansion')) dynamic.push({ minX: -22.9, maxX: -21.3, minZ: 0.1, maxZ: 3.9 });
         if (s.upgrades.includes('paint')) dynamic.push({ minX: -22.9, maxX: -16, minZ: 8.6, maxZ: 9 });
+        if (coopActive()) dynamic.push(...coopBoxes());
         movePlayer(dx, dz, dynamic);
       }
     }
@@ -181,6 +184,7 @@ function Bay({ index }: { index: number }) {
       onBody: (zone?: ZoneId) => g().tapBody(index, zone),
       onFluid: () => g().setPanel('fluids', index),
       onBleed: (side: 'fl' | 'fr') => g().bleedBrake(index, side),
+      onDoor: (side: number) => g().toggleDoor(index, side),
     };
   }, [index]);
   const useLift = useMemo(() => () => useGame.getState().tapLift(index), [index]);
@@ -304,7 +308,7 @@ function Parked({ slot }: { slot: number }) {
   const handlers = useMemo(() => {
     const g = useGame.getState;
     const lift = () => g().say('Für Arbeiten an Motor und Fahrwerk das Auto auf eine Hebebühne umparken.', true);
-    return { onHood: lift, onBody: (zone?: ZoneId) => g().tapBody(slot, zone), onComponent: lift, onBolt: lift, onConnector: lift, onFluid: lift, onBleed: lift };
+    return { onHood: lift, onBody: (zone?: ZoneId) => g().tapBody(slot, zone), onComponent: lift, onBolt: lift, onConnector: lift, onFluid: lift, onBleed: lift, onDoor: (side: number) => g().toggleDoor(slot, side) };
   }, [slot]);
   if (!car) return null;
   const def = SLOTS[slot];
@@ -364,6 +368,8 @@ export function GarageScene() {
       <Yard />
       <Annex />
       <Bays />
+      <ToolBoxes />
+      <Avatars />
       {SLOTS.filter((x) => x.kind !== 'lift').map((x) => (
         <Parked key={x.id} slot={x.id} />
       ))}
