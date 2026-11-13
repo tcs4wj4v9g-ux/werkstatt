@@ -1225,8 +1225,20 @@ export const useGame = create<GameState>()(
           if (!repair.isAssembled(car)) return s.say('Für Kompressions- und Öldruckprüfung muss der Motor komplett montiert sein.', true);
           const t = engineTest(fromStand(car));
           const cars = [...s.cars];
-          cars[STAND_SLOT] = { ...car, motor: { ...car.motor!, history: [...car.motor!.history, `Tag ${s.day}: Prüfstand – Kompression ${t.compression.join('/')} bar, Öldruck ${t.oilPressure} bar`] } };
-          set({ cars, engineReport: { title: motorLabel(car.motor!), ...t }, panel: 'enginetest' });
+          // Was die Messung belegt, landet in der Akte: Zylinder mit guter Kompression haben intakte Kolbenringe,
+          // normaler Öldruck schließt Lager und Ölpumpe aus. Zu niedrige Werte bestätigen nichts (Ringe oder Kopfdichtung?).
+          const comps = { ...car.components };
+          const known = (id: string) => {
+            if (comps[id] && comps[id].condition === 'ok') comps[id] = { ...comps[id], known: true };
+          };
+          t.compression.forEach((v, i) => v >= t.nominal * 0.85 && known(`piston${i + 1}`));
+          if (t.oilPressure >= 3.5) ['bearing', 'mainbrg', 'oil_pump', 'crank'].forEach(known);
+          cars[STAND_SLOT] = { ...car, components: comps, motor: { ...car.motor!, history: [...car.motor!.history, `Tag ${s.day}: Prüfstand – Kompression ${t.compression.join('/')} bar, Öldruck ${t.oilPressure} bar`] } };
+          const notes = [
+            ...(t.compression.every((v) => v >= t.nominal * 0.85) ? ['Kompression an allen Zylindern im Soll – Kolbenringe in Ordnung (in der Akte vermerkt).'] : []),
+            ...(t.oilPressure >= 3.5 ? ['Öldruck im Soll – Lager und Ölpumpe in Ordnung (in der Akte vermerkt).'] : []),
+          ];
+          set({ cars, engineReport: { title: motorLabel(car.motor!), ...t, findings: [...t.findings, ...notes] }, panel: 'enginetest' });
         },
         sellEngine: (uid) => {
           const s = get();

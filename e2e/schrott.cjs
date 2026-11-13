@@ -105,6 +105,8 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   await G(() => window.__gk.getState().testEngine());
   const rep = await G(() => window.__gk.getState().engineReport);
   expect(rep && rep.compression.length === 6 && rep.oilPressure > 3, `Motorprüfstand: 6 Zylinder, Kompression ${rep && rep.compression.join('/')} bar, Öldruck ${rep && rep.oilPressure} bar`);
+  const ringsKnown = await G(() => { const c = window.__gk.getState().cars[15].components; return Object.keys(c).filter((k) => /^piston\d$/.test(k)).every((k) => c[k].known && c[k].condition === 'ok') && c.mainbrg.known; });
+  expect(ringsKnown, 'Gute Kompression und guter Öldruck werden vermerkt: Kolbenringe und Lager gelten als geprüft (Akte: ausgeschlossen)');
   await G(() => window.__gk.getState().setPanel(null));
 
   // ---------- Motor am Ständer drehen und zurückdrehen: das Bild folgt beide Male ----------
