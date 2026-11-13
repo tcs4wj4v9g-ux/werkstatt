@@ -1,8 +1,8 @@
 // Zugang zum Supabase-Projekt der Koop-Werkstätten. Beide Werte sind öffentlich (der "anon"-Schlüssel ist
 // für den Einsatz im Browser gedacht); geschützt werden die Daten durch die Regeln in supabase/schema.sql.
-// Solange hier nichts eingetragen ist, bleibt der Koop-Modus im Menü ausgegraut.
-const PROJECT_URL = '';
-const ANON_KEY = '';
+// Ist hier nichts eingetragen, bleibt der Koop-Modus im Menü ausgegraut.
+const PROJECT_URL = 'https://uzmgjkcizzdpycfdgrvr.supabase.co';
+const ANON_KEY = 'sb_publishable_uRF5mwEQj60cztKofPwHnw_ONYgxYAR';
 
 // Für automatisierte Tests: ?koop=<Adresse>|<Schlüssel> zeigt auf den lokalen Nachbau (e2e/coop-server.cjs).
 const override = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('koop') : null;

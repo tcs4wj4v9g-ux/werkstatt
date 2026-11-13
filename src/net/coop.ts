@@ -96,6 +96,7 @@ const TEXT: Record<string, string> = {
   voll: 'Diese Werkstatt hat schon vier Mitglieder.',
   zu_viele_werkstaetten: 'Du bist schon in fünf Werkstätten.',
   kein_mitglied: 'Du bist kein Mitglied dieser Werkstatt.',
+  anonym_aus: 'Der Server lässt noch keine Anmeldung zu: Im Supabase-Projekt muss „Allow anonymous sign-ins“ eingeschaltet sein.',
 };
 const text = (reason: string) => TEXT[reason] ?? `Server: ${reason}`;
 
@@ -111,7 +112,11 @@ async function signIn() {
   const { data } = await c.auth.getSession();
   if (data.session) return;
   const r = await c.auth.signInAnonymously();
-  if (r.error) throw new NetError(r.error.message);
+  if (r.error) {
+    // Eine Absage des Servers (z. B. anonyme Anmeldung im Supabase-Projekt ausgeschaltet) ist kein Verbindungsproblem.
+    if ((r.error as any).status && (r.error as any).status < 500) throw new Error(/anonymous/i.test(r.error.message) ? 'anonym_aus' : r.error.message);
+    throw new NetError(r.error.message);
+  }
 }
 async function rpc<T = any>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await db().rpc(fn, args);
