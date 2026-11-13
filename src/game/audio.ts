@@ -126,6 +126,7 @@ export interface EngineSound {
   cylinders?: number;
   diesel?: boolean;
   turbo?: boolean;
+  sport?: number;
 }
 
 /**
@@ -217,7 +218,7 @@ function frame() {
   // Diesel klingen dumpfer, dafür härter (siehe Nageln unten).
   r.tone.frequency.setTargetAtTime((voice.tone + r.rpm * 0.22) * (p.diesel ? 0.72 : 1), t, 0.05);
   r.out.gain.setTargetAtTime(since < 0.55 ? 0.0001 : 0.16 + r.load * 0.12, t, 0.08);
-  r.exhaust.gain.setTargetAtTime((0.1 + r.load * 0.3) * voice.exhaust, t, 0.08);
+  r.exhaust.gain.setTargetAtTime((0.1 + r.load * 0.3) * voice.exhaust * (1 + 0.35 * (p.sport ?? 0)), t, 0.08);
 
   // Diesel-Nageln: ein harter Schlag je Zündung, kalt und im Leerlauf am deutlichsten.
   if (p.diesel && since > 0.55) {

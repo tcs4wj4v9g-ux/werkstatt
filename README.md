@@ -139,6 +139,19 @@ Alles ist weiterhin prozedural erzeugt – keine fremden 3D-Modelle, keine Bildd
 - Der Einzelspielstand bleibt unberührt; im Koop wird nichts lokal gespeichert.
 - Server: Supabase (kostenloser Tarif). Einrichtung: `docs/KOOP_EINRICHTUNG.md`. Architektur, Stand und Grenzen: `DEVELOPMENT_PROGRESS.md`.
 
+## Mega-Update: Schrottplatz, Motorrevision, Motorumbau, Tuning
+
+- **Schrottplatz:** eigener begehbarer Ort, erreichbar mit dem Lieferwagen im Hof. Sechs ausgeschlachtete Autos (Rost, fehlende Teile, manchmal ohne Motor, selten mit Tuningteilen), die sich mit der Zeit erneuern. Teile werden mit dem eigenen Werkzeug ausgebaut; jedes ausgebaute Teil hat eine eigene Kennung, kann nicht doppelt entnommen werden und kann versteckte Mängel haben. Ganze Motoren und ganze Wracks können gekauft werden.
+- **Motor als Objekt:** Jeder Motor hat eine eigene Kennung und behält Typ, Kilometer, Verschleiß, Defekte, eingebaute Teile, Tuning und Historie – im Auto, am Kran, auf dem Ständer und im Motorlager.
+- **Motorkran, Motorständer, Motorlager:** Ausbau nach Checkliste, Kran mit hängendem Motor, drehbarer Ständer, acht Paletten im Hof.
+- **Motorrevision:** Krümmer, Steuerkette, Nockenwellen, Zylinderköpfe, Kopfdichtung, Ölwanne, Ölpumpe, Hauptlager, Kolben mit Pleuel je Zylinder, Kurbelwelle – mit Schrauben und richtiger Reihenfolge. Neue Verschleißschäden (Kolbenringe, Hauptlager, Ölpumpe, Nockenwelle, Steuerkette) mit Symptomen. Motorprüfstand für Kompression und Öldruck.
+- **Motorumbau:** Kompatibilität nach Motorraumgröße, benötigte Umbauteile je Kombination, sichtbar neuer Motor, Diagnose, Klang, Leistung und Teile richten sich nach dem eingebauten Motor.
+- **Leistungstuning:** Luft, Ladedruck, Kraftstoff, Kühlung, Steuergerät und mechanische Grenzen begrenzen sich gegenseitig; Überforderung führt zu Schäden. Wirkt auf Leistung, Gewicht, Traktion, Fahrverhalten, Wert und Klang.
+- **Optisches Tuning in 3D:** Felgen (Form, Größe, Farbe), Fahrwerk/Tieferlegung, Front- und Heckschürze mit Diffusor, Schweller, Spoiler bis Heckflügel, Hauben, Verbreiterungen, Lackart, Folien, Leuchten, Endrohre, Sportsitze und -lenkrad.
+- **Koop:** Schrottplatz, Motoren, Kran, Lager und Tuning sind gemeinsam; Werkzeug am Schrottplatz liegt in einer eigenen Kiste. **Vor dem Mergen muss `supabase/schema.sql` einmal im Supabase-SQL-Editor ausgeführt werden.**
+
+Bewusste Grenzen: Der Kran wird über sein Bedienfenster gesteuert, nicht von Hand geschoben. Den Motor am Schrottplatz baut der Händler aus. Der Weg zum Schrottplatz ist eine Fahrt mit dem Lieferwagen (Ortswechsel), keine Fahrstrecke. Getriebe und Achsen werden nicht getauscht; Motorumbauten ändern den Antrieb nicht.
+
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
 1. In Safari `github.com` öffnen, anmelden, dieses Repository öffnen.

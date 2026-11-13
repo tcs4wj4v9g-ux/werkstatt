@@ -140,6 +140,38 @@ export function EngineShop() {
   );
 }
 
+const palletEngines = new Map<string, THREE.BufferGeometry>();
+/** Motor auf der Palette: Block, Ölwanne, Zylinderkopf(e) mit Ventildeckel, Schwungrad, Riemenscheibe, Krümmer, ggf. Turbo. */
+function palletEngine(layout: string, turbo: boolean) {
+  const key = layout + +turbo;
+  let g = palletEngines.get(key);
+  if (!g) {
+    const m = new Mesher(10);
+    const len = layout === 'R4' ? 0.52 : layout === 'R6' ? 0.72 : layout === 'V6' ? 0.5 : 0.6;
+    const v = layout.startsWith('V');
+    m.rbox(DECO.galv, [len, 0.3, v ? 0.42 : 0.26], 0.02, [0, 0.33, 0]);
+    m.rbox(DECO.steelDark, [len * 0.92, 0.1, v ? 0.36 : 0.24], 0.02, [0, 0.13, 0]);
+    const banks = v ? [-1, 1] : [0];
+    for (const b of banks) {
+      const z = b * 0.15, tilt = b * 0.5;
+      m.rbox(DECO.galv, [len, 0.1, 0.2], 0.015, [0, 0.53, z], [tilt, 0, 0]);
+      m.rbox(DECO.black, [len * 0.96, 0.07, 0.17], 0.025, [0, 0.62 - Math.abs(b) * 0.02, z + b * 0.04], [tilt, 0, 0]);
+      for (let i = 0; i < (v ? 3 : 2); i++) m.cyl(DECO.chrome, 0.012, 0.012, 0.02, [-len * 0.3 + i * len * 0.3, 0.665 - Math.abs(b) * 0.02, z + b * 0.06], undefined, 6);
+      // Abgaskrümmer an der Außenseite
+      const side = v ? b : -1;
+      m.rbox(DECO.steelDark, [len * 0.8, 0.06, 0.05], 0.015, [0, 0.42, side * (v ? 0.25 : 0.16)]);
+    }
+    m.cyl(DECO.steelDark, 0.17, 0.17, 0.04, [len / 2 + 0.03, 0.3, 0], Z90, 20);
+    m.cyl(DECO.black, 0.07, 0.07, 0.04, [-len / 2 - 0.03, 0.3, 0], Z90, 14);
+    if (!v) m.rbox(DECO.galv, [len * 0.85, 0.08, 0.1], 0.02, [0, 0.47, 0.17]);
+    if (turbo) m.cyl(DECO.galv, 0.07, 0.07, 0.08, [len * 0.2, 0.36, v ? 0.33 : -0.24], Z90, 14);
+    g = m.build();
+    palletEngines.set(key, g);
+  }
+  return g;
+}
+const Z90: V3 = [0, 0, Math.PI / 2];
+
 /** Motorlager im Hof: Paletten mit den ausgebauten Motoren. */
 export function EnginePallets() {
   const engines = useGame((s) => s.engines);
@@ -159,8 +191,8 @@ export function EnginePallets() {
           <group key={i} position={p}>
             <mesh geometry={pallet} material={decoMaterials()} receiveShadow />
             {e && (
-              <group position={[-1.3 * 0.7, 0.15 - 0.35 * 0.7, 0]} scale={0.7}>
-                <mesh geometry={engineDecor(e, 0, 'bare')} material={bayMaterials()} castShadow raycast={() => null} />
+              <group position={[0, 0.07, 0]}>
+                <mesh geometry={palletEngine(e.layout, e.turbo || !!u.motor.turboKit)} material={decoMaterials()} castShadow raycast={() => null} />
               </group>
             )}
           </group>

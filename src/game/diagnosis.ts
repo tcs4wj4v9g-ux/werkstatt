@@ -95,6 +95,8 @@ export interface SoundProfile {
   diesel: boolean;
   turbo: boolean;
   liters: number;
+  /** Sportteile an Ansaugung und Abgas (0–3): lauter, kerniger. */
+  sport?: number;
 }
 
 /** Welche Geräusche der Motor im aktuellen technischen Zustand macht (0 = keins). */
@@ -114,8 +116,9 @@ export function soundProfile(car: CarInstance): SoundProfile {
     layout: e.layout,
     cylinders: e.cylinders,
     diesel: e.fuel === 'diesel',
-    turbo: e.turbo && !has('turbo'),
+    turbo: (e.turbo || !!car.components.turbo?.installed) && !has('turbo'),
     liters: e.liters,
+    sport: ['exhaust_sport', 'manifold_sport', 'intake_sport'].filter((v) => Object.values(car.components).some((c) => c.installed && c.variant === v)).length,
   };
 }
 

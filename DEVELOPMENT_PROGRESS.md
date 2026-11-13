@@ -67,9 +67,24 @@ Supabase-Projekt anlegen, `supabase/schema.sql` ausführen, anonyme Anmeldung ei
 
 ## Stand
 
-- ☑ Phase 1 Datenmodell, Migration (alte Spielstände: neue Teile eingebaut ergänzt, Schrottplatz beim ersten Laden gefüllt)
-- ◐ Phase 2–9 Spiellogik fertig und mit Logiktests geprüft (`src/game/motor.test.ts`): Ausbau mit Checkliste, Kran, Ständer, Revision bis zur Kurbelwelle, Motorprüfstand, Umbau-Kompatibilität, Turbo-Nachrüstung, Tuningrisiken, Wert, Schrottplatz
-- ☐ 3D: Schrottplatz-Welt, Motorständer und Kran, Motorinneres, Umbauteile, optisches Tuning
-- ☐ Oberfläche: Kran/Lager/Ständer, Tuning-Werkbank, Teileshop-Abteilungen, Teileauswahl beim Einbau
-- ☐ Koop: neue Felder im SQL (`engines`, `crane`, `used`, `visualStock`), Stellplatzliste wächst von 15 auf 22
-- ☐ Browser-Tests
+- ☑ Phase 1 Datenmodell, Migration (alte Spielstände: neue Teile eingebaut ergänzt, Schrottplatz beim ersten Laden gefüllt; 15 → 22 Stellplätze)
+- ☑ Phase 2 Schrottplatz: eigener Ort (Lieferwagen im Hof), sechs Wracks mit fehlenden Teilen, Rost, Preisschildern; Ausbau mit eigenem Werkzeug, Kauf beim Ausbau, eindeutige Teilekennung, keine Doppelentnahme; Wrack- und Motorkauf; Erneuerung nach Ablauf
+- ☑ Phase 3 Gebrauchtteile: Zustand, versteckte Mängel, Prüfung an der Werkbank, Verkauf, Auswahl beim Einbau (neu oder gebraucht)
+- ☑ Phase 4 Motorausbau: Checkliste, Kran (Fenster), Ständer drehbar, Motorlager (8 Paletten, 3D)
+- ☑ Phase 5 Revision bis zur Kurbelwelle mit Abhängigkeiten und Schrauben, Verschleiß mit Symptomen, Motorprüfstand (Kompression, Öldruck)
+- ☑ Phase 6 Motorumbau: Motorraumgröße, Umbauteile je Kombination, Teileshop-Abteilung „Umbau“, Einbau sichtbar, Diagnose/Klang/Leistung folgen dem Motor
+- ☑ Phase 7 Leistungstuning: Luft, Ladedruck, Kraftstoff, Kühlung, Steuergerät, mechanische Grenzen; Risiken und Schäden auf Prüfstand und Probefahrt; Sportauspuff/-ansaugung lauter, nachgerüsteter Turbo pfeift
+- ☑ Phase 8 Optisches Tuning in 3D (siehe README), Lager `visualStock`, Wertung im Verkaufspreis
+- ☑ Phase 9 Wert: Originalität für Sammler, unsauberes Tuning, Leistungssteigerung, Motorumbau
+- ☑ Phase 10 Koop: `engines`, `crane`, `used`, `visualStock` im SQL; Kennungsprüfung gegen Duplikate; Werkzeugkiste am Schrottplatz; alte Koop-Werkstätten werden beim Laden ergänzt
+- ☑ Phase 11 Tests: 9 neue Logiktests (`motor.test.ts`), SQL-Test, Browser-Durchlauf `e2e/schrott.cjs` (21 Prüfungen), Koop-Durchlauf um gemeinsame Motorarbeit, gemeinsames Tuning und Wiederbeitritt mit halb zerlegtem Motor erweitert
+
+### Grenzen (ehrlich)
+
+- Der Kran wird über sein Fenster bedient, nicht frei durch die Halle geschoben; der Motor hängt sichtbar am Haken.
+- Motoren am Schrottplatz baut der Händler aus (Aufpreis), nicht der Spieler.
+- Optikteile werden im Tuningfenster montiert, nicht Schraube für Schraube.
+- Motorumbau ändert weder Getriebe noch Antriebsart.
+- Klang: Bauart, Turbo und Anzahl der Sportteile; keine eigene Klangfarbe je Auspuffmarke.
+- Das neue `supabase/schema.sql` muss vor dem Mergen im Supabase-SQL-Editor ausgeführt werden, sonst lehnt der Server die neuen Felder ab.
+- Kein echter iPad-Test – geprüft wurde in Chromium (Playwright).
