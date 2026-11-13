@@ -3,7 +3,7 @@ import { CAR_MODELS } from '../game/data/cars';
 import { ENGINES } from '../game/data/engines';
 import { BODY_SPECS, bodyShape, carGeometry, WHEEL_X } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, trimGeometry, wheelGeometry } from './carParts';
-import { engineDecor } from './engineBay';
+import { engineDecor, exhaustGeometry, intakeGeometry } from './engineBay';
 import { GFX } from './gfx';
 
 const finite = (g: { getAttribute(n: string): { array: ArrayLike<number> } }) => Array.from(g.getAttribute('position').array).every((v) => Number.isFinite(v));
@@ -91,7 +91,7 @@ describe('Anbauteile, Räder, Innenraum, Motorraum', () => {
     for (const e of Object.values(ENGINES)) {
       const g = engineDecor(e, 1);
       expect(finite(g), e.id).toBe(true);
-      size.add(g.getAttribute('position').count);
+      size.add(g.getAttribute('position').count + intakeGeometry(e).getAttribute('position').count + exhaustGeometry(e, false).getAttribute('position').count);
     }
     // R4, R6, V6, V8 sowie Diesel unterscheiden sich in der Geometrie
     expect(size.size).toBeGreaterThanOrEqual(5);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { CarModelDef } from '../game/data/cars';
 import type { EngineDef } from '../game/data/engines';
-import type { BodyStyle } from '../game/types';
+import type { BodyStyle, VisualTune } from '../game/types';
 import { ARCH_R, bodyShape, doorHinge, endPatch, sidePatch, WHEEL_X, wrapPatch, type Shape } from './carGeometry';
 import { mat, Mesher, type V3 } from './mesher';
 
@@ -24,9 +24,20 @@ export interface CarLook {
   /** Sitzfarbe und Akzent. */
   seat: string;
   seat2: string;
+  /** Optisches Tuning */
+  front: number;
+  rear: number;
+  skirts: boolean;
+  /** 0 = keiner, 1 = Lippe, 2 = Entenbürzel, 3 = Flügel. */
+  wing: number;
+  flares: boolean;
+  tips: 'stock' | 'dual' | 'quad' | 'oval';
+  rimSize: number;
+  sportSeats: boolean;
+  sportWheel: boolean;
 }
 
-export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: EngineDef): CarLook {
+export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: EngineDef, visual?: VisualTune): CarLook {
   const cls = model?.cls ?? 'budget';
   const brand = model?.brand ?? 'Bavaria';
   const classic = body === 'classic';
@@ -44,15 +55,26 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
     seat: lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
     seat2: lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
+    front: visual?.front ?? 0,
+    rear: visual?.rear ?? 0,
+    skirts: !!visual?.skirts,
+    wing: visual?.spoiler ?? (sport || model?.id === 'bavaria_340_ms' ? 3 : 0),
+    flares: !!visual?.flares,
+    tips: visual?.tips ?? 'stock',
+    rimSize: visual?.rimSize ?? 0,
+    sportSeats: visual?.seats === 'sport',
+    sportWheel: visual?.wheel === 'sport',
+    ...(visual?.rim ? { rim: visual.rim as RimStyle } : {}),
+    ...(visual?.seats === 'sport' ? { seat: '#16171a', seat2: '#b3261e' } : {}),
   };
 }
-export const lookKey = (l: CarLook) => [l.rim, l.grille, l.lamps, +l.chromeBumper, +l.blackBumper, +l.chromeTrim, +l.spoiler, l.pipes].join();
+export const lookKey = (l: CarLook) => [l.rim, l.grille, l.lamps, +l.chromeBumper, +l.blackBumper, +l.chromeTrim, l.pipes, l.front, l.rear, +l.skirts, l.wing, +l.flares, l.tips].join();
 
 // ---------------------------------------------------------------- Räder
 
 /** Materialgruppen eines Rads: Reifen, Felge (Farbe/Schmutz), dunkel, Felgenbett. */
 export const WHEEL_SLOT = { tire: 0, rim: 1, dark: 2, barrel: 3 } as const;
-const RIM_R: Record<RimStyle, number> = { steel: 0.215, double5: 0.232, multi: 0.242, turbine: 0.24, classic: 0.215, five: 0.25 };
+export const RIM_R: Record<RimStyle, number> = { steel: 0.215, double5: 0.232, multi: 0.242, turbine: 0.24, classic: 0.215, five: 0.25 };
 export const RIM_COLOR: Record<RimStyle, string> = { steel: '#aab0b7', double5: '#cdd2d8', multi: '#2a2c30', turbine: '#e4e7eb', classic: '#dfe3e8', five: '#3a3d42' };
 
 /** Speiche als verjüngter, leicht gewölbter Balken von der Nabe (z = r0) zum Felgenrand (z = r1). */
@@ -71,12 +93,13 @@ function spoke(m: Mesher, slot: number, angle: number, r0: number, r1: number, w
 
 const wheels = new Map<string, THREE.BufferGeometry>();
 /** Rad mit Achse entlang +Y (Außenseite = +Y). `lugs` = Radschrauben als Zierde (an den nicht demontierbaren Rädern). */
-export function wheelGeometry(style: RimStyle, detail: number, lugs: boolean) {
-  const key = `${style}${detail}${+lugs}`;
+export function wheelGeometry(style: RimStyle, detail: number, lugs: boolean, size = 0) {
+  const key = `${style}${detail}${+lugs}${size}`;
   let g = wheels.get(key);
   if (g) return g;
   const m = new Mesher(4);
-  const R = RIM_R[style];
+  // Größere Felge, gleicher Außendurchmesser: der Reifen wird flacher.
+  const R = RIM_R[style] + 0.025 * size;
   const W = WHEEL_SLOT;
   const seg = detail ? 36 : 20;
   // Reifen: Flanke mit Wulst, Lauffläche mit zwei Längsrillen
@@ -146,7 +169,7 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   const key = body + lookKey(look) + detail;
   let g = trims.get(key);
   if (g) return g;
-  const S = bodyShape(body);
+  const S = bodyShape(body, look.flares);
   const B = S.B;
   const m = new Mesher(SLOTS);
   const k = B.width / 0.9;
@@ -273,10 +296,14 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   // Diffusor und Auspuffblenden: ein Rohr beim Vierzylinder, Doppelrohr beim Sechszylinder, vier Rohre beim V8
   wrapPatch(m, SLOT.dark, S, -1, 0, 1.25, B.ground + 0.15, 0.085, 0.5, 0.005, N(16), 2);
   const zp = 0.5 * k;
-  for (const zz of look.pipes === 4 ? [-zp - 0.05, -zp + 0.05, zp - 0.05, zp + 0.05] : look.pipes === 2 ? [-zp - 0.05, -zp + 0.05] : [-zp]) {
+  const pipes = look.tips === 'quad' ? 4 : look.tips === 'dual' ? 2 : look.tips === 'oval' ? 2 : look.pipes;
+  const oval = look.tips === 'oval';
+  const zs = pipes === 4 ? [-zp - 0.05, -zp + 0.05, zp - 0.05, zp + 0.05] : pipes === 2 ? (look.tips === 'stock' ? [-zp - 0.05, -zp + 0.05] : [-zp, zp]) : [-zp];
+  for (const zz of zs) {
     const x = S.endX(-1, B.ground + 0.1, zz);
-    m.cyl(SLOT.chrome, 0.036, 0.034, 0.13, [x + 0.02, B.ground + 0.1, zz], [0, 0, Math.PI / 2], 14, true);
-    m.cyl(SLOT.dark, 0.03, 0.03, 0.01, [x + 0.06, B.ground + 0.1, zz], [0, 0, Math.PI / 2], 10);
+    const r = look.tips === 'stock' ? 0.036 : 0.042;
+    m.add(SLOT.chrome, new THREE.CylinderGeometry(r, r * 0.95, 0.14, 16, 1, true), mat([x + 0.02, B.ground + 0.1, zz], [0, 0, Math.PI / 2], oval ? [1, 1, 1.7] : 1));
+    m.add(SLOT.dark, new THREE.CylinderGeometry(r * 0.85, r * 0.85, 0.01, 12), mat([x + 0.07, B.ground + 0.1, zz], [0, 0, Math.PI / 2], oval ? [1, 1, 1.7] : 1));
   }
 
   // ---- Flanken ----
@@ -310,11 +337,46 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
     const x = Math.max(B.x1 + 0.16, -1.05);
     m.sphere(SLOT.solid, 1, [x, S.roofY(x) + 0.012, 0], [0.1, 0.035, 0.022], 10);
   }
-  if (look.spoiler) {
+  if (look.wing === 3) {
     const x = B.tail + 0.24;
     const y = S.crown(x);
     m.rbox(SLOT.solid, [0.2, 0.02, B.width * 1.62], 0.008, [x, y + 0.115, 0], [0, 0, 0.1]);
     for (const z of [-0.48, 0.48]) m.rbox(SLOT.gloss, [0.08, 0.12, 0.02], 0.006, [x + 0.01, y + 0.05, z]);
+    for (const s of [-1, 1]) m.rbox(SLOT.gloss, [0.22, 0.07, 0.012], 0.004, [x, y + 0.12, s * B.width * 0.81]);
+  } else if (look.wing === 2) {
+    // Entenbürzel: hochgezogene Abrisskante am Heckdeckel
+    const x = B.tail + B.tailLen + 0.06;
+    const y = S.crown(x);
+    m.rbox(SLOT.solid, [0.16, 0.05, B.width * 1.35], 0.02, [x, y + 0.03, 0], [0, 0, 0.35]);
+  } else if (look.wing === 1) {
+    const x = B.tail + B.tailLen + 0.02;
+    const y = S.crown(x);
+    m.rbox(SLOT.gloss, [0.05, 0.018, B.width * 1.3], 0.006, [x, y + 0.008, 0], [0, 0, 0.3]);
+  }
+  // Frontstoßstange Sport/Rennsport: Splitter und größere Einlässe
+  if (look.front > 0) {
+    const yl = B.ground + 0.07;
+    const x = S.endX(1, yl, 0);
+    m.rbox(SLOT.gloss, [0.06 + look.front * 0.03, 0.016, B.width * (look.front === 2 ? 1.5 : 1.3)], 0.006, [x + look.front * 0.012, yl - 0.02, 0]);
+    for (const s of [-1, 1]) {
+      wrapPatch(m, SLOT.dark, S, 1, s * 0.62 * k, 0.4, 0.4, 0.15, 0.4, 0.007, N(8), N(3));
+      if (look.front === 2) m.rbox(SLOT.gloss, [0.1, 0.012, 0.16], 0.004, [S.endX(1, 0.45, s * 0.72) + 0.03, 0.45, s * 0.74], [0, s * 0.4, s * 0.25]);
+    }
+    endPatch(m, SLOT.dark, S, 1, 0, 0.42, 0.7, 0.13, 0.4, 0.008, N(12), N(4));
+  }
+  // Heckschürze mit Diffusor
+  if (look.rear > 0) {
+    const yd = B.ground + 0.12;
+    wrapPatch(m, SLOT.gloss, S, -1, 0, 1.05, yd, 0.14, 0.3, 0.008, N(16), 3);
+    for (let i = -3; i <= 3; i++) m.rbox(SLOT.gloss, [0.18, 0.11, 0.012], 0.004, [S.endX(-1, yd, i * 0.12) + 0.06, yd - 0.01, i * 0.12]);
+  }
+  // Seitenschweller
+  if (look.skirts) {
+    for (const s of [-1, 1]) {
+      const xa = B.rearAxle + ARCH_R + 0.04;
+      const xb = WHEEL_X - ARCH_R - 0.04;
+      m.rbox(SLOT.solid, [xb - xa, 0.07, 0.045], 0.015, [(xa + xb) / 2, B.ground + 0.035, s * (S.sideZ((xa + xb) / 2, B.ground + 0.1) + 0.012)]);
+    }
   }
   for (const z of [-0.28, 0.22]) {
     m.tube(SLOT.dark, [[0.86, 0.985, z - 0.02], [0.8, 0.995, z + 0.18], [0.76, 1.005, z + 0.4]], 0.006, 4);
@@ -328,10 +390,10 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
 
 /** Anbauteile der Vordertüren (Griff, Spiegel, Zierleiste, Türverkleidung), relativ zum Scharnier. */
 export function doorTrimGeometry(body: BodyStyle, look: CarLook) {
-  const key = body + +look.chromeTrim;
+  const key = body + +look.chromeTrim + +look.flares;
   let g = doorTrims.get(key);
   if (g) return g;
-  const S = bodyShape(body);
+  const S = bodyShape(body, look.flares);
   const B = S.B;
   const [hx, hz] = doorHinge(S);
   g = [-1, 1].map((s) => {
@@ -386,15 +448,15 @@ function seat(m: Mesher, x: number, z: number, sporty: boolean) {
   for (const s of [-1, 1]) m.box(SLOT.dark, [0.5, 0.03, 0.03], [x, 0.42, z + s * 0.17]);
 }
 
-export function interiorGeometry(body: BodyStyle, detail: number) {
-  const key = body + detail;
+export function interiorGeometry(body: BodyStyle, detail: number, sportSeats = false, sportWheel = false) {
+  const key = body + detail + +sportSeats + +sportWheel;
   let g = interiors.get(key);
   if (g) return g;
   const S = bodyShape(body);
   const B = S.B;
   const m = new Mesher(SLOTS);
   const W = B.width;
-  const sporty = body === 'sport' || body === 'coupe';
+  const sporty = sportSeats || body === 'sport' || body === 'coupe';
   /** In flachen Autos sitzt man tiefer. */
   const k = (B.roof - 0.5) / 0.92;
   // Bodenwanne, Mitteltunnel, Schweller innen

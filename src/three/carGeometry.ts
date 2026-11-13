@@ -626,20 +626,25 @@ export interface CarGeometry extends Built {
 }
 
 const cache = new Map<string, CarGeometry>();
-const shapes = new Map<BodyStyle, Shape>();
+const shapes = new Map<string, Shape>();
 
-export function bodyShape(body: BodyStyle) {
-  let s = shapes.get(body);
-  if (!s) shapes.set(body, (s = new Shape(BODY_SPECS[body])));
+/** Form einer Karosserie; mit Kotflügelverbreiterungen breiter, mit stärker ausgestellten Radläufen und mehr Spur. */
+export function bodyShape(body: BodyStyle, flares = false) {
+  const key = body + (flares ? '+f' : '');
+  let s = shapes.get(key);
+  if (!s) {
+    const B = BODY_SPECS[body];
+    shapes.set(key, (s = new Shape(flares ? { ...B, width: B.width + 0.03, flare: B.flare + 0.035, trackF: B.trackF + 0.035, trackR: B.trackR + 0.045 } : B)));
+  }
   return s;
 }
 
 /** `detail` 0 = grobes Netz (niedrige Grafikstufe), 1 = feines Netz. */
-export function carGeometry(body: BodyStyle, detail = 1): CarGeometry {
-  const key = body + detail;
+export function carGeometry(body: BodyStyle, detail = 1, flares = false): CarGeometry {
+  const key = body + detail + (flares ? '+f' : '');
   let g = cache.get(key);
   if (!g) {
-    const shape = bodyShape(body);
+    const shape = bodyShape(body, flares);
     g = { shape, ...buildBody(shape, detail) };
     cache.set(key, g);
   }

@@ -11,6 +11,7 @@ import { CAR_MODELS } from '../game/data/cars';
 import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
+import { dropOf } from '../game/data/visual';
 import { Mesher } from './mesher';
 import { junkPartPrice } from '../game/motor';
 import { bayMaterials, beltGeometry, camGeometry, chainGeometry, crankGeometry, engineDecor, exhaustGeometry, intakeGeometry, mainCapsGeometry, oilPumpGeometry, pistonGeometry, V_PIVOT, V_TILT } from './engineBay';
@@ -288,8 +289,8 @@ export function zoneAt(x: number, y: number, z: number): ZoneId {
 
 const wheelMats = new Map<string, THREE.Material[]>();
 /** Materialien eines Rads: Reifen, Felge (mit Schmutz), dunkel, Felgenbett. */
-function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' | 'defect') {
-  const key = `${style}:${dirt}:${mode}`;
+function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' | 'defect', color?: string) {
+  const key = `${style}:${dirt}:${mode}:${color ?? ''}`;
   let m = wheelMats.get(key);
   if (!m) {
     if (mode === 'ghost') {
@@ -297,7 +298,7 @@ function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' 
       m = [g, g, g, g];
     } else {
       const em = mode === 'defect' ? { emissive: new THREE.Color('#ff2a1a'), emissiveIntensity: 0.6 } : {};
-      const rim = new THREE.Color(RIM_COLOR[style]).lerp(DIRT, dirt * 0.8);
+      const rim = new THREE.Color(color ?? RIM_COLOR[style]).lerp(DIRT, dirt * 0.8);
       m = [
         new THREE.MeshStandardMaterial({ color: new THREE.Color('#131415').lerp(DIRT, dirt * 0.35), roughness: 0.92, ...em }),
         new THREE.MeshStandardMaterial({ color: rim, metalness: style === 'steel' ? 0.55 : 0.95, roughness: (style === 'steel' ? 0.5 : 0.2) + dirt * 0.6, ...em }),
@@ -311,10 +312,10 @@ function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' 
 }
 
 /** Rad als ein einziges Netz. `out` = Außenseite (+1/-1); `lugs` = Zier-Radschrauben (nicht demontierbare Räder). */
-function WheelMeshes({ out, dirt = 0, style = 'double5', lugs = false }: { out: number; dirt?: number; style?: RimStyle; lugs?: boolean }) {
+function WheelMeshes({ out, dirt = 0, style = 'double5', lugs = false, size = 0, color }: { out: number; dirt?: number; style?: RimStyle; lugs?: boolean; size?: number; color?: string }) {
   const mode = useContext(GhostCtx);
   const detail = useGfxSettings().detail;
-  return <mesh geometry={wheelGeometry(style, detail, lugs)} material={wheelMaterials(style, Math.round(dirt * 5) / 5, mode)} rotation={[(out * Math.PI) / 2, 0, 0]} castShadow />;
+  return <mesh geometry={wheelGeometry(style, detail, lugs, size)} material={wheelMaterials(style, Math.round(dirt * 5) / 5, mode, color)} rotation={[(out * Math.PI) / 2, 0, 0]} castShadow />;
 }
 
 /** Färbt die Karosserie-Eckpunkte je Bereich: Lackfarbe, Schmutz, Schaum, Rostflecken. */
@@ -335,6 +336,13 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
     if (car) {
       const zone = car.zones[zoneAt(x, y, z)];
       if (zone.paint) c.set(zone.paint);
+      // Folie: Rennstreifen über Haube, Dach und Heck, Seitenstreifen, zweifarbiges Dach
+      const w = car.visual?.wrap;
+      if (w && w !== 'none') {
+        const wc = car.visual?.wrapColor ?? (c.getHSL({ h: 0, s: 0, l: 0 }).l > 0.55 ? '#16181d' : '#f2f3f5');
+        const az = Math.abs(z);
+        if ((w === 'stripes' && az > 0.06 && az < 0.2 && y > 0.85) || (w === 'side' && az > 0.75 && y > 0.6 && y < 0.67) || (w === 'twotone' && y > 1.0)) c.set(wc);
+      }
       // Rost sitzt fleckig, bevorzugt unten an Schwellern und Radläufen.
       if (zone.rust > 0) {
         const n = 0.5 + 0.5 * Math.sin(x * 9.1 + z * 3.3) * Math.sin(y * 13.7 + x * 2.9);
@@ -350,9 +358,12 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
 
 export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, modelId, hoodTap }: Props) {
   const G = useGfxSettings();
-  const shared = useMemo(() => carGeometry(body, G.detail), [body, G.detail]);
+  const flares = !!car?.visual?.flares;
+  const shared = useMemo(() => carGeometry(body, G.detail, flares), [body, G.detail, flares]);
   const S = shared.shape;
-  const B = BODY_SPECS[body];
+  const B = shared.shape.B;
+  /** Tieferlegung: Karosserie und Motor sinken, die Räder bleiben stehen. */
+  const drop = car && !car.bare ? dropOf(car.visual) / 100 : 0;
   const hinge = useMemo(() => doorHinge(S), [S]);
   // Eigene Kopien je Auto, weil jede Karosserie ihre eigene Einfärbung trägt.
   const geo = useMemo(() => ({ shell: shared.shell.clone(), cabin: shared.cabin.clone(), hood: shared.hood.clone(), doors: shared.doors.map((d) => d.clone()) }), [shared, car?.uid]);
@@ -408,6 +419,18 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   mats.paint.metalness = metallic * (1 - dirt * 0.7);
   mats.solid.metalness = metallic;
   mats.paint.roughness = 0.26 + (0.68 - metallic) * 0.12 + dirt * 0.52 - shine * 0.14;
+  // Lackart aus dem Tuning: Matt ohne Spiegelung, Uni ohne Metallic, Metallic mit viel Glanz
+  const finish = car?.visual?.finish;
+  if (finish === 'matte') {
+    mats.paint.roughness = 0.72 + dirt * 0.2;
+    mats.paint.metalness = 0.12;
+    mats.paint.envMapIntensity = 0.35;
+  } else if (finish === 'solid') mats.paint.metalness = 0.1;
+  else if (finish === 'metallic') mats.paint.metalness = 0.72 * (1 - dirt * 0.7);
+  if (mats.paint instanceof THREE.MeshPhysicalMaterial && finish === 'matte') mats.paint.clearcoat = 0;
+  const lamps = car?.visual?.lamps;
+  mats.tail.color.set(lamps === 'smoked' ? '#2a0608' : lamps === 'clear' ? '#d9cfcf' : '#8a0d12');
+  mats.tail.emissiveIntensity = lamps === 'smoked' ? 0.12 : lamps === 'clear' ? 0.05 : 0.3;
   mats.paint.envMapIntensity = 1.2 - dirt * 0.7;
   if (mats.paint instanceof THREE.MeshPhysicalMaterial) {
     mats.paint.clearcoat = (1 - dirt) * (0.3 + 0.7 * shine);
@@ -436,10 +459,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
 
   const model = CAR_MODELS[car?.modelId ?? modelId ?? ''];
   const engine = car ? engineOf(car) : ENGINES[model?.engineId ?? 'r4_20'];
-  const look = useMemo(() => lookOf(model, body, engine), [model, body, engine]);
+  const look = useMemo(() => lookOf(model, body, engine, car?.visual), [model, body, engine, car?.visual]);
   const trim = useMemo(() => trimGeometry(body, look, G.detail), [body, look, G.detail]);
   const doorTrim = useMemo(() => doorTrimGeometry(body, look), [body, look]);
-  const interior = useMemo(() => interiorGeometry(body, G.detail), [body, G.detail]);
+  const interior = useMemo(() => interiorGeometry(body, G.detail, look.sportSeats, look.sportWheel), [body, G.detail, look.sportSeats, look.sportWheel]);
   mats.seat.color.set(look.seat);
   mats.seat2.color.set(look.seat2);
   const trimMats = useMemo(() => {
@@ -459,7 +482,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     return list;
   }, [mats]);
   const cabinMats = useMemo(() => [mats.paint, mats.glass, mats.trim], [mats]);
-  const hoodMats = useMemo(() => [mats.paint, mats.dark], [mats]);
+  const carbon = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#1a1b1e', metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.05 }), []);
+  const hoodMats = useMemo(() => [car?.visual?.hood === 2 ? carbon : mats.paint, mats.dark], [mats, carbon, car?.visual?.hood]);
   const vee = isV(engine);
   const diesel = engine.fuel === 'diesel';
   const slots = cylinderSlots(engine);
@@ -554,7 +578,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     if (!full) {
       return (
         <group key={s} ref={wheelRef} position={[WX, WY, z(WZ)]} onClick={wheelTap}>
-          <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs />
+          <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={car?.visual?.rimColor} />
           <mesh position={[0, 0, -sign * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.17, 0.17, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
@@ -657,7 +681,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           </group>
         )}
         <group ref={wheelRef} position={[WX, WY, z(WZ)]}>
-          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} />)}
+          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} size={look.rimSize} color={car?.visual?.rimColor} />)}
           <group position={[-WX, -WY, -z(WZ)]}>{bolts(`wheel_${s}`, lug, axis)}</group>
         </group>
       </group>
@@ -688,7 +712,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       {!bare && (
       <>
       {/* Karosserie */}
-      <group onClick={bodyTap} userData={{ label: handlers && !full ? 'Karosserie' : undefined }}>
+      <group position={[0, -drop, 0]} onClick={bodyTap} userData={{ label: handlers && !full ? 'Karosserie' : undefined }}>
         <mesh geometry={geo.shell} material={mats.paint} castShadow />
         <mesh geometry={geo.cabin} material={cabinMats} castShadow />
         <mesh geometry={trim} material={trimMats} />
@@ -727,7 +751,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         const hx = B.handles[0];
         const hy = S.beltY(hx) - 0.085;
         return (
-          <group key={k} ref={k ? doorR : doorL} position={[hinge[0], 0, s * hinge[1]]}>
+          <group key={k} ref={k ? doorR : doorL} position={[hinge[0], -drop, s * hinge[1]]}>
             <group onClick={bodyTap} userData={{ label: handlers && !full ? 'Karosserie' : undefined }}>
               <mesh geometry={geo.doors[k]} material={cabinMats} castShadow />
               <mesh geometry={doorTrim[k]} material={trimMats} />
@@ -750,7 +774,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       {/* Hinterräder (nicht demontierbar) */}
       {[-1, 1].map((k) => (
         <group key={k} position={[B.rearAxle, WY, k * (WZ + B.trackR)]} onClick={wheelTap}>
-          <WheelMeshes out={k} dirt={wheelDirt} style={look.rim} lugs />
+          <WheelMeshes out={k} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={car?.visual?.rimColor} />
           <mesh position={[0, 0, -k * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.16, 0.16, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
@@ -765,7 +789,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       </>
       )}
       {full && (
-        <group position={bare ? [0, 0.95, 0] : undefined} rotation={bare && car!.lifted ? [Math.PI, 0, 0] : undefined}>
+        <group position={bare ? [0, 0.95, 0] : [0, -drop, 0]} rotation={bare && car!.lifted ? [Math.PI, 0, 0] : undefined}>
         <group position={bare ? [-1.3, -0.55, 0] : undefined}>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
@@ -1513,7 +1537,18 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       {!bare && (
       <>
       {/* Motorhaube, Scharnier an der Windschutzscheibe */}
-      <group ref={hood} position={[HOOD_X0, S.crown(HOOD_X0), 0]}>
+      <group ref={hood} position={[HOOD_X0, S.crown(HOOD_X0) - drop, 0]}>
+        {car?.visual?.hood === 1 && (
+          <mesh position={[0.5, 0.035, 0]} material={mats.solid} raycast={noRay}>
+            <boxGeometry args={[0.55, 0.05, 0.42]} />
+          </mesh>
+        )}
+        {car?.visual?.hood === 1 && (
+          <mesh position={[0.79, 0.04, 0]} raycast={noRay}>
+            <boxGeometry args={[0.012, 0.035, 0.36]} />
+            <meshStandardMaterial color="#0b0c0e" roughness={0.5} />
+          </mesh>
+        )}
         <mesh
           geometry={geo.hood}
           material={hoodMats}
