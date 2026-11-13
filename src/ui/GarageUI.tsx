@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { engineAudio } from '../game/audio';
 import { CAR_MODELS } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
+import { fitOf, splitKey } from '../game/fitment';
+import { MarketTab } from './MarketTab';
+import { AchievementsTab, CollectionTab, ContestResultModal, ContestsTab, DynoModal, UnlockedModal } from './CareerTabs';
 import { DEFECTS } from '../game/data/defects';
 import { PARTS } from '../game/data/parts';
 import { availableSlots, SLOTS } from '../game/data/workshop';
@@ -74,6 +77,9 @@ export function GarageUI() {
               <button className="btn" data-testid="move" onClick={() => s.setPanel('move', nearBay)}>🅿 Umparken</button>
               {!near.lifted && kind !== 'wash' && kind !== 'paint' && (
                 <button className="btn" data-testid="drive" onClick={() => s.startDrive(nearBay)}>🏁 Probefahrt</button>
+              )}
+              {s.upgrades.includes('dyno') && !near.lifted && kind === 'lift' && (
+                <button className="btn" data-testid="dyno" onClick={() => s.runDyno(nearBay)}>📈 Prüfstand</button>
               )}
               <button className={`btn ${running ? 'active' : ''}`} data-testid="engine" onClick={() => s.toggleEngine(nearBay)}>
                 {running ? '⏹ Motor aus' : '🔑 Motor starten'}
@@ -189,6 +195,9 @@ export function GarageUI() {
         </Modal>
       )}
       {s.panel === 'bench' && <BenchModal />}
+      {s.panel === 'dyno' && <DynoModal />}
+      <UnlockedModal />
+      {!s.lastSale && s.contestResult && <ContestResultModal />}
       {s.panel === 'drive' && <DriveModal />}
       {s.panel === 'obd' && <ObdModal />}
       {s.panel === 'file' && <FileModal />}
@@ -217,7 +226,8 @@ export function GarageUI() {
       {s.partPrompt && (
         <Modal title="Neuteil fehlt" onClose={s.closePartPrompt}>
           <p>
-            {COMPONENT_MAP[s.partPrompt.compId].name} ist defekt. Du hast kein Neuteil „{PARTS[s.partPrompt.partId].name}“ im Regal.
+            {COMPONENT_MAP[s.partPrompt.compId].name} ist defekt. Du hast kein passendes Neuteil „{PARTS[s.partPrompt.partId].name}“
+            {s.cars[s.partPrompt.bay] ? ` (${fitOf(s.cars[s.partPrompt.bay]!, s.partPrompt.partId)})` : ''} im Regal.
           </p>
           <button className="btn primary big" onClick={() => { s.closePartPrompt(); s.setPanel('shop'); }}>Teil bestellen</button>
           <button className="btn big" onClick={() => s.tapComponent(s.partPrompt!.bay, s.partPrompt!.compId, true)}>Defektes Altteil wieder einbauen</button>
@@ -267,12 +277,12 @@ function CabinetModal() {
 /** Werkbank: Übersicht über Lager und Befunde beider Autos. */
 function BenchModal() {
   const s = useGame();
-  const stock = (Object.keys(s.inventory) as PartId[]).filter((p) => s.inventory[p] > 0);
+  const stock = Object.keys(s.inventory).filter((k) => s.inventory[k] > 0 && PARTS[splitKey(k).part]);
   return (
     <Modal title="Werkbank" onClose={() => s.setPanel(null)} wide>
       <h4>Teile im Regal</h4>
       {stock.length === 0 && <p className="meta">Keine Ersatzteile vorrätig.</p>}
-      {stock.map((p) => <div key={p} className="meta">{s.inventory[p]}× {PARTS[p].name}</div>)}
+      {stock.map((k) => <div key={k} className="meta">{s.inventory[k]}× {PARTS[splitKey(k).part].name} – passend für {splitKey(k).fit}</div>)}
       {s.cars.map((car, i) =>
         car ? (
           <div key={i}>
@@ -334,7 +344,7 @@ function ObdModal() {
 
 function ComputerModal() {
   const s = useGame();
-  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'jobs' | 'parts' | 'build' | 'news'>('market');
+  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'contests' | 'news'>('market');
   const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
@@ -344,37 +354,19 @@ function ComputerModal() {
           ['market', 'Gebrauchtwagen'],
           ['auctions', 'Auktionen'],
           ['mine', 'Meine Autos'],
+          ['collection', 'Sammlung'],
           ['jobs', 'Aufträge'],
           ['parts', 'Teile'],
           ['build', 'Ausbau'],
+          ['career', `Erfolge (${s.achieved.length})`],
+          ['contests', s.meet && !s.meet.result ? 'Wettbewerbe ●' : 'Wettbewerbe'],
           ['news', news ? `Neuigkeiten (${news})` : 'Neuigkeiten'],
         ] as const).map(([id, label]) => (
           <button key={id} className={`btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
 
-      {tab === 'market' && (
-        <>
-          <p className="meta">
-            Tag {s.day} · {marketLabel(s.marketIndex)} · freie Stellplätze: {free}
-          </p>
-          {s.listings.map((l, i) => (
-            <div key={l.id} className="shop-row">
-              <div>
-                <b>{l.barn ? '🏚 Scheunenfund: ' : l.expiresDay ? '⏳ ' : ''}{CAR_MODELS[l.car.modelId].name}{l.car.rarity > 0 ? ` (${RARITY_NAMES[l.car.rarity]})` : ''}</b>
-                <div className="meta">
-                  {l.expiresDay !== undefined && `nur bis Tag ${l.expiresDay} · `}Bj. {l.car.year} · {l.car.km.toLocaleString('de-DE')} km · {l.seller}
-                  {l.hints.length > 0 && ` · ${l.hints.length} Auffälligkeit(en) notiert`}
-                  {l.gone && ' · Verkäufer hat abgebrochen'}
-                </div>
-              </div>
-              <div className="price">{eur(l.current)}</div>
-              <button className="btn primary" disabled={l.gone} onClick={() => s.viewListing(i)}>Besichtigen</button>
-            </div>
-          ))}
-          <button className="btn big" onClick={s.nextDay}>🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)</button>
-        </>
-      )}
+      {tab === 'market' && <MarketTab />}
 
       {tab === 'mine' && (
         <>
@@ -385,6 +377,9 @@ function ComputerModal() {
       )}
 
       {tab === 'auctions' && <AuctionsTab />}
+      {tab === 'collection' && <CollectionTab />}
+      {tab === 'career' && <AchievementsTab />}
+      {tab === 'contests' && <ContestsTab />}
       {tab === 'jobs' && <JobsTab />}
       {tab === 'parts' && <ShopList />}
       {tab === 'build' && <UpgradesTab />}

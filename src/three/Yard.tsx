@@ -93,7 +93,7 @@ export function Yard() {
       <Box p={[ROOM.minX - 0.1, H + 0.15, 0]} s={[0.5, 0.3, ROOM.maxZ - ROOM.minZ + 0.6]} c="#3f4650" m={0.4} />
       <Sign text="GARAGE KINGS" p={[ROOM.minX - 0.22, 3.75, 0]} rot={[0, -Math.PI / 2, 0]} size={[3.0, 0.7]} fg="#ff7a1a" />
       {/* Seitenwände der Halle von außen */}
-      {[ROOM.minZ - 0.1, ROOM.maxZ + 0.1].map((z) => (
+      {[...(has('loc_pro') ? [] : [ROOM.minZ - 0.1]), ...(has('loc_hq') ? [] : [ROOM.maxZ + 0.1])].map((z) => (
         <Box key={z} p={[(ROOM.minX + ROOM.maxX) / 2, H / 2, z]} s={[ROOM.maxX - ROOM.minX + 0.4, H, 0.2]} c="#d9d6cc" r={0.95} />
       ))}
 
@@ -123,7 +123,8 @@ export function Yard() {
       <Sign text="AUSFAHRT · PROBEFAHRT" p={[YARD.minX + 0.12, 2.5, BAY_Z[0]]} rot={[0, Math.PI / 2, 0]} size={[3.6, 0.42]} bg="#1d6b3a" />
       {/* Bäume hinter dem Zaun */}
       {[-20, -15, -9, -6].flatMap((x, i) =>
-        [YARD.minZ - 3, YARD.maxZ + 3].map((z) => (
+        // Wo Halle 2 bzw. der Showroom steht, wächst kein Baum mehr.
+        [YARD.minZ - 3, YARD.maxZ + 3].filter((z) => x < -8 || !(z < 0 ? has('loc_pro') : has('loc_hq'))).map((z) => (
           <group key={`${x}${z}`} position={[x + (i % 2), 0, z + (i % 3) - 1]}>
             <mesh position={[0, 0.8, 0]}>
               <cylinderGeometry args={[0.18, 0.24, 1.6, 6]} />

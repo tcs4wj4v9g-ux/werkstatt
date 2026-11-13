@@ -8,6 +8,19 @@ export const ROOM = { minX: -4.8, maxX: 6.4, minZ: -5.6, maxZ: 5.6, height: 4.4 
 /** Hof vor der Halle – durch die offenen Tore erreichbar. */
 export const YARD = { minX: -23, maxX: -4.8, minZ: -9, maxZ: 9 };
 export const DOOR_HALF = 1.6;
+/** Durchgang in den Seitenwänden der Stammhalle zu Halle 2 bzw. zum Showroom. */
+export const PASSAGE = { minX: -2.9, maxX: 1.4, height: 2.5 };
+/** Halle 2: mit dem Performance-Center um eine Bühne verlängert. */
+export const hall2 = (center: boolean) => ({ minX: ROOM.minX, maxX: ROOM.maxX, minZ: center ? -16.4 : -11.0, maxZ: ROOM.minZ });
+export const SHOWROOM = { minX: ROOM.minX, maxX: ROOM.maxX, minZ: ROOM.maxZ, maxZ: 14.6 };
+/** Welche Gebäudeteile es gibt – wird aus den gekauften Standorten gesetzt. */
+export const site = { pro: false, center: false, hq: false, hoist: false };
+export function setSite(upgrades: string[]) {
+  site.pro = upgrades.includes('loc_pro');
+  site.center = upgrades.includes('loc_center');
+  site.hq = upgrades.includes('loc_hq');
+  site.hoist = upgrades.includes('hoist');
+}
 export const BAY_Z = [-2.7, 2.7];
 export const LIFT_HEIGHT = 1.7;
 export const EYE = 1.62;
@@ -35,7 +48,7 @@ export const WORK_LABELS: Record<WorkView, string> = {
 
 /** Feste Arbeitsansicht nah am Bauteil. Der Spieler steht dabei still und kann sich nur umsehen. */
 export function workPose(view: WorkView, bay: number): WorkPose {
-  const z0 = BAY_Z[bay];
+  const z0 = SLOTS[bay].z;
   const h = LIFT_HEIGHT;
   const table: Record<WorkView, [[number, number, number], [number, number, number]]> = {
     engine: [[2.3, 1.5, z0], [1.32, 0.72, z0]],
@@ -74,6 +87,20 @@ export const STATIC_BOXES: Box[] = [
   ...BAY_Z.flatMap((z) => [box(0, z - 1.5, 0.3, 0.36), box(0, z + 1.5, 0.3, 0.36)]),
 ];
 
+/** Hindernisse der zugekauften Gebäudeteile: Säulen der Bühnen 3 und 4, Einrichtung. */
+function siteBoxes(): Box[] {
+  const out: Box[] = [];
+  for (const s of SLOTS) {
+    if (s.kind !== 'lift' || s.id < 10 || !(s.needs === 'loc_pro' ? site.pro : site.center)) continue;
+    out.push(box(0, s.z - 1.5, 0.3, 0.36), box(0, s.z + 1.5, 0.3, 0.36));
+  }
+  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1));
+  if (site.center) out.push(box(5.8, -13.6, 0.6, 0.8));
+  if (site.hq) out.push(box(5.6, 6.6, 1.0, 1.6));
+  if (site.hoist) out.push(box(5.75, 4.95, 1.1, 0.9));
+  return out;
+}
+
 /** Fahrzeuge blockieren nur, solange sie am Boden stehen. Quer geparkte Autos sind entsprechend gedreht. */
 export const carBox = (slot: number): Box => {
   const s = SLOTS[slot];
@@ -103,12 +130,24 @@ function inBounds(x: number, z: number) {
   const inRoom = x > ROOM.minX + RADIUS && x < ROOM.maxX - RADIUS && z > ROOM.minZ + RADIUS && z < ROOM.maxZ - RADIUS;
   const inYard = x > YARD.minX + RADIUS && x < YARD.maxX - RADIUS && z > YARD.minZ + RADIUS && z < YARD.maxZ - RADIUS;
   const inDoor = x >= YARD.maxX - RADIUS - 0.02 && x <= ROOM.minX + RADIUS + 0.02 && BAY_Z.some((d) => Math.abs(z - d) < DOOR_HALF - RADIUS);
-  return inRoom || inYard || inDoor;
+  if (inRoom || inYard || inDoor) return true;
+  const inPassage = x > PASSAGE.minX + RADIUS && x < PASSAGE.maxX - RADIUS;
+  const inX = x > ROOM.minX + RADIUS && x < ROOM.maxX - RADIUS;
+  if (site.pro) {
+    const h = hall2(site.center);
+    if (inX && z > h.minZ + RADIUS && z < h.maxZ - RADIUS) return true;
+    if (inPassage && Math.abs(z - ROOM.minZ) <= RADIUS + 0.02) return true;
+  }
+  if (site.hq) {
+    if (inX && z > SHOWROOM.minZ + RADIUS && z < SHOWROOM.maxZ - RADIUS) return true;
+    if (inPassage && Math.abs(z - ROOM.maxZ) <= RADIUS + 0.02) return true;
+  }
+  return false;
 }
 
 /** Bewegt den Spieler und lässt ihn an Wänden und Hindernissen entlanggleiten. */
 export function movePlayer(dx: number, dz: number, dynamic: Box[]) {
-  const boxes = [...STATIC_BOXES, ...dynamic];
+  const boxes = [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
   const free = (x: number, z: number) => inBounds(x, z) && !boxes.some((b) => hits(x, z, b));
   // Steckt der Spieler (z. B. nach dem Ablassen der Bühne) in einem Hindernis, darf er heraus.
   const stuck = inBounds(player.x, player.z) && boxes.some((b) => hits(player.x, player.z, b));

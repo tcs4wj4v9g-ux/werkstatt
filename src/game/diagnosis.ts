@@ -1,5 +1,6 @@
-import { COMPONENT_MAP } from './data/components';
-import { DEFECTS, DEFECT_LIST, type DefectDef } from './data/defects';
+import { COMPONENT_MAP, engineOf } from './data/components';
+import { DEFECTS, DEFECT_LIST, defectApplies, defectComponents, type DefectDef } from './data/defects';
+import type { EngineLayout } from './data/engines';
 import { SYMPTOMS, type Channel, type SymptomDef } from './data/symptoms';
 import { fluidSymptoms } from './fluids';
 import { activeDefects } from './repair';
@@ -34,13 +35,14 @@ export function observe(car: CarInstance, channels: Channel[], warm: boolean): O
 }
 
 /** Alle Defekte, die ein Symptom grundsätzlich verursachen können. */
-export const possibleCauses = (symptomId: string): DefectDef[] => DEFECT_LIST.filter((d) => d.symptoms.includes(symptomId));
+export const possibleCauses = (symptomId: string, car?: CarInstance): DefectDef[] =>
+  DEFECT_LIST.filter((d) => d.symptoms.includes(symptomId) && (!car || defectApplies(car, d)));
 
 export type CauseStatus = 'confirmed' | 'ruled_out' | 'open';
 
 /** Wissensstand des Spielers zu einer möglichen Ursache – unabhängig von der Wahrheit. */
 export function causeStatus(car: CarInstance, d: DefectDef): CauseStatus {
-  const comps = d.components.map((c) => car.components[c]);
+  const comps = defectComponents(car, d).map((c) => car.components[c]);
   if (comps.some((c) => c.known && c.condition === 'defect')) return 'confirmed';
   if (comps.every((c) => c.known && c.condition === 'ok')) return 'ruled_out';
   return 'open';
@@ -53,12 +55,21 @@ export function causeStatus(car: CarInstance, d: DefectDef): CauseStatus {
  */
 export function obdScan(car: CarInstance): string[] {
   const codes: string[] = [];
-  const bad = (id: string) => car.components[id].condition === 'defect';
-  for (let n = 1; n <= 4; n++) {
-    if (bad(`coil${n}`) || bad(`plug${n}`) || !car.components[`coil${n}`].installed || !car.components[`coil${n}`].connected) {
+  const bad = (id: string) => car.components[id]?.condition === 'defect';
+  const off = (id: string) => !!car.components[id] && (!car.components[id].installed || !car.components[id].connected);
+  const engine = engineOf(car);
+  for (let n = 1; n <= engine.cylinders; n++) {
+    if (engine.fuel === 'diesel') {
+      if (bad(`inj${n}`) || off(`inj${n}`)) codes.push(`P020${n} – Einspritzdüse Zylinder ${n}: Fehlfunktion`);
+      if (bad(`glow${n}`)) codes.push(`P067${n} – Glühkerze Zylinder ${n}: Stromkreis`);
+    } else if (bad(`coil${n}`) || bad(`plug${n}`) || off(`coil${n}`)) {
       codes.push(`P030${n} – Zündaussetzer Zylinder ${n} erkannt`);
     }
   }
+  // Ladedruck zu niedrig: ob Lader oder Leck, verrät der Code nicht.
+  if (bad('turbo') || bad('charge_pipe')) codes.push('P0299 – Ladedruck zu niedrig');
+  if (bad('egr') || off('egr')) codes.push('P0401 – Abgasrückführung: Durchfluss unzureichend');
+  if (bad('dpf')) codes.push('P2002 – Partikelfilter: Wirkungsgrad unter Schwellenwert');
   if (bad('intake_hose')) codes.push('P0171 – Gemisch zu mager (Bank 1)');
   if (['pads_fl', 'pads_fr'].some(bad)) codes.push('5E20 – Bremsbelagverschleiß Vorderachse, Verschleißgrenze erreicht');
   if (bad('alternator') || !car.components.alternator.connected) codes.push('P0562 – Bordnetzspannung zu niedrig');
@@ -75,19 +86,36 @@ export interface SoundProfile {
   tick: number;
   rattle: number;
   squeal: number;
+  /** Turbo heult (Laderschaden) bzw. zischt (Leck in der Ladeluft). */
+  whine: number;
+  boostHiss: number;
+  /** Grundcharakter des Motors. */
+  layout: EngineLayout;
+  cylinders: number;
+  diesel: boolean;
+  turbo: boolean;
+  liters: number;
 }
 
 /** Welche Geräusche der Motor im aktuellen technischen Zustand macht (0 = keins). */
 export function soundProfile(car: CarInstance): SoundProfile {
   const d = activeDefects(car);
   const has = (id: string) => d.includes(id as never);
+  const e = engineOf(car);
   return {
-    misfire: has('coil') ? 1 : has('plugs') ? 0.7 : has('vacuum') ? 0.4 : 0,
+    misfire: has('coil') || has('injector') ? 1 : has('plugs') ? 0.7 : has('vacuum') || has('egr') || has('glow') ? 0.4 : 0,
     hiss: has('vacuum') ? 1 : 0,
     knock: has('bearing') ? 1 : 0,
     tick: has('lifters') ? 1 : 0,
     rattle: has('chain') ? 1 : 0,
     squeal: has('belt') ? 1 : 0,
+    whine: has('turbo') ? 1 : 0,
+    boostHiss: has('boost_leak') ? 1 : 0,
+    layout: e.layout,
+    cylinders: e.cylinders,
+    diesel: e.fuel === 'diesel',
+    turbo: e.turbo && !has('turbo'),
+    liters: e.liters,
   };
 }
 

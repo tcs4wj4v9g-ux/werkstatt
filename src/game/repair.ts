@@ -1,6 +1,7 @@
 import { CAR_MODELS } from './data/cars';
-import { COMPONENTS, COMPONENT_MAP } from './data/components';
-import { DEFECT_LIST } from './data/defects';
+import { defOf, defsOf } from './data/components';
+import { DEFECT_LIST, defectComponents } from './data/defects';
+import { basePartPrice, fitOf, partKey } from './fitment';
 import { PARTS } from './data/parts';
 import { toolName } from './data/tools';
 import { TIGHT, type ActionResult, type CarInstance, type DefectId, type Inventory, type ToolNeed, type Toolset } from './types';
@@ -14,28 +15,28 @@ const done = (message?: string): ActionResult => ({ ok: true, message });
 /** Eingebaut, alle Schrauben fest, Stecker verbunden. */
 export const isComplete = (car: CarInstance, id: string) => {
   const c = car.components[id];
-  return c.installed && c.bolts.every((b) => b === TIGHT) && (!COMPONENT_MAP[id].connector || c.connected);
+  return c.installed && c.bolts.every((b) => b === TIGHT) && (!defOf(car, id).connector || c.connected);
 };
 
 export const blockersRemoved = (car: CarInstance, id: string) =>
-  COMPONENT_MAP[id].blockedBy.every((b) => !car.components[b].installed);
+  defOf(car, id).blockedBy.every((b) => !car.components[b]?.installed);
 
 /** Bauteile, die unter `id` liegen und vorher fertig montiert sein müssen. */
-const dependents = (id: string) => COMPONENTS.filter((c) => c.blockedBy.includes(id)).map((c) => c.id);
+const dependents = (car: CarInstance, id: string) => defsOf(car).filter((c) => c.blockedBy.includes(id) && car.components[c.id]).map((c) => c.id);
 
 /** Kann das Bauteil jetzt sofort herausgenommen werden? */
 export const removable = (car: CarInstance, id: string) => {
   const c = car.components[id];
-  return c.installed && c.bolts.every((b) => b === 0) && !(COMPONENT_MAP[id].connector && c.connected) && blockersRemoved(car, id);
+  return c.installed && c.bolts.every((b) => b === 0) && !(defOf(car, id).connector && c.connected) && blockersRemoved(car, id);
 };
 
 /** Alle Bauteile, die (auch indirekt) unter `id` verbaut sind. */
-export const beneath = (id: string): string[] => dependents(id).flatMap((d) => [d, ...beneath(d)]);
+export const beneath = (car: CarInstance, id: string): string[] => dependents(car, id).flatMap((d) => [d, ...beneath(car, d)]);
 
-export const installReady = (car: CarInstance, id: string) => dependents(id).every((d) => isComplete(car, d));
+export const installReady = (car: CarInstance, id: string) => dependents(car, id).every((d) => isComplete(car, d));
 
 function checkAccess(car: CarInstance, id: string): string | null {
-  const def = COMPONENT_MAP[id];
+  const def = defOf(car, id);
   if (def.access === 'hood') {
     if (car.lifted) return 'Für Arbeiten im Motorraum das Auto ablassen.';
     if (!car.hoodOpen) return 'Erst die Motorhaube öffnen.';
@@ -45,8 +46,8 @@ function checkAccess(car: CarInstance, id: string): string | null {
 }
 
 function blockedMessage(car: CarInstance, id: string): string | null {
-  const b = COMPONENT_MAP[id].blockedBy.find((x) => car.components[x].installed);
-  return b ? `Nicht zugänglich – erst ausbauen: ${COMPONENT_MAP[b].name}.` : null;
+  const b = defOf(car, id).blockedBy.find((x) => car.components[x]?.installed);
+  return b ? `Nicht zugänglich – erst ausbauen: ${defOf(car, b).name}.` : null;
 }
 
 export const describeNeed = (need: ToolNeed) =>
@@ -89,7 +90,7 @@ export function toggleLift(car: CarInstance): ActionResult {
  * entfernt –(Hand/Werkzeug)→ angesetzt –(Werkzeug)→ fest.
  */
 export function boltAction(car: CarInstance, id: string, index: number, tools: Toolset): ActionResult {
-  const def = COMPONENT_MAP[id];
+  const def = defOf(car, id);
   const st = car.components[id];
   const access = checkAccess(car, id);
   if (access) return fail(access);
@@ -125,7 +126,7 @@ export function boltAction(car: CarInstance, id: string, index: number, tools: T
 
 /** Elektrischen Stecker abziehen bzw. aufstecken (mit der Hand). */
 export function connectorAction(car: CarInstance, id: string, tools: Toolset): ActionResult {
-  const def = COMPONENT_MAP[id];
+  const def = defOf(car, id);
   const st = car.components[id];
   const access = checkAccess(car, id);
   if (access) return fail(access);
@@ -142,13 +143,13 @@ export function connectorAction(car: CarInstance, id: string, tools: Toolset): A
 export function inspect(car: CarInstance, id: string): ActionResult {
   const access = checkAccess(car, id);
   if (access) return fail(access);
-  const def = COMPONENT_MAP[id];
+  const def = defOf(car, id);
   const st = car.components[id];
   for (const other of def.inspectReveals ?? []) {
     const o = car.components[other];
-    if (!COMPONENT_MAP[other].hidden) o.known = true;
-    if (o.condition === 'defect' && !COMPONENT_MAP[other].hidden) {
-      return done(`${COMPONENT_MAP[other].name}: ${COMPONENT_MAP[other].defectText}`);
+    if (!defOf(car, other).hidden) o.known = true;
+    if (o.condition === 'defect' && !defOf(car, other).hidden) {
+      return done(`${defOf(car, other).name}: ${defOf(car, other).defectText}`);
     }
   }
   if (def.hidden && st.installed) {
@@ -165,7 +166,7 @@ export function componentAction(
   tools: Toolset,
   opts: { useOldPart?: boolean } = {},
 ): ActionResult {
-  const def = COMPONENT_MAP[id];
+  const def = defOf(car, id);
   const st = car.components[id];
   const access = checkAccess(car, id);
   if (access) return fail(access);
@@ -179,6 +180,9 @@ export function componentAction(
     return fail('Zum Aus- und Einbauen die Hand wählen.');
   }
 
+  if (def.equipment && tools.active === 'hand' && !tools.equipment?.includes(def.equipment)) {
+    return fail(`${def.name}: Das geht nur mit dem Motor- und Getriebeheber (Werkstatt-Computer → Ausbau).`);
+  }
   if (st.installed) {
     const blocked = blockedMessage(car, id);
     if (blocked) return fail(blocked);
@@ -195,7 +199,7 @@ export function componentAction(
       car.checked.oil = undefined;
       return done(`Ablassschraube heraus – ${liters.toLocaleString('de-DE')} l Altöl laufen in die Auffangwanne.`);
     }
-    if (['water_pump', 'thermostat', 'hose'].includes(id)) {
+    if (['water_pump', 'thermostat', 'hose', 'cyl_head'].includes(id)) {
       // Kühlsystem geöffnet: ein Großteil läuft aus, danach ist Luft im System.
       car.fluids.coolant.level = Math.min(car.fluids.coolant.level, Math.round(car.fluids.coolant.level * 3.5) / 10);
       car.fluids.coolant.air = true;
@@ -207,7 +211,7 @@ export function componentAction(
       return done(
         st.condition === 'defect'
           ? `${def.name} ausgebaut und begutachtet – ${def.defectText} Neuteil nötig.`
-          : `${def.name} ausgebaut und begutachtet – ${def.okText}`,
+          : `${def.name} ausgebaut und begutachtet – ${def.okText}${st.health !== undefined ? ` Restzustand ${st.health} %.` : ''}`,
       );
     }
     return done(`${def.name} ausgebaut.`);
@@ -216,37 +220,39 @@ export function componentAction(
   // Einbau
   const above = blockedMessage(car, id);
   if (above) return fail(above);
-  const missing = dependents(id).find((d) => !isComplete(car, d));
-  if (missing) return fail(`Erst fertig montieren: ${COMPONENT_MAP[missing].name}.`);
+  const missing = dependents(car, id).find((d) => !isComplete(car, d));
+  if (missing) return fail(`Erst fertig montieren: ${defOf(car, missing).name}.`);
   const next = def.bolts ? ' Jetzt Schrauben ansetzen und festziehen.' : def.connector ? ' Stecker nicht vergessen.' : '';
   if (def.partId && st.condition === 'defect' && !opts.useOldPart) {
-    if (inv[def.partId] > 0) {
-      inv[def.partId] -= 1;
+    const key = partKey(car, def.partId);
+    if ((inv[key] ?? 0) > 0) {
+      inv[key] -= 1;
       st.condition = 'ok';
       st.installed = true;
+      if (st.health !== undefined) st.health = 100;
       if (id === 'oil_filter') car.fluids.oil.filterFresh = true;
       // Teilekosten werden dem Auto zugerechnet, in das das Teil wandert.
-      car.partsSpent += Math.round(PARTS[def.partId].price / PARTS[def.partId].units);
+      car.partsSpent += Math.round(basePartPrice(car, def.partId) / PARTS[def.partId].units);
       return done(`Neuteil eingebaut: ${def.name}.${next}`);
     }
-    return { ok: false, needsPart: def.partId, message: `Kein Neuteil im Lager: ${PARTS[def.partId].name}.` };
+    return { ok: false, needsPart: def.partId, message: `Kein passendes Neuteil im Lager: ${PARTS[def.partId].name} (${fitOf(car, def.partId)}).` };
   }
   st.installed = true;
   return done(`${def.name} eingebaut.${next}`);
 }
 
 export function activeDefects(car: CarInstance): DefectId[] {
-  return DEFECT_LIST.filter((d) => d.components.some((c) => car.components[c].condition === 'defect')).map((d) => d.id);
+  return DEFECT_LIST.filter((d) => defectComponents(car, d).some((c) => car.components[c].condition === 'defect')).map((d) => d.id);
 }
 
 /** Defekte, die der Spieler am Bauteil selbst festgestellt hat. */
 export function knownDefects(car: CarInstance): DefectId[] {
   return DEFECT_LIST.filter((d) =>
-    d.components.some((c) => car.components[c].condition === 'defect' && car.components[c].known),
+    defectComponents(car, d).some((c) => car.components[c].condition === 'defect' && car.components[c].known),
   ).map((d) => d.id);
 }
 
-export const isAssembled = (car: CarInstance) => COMPONENTS.every((c) => isComplete(car, c.id));
+export const isAssembled = (car: CarInstance) => defsOf(car).every((c) => isComplete(car, c.id));
 
 export function driveBlocker(car: CarInstance): string | null {
   if (!isAssembled(car)) return 'Das Auto ist nicht komplett zusammengebaut.';
@@ -261,7 +267,7 @@ export function driveBlocker(car: CarInstance): string | null {
 export function engineBlocker(car: CarInstance): string | null {
   // Eine tote Batterie bemerkt man vor allem anderen: Es klackt nur das Relais.
   if (car.components.battery.condition === 'defect' && car.components.battery.installed) return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
-  const open = COMPONENTS.find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug') && !isComplete(car, c.id));
+  const open = defsOf(car).find((c) => (c.access === 'hood' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf' || c.id === 'gearbox') && !isComplete(car, c.id));
   if (open) return `Der Motor startet so nicht – erst fertig montieren: ${open.name}.`;
   if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
   return null;

@@ -1,13 +1,14 @@
-import { CAR_MODELS, COMMON_MODELS, RARE_MODELS } from './data/cars';
-import { COMPONENTS } from './data/components';
-import { DEFECTS, DEFECT_LIST } from './data/defects';
+import { CAR_MODELS, COLLECTOR_MODELS, modelsOfClass, RARE_MODELS } from './data/cars';
+import { defsOf } from './data/components';
+import { DEFECTS, DEFECT_LIST, defectApplies, defectComponents } from './data/defects';
+import { costFactor, defectPenalty } from './fitment';
 import { SELLER_LIST, SELLER_NAMES, SELLERS, type SellerProfile } from './data/sellers';
 import { SYMPTOMS, type Channel } from './data/symptoms';
-import { createZones, detailFactor } from './detail';
+import { createZones, detailFactor, dirtLevel, rustLevel } from './detail';
 import { observe } from './diagnosis';
 import { createFluids, serviceState } from './fluids';
 import { activeDefects, isAssembled } from './repair';
-import type { CarInstance, DefectId, Listing } from './types';
+import type { CarClass, CarInstance, DefectId, Listing, PartId } from './types';
 
 export type Rng = () => number;
 const round50 = (n: number) => Math.round(n / 50) * 50;
@@ -15,30 +16,63 @@ const pick = <T,>(arr: T[], rng: Rng) => arr[Math.floor(rng() * arr.length)];
 let uidCounter = 0;
 const uid = (rng: Rng) => `${Date.now().toString(36)}-${(uidCounter++).toString(36)}-${Math.floor(rng() * 1e6).toString(36)}`;
 
-export const MAX_LISTINGS = 4;
+export const MAX_LISTINGS = 25;
+/** Wie viele Inserate je Preisklasse gleichzeitig am Markt sind. */
+export const CLASS_TARGETS: Record<CarClass, number> = { budget: 8, mid: 7, sport: 5, luxury: 3, collector: 2 };
 
-export function freshComponents(): CarInstance['components'] {
+/** Zünd- und Einspritzteile haben einen messbaren Restzustand in Prozent. */
+export const HEALTH_PARTS: PartId[] = ['ignition_coil', 'spark_plug', 'injector', 'glow_plug'];
+
+export function freshComponents(modelId = 'bavaria_320'): CarInstance['components'] {
   const components: CarInstance['components'] = {};
-  for (const c of COMPONENTS) {
+  for (const c of defsOf({ modelId })) {
     components[c.id] = { installed: true, bolts: Array(c.bolts).fill(2), connected: true, condition: 'ok', known: false };
+    if (c.partId && HEALTH_PARTS.includes(c.partId)) components[c.id].health = 100;
   }
   return components;
 }
+
+/** Schäden, die an diesem Modell überhaupt vorkommen können (ein Diesel hat keine Zündspulen). */
+export function applicableDefects(modelId: string): DefectId[] {
+  const probe = { components: freshComponents(modelId) };
+  return DEFECT_LIST.filter((d) => defectApplies(probe, d)).map((d) => d.id);
+}
+
+/** Verlangter Anteil am üblichen Wert (ohne Mängelabschlag) je Klasse. */
+const ASKING_BAND: Record<CarClass, [number, number]> = {
+  budget: [0.86, 0.94], mid: [0.9, 0.98], sport: [0.94, 1.02], luxury: [0.96, 1.04], collector: [0.98, 1.08],
+};
+/** Bei teuren Autos sind Mängel eher bekannt und eingepreist – aber eben nicht alle. */
+const KNOWLEDGE_BONUS: Record<CarClass, number> = { budget: 0, mid: 0.05, sport: 0.1, luxury: 0.15, collector: 0.15 };
+
+/** Übliche Laufleistung je Klasse: teure Autos werden weniger gefahren. */
+const KM_RANGE: Record<CarClass, [number, number]> = {
+  budget: [120000, 260000], mid: [90000, 220000], sport: [50000, 150000], luxury: [25000, 110000], collector: [30000, 110000],
+};
 
 export function createCar(modelId: string, defects: DefectId[], rng: Rng, opts: Partial<CarInstance> = {}): CarInstance {
   const model = CAR_MODELS[modelId];
   const [y0, y1] = model.years ?? [2005, 2011];
   const year = opts.year ?? y0 + Math.floor(rng() * (y1 - y0 + 1));
-  const km = opts.km ?? round50(120000 + rng() * 140000);
-  // Seltene Modelle sind Liebhaberstücke: das Alter drückt ihren Wert nicht.
-  const age = model.rare ? 1 : 1 + (year - 2008) * 0.04;
-  const cleanValue = round50(model.baseValue * age * (1 - (km - 180000) / 900000));
+  const [k0, k1] = KM_RANGE[model.cls];
+  const km = opts.km ?? round50(k0 + rng() * (k1 - k0));
+  // Seltene Modelle und Sammlerstücke sind Liebhaberautos: das Alter drückt ihren Wert nicht.
+  const age = model.rare || model.collector ? 1 : 1 + (year - (y0 + y1) / 2) * 0.04;
+  const kmRef = (k0 + k1) / 2 + (model.cls === 'budget' ? -10000 : 0);
+  const cleanValue = round50(model.baseValue * age * (1 - (km - kmRef) / 900000));
   const wear = opts.rarity !== undefined && opts.origin === 'barn' ? 1 : 0.15 + rng() * 0.45;
-  const components = freshComponents();
+  const components = freshComponents(modelId);
+  // Verschleißteile sind unterschiedlich weit herunter – jedes einzeln.
+  for (const c of Object.values(components)) if (c.health !== undefined) c.health = Math.round(55 + rng() * 43);
   for (const d of defects) {
     const def = DEFECTS[d];
-    const targets = def.pick === 'one' ? [pick(def.components, rng)] : def.components;
-    targets.forEach((t) => (components[t].condition = 'defect'));
+    const all = defectComponents({ components }, def);
+    if (!all.length) continue; // Schaden gibt es an diesem Motor nicht
+    const targets = def.pick === 'one' ? [pick(all, rng)] : all;
+    targets.forEach((t) => {
+      components[t].condition = 'defect';
+      if (components[t].health !== undefined) components[t].health = Math.round(rng() * 22);
+    });
   }
   return {
     uid: uid(rng),
@@ -60,7 +94,7 @@ export function createCar(modelId: string, defects: DefectId[], rng: Rng, opts: 
     checked: {},
     zones: createZones(0.15 + rng() * 0.5, 0.35 + rng() * 0.4, 0, rng),
     interior: { seats: rng() * 0.7, dash: rng() * 0.6, floor: rng() * 0.8 },
-    rarity: model.rare ? 1 : 0,
+    rarity: model.collector ? 2 : model.rare ? 1 : 0,
     origin: 'market',
     keep: false,
     ...opts,
@@ -80,9 +114,13 @@ const between = ([a, b]: [number, number], rng: Rng) => a + (b - a) * rng();
 const eur = (n: number) => `${n.toLocaleString('de-DE')} €`;
 
 export function createListing(car: CarInstance, rng: Rng, index: number, profile: SellerProfile = pick(SELLER_LIST, rng), seller = pick(SELLER_NAMES, rng)): Listing {
-  const penalties = activeDefects(car).reduce((s, d) => s + DEFECTS[d].penalty, 0);
+  const penalties = activeDefects(car).reduce((s, d) => s + defectPenalty(car, d), 0);
   // Wer sein Auto kennt, hat die Mängel schon eingepreist; Ahnungslose verlangen fast den vollen Preis.
-  const asking = Math.max(900, round50(car.cleanValue * index * (0.86 + rng() * 0.08) - penalties * (0.2 + 0.65 * profile.knowledge)));
+  const floor = Math.max(600, round50(car.cleanValue * 0.22));
+  // Je teurer die Klasse, desto knapper wird kalkuliert – und desto genauer kennen Verkäufer ihr Auto.
+  const [lo, hi] = ASKING_BAND[CAR_MODELS[car.modelId].cls];
+  const known = Math.min(0.95, 0.2 + 0.65 * profile.knowledge + KNOWLEDGE_BONUS[CAR_MODELS[car.modelId].cls]);
+  const asking = Math.max(floor, round50(car.cleanValue * index * (lo + rng() * (hi - lo)) - penalties * known));
   return {
     id: car.uid,
     car,
@@ -112,10 +150,25 @@ export function starterListing(rng: Rng): Listing {
   return l;
 }
 
-function randomListing(rng: Rng, index: number): Listing {
-  const n = 1 + Math.floor(rng() * 3);
-  const defects = [...DEFECT_LIST].sort(() => rng() - 0.5).slice(0, n).map((d) => d.id);
-  return createListing(createCar(pick(COMMON_MODELS, rng), defects, rng), rng, index);
+/** Zufällige Schäden, die zu diesem Modell passen. */
+export function randomDefects(modelId: string, n: number, rng: Rng, exclude: DefectId[] = []): DefectId[] {
+  // Gewichtete Auswahl: kapitale Schäden (Kopfdichtung, Getriebe) kommen deutlich seltener vor.
+  return applicableDefects(modelId)
+    .filter((d) => !exclude.includes(d))
+    .map((d) => ({ d, key: rng() ** (1 / (DEFECTS[d].weight ?? 1)) }))
+    .sort((a, b) => b.key - a.key)
+    .slice(0, n)
+    .map((x) => x.d);
+}
+
+export function randomListing(rng: Rng, index: number, cls: CarClass = 'budget', day = 1): Listing {
+  const modelId = pick(cls === 'collector' ? COLLECTOR_MODELS : modelsOfClass(cls), rng);
+  // Etwa jedes sechste Auto ist technisch einwandfrei – dafür entsprechend teuer.
+  const n = rng() < 0.16 ? 0 : 1 + Math.floor(rng() * 3);
+  const l = createListing(createCar(modelId, randomDefects(modelId, n, rng), rng), rng, index);
+  // Inserate bleiben einige Tage stehen; teure Autos länger.
+  l.until = day + 2 + Math.floor(rng() * (cls === 'budget' ? 4 : cls === 'mid' ? 5 : 7));
+  return l;
 }
 
 /** Günstiges Bastlerfahrzeug, damit auch bei knapper Kasse etwas geht. */
@@ -129,22 +182,26 @@ function budgetListing(money: number, rng: Rng, index: number): Listing {
 }
 
 /** Füllt den Markt auf. Mindestens ein Angebot bleibt bezahlbar. */
-export function fillListings(existing: Listing[], money: number, rng: Rng, index = 1, first = false): Listing[] {
+export function fillListings(existing: Listing[], money: number, rng: Rng, index = 1, first = false, day = 1): Listing[] {
   const out = first ? [starterListing(rng)] : existing.filter((l) => !l.gone);
   // Scheunenfunde und Sonderangebote zählen nicht zum normalen Marktbestand.
-  const regular = () => out.filter((l) => !l.barn && !l.expiresDay).length;
-  while (regular() < MAX_LISTINGS) out.push(randomListing(rng, index));
-  if (!out.some((o) => o.asking <= money)) out[out.findIndex((l) => !l.barn && !l.expiresDay)] = budgetListing(money, rng, index);
+  const regular = (cls?: CarClass) => out.filter((l) => !l.barn && !l.expiresDay && (!cls || CAR_MODELS[l.car.modelId].cls === cls)).length;
+  for (const cls of Object.keys(CLASS_TARGETS) as CarClass[]) {
+    while (regular(cls) < CLASS_TARGETS[cls]) out.push(randomListing(rng, index, cls, day));
+  }
+  if (!out.some((o) => o.asking <= money)) {
+    const i = out.findIndex((l) => !l.barn && !l.expiresDay && CAR_MODELS[l.car.modelId].cls === 'budget' && l.id !== out[0]?.id);
+    out[i < 0 ? out.length : i] = { ...budgetListing(money, rng, index), until: day + 3 };
+  }
   return out;
 }
 
-/** Neuer Tag: ein bis zwei alte Angebote verschwinden, neue kommen dazu. */
+/** Neuer Tag: abgelaufene Inserate verschwinden, neue kommen dazu. */
 export function refreshListings(existing: Listing[], money: number, rng: Rng, index: number, day = 0): Listing[] {
   const keep = existing.filter((l) => !l.gone && (!l.expiresDay || l.expiresDay >= day));
-  const normal = keep.filter((l) => !l.barn && !l.expiresDay);
-  const drop = Math.min(normal.length, 1 + Math.floor(rng() * 2));
-  for (let i = 0; i < drop; i++) keep.splice(keep.indexOf(normal.splice(Math.floor(rng() * normal.length), 1)[0]), 1);
-  return fillListings(keep, money, rng, index);
+  // Inserate bleiben stehen, bis ihre Laufzeit endet – dann hat ein anderer gekauft.
+  const stay = keep.filter((l) => l.barn || l.expiresDay || (l.until ?? day) >= day);
+  return fillListings(stay, money, rng, index, false, day);
 }
 
 /** Was man beim Verkäufer prüfen kann – jede Prüfung zeigt nur Symptome, nie die Ursache. */
@@ -192,7 +249,7 @@ export function makeOffer(l: Listing, amount: number, args: string[] = []): Offe
     const evidenced = (ids: string[]) => active.filter((d) => DEFECTS[d].symptoms.some((s) => ids.includes(s)));
     const before = evidenced(l.usedArgs);
     const newly = evidenced([...l.usedArgs, ...fresh]).filter((d) => !before.includes(d));
-    conceded = newly.reduce((s, d) => s + DEFECTS[d].penalty, 0) * (1 - profile.knowledge) * profile.concede;
+    conceded = newly.reduce((s, d) => s + defectPenalty(l.car, d), 0) * (1 - profile.knowledge) * profile.concede;
     l.usedArgs.push(...fresh);
     // Auch mit den besten Argumenten verschenkt niemand sein Auto.
     l.minPrice = Math.max(round50(l.asking * 0.7), round50(l.minPrice - conceded));
@@ -243,8 +300,8 @@ export function makeOffer(l: Listing, amount: number, args: string[] = []): Offe
  */
 export function createBarnFind(rng: Rng, index: number, day: number): Listing {
   const modelId = pick(RARE_MODELS, rng);
-  const pool: DefectId[] = ['plugs', 'belt', 'brakes', 'discs', 'coolant_hose', 'gasket', 'water_pump', 'lifters', 'chain', 'thermostat', 'oil_pan'];
-  const defects: DefectId[] = ['battery', 'tires', ...pool.sort(() => rng() - 0.5).slice(0, 2 + Math.floor(rng() * 3))];
+  const pool = randomDefects(modelId, 2 + Math.floor(rng() * 3), rng, ['battery', 'tires', 'coil', 'vacuum', 'alternator', 'bearing']);
+  const defects: DefectId[] = ['battery', 'tires', ...pool];
   const rarity = rng() < 0.3 ? 2 : 1;
   const car = createCar(modelId, defects, rng, { km: round50(60000 + rng() * 110000), rarity, origin: 'barn' });
   // Sehr seltene Exemplare (wenig gelaufen, Erstbesitz) sind deutlich mehr wert.
@@ -284,8 +341,8 @@ export interface Valuation {
  */
 export function valuate(car: CarInstance, index = 1): Valuation {
   const cleanValue = round50(car.cleanValue * index);
-  const deductions: Valuation['deductions'] = activeDefects(car).map((d) => ({ label: DEFECTS[d].name, amount: DEFECTS[d].penalty, defect: d }));
-  if (!isAssembled(car)) deductions.push({ label: 'Nicht fahrbereit (Teile demontiert)', amount: 1500 });
+  const deductions: Valuation['deductions'] = activeDefects(car).map((d) => ({ label: DEFECTS[d].name, amount: defectPenalty(car, d), defect: d }));
+  if (!isAssembled(car)) deductions.push({ label: 'Nicht fahrbereit (Teile demontiert)', amount: round50(1500 * costFactor(car)) });
   const clean = deductions.length === 0;
   if (!car.testDriven) deductions.push({ label: 'Keine Probefahrt nach Reparatur', amount: round50(cleanValue * 0.06) });
   // Wartungszustand der Flüssigkeiten
@@ -293,12 +350,21 @@ export function valuate(car: CarInstance, index = 1): Valuation {
   if (!sv.oilOk) deductions.push({ label: 'Motoröl alt, falsch oder zu wenig', amount: 150 });
   if (!sv.coolantOk) deductions.push({ label: 'Kühlsystem nicht in Ordnung', amount: 120 });
   if (!sv.brakeOk) deductions.push({ label: 'Bremsflüssigkeit überaltert', amount: 150 });
-  let value = Math.max(500, cleanValue - deductions.reduce((s, d) => s + d.amount, 0));
+  let value = Math.max(round50(cleanValue * 0.12), 500, cleanValue - deductions.reduce((s, d) => s + d.amount, 0));
   // Aufbereitung wirkt nur anteilig am tatsächlichen Zustand: ein defektes Auto wird durch Waschen nicht wertvoll.
   const condition = value / cleanValue;
   const extras: Valuation['extras'] = [];
   if (sv.oilChanged) extras.push({ label: 'Frischer Ölwechsel mit Filter', amount: 100 });
-  for (const f of detailFactor(car)) extras.push({ label: f.label, amount: Math.round((cleanValue * f.pct * (f.pct > 0 ? condition : 1)) / 10) * 10 });
+  // Pflege zählt bei jedem Auto, aber nicht proportional zum Preis: Politur macht aus 100.000 € keine 110.000 €.
+  const careScale = 1 / Math.sqrt(costFactor(car));
+  for (const f of detailFactor(car)) extras.push({ label: f.label, amount: Math.round((cleanValue * f.pct * careScale * (f.pct > 0 ? condition : 1)) / 10) * 10 });
+  // Liebhaber zahlen für seltene Autos in Bestzustand einen Aufschlag – technisch einwandfrei und gepflegt.
+  if (car.rarity > 0 && clean) {
+    const kept = dirtLevel(car) < 0.2 && rustLevel(car) < 0.05;
+    extras.push({ label: kept ? `Sammlerzustand (${RARITY_NAMES[car.rarity]})` : `Liebhaberfahrzeug (${RARITY_NAMES[car.rarity]}), Pflege mäßig`, amount: round50(cleanValue * (car.rarity === 2 ? 0.07 : 0.05) * (kept ? 1 : 0.3)) });
+  }
+  // Ein aktuelles Prüfstandsprotokoll mit voller Leistung überzeugt Käufer.
+  if (car.dyno && clean && car.dyno.ps >= car.dyno.ratedPs * 0.97) extras.push({ label: `Leistungsprotokoll (${car.dyno.ps} PS gemessen)`, amount: round50(cleanValue * 0.015) });
   value = Math.max(400, value + extras.reduce((s, e) => s + e.amount, 0));
   const offer = round50(value * (clean ? 0.97 : 0.93));
   // Nachverhandeln klappt nur, wenn das Auto überzeugt.

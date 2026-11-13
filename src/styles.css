@@ -176,7 +176,7 @@ h3.small { font-size: 15px; }
 .panel.market { width: 350px; }
 
 /* --- Flüssigkeiten, Aufbereitung, Auktionen, Ausbau --- */
-.tabrow { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 8px; padding-bottom: 4px; touch-action: pan-x; }
+.tabrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; padding-bottom: 4px; }
 .tabrow .btn { white-space: nowrap; flex: 0 0 auto; padding: 8px 12px; font-size: 14px; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .gauge { height: 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.12); overflow: hidden; margin: 8px 0 4px; }
@@ -195,3 +195,18 @@ h3.small { font-size: 15px; }
 .car-actions { max-height: calc(100% - 300px); overflow-y: auto; touch-action: pan-y; }
 .note .btn { margin-left: 10px; }
 .toast { bottom: calc(250px + var(--sab)); }
+
+/* Marktfilter */
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 6px 0; }
+.filters label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted, #9aa3ad); }
+.filters select { font: inherit; font-size: 15px; padding: 9px 8px; border-radius: 8px; border: 1px solid var(--line); background: #1b2026; color: #fff; min-height: 42px; }
+.price.bad { color: #ff8a80; }
+
+/* Karriere */
+.bar { height: 6px; background: #2a313a; border-radius: 3px; margin-top: 5px; overflow: hidden; max-width: 320px; }
+.bar > div { height: 100%; background: #ffd23f; }
+.price.dim { opacity: 0.55; }
+.dyno { width: 100%; max-width: 640px; background: #151a20; border-radius: 10px; border: 1px solid var(--line); }
+
+.unlock-banner { position: absolute; top: calc(64px + var(--sat)); left: 50%; transform: translateX(-50%); z-index: 40; pointer-events: none; background: rgba(22, 24, 29, 0.94); border: 1px solid #ffd23f; color: #fff; border-radius: 12px; padding: 10px 16px; font-size: 15px; text-align: center; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
+.unlock-banner b { color: #ffd23f; }

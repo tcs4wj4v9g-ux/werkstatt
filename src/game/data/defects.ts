@@ -3,7 +3,7 @@ import type { DefectId } from '../types';
 export interface DefectDef {
   id: DefectId;
   name: string;
-  /** Betroffene Bauteile. 'one' = ein zufälliges davon, 'all' = alle. */
+  /** Betroffene Bauteile; `coil*` meint alle Zündspulen des Motors. 'one' = ein zufälliges davon, 'all' = alle. */
   components: string[];
   pick: 'one' | 'all';
   /** Wertminderung beim Verkauf, solange der Defekt besteht. */
@@ -12,7 +12,9 @@ export interface DefectDef {
   symptoms: string[];
   /** Arbeitslohn, den ein Kunde für die Behebung zahlt. */
   labor: number;
-  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung';
+  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung' | 'Antrieb';
+  /** Wie oft der Schaden zufällig vorkommt (1 = normal). Kapitale Schäden sind selten. */
+  weight?: number;
   /** Kontrollleuchte während der Probefahrt. */
   lamp?: string;
 }
@@ -21,11 +23,11 @@ export interface DefectDef {
 // OBD-Regel (falls elektronisch erfassbar) in diagnosis.ts.
 export const DEFECTS: Record<DefectId, DefectDef> = {
   coil: {
-    id: 'coil', name: 'Defekte Zündspule', components: ['coil1', 'coil2', 'coil3', 'coil4'], pick: 'one',
+    id: 'coil', name: 'Defekte Zündspule', components: ['coil*'], pick: 'one',
     penalty: 800, symptoms: ['rough_idle', 'misfire', 'power_loss'], labor: 90, category: 'Motor', lamp: '⚙️ Motor',
   },
   plugs: {
-    id: 'plugs', name: 'Verschlissene Zündkerze', components: ['plug1', 'plug2', 'plug3', 'plug4'], pick: 'one',
+    id: 'plugs', name: 'Verschlissene Zündkerze', components: ['plug*'], pick: 'one',
     penalty: 400, symptoms: ['rough_idle', 'misfire', 'power_loss'], labor: 80, category: 'Wartung', lamp: '⚙️ Motor',
   },
   vacuum: {
@@ -45,7 +47,7 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
     penalty: 1200, symptoms: ['metal_noise', 'rattle_start'], labor: 140, category: 'Motor',
   },
   gasket: {
-    id: 'gasket', name: 'Undichte Ventildeckeldichtung', components: ['gasket'], pick: 'all',
+    id: 'gasket', name: 'Undichte Ventildeckeldichtung', components: ['gasket', 'gasket_b'], pick: 'one',
     penalty: 900, symptoms: ['oil_top', 'oil_drip'], labor: 180, category: 'Motor',
   },
   oil_pan: {
@@ -72,6 +74,38 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
     id: 'thermostat', name: 'Defekter Thermostat', components: ['thermostat'], pick: 'all',
     penalty: 500, symptoms: ['temp_low'], labor: 120, category: 'Kühlung', lamp: '🌡️ kalt',
   },
+  glow: {
+    id: 'glow', name: 'Defekte Glühkerze', components: ['glow*'], pick: 'one',
+    penalty: 350, symptoms: ['cold_start', 'rough_idle'], labor: 90, category: 'Motor',
+  },
+  injector: {
+    id: 'injector', name: 'Defekte Einspritzdüse', components: ['inj*'], pick: 'one',
+    penalty: 900, symptoms: ['rough_idle', 'diesel_knock', 'power_loss'], labor: 140, category: 'Motor', lamp: '⚙️ Motor',
+  },
+  turbo: {
+    id: 'turbo', name: 'Turboladerschaden', components: ['turbo'], pick: 'all',
+    penalty: 2200, symptoms: ['boost_loss', 'turbo_whine', 'blue_smoke'], labor: 380, category: 'Motor', lamp: '⚙️ Motor',
+  },
+  boost_leak: {
+    id: 'boost_leak', name: 'Undichte Ladeluftstrecke', components: ['charge_pipe'], pick: 'all',
+    penalty: 500, symptoms: ['boost_loss', 'boost_hiss'], labor: 80, category: 'Motor',
+  },
+  egr: {
+    id: 'egr', name: 'Verkoktes AGR-Ventil', components: ['egr'], pick: 'all',
+    penalty: 650, symptoms: ['rough_idle', 'black_smoke'], labor: 130, category: 'Motor', lamp: '⚙️ Motor',
+  },
+  dpf: {
+    id: 'dpf', name: 'Zugesetzter Partikelfilter', components: ['dpf'], pick: 'all',
+    penalty: 1600, symptoms: ['limp_mode', 'dpf_lamp'], labor: 220, category: 'Motor', lamp: '🟠 DPF',
+  },
+  head_gasket: {
+    id: 'head_gasket', name: 'Durchgebrannte Zylinderkopfdichtung', components: ['head_gasket'], pick: 'all',
+    penalty: 2600, symptoms: ['white_smoke', 'oil_milky', 'temp_high'], labor: 650, category: 'Motor', lamp: '🌡️ heiß', weight: 0.3,
+  },
+  gearbox: {
+    id: 'gearbox', name: 'Getriebeschaden', components: ['gearbox'], pick: 'all',
+    penalty: 3200, symptoms: ['gear_grind', 'gear_whine'], labor: 520, category: 'Antrieb', weight: 0.3,
+  },
   battery: {
     id: 'battery', name: 'Defekte Batterie', components: ['battery'], pick: 'all',
     penalty: 250, symptoms: ['no_start'], labor: 40, category: 'Elektrik',
@@ -91,3 +125,12 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
 };
 
 export const DEFECT_LIST = Object.values(DEFECTS);
+
+type WithComponents = { components: Record<string, unknown> };
+/** Bauteile eines Autos, die zu einem Defekt gehören (löst `coil*` usw. auf). */
+export function defectComponents(car: WithComponents, d: DefectDef): string[] {
+  const ids = Object.keys(car.components);
+  return d.components.flatMap((p) => (p.endsWith('*') ? ids.filter((id) => new RegExp(`^${p.slice(0, -1)}\\d+$`).test(id)) : ids.includes(p) ? [p] : []));
+}
+/** Kann dieser Defekt an diesem Auto überhaupt auftreten? (Ein Diesel hat keine Zündspulen, ein Sauger keinen Turbo.) */
+export const defectApplies = (car: WithComponents, d: DefectDef) => defectComponents(car, d).length > 0;

@@ -96,6 +96,29 @@ Zusatzbefund am Kundenauto. Nichts davon ist Pflicht; was du liegen lässt, verf
 Der Spielstand (beide Autos mit jeder einzelnen Schraube, Werkzeuge, Lager, Markt, Aufträge) wird automatisch lokal gespeichert;
 ältere Spielstände werden beim Laden übernommen. Das fertige Spiel braucht kein Internet und keine KI-Dienste.
 
+## Karriere-Update: Motoren, Fuhrpark, Markt, Standorte
+
+- **Motoren:** 15 Motoren in vier Bauarten (R4, R6, V6, V8), Benziner und Diesel, Sauger und Turbo. Jeder Zylinder hat eigene Teile:
+  Benziner Zündspule + Zündkerze, Diesel Einspritzdüse + Glühkerze. V-Motoren haben zwei Bänke mit je eigenem Ventildeckel.
+  Turbomotoren haben Ladeluftrohr und Turbolader, Diesel zusätzlich AGR-Ventil und Partikelfilter. Zünd- und Einspritzteile haben
+  einen Restzustand in Prozent. Jede Bauart klingt anders (Zündfrequenz, V8-Blubbern, Diesel-Nageln, Turbopfeifen).
+- **Ersatzteile mit Passform:** Motorteile passen nur zur Motorfamilie, Fahrwerksteile nur zur Fahrzeugklasse. Preise und Schäden
+  skalieren mit dem Fahrzeugwert.
+- **22 Fahrzeuge in fünf Preisklassen** (rund 3.000 € bis knapp 1 Mio. €) mit sieben Karosserieformen, eigenen Fronten, Felgen und
+  Auspuffanlagen. Fahrleistungen ergeben sich aus Leistung, Gewicht und Zustand.
+- **Markt:** 25 Inserate gleichzeitig, mehrere Tage Laufzeit, Filter (Klasse, Marke, Motor, bezahlbar, mit Mängeln, selten) und
+  Sortierung (Preis, Kilometer, Baujahr, Leistung, Zustand). In 3D wird nur das besichtigte Auto geladen.
+- **Kapitale Schäden:** Zylinderkopfdichtung (Kopf muss runter) und Getriebe (nur mit Motor- und Getriebeheber).
+- **Leistungsprüfstand:** misst Leistung und Drehmoment im aktuellen Zustand und zeigt die Kurve – verrät aber nicht die Ursache.
+- **Karriere:** 26 Erfolge mit einmaliger Prämie, private Sammlung mit Wert und Ansehen, Händler-Wettbewerbe gegen simulierte
+  Konkurrenten, Fahrzeugtreffen mit Wertung aus den echten Fahrzeugdaten.
+- **Standorte:** Profi-Werkstatt (Halle 2, dritte Hebebühne), Performance-Center (vierte Hebebühne, Prüfstand, Lackierkabine),
+  Headquarters mit Showroom (ausgestellte Autos verkaufen sich teurer). Die Gebäude sind begehbar und schließen an die Stammhalle an.
+
+Bewusste Grenzen: Die Standorte erweitern dasselbe Gelände (kein getrennter zweiter Ort). Hinterachse und Hinterradbremsen sind nicht
+zerlegbar. Biturbo-Motoren haben ein Lader-Bauteil. Die Glühkerze sitzt spielmechanisch unter der Einspritzdüse. Alle Fahrzeuge,
+Marken und Motoren sind frei erfunden.
+
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
 1. In Safari `github.com` öffnen, anmelden, dieses Repository öffnen.

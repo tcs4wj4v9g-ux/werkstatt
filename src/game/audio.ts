@@ -118,9 +118,38 @@ export interface EngineSound {
   tick: number;
   rattle: number;
   squeal: number;
+  /** Turbolader heult (Schaden) bzw. Ladeluft zischt (Leck). */
+  whine?: number;
+  boostHiss?: number;
+  /** Grundcharakter: Bauart, Zylinderzahl, Diesel, Aufladung. */
+  layout?: 'R4' | 'R6' | 'V6' | 'V8';
+  cylinders?: number;
+  diesel?: boolean;
+  turbo?: boolean;
 }
 
+/**
+ * Klangcharakter je Bauart: Frequenzverhältnisse und Lautstärken der drei
+ * Grundoszillatoren zur Zündfrequenz, Klangfarbe und Auspuffanteil.
+ * R4 brummt kernig, R6 läuft seidig und hell, V6 leicht rau, V8 blubbert
+ * mit kräftigen Unterschwingungen.
+ */
+export const VOICES: Record<string, { ratios: number[]; gains: number[]; tone: number; exhaust: number }> = {
+  R4: { ratios: [1, 0.5, 2.01], gains: [0.5, 0.35, 0.12], tone: 260, exhaust: 1 },
+  R6: { ratios: [1, 0.5, 2.0], gains: [0.4, 0.1, 0.24], tone: 340, exhaust: 0.85 },
+  V6: { ratios: [1, 1 / 3, 1.5], gains: [0.45, 0.26, 0.14], tone: 285, exhaust: 1.1 },
+  V8: { ratios: [1, 0.25, 0.5], gains: [0.38, 0.42, 0.34], tone: 215, exhaust: 1.7 },
+};
+/** Zündfrequenz in Hz: je zwei Kurbelumdrehungen zündet jeder Zylinder einmal. */
+export const firingHz = (rpm: number, cylinders = 4) => (rpm / 60) * (cylinders / 2);
+
 interface Running {
+  clatter: GainNode;
+  boost: GainNode;
+  whistle: OscillatorNode;
+  whistleGain: GainNode;
+  spool: number;
+  nextClatter: number;
   oscs: OscillatorNode[];
   noise: AudioBufferSourceNode;
   tone: BiquadFilterNode;
@@ -182,13 +211,33 @@ function frame() {
 
   // Unrunder Lauf: Drehzahl schwankt, einzelne Zündungen fallen aus.
   const wobble = p.misfire ? Math.sin(t * 9) * 30 * p.misfire : 0;
-  const firing = Math.max(8, ((r.rpm + wobble) / 60) * 2);
-  r.oscs[0].frequency.setTargetAtTime(firing, t, 0.03);
-  r.oscs[1].frequency.setTargetAtTime(firing / 2, t, 0.03);
-  r.oscs[2].frequency.setTargetAtTime(firing * 2.01, t, 0.03);
-  r.tone.frequency.setTargetAtTime(260 + r.rpm * 0.22, t, 0.05);
+  const voice = VOICES[p.layout ?? 'R4'];
+  const firing = Math.max(8, firingHz(r.rpm + wobble, p.cylinders));
+  voice.ratios.forEach((ratio, i) => r.oscs[i].frequency.setTargetAtTime(firing * ratio, t, 0.03));
+  // Diesel klingen dumpfer, dafür härter (siehe Nageln unten).
+  r.tone.frequency.setTargetAtTime((voice.tone + r.rpm * 0.22) * (p.diesel ? 0.72 : 1), t, 0.05);
   r.out.gain.setTargetAtTime(since < 0.55 ? 0.0001 : 0.16 + r.load * 0.12, t, 0.08);
-  r.exhaust.gain.setTargetAtTime(0.1 + r.load * 0.3, t, 0.08);
+  r.exhaust.gain.setTargetAtTime((0.1 + r.load * 0.3) * voice.exhaust, t, 0.08);
+
+  // Diesel-Nageln: ein harter Schlag je Zündung, kalt und im Leerlauf am deutlichsten.
+  if (p.diesel && since > 0.55) {
+    const period = 1 / firing;
+    const amp = (r.warm ? 0.035 : 0.06) * (1 - r.load * 0.4) * (p.misfire ? 1.6 : 1);
+    while (r.nextClatter < t + 0.12) {
+      const at = Math.max(t, r.nextClatter);
+      r.clatter.gain.setValueAtTime(amp * (p.misfire ? 0.5 + Math.random() : 1), at);
+      r.clatter.gain.exponentialRampToValueAtTime(0.0001, at + Math.min(0.02, period * 0.6));
+      r.nextClatter = at + period;
+    }
+  }
+  // Turbolader: läuft mit Verzögerung hoch, pfeift unter Last; ein defekter Lader heult wie eine Sirene.
+  if (p.turbo || p.whine) {
+    r.spool += ((r.load * Math.min(1, r.rpm / 3000)) - r.spool) * 0.04;
+    r.whistle.frequency.setTargetAtTime(p.whine ? 900 + r.spool * 2600 : 2600 + r.spool * 5200, t, 0.05);
+    r.whistleGain.gain.setTargetAtTime(since < 0.6 ? 0.0001 : p.whine ? 0.012 + r.spool * 0.05 : r.spool * 0.014, t, 0.06);
+  }
+  // Leck in der Ladeluft: zischt, sobald Ladedruck aufgebaut werden soll.
+  if (p.boostHiss) r.boost.gain.setTargetAtTime(r.load * 0.07, t, 0.05);
   if (p.misfire && t >= r.nextMiss) {
     r.miss.gain.setTargetAtTime(0.2, t, 0.008);
     r.miss.gain.setTargetAtTime(1, t + 0.07, 0.02);
@@ -248,7 +297,7 @@ export const engineAudio = {
         const o = c.createOscillator();
         o.type = type;
         const g = c.createGain();
-        g.gain.value = [0.5, 0.35, 0.12][i];
+        g.gain.value = VOICES[profile.layout ?? 'R4'].gains[i];
         o.connect(g).connect(tone);
         o.start(t);
         return o;
@@ -260,6 +309,15 @@ export const engineAudio = {
       const knock = band(c, src, 'bandpass', 620, 4, master);
       const tick = band(c, src, 'bandpass', 3900, 7, master);
       const rattle = band(c, src, 'bandpass', 2300, 1.4, master);
+      const clatter = band(c, src, 'bandpass', 1750, 2.2, master);
+      const boost = band(c, src, 'highpass', 3400, 0.7, master);
+      const whistle = c.createOscillator();
+      whistle.type = 'sine';
+      whistle.frequency.value = 2600;
+      const whistleGain = c.createGain();
+      whistleGain.gain.value = 0.0001;
+      whistle.connect(whistleGain).connect(master);
+      whistle.start(t);
       src.start(t);
       // Riemenquietschen als vierter Oszillator nur, wenn der Riemen wirklich defekt ist.
       const squeal = c.createGain();
@@ -298,7 +356,8 @@ export const engineAudio = {
       starter.stop(t + 0.8);
 
       run = {
-        oscs, noise: src, tone, out, miss, exhaust, knock, tick, rattle, squeal, profile,
+        oscs: [...oscs, whistle], noise: src, tone, out, miss, exhaust, knock, tick, rattle, squeal, profile,
+        clatter, boost, whistle, whistleGain, spool: 0, nextClatter: t + 0.6,
         started: t, rpm: 250, target: IDLE, load: 0, warm: false,
         nextKnock: t + 0.7, nextTick: t + 0.7, nextMiss: t + 1, raf: 0, demoTimer: 0,
       };
@@ -318,7 +377,7 @@ export const engineAudio = {
 
   /** Gaspedal im Stand: 0 = Leerlauf, 1 = hohe Drehzahl. */
   throttle(amount: number) {
-    this.set(IDLE + amount * 2600, amount);
+    this.set(IDLE + amount * (run?.profile.diesel ? 2000 : 2600), amount);
   },
 
   setWarm(warm: boolean) {
@@ -346,7 +405,7 @@ export const engineAudio = {
     clearTimeout(r.demoTimer);
     const t = ctx.currentTime;
     // Auslaufen statt abruptem Ende – so gibt es kein Knacken.
-    for (const g of [r.out, r.exhaust, r.knock, r.tick, r.rattle, r.squeal]) {
+    for (const g of [r.out, r.exhaust, r.knock, r.tick, r.rattle, r.squeal, r.clatter, r.boost, r.whistleGain]) {
       g.gain.cancelScheduledValues(t);
       g.gain.setTargetAtTime(0.0001, t, 0.07);
     }

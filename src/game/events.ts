@@ -1,9 +1,8 @@
 import { PARTS } from './data/parts';
 import { createAuction } from './auctions';
 import { createJobOffer } from './jobs';
-import { createBarnFind, createListing, createCar, type Rng } from './market';
-import { COMMON_MODELS } from './data/cars';
-import { DEFECT_LIST } from './data/defects';
+import { createBarnFind, createListing, createCar, randomDefects, type Rng } from './market';
+import { modelsOfClass } from './data/cars';
 import { SELLERS } from './data/sellers';
 import type { DefectId, GameEvent, PartId } from './types';
 
@@ -39,8 +38,8 @@ const makers: { type: GameEvent['type']; weight: number; minDeals: number; make:
     type: 'special_listing', weight: 3, minDeals: 0,
     make: (rng, p) => {
       const n = 1 + Math.floor(rng() * 2);
-      const defects = [...DEFECT_LIST].sort(() => rng() - 0.5).slice(0, n).map((d) => d.id).filter((d) => d !== 'battery' && d !== 'tires');
-      const l = createListing(createCar(pick(COMMON_MODELS, rng), defects, rng), rng, p.marketIndex, SELLERS.hurry);
+      const modelId = pick(modelsOfClass(p.deals < 3 ? 'budget' : pick(['budget', 'mid', 'mid', 'sport'] as const, rng)), rng);
+      const l = createListing(createCar(modelId, randomDefects(modelId, n, rng, ['battery', 'tires']), rng), rng, p.marketIndex, SELLERS.hurry);
       l.asking = l.current = Math.round((l.asking * 0.85) / 50) * 50;
       l.minPrice = Math.round((l.asking * 0.88) / 50) * 50;
       l.expiresDay = p.day;

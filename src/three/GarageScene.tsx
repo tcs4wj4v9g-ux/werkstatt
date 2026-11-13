@@ -3,12 +3,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { useGame } from '../game/store';
+import { Annex } from './Annex';
 import type { ZoneId } from '../game/types';
 import { CarModel } from './CarModel';
 import { Env } from './Env';
 import { Interactable } from './Interactable';
-import { SLOTS, slotAvailable } from '../game/data/workshop';
-import { BAY_Z, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box } from './player';
+import { availableSlots, SLOTS, slotAvailable } from '../game/data/workshop';
+import { BAY_Z, setSite, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box } from './player';
 import { Yard } from './Yard';
 import { textTexture } from './textures';
 import { Workshop } from './Workshop';
@@ -156,10 +157,16 @@ function Bay({ index }: { index: number }) {
   const car = useGame((s) => s.cars[index]);
   const up = useGame((s) => (s.cars[index] ? s.cars[index]!.lifted : s.liftUp[index]));
   const tool = useGame((s) => s.tool);
+  // iPad-Leistung: Motorraum, Schrauben und Bremsen werden nur an dem Auto aufgebaut, an dem gerade gearbeitet wird
+  // (Spieler steht daneben, Haube offen, angehoben oder Motor läuft). Alle anderen Bühnenautos zeigen die einfache Darstellung.
+  const near = useFocus((f) => f.nearBay === index);
+  const running = useGame((s) => s.engineBay === index);
+  const detailed = near || running || !!car?.hoodOpen || !!car?.lifted || up;
   const carriage = useRef<THREE.Group>(null);
   const target = up ? LIFT_HEIGHT : 0;
-  const z = BAY_Z[index];
+  const z = SLOTS[index].z;
   const inner = index === 0 ? 1 : -1; // Seite zum Mittelgang
+  const number = SLOTS.filter((x) => x.kind === 'lift' && x.id <= index).length;
   const wasUp = useRef(up);
 
   const handlers = useMemo(() => {
@@ -191,7 +198,7 @@ function Bay({ index }: { index: number }) {
 
   const leak = car && car.components.oil_pan_gasket.condition === 'defect';
   const coolant = car && (car.components.water_pump.condition === 'defect' || car.components.hose.condition === 'defect');
-  const label = textTexture(`BÜHNE ${index + 1}`, { bg: '#e3a81c', fg: '#16181d', w: 256, h: 64, font: 44 });
+  const label = textTexture(`BÜHNE ${number}`, { bg: '#e3a81c', fg: '#16181d', w: 256, h: 64, font: 44 });
 
   return (
     <group position={[0, 0, z]}>
@@ -285,7 +292,7 @@ function Bay({ index }: { index: number }) {
             ))}
           </group>
         ))}
-        {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} />}
+        {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} lod={detailed ? 'full' : 'simple'} hoodTap />}
       </group>
       <Blob />
     </group>
@@ -332,6 +339,22 @@ function Parked({ slot }: { slot: number }) {
   );
 }
 
+/** Alle vorhandenen Hebebühnen – die dritte und vierte kommen mit den größeren Standorten. */
+function Bays() {
+  const upgrades = useGame((s) => s.upgrades);
+  // Begehbare Bereiche folgen den gekauften Standorten.
+  setSite(upgrades);
+  return (
+    <>
+      {availableSlots(upgrades)
+        .filter((x) => x.kind === 'lift')
+        .map((x) => (
+          <Bay key={x.id} index={x.id} />
+        ))}
+    </>
+  );
+}
+
 export function GarageScene() {
   return (
     <>
@@ -360,8 +383,8 @@ export function GarageScene() {
       <FirstPerson />
       <Workshop />
       <Yard />
-      <Bay index={0} />
-      <Bay index={1} />
+      <Annex />
+      <Bays />
       {SLOTS.filter((x) => x.kind !== 'lift').map((x) => (
         <Parked key={x.id} slot={x.id} />
       ))}
