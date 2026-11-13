@@ -33,6 +33,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   let saveBefore = null;
   const unchanged = (now) => { const s1 = JSON.parse(saveBefore).state, s2 = JSON.parse(now).state; return Object.keys(s1).filter((k) => k !== 'auctions' && norm(s1[k]) !== norm(s2[k])); };
   const sees = (p, name, car) => until(p, ([name, car]) => { const m = window.__gkCoop.useCoop.getState().members.find((x) => x.name === name); return m && (m.presence.car || null) === car; }, [name, car]);
+  const p2shot = async (pl, name) => { await G(pl, () => Object.assign(window.__gkPlayer, { x: 4.6, z: -0.6, yaw: Math.atan2(4.6, -2.1), pitch: -0.12, zoom: false, work: null })); await pl.waitForTimeout(1200); await pl.screenshot({ path: `${S}/${name}.png` }); };
   const toolOf = (c, type, box) => c.tools.find((t) => t.type === type && t.box === box);
 
   // ---------- Vorbereitung: Spieler 1 hat einen Einzelspielstand ----------
@@ -159,9 +160,9 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await G(B, (t) => window.__gkCoop.takeTool(t), toolOf(cb, 'wrench', 'kiste_b')); await B.waitForTimeout(600);
   expect((await game(B)).carried.length === 3 && /voll/.test((await game(B)).toast), 'Vierte Entnahme scheitert an der Leiste mit drei Plätzen – ' + (await game(B)).toast);
   // Weiteres Exemplar kaufen
-  const m0 = (await game(A)).money;
+  const m0 = (await game(A)).money; const r0 = (await coop(A)).tools.filter((t) => t.type === 'ratchet').length;
   await G(A, () => window.__gkCoop.buyTool('ratchet', 'kiste_a'));
-  expect(await until(B, (m) => window.__gk.getState().money === m - 60 && window.__gkCoop.useCoop.getState().tools.filter((t) => t.type === 'ratchet').length === 4, m0), 'Vierte Ratsche gekauft: eigenes Exemplar, 60 € vom gemeinsamen Konto, bei beiden sichtbar');
+  expect(await until(B, ([m, r]) => window.__gk.getState().money === m - 60 && window.__gkCoop.useCoop.getState().tools.filter((t) => t.type === 'ratchet').length === r + 1, [m0, r0]), 'Vierte Ratsche gekauft: eigenes Exemplar, 60 € vom gemeinsamen Konto, bei beiden sichtbar');
 
   // ---------- Gemeinsames Lager ----------
   await until(A, (m) => window.__gk.getState().money === m - 60, m0); await settled(A);
@@ -179,7 +180,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await both(A, B);
   const ga = await game(A), gb = await game(B);
   expect(ga.money === 1000 && gb.money === 1000, 'Beide kaufen gleichzeitig für 8.000 € bei 9.000 € Guthaben: nur einmal abgebucht (Konto 1.000 €)');
-  expect(ga.cars.filter(Boolean).length === 2 && norm(ga.cars.map((c) => c && c.uid)) === norm(gb.cars.map((c) => c && c.uid)), 'Genau eines der beiden Autos wurde gekauft; beide sehen denselben Fuhrpark');
+  expect(ga.cars.slice(0, 15).filter(Boolean).length === 2 && norm(ga.cars.map((c) => c && c.uid)) === norm(gb.cars.map((c) => c && c.uid)), 'Genau eines der beiden Autos wurde gekauft; beide sehen denselben Fuhrpark');
   await A.getByTestId('coop-chip').click(); await A.waitForTimeout(900);
   const ledger = await A.getByTestId('coop-ledger').innerText();
   expect(/kaufte .* für 8\.000 €/.test(ledger) && /Werkzeug gekauft/.test(ledger) && /Bestellt/.test(ledger), 'Kontobuch nennt, wer was gekauft hat');
@@ -223,8 +224,56 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await block(false);
   await until(A, () => window.__gkCoop.useCoop.getState().status === 'online', null, 15000); await both(A, B);
 
+  // ---------- Mega-Update: zwei Spieler am selben Motor, gemeinsames Tuning ----------
+  const helper = () => {
+    const kit = ['ratchet', 'socket10', 'socket13', 'socket16', 'socket17', 'wrench', 'screwdriver'];
+    const g = window.__gk; const L = window.__gkLib;
+    const use = (t) => g.setState({ tool: t, carried: g.getState().carried.length ? g.getState().carried : [] });
+    window.__t = {
+      strip(slot, id) {
+        const c = g.getState().cars[slot]; const d = L.defOf(c, id); const s0 = c.components[id];
+        if (!s0 || !s0.installed) return;
+        for (const x of d.blockedBy) this.strip(slot, x);
+        const cc = () => g.getState().cars[slot];
+        if (cc().bare && cc().lifted !== !!(d.access === 'lifted' || d.under)) g.getState().flipEngine();
+        cc().components[id].bolts.forEach((b, i) => { if (b === 0) return; if (b === 2) { use(d.fastener.driver); g.getState().tapBolt(slot, id, i); } use('hand'); g.getState().tapBolt(slot, id, i); });
+        if (d.connector && cc().components[id].connected) { use('hand'); g.getState().tapConnector(slot, id); }
+        use(d.removeWith ? d.removeWith.driver : 'hand'); g.getState().tapComponent(slot, id);
+      },
+    };
+  };
+  await G(A, helper); await G(B, helper);
+  // Werkzeug für beide: die Leiste kommt aus den Kisten – für diesen Teil reicht die Testabkürzung über den Spielzustand nicht,
+  // weil die Leiste vom Server kommt. Beide holen Ratsche, 10er und 13er Nuss.
+  for (const [pl, box] of [[A, 'schrank'], [B, 'kiste_a']]) {
+    for (const type of ['ratchet', 'socket10', 'socket13']) {
+      await G(pl, ([type, box]) => { const c = window.__gkCoop.useCoop.getState(); const me = c.me; if (c.tools.some((t) => t.holder === me && t.type === type)) return; const t = c.tools.find((x) => x.type === type && x.box === box) || c.tools.find((x) => x.type === type && x.box); if (t) window.__gkCoop.takeTool(t); }, [type, box]);
+      await pl.waitForTimeout(700);
+    }
+  }
+  expect((await game(A)).carried.length === 3 && (await game(B)).carried.length >= 2, `Beide holen ihr Werkzeug selbst: A ${(await game(A)).carried} / B ${(await game(B)).carried}`);
+  await G(A, () => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const c = L.createCar('bavaria_330', [], Math.random, {}); const u = L.motor.extractEngine(c); const cars = [...s.cars]; cars[15] = L.motor.asStand(u, 'bavaria_330'); g.setState({ cars }); });
+  expect(await until(B, () => !!window.__gk.getState().cars[15]), 'Motor auf dem Ständer erscheint beim Partner');
+  // Gleichzeitig: A baut den Ansaugkrümmer ab, B die Motorabdeckung und den Ventildeckel
+  await Promise.all([
+    G(A, () => window.__t.strip(15, 'intake_manifold')),
+    G(B, () => { window.__t.strip(15, 'engine_cover'); }),
+  ]);
+  await both(A, B);
+  await G(B, () => { const c = window.__gk.getState().cars[15]; for (const k of Object.keys(c.components)) if (/^coil\d$/.test(k)) window.__t.strip(15, k); });
+  await both(A, B);
+  await G(B, () => window.__t.strip(15, 'valve_cover'));
+  await both(A, B);
+  const engA = await G(A, () => window.__gk.getState().cars[15].components);
+  const engB = await G(B, () => window.__gk.getState().cars[15].components);
+  expect(!engA.intake_manifold.installed && !engA.valve_cover.installed && !engB.intake_manifold.installed && !engB.valve_cover.installed && norm(engA) === norm(engB), 'Beide arbeiten am selben Motor: Ansaugkrümmer (A) und Ventildeckel (B) sind bei beiden ab');
+  // Tuning: A montiert Felgen und Spoiler, B sieht es
+  await G(A, () => { const g = window.__gk; const s = g.getState(); if (!s.cars[0]) return; g.setState({ money: Math.max(s.money, 20000) }); g.getState().buyVisual('rim:five'); g.getState().buyVisual('spoiler:3'); g.getState().mountVisual(0, 'rim:five'); g.getState().mountVisual(0, 'spoiler:3'); });
+  expect(await until(B, () => { const c = window.__gk.getState().cars[0]; return c && c.visual && c.visual.rim === 'five' && c.visual.spoiler === 3; }), 'Tuningteile von Spieler 1 sind bei Spieler 2 am selben Auto montiert');
+  await p2shot(B, 'koop-tuning');
+
   // ---------- Test 7: Wiederbeitritt ----------
-  const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools) };
+  const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools), stand: norm(await G(B, () => window.__gk.getState().cars[15])) };
   await G(A, () => window.__gkCoop.leave()); await G(B, () => window.__gkCoop.leave()); await B.waitForTimeout(600);
   expect((await coop(A)).status === 'off' && (await coop(B)).status === 'off', 'Beide verlassen das Spiel');
   await B.reload(); await B.waitForTimeout(1500);
@@ -232,6 +281,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(await until(B, () => window.__gkCoop.useCoop.getState().status === 'online' && window.__gk.getState().screen === 'garage'), 'Spieler 2 öffnet die Werkstatt später allein (nach Neuladen der Seite, ohne Code)');
   const after = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools) };
   expect(after.car === before.car && after.money === before.money, 'Reparaturfortschritt und Geld sind erhalten');
+  expect(norm(await G(B, () => window.__gk.getState().cars[15])) === before.stand, 'Der halb zerlegte Motor auf dem Ständer ist erhalten');
   expect(after.tools === before.tools && (await game(B)).carried.length === 3, 'Alle Werkzeugexemplare liegen, wo sie waren; die Leiste von Spieler 2 ist erhalten: ' + (await game(B)).carried);
   expect(JSON.parse(before.tools).find((t) => t.id === ratA.id).holder === ca.me, 'Ratsche A ist weiterhin Spieler 1 zugeordnet (nicht dupliziert, nicht verschwunden)');
 

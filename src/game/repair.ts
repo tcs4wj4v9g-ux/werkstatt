@@ -239,8 +239,13 @@ export function componentAction(
   const missing = dependents(car, id).find((d) => !isComplete(car, d));
   if (missing) return fail(`Erst fertig montieren: ${defOf(car, missing).name}.`);
   const next = def.bolts ? ' Jetzt Schrauben ansetzen und festziehen.' : def.connector ? ' Stecker nicht vergessen.' : '';
-  if (st.missing) return fail('Dieses Teil fehlt am Fahrzeug ganz.');
+  // Fehlt das Teil ganz (am Schrottplatz ausgebaut), geht nur ein anderes Exemplar hinein – kein Altteil.
+  if (st.missing && !opts.source) {
+    if (!def.partId || opts.useOldPart) return fail('Dieses Teil fehlt ganz – es braucht ein neues oder gebrauchtes.');
+    st.condition = 'defect';
+  }
   if (opts.source) {
+    delete st.missing;
     // Ein bestimmtes Teil wird eingesetzt: Gebrauchtteil, Tuningteil oder Neuteil aus dem Lager.
     const src = opts.source;
     st.installed = true;
@@ -259,6 +264,7 @@ export function componentAction(
       inv[key] -= 1;
       st.condition = 'ok';
       st.installed = true;
+      delete st.missing;
       if (st.health !== undefined) st.health = 100;
       if (id === 'oil_filter') car.fluids.oil.filterFresh = true;
       // Teilekosten werden dem Auto zugerechnet, in das das Teil wandert.

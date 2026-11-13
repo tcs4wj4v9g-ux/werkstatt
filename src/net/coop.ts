@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
 import { saveGate } from '../game/saveGate';
 import { useGame } from '../game/store';
+import { SLOT_COUNT } from '../game/data/workshop';
+import { refreshJunk } from '../game/junkyard';
 import type { ToolId } from '../game/types';
 import { place, player, useFocus } from '../three/player';
 import { COOP_CONFIGURED, REALTIME, SUPABASE_KEY, SUPABASE_URL } from './config';
@@ -225,6 +227,21 @@ function loadState(s: any, entering: boolean) {
   }
   setMembers(s.members ?? []);
   setTools(s.tools, s.toolsRev);
+  // Werkstatt aus einer älteren Spielversion: neue Stellplätze (Motorständer, Schrottplatz) und Lager ergänzen.
+  // Das ist eine normale Änderung und wird beim nächsten Abgleich übertragen.
+  const g = useGame.getState();
+  const missing = g.cars.length < SLOT_COUNT || !Array.isArray((s.state as any).engines);
+  if (missing) {
+    const cars = Array.from({ length: SLOT_COUNT }, (_, i) => g.cars[i] ?? null);
+    useGame.setState({
+      cars: refreshJunk(cars, Math.random, g.day),
+      engines: g.engines ?? [],
+      crane: g.crane ?? null,
+      used: g.used ?? [],
+      visualStock: g.visualStock ?? {},
+    });
+    dirty = true;
+  }
 }
 
 async function resync(reason?: string) {

@@ -91,7 +91,7 @@ alter table gk_tools enable row level security;
 -- ---------------------------------------------------------------- Stammdaten
 
 create or replace function gk_box_cap(p_box text) returns int language sql immutable as $$
-  select case p_box when 'kiste_a' then 6 when 'kiste_b' then 6 when 'schrank' then 14 when 'spezial' then 4 else null end;
+  select case p_box when 'kiste_a' then 6 when 'kiste_b' then 6 when 'schrank' then 14 when 'spezial' then 4 when 'schrott' then 8 else null end;
 $$;
 
 -- Kaufpreis eines weiteren Exemplars; null = Spezialwerkzeug, das es nur einmal je Werkstatt gibt.
@@ -104,7 +104,8 @@ $$;
 
 create or replace function gk_shared_key(p_key text) returns boolean language sql immutable as $$
   select p_key = any (array['money','cars','upgrades','fluidStock','drainPan','auctions','waiting','events','liftUp','inventory',
-    'listings','jobs','day','marketIndex','carsSold','totalProfit','jobsDone','career','achieved','contest','meet','jobEarnings']);
+    'listings','jobs','day','marketIndex','carsSold','totalProfit','jobsDone','career','achieved','contest','meet','jobEarnings',
+    'engines','crane','used','visualStock']);
 $$;
 
 -- ---------------------------------------------------------------- Hilfsfunktionen (nicht von außen aufrufbar)
@@ -161,7 +162,7 @@ begin
     select tl.id, tl.home_box from gk_tools tl join gk_members m on m.workshop_id = tl.workshop_id and m.user_id = tl.holder
     where tl.workshop_id = p_ws and m.last_seen < now() - interval '30 minutes' for update of tl
   loop
-    select b into target from unnest(array[t.home_box, 'schrank', 'kiste_a', 'kiste_b', 'spezial']) with ordinality as x(b, ord)
+    select b into target from unnest(array[t.home_box, 'schrank', 'kiste_a', 'kiste_b', 'spezial', 'schrott']) with ordinality as x(b, ord)
       where (select count(*) from gk_tools where workshop_id = p_ws and box = b) < gk_box_cap(b) order by ord limit 1;
     update gk_tools set holder = null, box = coalesce(target, t.home_box), taken_at = null where id = t.id;
     update gk_workshops set tools_rev = tools_rev + 1 where id = p_ws;
@@ -193,7 +194,8 @@ begin
     ('kiste_a', 'ratchet'), ('kiste_a', 'socket10'), ('kiste_a', 'socket16'), ('kiste_a', 'screwdriver'),
     ('kiste_b', 'ratchet'), ('kiste_b', 'socket13'), ('kiste_b', 'socket17'), ('kiste_b', 'wrench'),
     ('schrank', 'ratchet'), ('schrank', 'socket10'), ('schrank', 'socket13'), ('schrank', 'socket16'), ('schrank', 'socket17'), ('schrank', 'screwdriver'), ('schrank', 'wrench'),
-    ('spezial', 'torque'), ('spezial', 'obd')
+    ('spezial', 'torque'), ('spezial', 'obd'),
+    ('schrott', 'ratchet'), ('schrott', 'socket10'), ('schrott', 'socket13'), ('schrott', 'socket17'), ('schrott', 'screwdriver'), ('schrott', 'wrench')
   ) as seed(b, t);
   insert into gk_ledger(workshop_id, by_user, by_name, amount, balance, note)
   values (w, v, (select name from gk_members where workshop_id = w and user_id = v), 0, (p_state->>'money')::numeric, 'Werkstatt gegründet');
@@ -242,6 +244,15 @@ create or replace function gk_get_state(p_ws uuid) returns jsonb language plpgsq
 declare v uuid := gk_require_member(p_ws); w gk_workshops%rowtype;
 begin
   perform gk_touch(p_ws, v, null);
+  -- Werkzeugregal am Schrottplatz (für Werkstätten aus älteren Versionen einmalig anlegen)
+  if not exists (select 1 from gk_tools where workshop_id = p_ws and home_box = 'schrott') then
+    perform 1 from gk_workshops where id = p_ws for update;
+    if not exists (select 1 from gk_tools where workshop_id = p_ws and home_box = 'schrott') then
+      insert into gk_tools(workshop_id, type, home_box, box)
+      select p_ws, t, 'schrott', 'schrott' from unnest(array['ratchet', 'socket10', 'socket13', 'socket17', 'screwdriver', 'wrench']) as t;
+      update gk_workshops set tools_rev = tools_rev + 1 where id = p_ws;
+    end if;
+  end if;
   perform gk_reclaim(p_ws);
   select * into w from gk_workshops where id = p_ws;
   return jsonb_build_object('me', v, 'name', w.name, 'code', w.invite_code, 'open', w.invite_open, 'state', w.state, 'rev', w.rev, 'vers', w.vers,
@@ -323,8 +334,27 @@ begin
      or exists (select 1 from jsonb_each(st->'fluidStock') e where jsonb_typeof(e.value) = 'number' and (e.value #>> '{}')::numeric < -0.0001) then
     return jsonb_build_object('ok', false, 'reason', 'bestand', 'rev', w.rev, 'vers', w.vers, 'changes', gk_changes_json(p_ws, p_since, w.rev));
   end if;
+  -- Kein Motor und kein Gebrauchtteil darf doppelt existieren (Lager, Kran, eingebaut).
+  if 'engines' = any (touched) or 'crane' = any (touched) or 'cars' = any (touched) then
+    if exists (
+      select 1 from (
+        select e->'motor'->>'uid' as uid from jsonb_array_elements(coalesce(st->'engines', '[]'::jsonb)) e
+        union all select st->'crane'->'motor'->>'uid' where jsonb_typeof(st->'crane') = 'object'
+        union all select c->'motor'->>'uid' from jsonb_array_elements(st->'cars') c where jsonb_typeof(c) = 'object' and jsonb_typeof(c->'motor') = 'object'
+      ) u where uid is not null group by uid having count(*) > 1
+    ) then
+      return jsonb_build_object('ok', false, 'reason', 'doppelt', 'rev', w.rev, 'vers', w.vers, 'changes', gk_changes_json(p_ws, p_since, w.rev));
+    end if;
+  end if;
+  if 'used' = any (touched) and exists (select 1 from jsonb_array_elements(coalesce(st->'used', '[]'::jsonb)) u group by u->>'id' having count(*) > 1) then
+    return jsonb_build_object('ok', false, 'reason', 'doppelt', 'rev', w.rev, 'vers', w.vers, 'changes', gk_changes_json(p_ws, p_since, w.rev));
+  end if;
+  if exists (select 1 from jsonb_each(coalesce(st->'visualStock', '{}'::jsonb)) e where jsonb_typeof(e.value) = 'number' and (e.value #>> '{}')::numeric < 0) then
+    return jsonb_build_object('ok', false, 'reason', 'bestand', 'rev', w.rev, 'vers', w.vers, 'changes', gk_changes_json(p_ws, p_since, w.rev));
+  end if;
   if 'cars' = any (touched) or 'waiting' = any (touched) then
-    if jsonb_typeof(st->'cars') <> 'array' or jsonb_array_length(st->'cars') <> jsonb_array_length(w.state->'cars') then raise exception 'ungueltige_stellplaetze'; end if;
+    -- Die Stellplatzliste darf mit neuen Spielversionen wachsen, aber nie schrumpfen.
+    if jsonb_typeof(st->'cars') <> 'array' or jsonb_array_length(st->'cars') < jsonb_array_length(w.state->'cars') then raise exception 'ungueltige_stellplaetze'; end if;
     -- Kein Auto darf doppelt existieren (zwei Stellplätze oder Stellplatz + Warteliste).
     if exists (
       select 1 from (

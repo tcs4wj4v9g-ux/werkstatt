@@ -8,7 +8,7 @@
 # Die Seite läuft im Testmodus (?test): ein Viertel der Auflösung, keine Schatten – deutlich schneller, gleiche Logik.
 cd "$(dirname "$0")/.."
 # Die längsten zuerst, damit die Gesamtzeit nicht an einem späten langen Lauf hängt.
-ALL="werkstatt diagnose koop motoren mechanik karriere markt bremse"
+ALL="werkstatt diagnose koop schrott motoren mechanik karriere markt bremse"
 TESTS="${*:-$ALL}"
 JOBS="${JOBS:-3}"
 PORT="${PORT:-4173}"
