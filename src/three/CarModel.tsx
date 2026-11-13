@@ -12,6 +12,7 @@ import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
 import { dropOf } from '../game/data/visual';
+import { fastenerText } from '../game/data/tools';
 import { Mesher } from './mesher';
 import { junkPartPrice } from '../game/motor';
 import { bayMaterials, beltGeometry, camGeometry, chainGeometry, crankGeometry, engineDecor, exhaustGeometry, intakeGeometry, mainCapsGeometry, oilPumpGeometry, pistonGeometry, V_PIVOT, V_TILT } from './engineBay';
@@ -92,7 +93,7 @@ const ghostTap = (car: CarInstance, id: string, fn: () => void) => (e: ThreeEven
 };
 
 /** Platzhalter schweben etwas neben der Einbauposition, damit das Teil darunter erreichbar bleibt. */
-const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, valve_cover_b: 0.14, cyl_head: 0.1, gearbox: -0.12, caliper_fl: 0.12, caliper_fr: 0.12, oil_pan: -0.14, engine_cover: 0.36, charge_pipe: 0.12 };
+const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, valve_cover_b: 0.14, cyl_head: 0.1, gearbox: -0.12, caliper_fl: 0.12, caliper_fr: 0.12, caliper_rl: 0.12, caliper_rr: 0.12, oil_pan: -0.14, engine_cover: 0.36, charge_pipe: 0.12 };
 
 type Axis = 'y' | 'y-' | 'z+' | 'z-' | 'x+';
 const AXIS_ROT: Record<Axis, V3> = {
@@ -117,6 +118,30 @@ function boltGeometry() {
   }
   return boltGeo;
 }
+let slotGeo: THREE.BufferGeometry | null = null;
+/** Schlitzschraube mit Kreuzschlitz (für den Schraubendreher): runder, flacher Kopf. */
+function slotGeometry() {
+  if (!slotGeo) {
+    const m = new Mesher(2);
+    m.cyl(0, 0.021, 0.023, 0.014, [0, -0.006, 0], undefined, 16);
+    m.box(1, [0.034, 0.006, 0.006], [0, 0.002, 0]);
+    m.box(1, [0.006, 0.006, 0.034], [0, 0.002, 0]);
+    slotGeo = m.build();
+  }
+  return slotGeo;
+}
+let nutGeo: THREE.BufferGeometry | null = null;
+/** Große Sechskantmutter mit Bund (für den Schraubenschlüssel). */
+function nutGeometry() {
+  if (!nutGeo) {
+    const m = new Mesher(1);
+    m.cyl(0, 0.026, 0.026, 0.022, [0, -0.004, 0], undefined, 6);
+    m.cyl(0, 0.031, 0.031, 0.006, [0, -0.014, 0], undefined, 16);
+    nutGeo = m.build();
+  }
+  return nutGeo;
+}
+const SLOT_DARK = new THREE.MeshStandardMaterial({ color: '#15171a', roughness: 0.8 });
 const BOLT_MATS = {
   tight: new THREE.MeshStandardMaterial({ color: '#d9dde2', metalness: 0.9, roughness: 0.25 }),
   loose: new THREE.MeshStandardMaterial({ color: '#e8c35a', metalness: 0.9, roughness: 0.25 }),
@@ -157,25 +182,40 @@ function Bank({ bank, children }: { bank: number; children: ReactNode }) {
 }
 
 /** Schraube: 2 = fest, 1 = gelöst (steht sichtbar heraus), 0 = entfernt (grüne Markierung am Gewinde). */
-function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: Axis; state: number; live?: string; label: string; onTap?: () => void }) {
-  const text = `${label} (${state === 2 ? 'fest' : state === 1 ? 'gelöst' : 'entfernt'})`;
+function Bolt({ pos, axis = 'y', state, live, label, onTap, kind = 'ratchet', tools }: { pos: V3; axis?: Axis; state: number; live?: string; label: string; onTap?: () => void; kind?: 'ratchet' | 'wrench' | 'screwdriver'; tools?: string }) {
+  const text = `${label} (${state === 2 ? 'fest' : state === 1 ? 'gelöst' : 'entfernt'})${tools ? ` · ${tools}` : ''}`;
   const head = useRef<THREE.Group>(null);
   const targetY = state === 1 ? 0.03 : 0.012;
-  // Lösen und Festziehen: die Schraube dreht sich sichtbar heraus bzw. hinein.
+  // Neu eingesetzte Schraube beginnt weiter draußen und wird hineingedreht.
+  const prev = useRef(state);
+  const fresh = useRef(false);
+  if (prev.current !== state) {
+    if (prev.current === 0 && state > 0) fresh.current = true;
+    prev.current = state;
+  }
+  // Lösen dreht gegen den Uhrzeigersinn heraus, Eindrehen und Festziehen im Uhrzeigersinn hinein (Blick auf den Kopf).
   useFrame((_, dt) => {
     const h = head.current;
     if (!h) return;
+    if (fresh.current) {
+      fresh.current = false;
+      if (!TEST_MODE) h.position.y = 0.052;
+    }
     const d = targetY - h.position.y;
     if (Math.abs(d) < 0.0004) return;
     const step = TEST_MODE ? d : d * Math.min(1, dt * 9);
     h.position.y += step;
-    h.rotation.y -= step * 260;
+    h.rotation.y += step * 260;
   });
   return (
     <group position={pos} rotation={AXIS_ROT[axis]} userData={{ liveId: live, label: onTap ? text : undefined }} onClick={onTap && tap(onTap)}>
       {state > 0 ? (
         <group ref={head} position={[0, 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
-          <mesh geometry={boltGeometry()} material={state === 1 ? BOLT_MATS.loose : BOLT_MATS.tight} />
+          {kind === 'screwdriver' ? (
+            <mesh geometry={slotGeometry()} material={[state === 1 ? BOLT_MATS.loose : BOLT_MATS.tight, SLOT_DARK]} />
+          ) : (
+            <mesh geometry={kind === 'wrench' ? nutGeometry() : boltGeometry()} material={state === 1 ? BOLT_MATS.loose : BOLT_MATS.tight} />
+          )}
           {state === 1 && (
             <mesh position={[0, -0.025, 0]} material={BOLT_MATS.shaft}>
               <cylinderGeometry args={[0.009, 0.009, 0.03, 6]} />
@@ -237,7 +277,7 @@ function mainBolts(e: ReturnType<typeof engineOf>): V3[] {
 }
 const UNDER = new Set(['oil_pan', 'oil_pan_gasket', 'bearing', 'drain_plug', 'gearbox', 'dpf']);
 /** Richtung, in die ein Teil beim Ausbau herausgenommen wird. */
-const pullAxis = (id: string): V3 => (id.endsWith('_fl') ? [0, 0, -1] : id.endsWith('_fr') ? [0, 0, 1] : id === 'belt' ? [1, 0, 0] : UNDER.has(id) ? [0, -1, 0] : [0, 1, 0]);
+const pullAxis = (id: string): V3 => (/_[fr]l$/.test(id) ? [0, 0, -1] : /_[fr]r$/.test(id) ? [0, 0, 1] : id === 'belt' ? [1, 0, 0] : UNDER.has(id) ? [0, -1, 0] : [0, 1, 0]);
 const DURATION = 0.26;
 
 /**
@@ -273,6 +313,7 @@ const COVER_BOLTS: V3[] = [1.0, 1.3, 1.6].flatMap((x) => [-0.15, 0.15].map((z) =
 /** Ventildeckelschrauben einer Bank beim V-Motor (vier je Deckel). */
 const bankBolts = (bank: number, cylinders: number): V3[] => [[0.975, 0.18], [1.635, 0.18], [0.985, 0.03], [cylinders === 8 ? 1.35 : 1.25, 0.03]].map(([x, z]) => [x, 0.78, bank * z] as V3);
 const WX = 1.38; // Radmitte vorn/hinten (±)
+const WHEEL_FRONT = WX;
 const WZ = 0.8;
 const WY = 0.33;
 const DIRT = new THREE.Color('#5b4a36');
@@ -546,6 +587,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         axis={axis}
         state={st(id)?.bolts[i] ?? 2}
         label={`Schraube – ${def(id).name}`}
+        kind={def(id).fastener?.driver}
+        tools={def(id).fastener && fastenerText(def(id).fastener!)}
         live={interactive && blockersRemoved(car!, id) && toolFitsBolt(id) ? id : undefined}
         onTap={interactive ? () => handlers!.onBolt(id, i) : undefined}
       />
@@ -570,12 +613,16 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     </group>
   );
 
-  const frontCorner = (s: 'fl' | 'fr') => {
-    const sign = s === 'fr' ? 1 : -1;
+  /** Radecke mit Rad, Bremssattel, Belägen und Scheibe – vorn und hinten gleich aufgebaut. */
+  const corner = (s: 'fl' | 'fr' | 'rl' | 'rr') => {
+    const rear = s[0] === 'r';
+    const sign = s[1] === 'r' ? 1 : -1;
+    const WX = rear ? B.rearAxle : WHEEL_FRONT;
     const axis: Axis = sign > 0 ? 'z+' : 'z-';
-    const z = (d: number) => sign * (d + B.trackF);
-    const wheelRef = s === 'fl' ? wheelFL : wheelFR;
-    if (!full) {
+    const z = (d: number) => sign * (d + (rear ? B.trackR : B.trackF));
+    const wheelRef = s === 'fl' ? wheelFL : s === 'fr' ? wheelFR : undefined;
+    // Ältere Daten ohne Hinterachs-Bauteile: Rad nur zeigen, nicht zerlegbar.
+    if (!full || (rear && !st(`wheel_${s}`))) {
       return (
         <group key={s} ref={wheelRef} position={[WX, WY, z(WZ)]} onClick={wheelTap}>
           <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={car?.visual?.rimColor} />
@@ -650,12 +697,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         )}
         {bolts(`caliper_${s}`, [[WX - 0.06, cy, z(0.78)], [WX + 0.06, cy, z(0.78)]], axis)}
         {/* Entlüfternippel oben am Bremssattel; nach dem Entlüften steckt ein Schlauch mit Auffangflasche daran */}
-        {installed(`caliper_${s}`) && (
+        {!rear && installed(`caliper_${s}`) && (
           <group
             position={[WX + 0.075, cy + 0.07, z(0.8)]}
             rotation={[sign * 0.6, 0, 0]}
-            userData={{ liveId: `caliper_${s}`, label: interactive ? `Entlüfternippel vorne ${s === 'fl' ? 'links' : 'rechts'}${car!.fluids.brake.bled[s] ? ' (entlüftet)' : ''}` : undefined }}
-            onClick={interactive ? tap(() => handlers!.onBleed(s)) : undefined}
+            userData={{ liveId: `caliper_${s}`, label: interactive ? `Entlüfternippel vorne ${s === 'fl' ? 'links' : 'rechts'}${car!.fluids.brake.bled[s as 'fl' | 'fr'] ? ' (entlüftet)' : ''}` : undefined }}
+            onClick={interactive ? tap(() => handlers!.onBleed(s as 'fl' | 'fr')) : undefined}
           >
             <mesh>
               <cylinderGeometry args={[0.009, 0.012, 0.035, 8]} />
@@ -665,7 +712,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               <sphereGeometry args={[0.012, 8, 6]} />
               <meshStandardMaterial color="#1b1d21" roughness={0.6} />
             </mesh>
-            {car?.fluids.brake.bled[s] && (
+            {car?.fluids.brake.bled[s as 'fl' | 'fr'] && (
               <>
                 <mesh position={[0, 0.07, z(0.05)]} rotation={[sign * 0.9, 0, 0]}>
                   <cylinderGeometry args={[0.006, 0.006, 0.13, 6]} />
@@ -771,10 +818,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           </group>
         );
       })}
-      {/* Hinterräder (nicht demontierbar) */}
-      {[-1, 1].map((k) => (
+      {/* Hinterräder ohne Fahrzeugdaten (z. B. Vorschau); mit Auto übernimmt corner('rl'/'rr') */}
+      {!car && [-1, 1].map((k) => (
         <group key={k} position={[B.rearAxle, WY, k * (WZ + B.trackR)]} onClick={wheelTap}>
-          <WheelMeshes out={k} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={car?.visual?.rimColor} />
+          <WheelMeshes out={k} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={undefined} />
           <mesh position={[0, 0, -k * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.16, 0.16, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
@@ -789,7 +836,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       </>
       )}
       {full && (
-        <group position={bare ? [0, 0.95, 0] : [0, -drop, 0]} rotation={bare && car!.lifted ? [Math.PI, 0, 0] : undefined}>
+        <group position={bare ? [0, 0.95, 0] : [0, -drop, 0]} rotation={[bare && car!.lifted ? Math.PI : 0, 0, 0]}>
         <group position={bare ? [-1.3, -0.55, 0] : undefined}>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
@@ -1558,8 +1605,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         />
       </group>
 
-      {frontCorner('fl')}
-      {frontCorner('fr')}
+      {corner('fl')}
+      {corner('fr')}
+      {car && corner('rl')}
+      {car && corner('rr')}
       </>
       )}
     </group>

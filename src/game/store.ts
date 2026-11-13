@@ -874,11 +874,26 @@ export const useGame = create<GameState>()(
           engineAudio.stop();
           engineAudio.start(soundProfile(car));
           set({ engineBay: bay, engineSince: Date.now(), engineWarm: false });
+          if (fluids.fill(car, 'oil') < 0.1) return s.say('Die Öldruckleuchte leuchtet rot! Sofort abstellen – ohne Öl fressen die Lager in Sekunden.', true);
           perceive(bay, ['idle', 'sound', 'dash'], false, 'Der Motor springt an und läuft ruhig. Lass ihn warm werden und gib etwas Gas.');
         },
         engineTick: () => {
           const s = get();
-          if (s.engineBay < 0 || s.engineWarm || Date.now() - s.engineSince < WARM_AFTER * 1000) return;
+          if (s.engineBay < 0) return;
+          // Ohne oder mit falschem Öl nimmt der laufende Motor Schaden.
+          const runCar = s.cars[s.engineBay];
+          const harm = runCar && fluids.oilHarm(runCar, Date.now() - s.engineSince);
+          if (runCar && harm) {
+            const cars = [...s.cars];
+            const comps = { ...runCar.components };
+            for (const id of harm.ids) comps[id] = { ...comps[id], condition: 'defect', known: false };
+            cars[s.engineBay] = { ...runCar, components: comps };
+            set({ cars });
+            engineAudio.setProfile(soundProfile(cars[s.engineBay]!));
+            sfx.error();
+            s.say(harm.text, true);
+          }
+          if (s.engineWarm || Date.now() - s.engineSince < WARM_AFTER * 1000) return;
           set({ engineWarm: true });
           engineAudio.setWarm(true);
           perceive(s.engineBay, ['idle', 'sound', 'dash'], true, 'Der Motor ist jetzt warm und läuft weiter unauffällig.');
@@ -1004,7 +1019,7 @@ export const useGame = create<GameState>()(
           const car = s.cars[from];
           if (!car || s.cars[to] || !availableSlots(s.upgrades).some((x) => x.id === to)) return;
           if (car.lifted) return s.say('Erst das Auto von der Hebebühne ablassen.', true);
-          if (['wheel_fl', 'wheel_fr'].some((w) => !repair.isComplete(car, w))) return s.say('Ohne festgezogene Räder lässt sich das Auto nicht bewegen.', true);
+          if (repair.WHEELS.some((w) => car.components[w] && !repair.isComplete(car, w))) return s.say('Ohne festgezogene Räder lässt sich das Auto nicht bewegen.', true);
           if (s.engineBay === from) stopEngine();
           sfx.clunk();
           const cars = [...s.cars];

@@ -384,6 +384,10 @@ export const engineAudio = {
   setWarm(warm: boolean) {
     if (run) run.warm = warm;
   },
+  /** Klangbild des laufenden Motors ändern (z. B. wenn er gerade Schaden nimmt). */
+  setProfile(profile: EngineSound) {
+    if (run) run.profile = { ...run.profile, ...profile };
+  },
 
   /** Kurze Hörprobe beim Verkäufer; mit `driving` inklusive Gasstoß und warmem Motor. */
   demo(profile: EngineSound, driving: boolean) {

@@ -1,4 +1,4 @@
-import type { ToolId } from '../types';
+import type { ToolId, ToolNeed } from '../types';
 
 export interface ToolDef {
   id: ToolId;
@@ -40,3 +40,10 @@ export const TOOLS: ToolDef[] = [
 export const TOOL_MAP = Object.fromEntries(TOOLS.map((t) => [t.id, t])) as Record<ToolId, ToolDef>;
 export const CABINET_TOOLS = TOOLS.filter((t) => t.kind === 'driver' || t.kind === 'socket' || t.kind === 'device');
 export const toolName = (id: ToolId) => TOOL_MAP[id].name;
+
+const NUSS: Partial<Record<ToolId, string>> = { socket10: '10er Nuss', socket13: '13er Nuss', socket16: 'Kerzennuss', socket17: '17er Nuss' };
+/** Womit eine Schraube gelöst wird – für die Beschriftung beim Anvisieren. */
+export function fastenerText(need: ToolNeed): string {
+  const base = need.driver === 'ratchet' ? `🔧 Ratsche + ${NUSS[need.socket!] ?? 'Nuss'}` : need.driver === 'screwdriver' ? '🪛 Schraubendreher' : '🗜️ Schraubenschlüssel';
+  return need.torque ? `${base}, festziehen mit 📏 Drehmomentschlüssel` : base;
+}

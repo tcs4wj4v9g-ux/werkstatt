@@ -51,18 +51,21 @@ export interface WorkPose {
 
 export const player = { x: 4.3, z: 0, yaw: Math.PI / 2, pitch: -0.12, zoom: false, work: null as WorkPose | null };
 
-export type WorkView = 'engine' | 'engine_left' | 'engine_right' | 'wheel_left' | 'wheel_right' | 'under';
+export type WorkView = 'engine' | 'engine_left' | 'engine_right' | 'wheel_left' | 'wheel_right' | 'rear_left' | 'rear_right' | 'under';
 export const WORK_LABELS: Record<WorkView, string> = {
   engine: 'Motor von vorn',
   engine_left: 'Motor links',
   engine_right: 'Motor rechts',
-  wheel_left: 'Rad links',
-  wheel_right: 'Rad rechts',
+  wheel_left: 'Rad vorne links',
+  wheel_right: 'Rad vorne rechts',
+  rear_left: 'Rad hinten links',
+  rear_right: 'Rad hinten rechts',
   under: 'Unterboden',
 };
 
 /** Feste Arbeitsansicht nah am Bauteil. Der Spieler steht dabei still und kann sich nur umsehen. */
-export function workPose(view: WorkView, bay: number): WorkPose {
+/** `rearX`: Lage der Hinterachse des Autos (je Karosserie verschieden). */
+export function workPose(view: WorkView, bay: number, rearX = -1.38): WorkPose {
   const z0 = SLOTS[bay].z;
   const h = LIFT_HEIGHT;
   const table: Record<WorkView, [[number, number, number], [number, number, number]]> = {
@@ -71,6 +74,8 @@ export function workPose(view: WorkView, bay: number): WorkPose {
     engine_right: [[1.42, 1.4, z0 + 1.15], [1.42, 0.62, z0 + 0.28]],
     wheel_left: [[1.38, h + 0.42, z0 - 1.85], [1.38, h + 0.36, z0 - 0.8]],
     wheel_right: [[1.38, h + 0.42, z0 + 1.85], [1.38, h + 0.36, z0 + 0.8]],
+    rear_left: [[rearX, h + 0.42, z0 - 1.85], [rearX, h + 0.36, z0 - 0.8]],
+    rear_right: [[rearX, h + 0.42, z0 + 1.85], [rearX, h + 0.36, z0 + 0.8]],
     under: [[2.25, 1.2, z0], [1.3, h + 0.22, z0]],
   };
   const [pos, to] = table[view];

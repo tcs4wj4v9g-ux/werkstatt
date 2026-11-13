@@ -194,3 +194,22 @@ describe('Schrottplatz', () => {
     }
   });
 });
+
+describe('Öl und Motorschaden', () => {
+  it('ohne Öl startet der Motor, nach Sekunden fressen die Lager; falsches Öl lässt die Stößel klappern', async () => {
+    const { oilHarm, DRY_RUN_MS, WRONG_OIL_MS } = await import('./fluids');
+    const car = mk('bavaria_330');
+    car.fluids.oil.level = 0;
+    expect(r.engineBlocker(car)).toBeNull();
+    expect(r.driveBlocker(car)).toMatch(/Öldruck/);
+    expect(oilHarm(car, 1000)).toBeNull();
+    expect(oilHarm(car, DRY_RUN_MS)!.ids).toEqual(expect.arrayContaining(['bearing', 'camshaft']));
+    const wrong = mk('bavaria_330');
+    wrong.fluids.oil.product = wrong.fluids.oil.product === 'oil_5w40' ? 'oil_5w30' : 'oil_5w40';
+    expect(oilHarm(wrong, WRONG_OIL_MS - 1)).toBeNull();
+    expect(oilHarm(wrong, WRONG_OIL_MS)!.ids).toEqual(['rocker']);
+    wrong.components.rocker.condition = 'defect';
+    expect(oilHarm(wrong, WRONG_OIL_MS)).toBeNull();
+    expect(oilHarm(mk('bavaria_330'), 60000)).toBeNull();
+  });
+});

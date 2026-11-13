@@ -2,7 +2,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from '@supaba
 import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
 import { saveGate } from '../game/saveGate';
-import { useGame } from '../game/store';
+import { normalizeCar, useGame } from '../game/store';
 import { SLOT_COUNT } from '../game/data/workshop';
 import { refreshJunk } from '../game/junkyard';
 import type { ToolId } from '../game/types';
@@ -239,6 +239,17 @@ function loadState(s: any, entering: boolean) {
       crane: g.crane ?? null,
       used: g.used ?? [],
       visualStock: g.visualStock ?? {},
+    });
+    dirty = true;
+  }
+  // Autos aus einer Version ohne zerlegbare Hinterachse bekommen Räder und Bremsen hinten.
+  const old = (c: any) => c && !c.bare && c.components && !c.components.wheel_rl;
+  const st = useGame.getState();
+  if ([...st.cars, ...st.listings.map((l) => l.car), ...st.waiting].some(old)) {
+    useGame.setState({
+      cars: st.cars.map((c) => (old(c) ? normalizeCar(c) : c)),
+      listings: st.listings.map((l) => (old(l.car) ? { ...l, car: normalizeCar(l.car)! } : l)),
+      waiting: st.waiting.map((c) => (old(c) ? normalizeCar(c)! : c)),
     });
     dirty = true;
   }

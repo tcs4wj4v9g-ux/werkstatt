@@ -166,6 +166,28 @@ export function serviceState(car: CarInstance): ServiceState {
   };
 }
 
+/** Ab wann ein laufender Motor ohne Öl bzw. mit falschem Öl Schaden nimmt (Millisekunden). */
+export const DRY_RUN_MS = 4000;
+export const WRONG_OIL_MS = 15000;
+/**
+ * Schaden durch Öl: Ohne Öl reißt nach wenigen Sekunden der Schmierfilm – Pleuellager, Hauptlager und Nockenwelle fressen.
+ * Mit falschem Öl (andere Viskosität oder Gemisch) laufen die Hydrostößel trocken und klappern.
+ * Gibt nur Bauteile zurück, die noch nicht defekt sind.
+ */
+export function oilHarm(car: CarInstance, runningMs: number): { ids: string[]; text: string } | null {
+  const ok = (id: string) => car.components[id] && car.components[id].condition !== 'defect';
+  if (fill(car, 'oil') < 0.1) {
+    if (runningMs < DRY_RUN_MS) return null;
+    const ids = ['bearing', 'mainbrg', 'camshaft'].filter(ok);
+    return ids.length ? { ids, text: 'Ohne Öl gelaufen! Es klopft metallisch – Pleuellager und Nockenwelle haben Schaden genommen.' } : null;
+  }
+  if (car.fluids.oil.product !== CAR_MODELS[car.modelId].oilSpec && runningMs >= WRONG_OIL_MS) {
+    const ids = ['rocker'].filter(ok);
+    return ids.length ? { ids, text: 'Oben im Motor klappert es – mit dem falschen Öl laufen die Hydrostößel trocken.' } : null;
+  }
+  return null;
+}
+
 /** Darf der Motor so laufen? */
 export function fluidEngineBlocker(car: CarInstance): string | null {
   if (fill(car, 'oil') < 0.1) return 'Im Motor ist kein Öl – so startest du ihn nicht.';
