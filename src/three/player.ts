@@ -84,6 +84,9 @@ export const STATIC_BOXES: Box[] = [
   box(-4.35, 5.05, 0.7, 0.7), // Ölfass
   box(-4.25, -5.0, 0.9, 0.8), // Kompressor
   box(3.2, -5.4, 2.6, 0.5), // Wandregal
+  box(-3.65, 5.1, 0.7, 0.7), // zweites Ölfass
+  box(-3.0, 5.2, 0.6, 0.7), // Kanister
+  box(5.2, -5.15, 1.5, 0.6), // Rangierwagenheber
   ...BAY_Z.flatMap((z) => [box(0, z - 1.5, 0.3, 0.36), box(0, z + 1.5, 0.3, 0.36)]),
 ];
 
@@ -94,7 +97,8 @@ function siteBoxes(): Box[] {
     if (s.kind !== 'lift' || s.id < 10 || !(s.needs === 'loc_pro' ? site.pro : site.center)) continue;
     out.push(box(0, s.z - 1.5, 0.3, 0.36), box(0, s.z + 1.5, 0.3, 0.36));
   }
-  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1));
+  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1), box(5.9, 1.3, 0.6, 0.5));
+  else out.push(box(-3.4, -5.2, 0.8, 0.6)); // Unterstellböcke vor der geschlossenen Seitenwand
   if (site.center) out.push(box(5.8, -13.6, 0.6, 0.8));
   if (site.hq) out.push(box(5.6, 6.6, 1.0, 1.6));
   if (site.hoist) out.push(box(5.75, 4.95, 1.1, 0.9));

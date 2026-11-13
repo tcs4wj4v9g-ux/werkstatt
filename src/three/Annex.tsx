@@ -66,7 +66,7 @@ export function Annex() {
   const hq = upgrades.includes('loc_hq');
   const tex = useMemo(() => {
     const floor = concreteTexture().clone();
-    floor.repeat.set(4, 4);
+    floor.repeat.set(2, 2);
     floor.needsUpdate = true;
     const wall = wallTexture().clone();
     wall.repeat.set(4, 2);

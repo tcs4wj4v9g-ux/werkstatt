@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '../game/store';
-import { eur } from './common';
+import { eur, GfxPicker } from './common';
 
 export function MenuScreen() {
   const s = useGame();
@@ -30,6 +30,7 @@ export function MenuScreen() {
             Kontostand {eur(s.money)} · Verkaufte Autos {s.carsSold} · Gesamtgewinn {eur(s.totalProfit)}
           </p>
         )}
+        <GfxPicker />
         <p className="fine">Spielstand wird automatisch auf diesem Gerät gespeichert.</p>
       </div>
     </div>

@@ -1,6 +1,8 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect } from 'react';
 import { useGame } from './game/store';
+import { Perf } from './three/Env';
+import { GFX, TEST_DPR, TEST_MODE, useGfx } from './three/gfx';
 import { GarageScene } from './three/GarageScene';
 import { MarketScene } from './three/MarketScene';
 import { TrackScene } from './three/TrackScene';
@@ -13,20 +15,21 @@ import { TrackUI } from './ui/TrackUI';
 /** Macht Kamera/Szene für automatisierte Tests erreichbar. */
 function TestHook() {
   const camera = useThree((s) => s.camera);
+  const gl = useThree((s) => s.gl);
   (window as any).__gkCamera = camera;
+  (window as any).__gkGL = gl;
+  (window as any).__gkScene = useThree((s) => s.scene);
   return null;
 }
-
-/**
- * Testmodus (`?test` in der Adresse): halbe Auflösung, keine Schatten, keine Kantenglättung.
- * Nur für automatisierte Browser-Tests ohne Grafikkarte – Spiellogik und Tipp-Erkennung sind unverändert.
- */
-const TEST_MODE = new URLSearchParams(window.location.search).has('test');
 
 export function App() {
   const stored = useGame((s) => s.screen);
   const hasListings = useGame((s) => (s.marketSource === 'auctions' ? s.auctions.length : s.listings.length) > 0);
   const panel = useGame((s) => s.panel);
+  const level = useGfx((s) => s.level);
+  const scale = useGfx((s) => s.scale);
+  const G = GFX[level];
+  const dpr = TEST_MODE ? TEST_DPR : Math.max(0.6, Math.min(window.devicePixelRatio || 1, G.dpr) * scale);
   // Auktionen laufen in Echtzeit – auch die Zeit, in der das Spiel geschlossen war, wird beim Start nachgeholt.
   useEffect(() => {
     const tick = () => useGame.getState().tickAuctions(Date.now());
@@ -40,8 +43,10 @@ export function App() {
 
   return (
     <div className="app">
-      <Canvas shadows={!TEST_MODE} dpr={TEST_MODE ? 0.5 : [1, 1.6]} gl={{ antialias: !TEST_MODE }} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
+      {/* Ein Wechsel der Grafikstufe baut die 3D-Ansicht neu auf (Kantenglättung und Schatten lassen sich nicht im Betrieb umschalten). */}
+      <Canvas key={level} shadows={G.shadows} dpr={dpr} gl={{ antialias: G.antialias, powerPreference: 'high-performance' }} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
         <TestHook />
+        <Perf />
         {screen === 'menu' && <MarketScene showroom />}
         {screen === 'market' && <MarketScene />}
         {screen === 'garage' && <GarageScene />}

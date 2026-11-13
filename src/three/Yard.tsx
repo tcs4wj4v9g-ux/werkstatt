@@ -4,7 +4,7 @@ import { SLOTS, slotAvailable } from '../game/data/workshop';
 import { useGame } from '../game/store';
 import { Interactable } from './Interactable';
 import { BAY_Z, DOOR_HALF, ROOM, YARD } from './player';
-import { concreteTexture, doorTexture, textTexture, wallTexture } from './textures';
+import { doorTexture, textTexture, wallTexture, asphaltTexture } from './textures';
 
 type V3 = [number, number, number];
 const H = ROOM.height;
@@ -33,8 +33,8 @@ export function Yard() {
   const upgrades = useGame((s) => s.upgrades);
   const setPanel = useGame((s) => s.setPanel);
   const tex = useMemo(() => {
-    const asphalt = concreteTexture().clone();
-    asphalt.repeat.set(7, 7);
+    const asphalt = asphaltTexture().clone();
+    asphalt.repeat.set(6, 6);
     asphalt.needsUpdate = true;
     const wall = wallTexture().clone();
     wall.repeat.set(1.2, 2);
@@ -64,7 +64,7 @@ export function Yard() {
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ycx, 0, 0]} receiveShadow>
         <planeGeometry args={[yw, yd]} />
-        <meshStandardMaterial map={tex.asphalt} color="#7a7d82" roughness={0.9} />
+        <meshStandardMaterial map={tex.asphalt} color="#6c6f74" roughness={0.92} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[YARD.minX - 6, -0.01, BAY_Z[0]]}>
         <planeGeometry args={[12, 6]} />

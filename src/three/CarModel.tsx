@@ -1,5 +1,5 @@
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { COMPONENT_MAP, defOf, engineOf } from '../game/data/components';
 import { cylinderSlots, ENGINES, isV } from '../game/data/engines';
@@ -8,7 +8,13 @@ import { beneath, blockersRemoved, installReady, removable } from '../game/repai
 import { useGame } from '../game/store';
 import type { BodyStyle, CarInstance, FluidId, ToolId, ZoneId } from '../game/types';
 import { CAR_MODELS } from '../game/data/cars';
-import { BODY_SPECS, carGeometry, HOOD_X0, roundedRect, topY } from './carGeometry';
+import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
+import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
+import { TEST_MODE, useGfxSettings } from './gfx';
+import { Mesher } from './mesher';
+import { bayMaterials, beltGeometry, engineDecor, V_PIVOT, V_TILT } from './engineBay';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { create } from 'zustand';
 
 // Selbst gebautes Fahrzeug (keine Markenlogos, kein Fremdmodell). Fahrtrichtung = +X.
 // Mit `handlers` wird das Modell interaktiv (Werkstatt), sonst reine Anzeige.
@@ -92,29 +98,82 @@ const AXIS_ROT: Record<Axis, V3> = {
   'x+': [0, 0, -Math.PI / 2],
 };
 
+/** Unsichtbares Material: wird nicht gezeichnet, bleibt aber antippbar. */
+const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
+const HIT_GEO = new THREE.SphereGeometry(1, 8, 6);
+let boltGeo: THREE.BufferGeometry | null = null;
+/** Sechskantkopf mit Bund als ein Netz. */
+function boltGeometry() {
+  if (!boltGeo) {
+    const m = new Mesher(1);
+    m.cyl(0, 0.019, 0.02, 0.03, [0, 0, 0], undefined, 6);
+    m.cyl(0, 0.026, 0.027, 0.006, [0, -0.012, 0], undefined, 12);
+    boltGeo = m.build();
+  }
+  return boltGeo;
+}
+const BOLT_MATS = {
+  tight: new THREE.MeshStandardMaterial({ color: '#d9dde2', metalness: 0.9, roughness: 0.25 }),
+  loose: new THREE.MeshStandardMaterial({ color: '#e8c35a', metalness: 0.9, roughness: 0.25 }),
+  shaft: new THREE.MeshStandardMaterial({ color: '#8d9399', metalness: 0.9, roughness: 0.4 }),
+};
+
 /** Unsichtbare Trefferfläche für kleine Teile. */
-const Hit = ({ r = 0.046 }: { r?: number }) => (
-  <mesh>
-    <sphereGeometry args={[r, 8, 6]} />
-    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+const Hit = ({ r = 0.046 }: { r?: number }) => <mesh geometry={HIT_GEO} material={HIT_MAT} scale={r} />;
+
+const rbCache = new Map<string, THREE.BufferGeometry>();
+/** Quader mit gerundeten Kanten (Geometrie wird je Abmessung nur einmal erzeugt). */
+function RB({ s, r = 0.012, p, rot, children }: { s: V3; r?: number; p?: V3; rot?: V3; children: ReactNode }) {
+  const key = `${s.join()}:${r}`;
+  let g = rbCache.get(key);
+  if (!g) rbCache.set(key, (g = new RoundedBoxGeometry(s[0], s[1], s[2], 2, Math.max(0.001, Math.min(r, Math.min(...s) / 2 - 0.0005)))));
+  return (
+    <mesh geometry={g} position={p} rotation={rot}>
+      {children}
+    </mesh>
+  );
+}
+const noRay = () => null;
+/** Unsichtbarer Körper, der Tipps abfängt (hinter fest verbauten Motorteilen). */
+const Proxy = ({ s, p }: { s: V3; p: V3 }) => (
+  <mesh position={p}>
+    <boxGeometry args={s} />
+    <primitive object={HIT_MAT} attach="material" />
   </mesh>
 );
+/** Geneigte Zylinderbank eines V-Motors. */
+function Bank({ bank, children }: { bank: number; children: ReactNode }) {
+  if (!bank) return <>{children}</>;
+  return (
+    <group position={[0, V_PIVOT, 0]} rotation={[bank * V_TILT, 0, 0]}>
+      <group position={[0, -V_PIVOT, 0]}>{children}</group>
+    </group>
+  );
+}
 
 /** Schraube: 2 = fest, 1 = gelöst (steht sichtbar heraus), 0 = entfernt (grüne Markierung am Gewinde). */
 function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: Axis; state: number; live?: string; label: string; onTap?: () => void }) {
   const text = `${label} (${state === 2 ? 'fest' : state === 1 ? 'gelöst' : 'entfernt'})`;
+  const head = useRef<THREE.Group>(null);
+  const targetY = state === 1 ? 0.03 : 0.012;
+  // Lösen und Festziehen: die Schraube dreht sich sichtbar heraus bzw. hinein.
+  useFrame((_, dt) => {
+    const h = head.current;
+    if (!h) return;
+    const d = targetY - h.position.y;
+    if (Math.abs(d) < 0.0004) return;
+    const step = TEST_MODE ? d : d * Math.min(1, dt * 9);
+    h.position.y += step;
+    h.rotation.y -= step * 260;
+  });
   return (
     <group position={pos} rotation={AXIS_ROT[axis]} userData={{ liveId: live, label: onTap ? text : undefined }} onClick={onTap && tap(onTap)}>
       {state > 0 ? (
-        <group position={[0, state === 1 ? 0.03 : 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
-          <mesh>
-            <cylinderGeometry args={[0.02, 0.02, 0.03, 6]} />
-            <meshStandardMaterial color={state === 1 ? '#e8c35a' : '#d9dde2'} metalness={0.9} roughness={0.25} />
-          </mesh>
+        <group ref={head} position={[0, 0.012, 0]} rotation={[state === 1 ? 0.22 : 0, 0, 0]}>
+          <mesh geometry={boltGeometry()} material={state === 1 ? BOLT_MATS.loose : BOLT_MATS.tight} />
           {state === 1 && (
-            <mesh position={[0, -0.025, 0]}>
+            <mesh position={[0, -0.025, 0]} material={BOLT_MATS.shaft}>
               <cylinderGeometry args={[0.009, 0.009, 0.03, 6]} />
-              <meshStandardMaterial color="#8d9399" metalness={0.9} roughness={0.4} />
             </mesh>
           )}
         </group>
@@ -132,15 +191,71 @@ function Bolt({ pos, axis = 'y', state, live, label, onTap }: { pos: V3; axis?: 
 /** Elektrischer Stecker: aufgesteckt sitzt er am Bauteil, abgezogen hängt er sichtbar daneben. */
 function Connector({ pos, off, connected, label, onTap }: { pos: V3; off: V3; connected: boolean; label: string; onTap?: () => void }) {
   const p: V3 = connected ? pos : [pos[0] + off[0], pos[1] + off[1], pos[2] + off[2]];
+  const ref = useRef<THREE.Group>(null);
+  const start = useRef(true);
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g) return;
+    if (start.current || TEST_MODE) {
+      g.position.set(...p);
+      start.current = false;
+      return;
+    }
+    if (Math.abs(g.position.x - p[0]) + Math.abs(g.position.y - p[1]) + Math.abs(g.position.z - p[2]) < 0.0005) return;
+    g.position.lerp(tmpV.set(...p), Math.min(1, dt * 10));
+  });
   return (
-    <group position={p} userData={{ label: onTap ? `Stecker ${label} (${connected ? 'verbunden' : 'abgezogen'})` : undefined }} onClick={onTap && tap(onTap)}>
-      <mesh>
-        <boxGeometry args={[0.045, 0.03, 0.04]} />
+    <group ref={ref} position={p} userData={{ label: onTap ? `Stecker ${label} (${connected ? 'verbunden' : 'abgezogen'})` : undefined }} onClick={onTap && tap(onTap)}>
+      <RB s={[0.045, 0.03, 0.04]} r={0.007}>
         <meshStandardMaterial color={connected ? '#3a3f46' : '#e3a81c'} roughness={0.6} />
+      </RB>
+      <mesh position={[0, 0.018, 0]}>
+        <boxGeometry args={[0.02, 0.008, 0.026]} />
+        <meshStandardMaterial color={connected ? '#5a6068' : '#f0c040'} roughness={0.5} />
+      </mesh>
+      {/* Kabelschwanz */}
+      <mesh position={[0, -0.03, 0]} raycast={noRay}>
+        <cylinderGeometry args={[0.006, 0.006, 0.04, 5]} />
+        <meshStandardMaterial color="#111214" roughness={0.9} />
       </mesh>
       {onTap && <Hit r={0.04} />}
     </group>
   );
+}
+
+const tmpV = new THREE.Vector3();
+const UNDER = new Set(['oil_pan', 'oil_pan_gasket', 'bearing', 'drain_plug', 'gearbox', 'dpf']);
+/** Richtung, in die ein Teil beim Ausbau herausgenommen wird. */
+const pullAxis = (id: string): V3 => (id.endsWith('_fl') ? [0, 0, -1] : id.endsWith('_fr') ? [0, 0, 1] : id === 'belt' ? [1, 0, 0] : UNDER.has(id) ? [0, -1, 0] : [0, 1, 0]);
+const DURATION = 0.26;
+
+/**
+ * Weicher Übergang beim Aus- und Einbau: Das Teil wird sichtbar herausgezogen bzw. eingesetzt,
+ * statt schlagartig zu verschwinden oder aufzutauchen.
+ */
+function PartAnim({ installed, axis, real, ghost }: { installed: boolean; axis: V3; real: ReactNode; ghost: ReactNode }) {
+  const [st, setSt] = useState({ installed, leaving: false });
+  const ref = useRef<THREE.Group>(null);
+  const t = useRef(1);
+  if (st.installed !== installed) {
+    t.current = TEST_MODE ? 1 : 0;
+    setSt({ installed, leaving: !installed && !TEST_MODE });
+  }
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g || t.current >= 1) return;
+    t.current = Math.min(1, t.current + dt / DURATION);
+    const k = t.current * t.current * (3 - 2 * t.current);
+    const d = st.leaving ? k * 0.2 : (1 - k) * 0.16;
+    g.position.set(axis[0] * d, axis[1] * d, axis[2] * d);
+    g.scale.setScalar(st.leaving ? 1 - k * 0.2 : 1);
+    if (t.current >= 1) {
+      g.position.set(0, 0, 0);
+      g.scale.setScalar(1);
+      if (st.leaving) setSt({ installed, leaving: false });
+    }
+  });
+  return <group ref={ref}>{st.leaving || installed ? real : ghost}</group>;
 }
 
 const COVER_BOLTS: V3[] = [1.0, 1.3, 1.6].flatMap((x) => [-0.15, 0.15].map((z) => [x, 0.78, z] as V3));
@@ -153,12 +268,9 @@ const DIRT = new THREE.Color('#5b4a36');
 const RUST = new THREE.Color('#6a3414');
 const FOAM = new THREE.Color('#f4f6f8');
 
-// Einmal erzeugte Formen für Leuchten und Grill.
-const lampGeo = roundedRect(0.36, 0.105, 0.04, 0.05);
-const tailGeo = roundedRect(0.4, 0.12, 0.035, 0.04);
-const lampInner = roundedRect(0.33, 0.08, 0.03, 0.054);
-const kidneyGeo = roundedRect(0.26, 0.125, 0.045, 0.03);
-const kidneyInner = roundedRect(0.225, 0.094, 0.032, 0.034);
+/** Geöffnete Vordertüren (nur Anzeige, nicht Teil des Spielstands): Schlüssel `uid:0|1`. */
+const useDoors = create<Record<string, boolean>>(() => ({}));
+(window as any).__gkDoors = useDoors;
 
 /** Karosseriebereich zu einem Punkt in Fahrzeugkoordinaten. */
 export function zoneAt(x: number, y: number, z: number): ZoneId {
@@ -168,63 +280,39 @@ export function zoneAt(x: number, y: number, z: number): ZoneId {
   return z < 0 ? 'left' : 'right';
 }
 
-/** Rad mit Niederquerschnittsreifen, Felgenbett und fünf Doppelspeichen. `out` = Außenseite (+1/-1). */
-export type RimStyle = 'steel' | 'double5' | 'multi' | 'chrome7' | 'classic';
-const RIMS: Record<RimStyle, { n: number; double: boolean; color: string; w: number }> = {
-  steel: { n: 0, double: false, color: '#3a3d42', w: 0 },
-  double5: { n: 5, double: true, color: '#cdd2d8', w: 0.018 },
-  multi: { n: 10, double: false, color: '#2a2c30', w: 0.014 },
-  chrome7: { n: 7, double: false, color: '#eef1f4', w: 0.026 },
-  classic: { n: 16, double: false, color: '#dfe3e8', w: 0.007 },
-};
-function WheelMeshes({ geo, out, dirt = 0, style = 'double5' }: { geo: THREE.BufferGeometry; out: number; dirt?: number; style?: RimStyle }) {
-  const R = RIMS[style];
-  const rim = useMemo(() => '#' + new THREE.Color(R.color).lerp(DIRT, dirt * 0.8).getHexString(), [dirt, R.color]);
-  const rough = 0.22 + dirt * 0.6;
-  return (
-    <group rotation={[Math.PI / 2, 0, 0]}>
-      <mesh geometry={geo} castShadow>
-        <Mat color="#151617" rough={0.93} />
-      </mesh>
-      <mesh>
-        <cylinderGeometry args={[0.232, 0.232, 0.19, 32, 1, true]} />
-        <meshStandardMaterial color="#8f959c" metalness={0.9} roughness={0.35} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[0, out * 0.094, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.226, 0.012, 8, 36]} />
-        <Mat color={rim} metal={0.95} rough={rough} />
-      </mesh>
-      {Array.from({ length: R.n }, (_, i) => (
-        <group key={i} rotation={[0, (i / R.n) * Math.PI * 2 + 0.31, 0]}>
-          {(R.double ? [-0.03, 0.03] : [0]).map((o) => (
-            <mesh key={o} position={[o * 0.9, out * 0.084, 0.135]} rotation={[0, -o * 3.2, 0]}>
-              <boxGeometry args={[R.w, 0.016, 0.19]} />
-              <Mat color={rim} metal={0.95} rough={rough} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      {/* Stahlfelge mit Radkappe bzw. Chromdeckel des Klassikers */}
-      {(style === 'steel' || style === 'classic') && (
-        <mesh position={[0, out * 0.08, 0]}>
-          <cylinderGeometry args={[style === 'steel' ? 0.222 : 0.1, style === 'steel' ? 0.228 : 0.11, 0.02, 24]} />
-          <Mat color={rim} metal={style === 'steel' ? 0.5 : 1} rough={style === 'steel' ? 0.6 : 0.15} />
-        </mesh>
-      )}
-      <mesh position={[0, out * 0.082, 0]}>
-        <cylinderGeometry args={[0.06, 0.07, 0.03, 20]} />
-        <Mat color={rim} metal={0.95} rough={rough} />
-      </mesh>
-      <mesh position={[0, out * 0.099, 0]}>
-        <cylinderGeometry args={[0.028, 0.028, 0.006, 16]} />
-        <Mat color="#1b1d21" metal={0.6} rough={0.4} />
-      </mesh>
-    </group>
-  );
+const wheelMats = new Map<string, THREE.Material[]>();
+/** Materialien eines Rads: Reifen, Felge (mit Schmutz), dunkel, Felgenbett. */
+function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' | 'defect') {
+  const key = `${style}:${dirt}:${mode}`;
+  let m = wheelMats.get(key);
+  if (!m) {
+    if (mode === 'ghost') {
+      const g = new THREE.MeshBasicMaterial({ color: '#39e06f', transparent: true, opacity: 0.4, depthWrite: false });
+      m = [g, g, g, g];
+    } else {
+      const em = mode === 'defect' ? { emissive: new THREE.Color('#ff2a1a'), emissiveIntensity: 0.6 } : {};
+      const rim = new THREE.Color(RIM_COLOR[style]).lerp(DIRT, dirt * 0.8);
+      m = [
+        new THREE.MeshStandardMaterial({ color: new THREE.Color('#131415').lerp(DIRT, dirt * 0.35), roughness: 0.92, ...em }),
+        new THREE.MeshStandardMaterial({ color: rim, metalness: style === 'steel' ? 0.55 : 0.95, roughness: (style === 'steel' ? 0.5 : 0.2) + dirt * 0.6, ...em }),
+        new THREE.MeshStandardMaterial({ color: '#16171a', metalness: 0.5, roughness: 0.6, ...em }),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color('#9aa0a7').lerp(DIRT, dirt * 0.7), metalness: 0.9, roughness: 0.32 + dirt * 0.5, side: THREE.DoubleSide, ...em }),
+      ];
+    }
+    wheelMats.set(key, m);
+  }
+  return m;
+}
+
+/** Rad als ein einziges Netz. `out` = Außenseite (+1/-1); `lugs` = Zier-Radschrauben (nicht demontierbare Räder). */
+function WheelMeshes({ out, dirt = 0, style = 'double5', lugs = false }: { out: number; dirt?: number; style?: RimStyle; lugs?: boolean }) {
+  const mode = useContext(GhostCtx);
+  const detail = useGfxSettings().detail;
+  return <mesh geometry={wheelGeometry(style, detail, lugs)} material={wheelMaterials(style, Math.round(dirt * 5) / 5, mode)} rotation={[(out * Math.PI) / 2, 0, 0]} castShadow />;
 }
 
 /** Färbt die Karosserie-Eckpunkte je Bereich: Lackfarbe, Schmutz, Schaum, Rostflecken. */
-function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: string, offsetX = 0, offsetY = 0) {
+function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: string, offsetX = 0, offsetY = 0, offsetZ = 0) {
   const pos = geo.getAttribute('position');
   let attr = geo.getAttribute('color') as THREE.BufferAttribute | undefined;
   if (!attr) {
@@ -236,7 +324,7 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i) + offsetX;
     const y = pos.getY(i) + offsetY;
-    const z = pos.getZ(i);
+    const z = pos.getZ(i) + offsetZ;
     c.copy(baseColor);
     if (car) {
       const zone = car.zones[zoneAt(x, y, z)];
@@ -255,15 +343,23 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
 }
 
 export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, modelId, hoodTap }: Props) {
-  const shared = useMemo(() => carGeometry(body), [body]);
+  const G = useGfxSettings();
+  const shared = useMemo(() => carGeometry(body, G.detail), [body, G.detail]);
+  const S = shared.shape;
+  const B = BODY_SPECS[body];
+  const hinge = useMemo(() => doorHinge(S), [S]);
   // Eigene Kopien je Auto, weil jede Karosserie ihre eigene Einfärbung trägt.
-  const geo = useMemo(() => ({ shell: shared.shell.clone(), cabin: shared.cabin.clone(), hood: shared.hood.clone(), tire: shared.tire }), [shared, car?.uid]);
-  useEffect(() => () => [geo.shell, geo.cabin, geo.hood].forEach((g) => g.dispose()), [geo]);
+  const geo = useMemo(() => ({ shell: shared.shell.clone(), cabin: shared.cabin.clone(), hood: shared.hood.clone(), doors: shared.doors.map((d) => d.clone()) }), [shared, car?.uid]);
+  useEffect(() => () => [geo.shell, geo.cabin, geo.hood, ...geo.doors].forEach((g) => g.dispose()), [geo]);
 
   const root = useRef<THREE.Group>(null);
   const hood = useRef<THREE.Group>(null);
   const wheelFL = useRef<THREE.Group>(null);
   const wheelFR = useRef<THREE.Group>(null);
+  const doorL = useRef<THREE.Group>(null);
+  const doorR = useRef<THREE.Group>(null);
+  const doorKey = car?.uid ?? '';
+  const doorsOpen = [useDoors((d) => !!d[`${doorKey}:0`]), useDoors((d) => !!d[`${doorKey}:1`])];
   const hoodOpen = car?.hoodOpen ?? false;
   const full = lod === 'full';
   const dirt = car ? dirtLevel(car) : 0;
@@ -275,36 +371,48 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   useEffect(() => {
     tint(geo.shell, car, color);
     tint(geo.cabin, car, color);
-    tint(geo.hood, car, color, HOOD_X0, topY(HOOD_X0));
+    tint(geo.hood, car, color, HOOD_X0, S.crown(HOOD_X0));
+    geo.doors.forEach((d, k) => tint(d, car, color, hinge[0], 0, (k ? 1 : -1) * hinge[1]));
   }, [geo, color, zoneKey]);
 
-  const mats = useMemo(
-    () => ({
-      paint: new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, metalness: 0.6, side: THREE.DoubleSide }),
-      solid: new THREE.MeshPhysicalMaterial({ metalness: 0.6, roughness: 0.4, clearcoat: 0.8 }),
-      glass: new THREE.MeshPhysicalMaterial({ metalness: 0.2, transparent: true, side: THREE.DoubleSide }),
-      dark: new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.85 }),
-      trim: new THREE.MeshStandardMaterial({ color: '#0c0d0f', roughness: 0.45, metalness: 0.4 }),
-      seat: new THREE.MeshStandardMaterial({ color: '#3a342c', roughness: 0.9 }),
-      chrome: new THREE.MeshStandardMaterial({ color: '#dfe3e8', roughness: 0.16, metalness: 1 }),
-      lens: new THREE.MeshPhysicalMaterial({ color: '#15171b', metalness: 0.7, roughness: 0.08, clearcoat: 1 }),
-      reflector: new THREE.MeshStandardMaterial({ color: '#c3cad3', metalness: 1, roughness: 0.18 }),
-      ring: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#f3f8ff', emissiveIntensity: 1.6 }),
-      tail: new THREE.MeshPhysicalMaterial({ color: '#7d0c10', roughness: 0.12, clearcoat: 1, emissive: '#ff1a1a', emissiveIntensity: 0.35 }),
-      tailBar: new THREE.MeshStandardMaterial({ color: '#ff3b30', emissive: '#ff2a1a', emissiveIntensity: 1.3 }),
+  const mats = useMemo(() => {
+    const paintOpts = { color: '#ffffff', vertexColors: true, metalness: 0.62, side: THREE.DoubleSide };
+    const m = {
+      paint: G.clearcoat ? new THREE.MeshPhysicalMaterial(paintOpts) : new THREE.MeshStandardMaterial(paintOpts),
+      solid: new THREE.MeshStandardMaterial({ metalness: 0.62, roughness: 0.3 }),
+      glass: new THREE.MeshPhysicalMaterial({ metalness: 0.25, transparent: true, side: THREE.DoubleSide, envMapIntensity: 1.6 }),
+      dark: new THREE.MeshStandardMaterial({ color: '#131416', roughness: 0.88 }),
+      trim: new THREE.MeshStandardMaterial({ color: '#0b0c0e', roughness: 0.28, metalness: 0.5 }),
+      seat: new THREE.MeshStandardMaterial({ roughness: 0.82 }),
+      seat2: new THREE.MeshStandardMaterial({ roughness: 0.9 }),
+      chrome: new THREE.MeshStandardMaterial({ color: '#e6e9ed', roughness: 0.12, metalness: 1 }),
+      lens: new THREE.MeshPhysicalMaterial({ color: '#aab2bc', metalness: 0.95, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.03 }),
+      ring: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#f3f8ff', emissiveIntensity: 1.5 }),
+      tail: new THREE.MeshPhysicalMaterial({ color: '#8a0d12', roughness: 0.1, clearcoat: 1, emissive: '#ff1a1a', emissiveIntensity: 0.3 }),
+      tailBar: new THREE.MeshStandardMaterial({ color: '#ff3b30', emissive: '#ff2a1a', emissiveIntensity: 1.25 }),
       amber: new THREE.MeshStandardMaterial({ color: '#f0a020', emissive: '#f08a00', emissiveIntensity: 0.4, roughness: 0.3 }),
-    }),
-    [],
-  );
+      plate: new THREE.MeshStandardMaterial({ color: '#f2f2ee', roughness: 0.55 }),
+    };
+    return m;
+  }, [G.clearcoat]);
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
   // Pflegezustand wirkt auf Glanz und Spiegelung.
-  mats.paint.roughness = 0.34 + dirt * 0.5 - shine * 0.12;
-  mats.paint.clearcoat = (1 - dirt) * (0.25 + 0.75 * shine);
-  mats.paint.clearcoatRoughness = 0.06 + (1 - shine) * 0.3;
+  // Weiß und kräftiges Rot sind Uni-Lacke, alles andere Metallic.
+  const hsl = useMemo(() => new THREE.Color(color).getHSL({ h: 0, s: 0, l: 0 }), [color]);
+  const metallic = hsl.l > 0.78 ? 0.12 : hsl.s > 0.6 && (hsl.h < 0.06 || hsl.h > 0.94) ? 0.3 : 0.68;
+  mats.paint.metalness = metallic * (1 - dirt * 0.7);
+  mats.solid.metalness = metallic;
+  mats.paint.roughness = 0.26 + (0.68 - metallic) * 0.12 + dirt * 0.52 - shine * 0.14;
+  mats.paint.envMapIntensity = 1.2 - dirt * 0.7;
+  if (mats.paint instanceof THREE.MeshPhysicalMaterial) {
+    mats.paint.clearcoat = (1 - dirt) * (0.3 + 0.7 * shine);
+    mats.paint.clearcoatRoughness = 0.04 + (1 - shine) * 0.3;
+  }
   mats.solid.color.set(color).lerp(DIRT, dirt * 0.6);
+  mats.solid.roughness = 0.26 + dirt * 0.5;
   mats.glass.color.set('#0b1217').lerp(DIRT, glassDirt * 0.5);
-  mats.glass.roughness = 0.04 + glassDirt * 0.55;
-  mats.glass.opacity = 0.55 + glassDirt * 0.3;
+  mats.glass.roughness = 0.03 + glassDirt * 0.55;
+  mats.glass.opacity = 0.5 + glassDirt * 0.3;
 
   useFrame((_, dt) => {
     if (hood.current) {
@@ -314,27 +422,39 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     if (steer) {
       for (const w of [wheelFL.current, wheelFR.current]) if (w) w.rotation.y = steer.current * 0.45;
     }
+    [doorL.current, doorR.current].forEach((d, k) => {
+      if (!d) return;
+      const target = doorsOpen[k] ? (k ? 1 : -1) * 1.08 : 0;
+      if (Math.abs(target - d.rotation.y) > 0.001) d.rotation.y += (target - d.rotation.y) * Math.min(1, dt * 6);
+    });
   });
 
   const model = CAR_MODELS[car?.modelId ?? modelId ?? ''];
-  const B = BODY_SPECS[body];
-  /** Versatz des Hecks gegenüber der Limousine (kurzes Schrägheck). */
-  const rx = B.tail + 2.3;
   const engine = car ? engineOf(car) : ENGINES[model?.engineId ?? 'r4_20'];
-  const look = useMemo(() => {
-    const cls = model?.cls ?? 'budget';
-    const brand = model?.brand ?? 'Bavaria';
-    return {
-      rim: (body === 'classic' ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : cls === 'sport' || body === 'sport' ? 'multi' : cls === 'luxury' || body === 'luxury' ? 'chrome7' : 'double5') as RimStyle,
-      /** Bavaria: zweigeteilter Grill; andere Marken: breiter Grill; Sportwagen: flacher Lufteinlass. */
-      grille: body === 'sport' ? 'slot' : body === 'classic' ? 'classic' : brand === 'Bavaria' ? 'twin' : 'wide',
-      roundLamps: body === 'classic',
-      chromeBumper: body === 'classic',
-      spoiler: body === 'sport' || model?.id === 'bavaria_340_ms',
-      pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
-      seatScale: (B.roof - 0.5) / 0.92,
-    };
-  }, [model, body, engine, B]);
+  const look = useMemo(() => lookOf(model, body, engine), [model, body, engine]);
+  const trim = useMemo(() => trimGeometry(body, look, G.detail), [body, look, G.detail]);
+  const doorTrim = useMemo(() => doorTrimGeometry(body, look), [body, look]);
+  const interior = useMemo(() => interiorGeometry(body, G.detail), [body, G.detail]);
+  mats.seat.color.set(look.seat);
+  mats.seat2.color.set(look.seat2);
+  const trimMats = useMemo(() => {
+    const list: THREE.Material[] = [];
+    list[SLOT.dark] = mats.dark;
+    list[SLOT.gloss] = mats.trim;
+    list[SLOT.chrome] = mats.chrome;
+    list[SLOT.lens] = mats.lens;
+    list[SLOT.glow] = mats.ring;
+    list[SLOT.tail] = mats.tail;
+    list[SLOT.tailBar] = mats.tailBar;
+    list[SLOT.amber] = mats.amber;
+    list[SLOT.plate] = mats.plate;
+    list[SLOT.solid] = mats.solid;
+    list[SLOT.seat] = mats.seat;
+    list[SLOT.seat2] = mats.seat2;
+    return list;
+  }, [mats]);
+  const cabinMats = useMemo(() => [mats.paint, mats.glass, mats.trim], [mats]);
+  const hoodMats = useMemo(() => [mats.paint, mats.dark], [mats]);
   const vee = isV(engine);
   const diesel = engine.fuel === 'diesel';
   const slots = cylinderSlots(engine);
@@ -359,29 +479,26 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const part = (id: string, children: ReactNode) => {
     const s = st(id);
     const name = def(id).name;
-    if (!s || s.installed) {
-      const defect = !!s && s.known && s.condition === 'defect';
-      const live = interactive && removable(car!, id) && toolFitsPart(id) ? id : undefined;
-      return (
-        <GhostCtx.Provider value={defect ? 'defect' : 'normal'}>
-          <group userData={{ liveId: live, label: interactive ? name : undefined }} onClick={interactive ? tap(() => handlers!.onComponent(id)) : undefined}>
-            {children}
-          </group>
-        </GhostCtx.Provider>
-      );
-    }
-    if (!interactive || !installReady(car!, id) || !blockersRemoved(car!, id)) return null;
-    return (
-      <GhostCtx.Provider value="ghost">
-        <group
-          position={[0, GHOST_LIFT[id] ?? 0, 0]}
-          userData={{ label: `${name} einbauen` }}
-          onClick={ghostTap(car!, id, () => handlers!.onComponent(id))}
-        >
+    const isIn = !s || s.installed;
+    const defect = !!s && s.known && s.condition === 'defect';
+    const live = interactive && isIn && removable(car!, id) && toolFitsPart(id) ? id : undefined;
+    const real = (
+      <GhostCtx.Provider value={defect ? 'defect' : 'normal'}>
+        <group userData={{ liveId: live, label: interactive ? name : undefined }} onClick={interactive ? tap(() => handlers!.onComponent(id)) : undefined}>
           {children}
         </group>
       </GhostCtx.Provider>
     );
+    const ghost =
+      isIn || !interactive || !installReady(car!, id) || !blockersRemoved(car!, id) ? null : (
+        <GhostCtx.Provider value="ghost">
+          <group position={[0, GHOST_LIFT[id] ?? 0, 0]} userData={{ label: `${name} einbauen` }} onClick={ghostTap(car!, id, () => handlers!.onComponent(id))}>
+            {children}
+          </group>
+        </GhostCtx.Provider>
+      );
+    if (!s) return real;
+    return <PartAnim installed={isIn} axis={pullAxis(id)} real={real} ghost={ghost} />;
   };
 
   const bolts = (id: string, positions: V3[], axis: Axis = 'y') =>
@@ -420,13 +537,13 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const frontCorner = (s: 'fl' | 'fr') => {
     const sign = s === 'fr' ? 1 : -1;
     const axis: Axis = sign > 0 ? 'z+' : 'z-';
-    const z = (d: number) => sign * d;
+    const z = (d: number) => sign * (d + B.trackF);
     const wheelRef = s === 'fl' ? wheelFL : wheelFR;
     if (!full) {
       return (
         <group key={s} ref={wheelRef} position={[WX, WY, z(WZ)]} onClick={wheelTap}>
-          <WheelMeshes geo={geo.tire} out={sign} dirt={wheelDirt} style={look.rim} />
-          <mesh position={[0, 0, -z(0.08)]} rotation={[Math.PI / 2, 0, 0]}>
+          <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs />
+          <mesh position={[0, 0, -sign * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.17, 0.17, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
           </mesh>
@@ -441,6 +558,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     const scored = st(`disc_${s}`)?.condition === 'defect';
     const padT = worn ? 0.008 : 0.022;
     const cy = WY + 0.125;
+    const caliperColor = model?.cls === 'sport' || body === 'sport' ? '#b3261e' : model?.cls === 'luxury' ? '#2a2c30' : '#8a9097';
     return (
       <group key={s}>
         <mesh position={[WX, WY, z(0.69)]} rotation={[Math.PI / 2, 0, 0]} material={mats.dark}>
@@ -449,9 +567,16 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         {part(
           `disc_${s}`,
           <>
+            {/* Innenbelüftete Scheibe: zwei Reibringe mit dunklem Luftspalt */}
+            {[-0.009, 0.009].map((o) => (
+              <mesh key={o} position={[WX, WY, z(0.72) + o]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.17, 0.17, 0.007, 32]} />
+                <Mat color={scored ? '#6e5a4a' : '#a9aeb4'} metal={0.9} rough={scored ? 0.7 : 0.3} />
+              </mesh>
+            ))}
             <mesh position={[WX, WY, z(0.72)]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.17, 0.17, 0.024, 32]} />
-              <Mat color={scored ? '#6e5a4a' : '#a9aeb4'} metal={0.9} rough={scored ? 0.7 : 0.3} />
+              <cylinderGeometry args={[0.166, 0.166, 0.012, 32]} />
+              <Mat color="#3a3d42" metal={0.7} rough={0.6} />
             </mesh>
             <mesh position={[WX, WY, z(0.735)]} rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.08, 0.08, 0.04, 20]} />
@@ -478,10 +603,14 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         )}
         {part(
           `caliper_${s}`,
-          <mesh position={[WX, cy, z(0.725)]}>
-            <boxGeometry args={[0.2, 0.12, 0.11]} />
-            <Mat color="#8a9097" metal={0.7} rough={0.45} />
-          </mesh>,
+          <>
+            <RB s={[0.2, 0.12, 0.11]} r={0.028} p={[WX, cy, z(0.725)]}>
+              <Mat color={caliperColor} metal={0.55} rough={0.42} />
+            </RB>
+            <RB s={[0.12, 0.05, 0.03]} r={0.01} p={[WX, cy + 0.01, z(0.785)]}>
+              <Mat color={caliperColor} metal={0.55} rough={0.42} />
+            </RB>
+          </>,
         )}
         {bolts(`caliper_${s}`, [[WX - 0.06, cy, z(0.78)], [WX + 0.06, cy, z(0.78)]], axis)}
         {/* Entlüfternippel oben am Bremssattel; nach dem Entlüften steckt ein Schlauch mit Auffangflasche daran */}
@@ -516,13 +645,26 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           </group>
         )}
         <group ref={wheelRef} position={[WX, WY, z(WZ)]}>
-          {part(`wheel_${s}`, <WheelMeshes geo={geo.tire} out={sign} dirt={wheelDirt} style={look.rim} />)}
+          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} />)}
           <group position={[-WX, -WY, -z(WZ)]}>{bolts(`wheel_${s}`, lug, axis)}</group>
         </group>
       </group>
     );
   };
 
+  // Beim Herausdrehen der Ablassschraube läuft das Öl sichtbar in die Wanne.
+  const plugIn = installed('drain_plug');
+  const [draining, setDraining] = useState(false);
+  const plugWas = useRef(plugIn);
+  useEffect(() => {
+    if (plugWas.current && !plugIn && !TEST_MODE) {
+      setDraining(true);
+      const t = setTimeout(() => setDraining(false), 3200);
+      plugWas.current = plugIn;
+      return () => clearTimeout(t);
+    }
+    plugWas.current = plugIn;
+  }, [plugIn]);
   const oilLeak = st('oil_pan_gasket')?.condition === 'defect';
   const pumpLeak = st('water_pump')?.condition === 'defect';
   const beltBad = st('belt')?.condition === 'defect';
@@ -534,208 +676,54 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       {/* Karosserie */}
       <group onClick={bodyTap} userData={{ label: handlers && !full ? 'Karosserie' : undefined }}>
         <mesh geometry={geo.shell} material={mats.paint} castShadow />
-        <mesh geometry={geo.cabin} material={[mats.paint, mats.glass]} castShadow />
-        <mesh position={[0.02 + rx / 2, 0.32, 0]} material={mats.dark}>
-          <boxGeometry args={[4.3 - rx, 0.08, 1.3]} />
+        <mesh geometry={geo.cabin} material={cabinMats} castShadow />
+        <mesh geometry={trim} material={trimMats} />
+        <mesh geometry={interior} material={trimMats} />
+        {/* Unterboden und Spritzwand */}
+        <mesh position={[(B.nose + B.tail) / 2, B.ground + 0.05, 0]} material={mats.dark}>
+          <boxGeometry args={[B.nose - B.tail - 0.4, 0.08, 1.3]} />
         </mesh>
         <mesh position={[0.79, 0.67, 0]} material={mats.dark}>
-          <boxGeometry args={[0.03, 0.64, 1.5]} />
-        </mesh>
-
-        {/* Front: Doppelscheinwerfer mit Leuchtringen, zweigeteilter Grill, Lufteinlässe */}
-        {[-1, 1].map((k) => (
-          <group key={k}>
-            <group position={[2.262, 0.668, k * 0.585]} rotation={[0, Math.PI / 2 - k * 0.3, 0]}>
-              <mesh geometry={lampGeo} material={mats.lens} position={[0, 0, -0.02]} />
-              <mesh geometry={lampInner} material={mats.reflector} position={[0, 0, -0.02]} />
-              {[-0.085, 0.07].map((o) => (
-                <group key={o} position={[k * o, 0, 0.036]}>
-                  <mesh material={mats.ring}>
-                    <torusGeometry args={[0.036, 0.007, 8, 24]} />
-                  </mesh>
-                  <mesh material={mats.lens} scale={[1, 1, 0.5]}>
-                    <sphereGeometry args={[0.027, 12, 10]} />
-                  </mesh>
-                </group>
-              ))}
-              <mesh position={[k * -0.155, 0, 0.03]} material={mats.amber}>
-                <boxGeometry args={[0.035, 0.06, 0.012]} />
-              </mesh>
-              {look.roundLamps &&
-                [-0.085, 0.07].map((o) => (
-                  <mesh key={o} position={[k * o, 0, 0.04]} material={mats.chrome}>
-                    <torusGeometry args={[0.05, 0.01, 8, 24]} />
-                  </mesh>
-                ))}
-            </group>
-            {/* Grillhälfte mit Chromrahmen und senkrechten Stäben */}
-            {look.grille === 'twin' && (
-              <group position={[2.292, 0.642, k * 0.142]} rotation={[0, Math.PI / 2, 0]}>
-                <mesh geometry={kidneyGeo} material={mats.chrome} />
-                <mesh geometry={kidneyInner} material={mats.trim} />
-                {[-0.075, -0.045, -0.015, 0.015, 0.045, 0.075].map((o) => (
-                  <mesh key={o} position={[o, 0, 0.034]} material={mats.chrome}>
-                    <boxGeometry args={[0.006, 0.084, 0.006]} />
-                  </mesh>
-                ))}
-              </group>
-            )}
-            {look.grille === 'classic' && (
-              <group position={[2.292, 0.66, k * 0.06]} rotation={[0, Math.PI / 2, 0]}>
-                <mesh material={mats.chrome}>
-                  <boxGeometry args={[0.09, 0.19, 0.06]} />
-                </mesh>
-                <mesh position={[0, 0, 0.032]} material={mats.trim}>
-                  <boxGeometry args={[0.068, 0.165, 0.006]} />
-                </mesh>
-              </group>
-            )}
-            {/* Nebelscheinwerfer im seitlichen Lufteinlass */}
-            <mesh position={[2.3, 0.44, k * 0.62]} material={mats.trim}>
-              <boxGeometry args={[0.03, 0.085, 0.3]} />
-            </mesh>
-            <mesh position={[2.316, 0.44, k * 0.62]} rotation={[0, 0, Math.PI / 2]} material={mats.ring}>
-              <cylinderGeometry args={[0.028, 0.028, 0.008, 14]} />
-            </mesh>
-            {/* Rückleuchte: L-förmig mit Leuchtbalken */}
-            <group position={[-2.262 + rx, 0.845, k * 0.6]} rotation={[0, -Math.PI / 2 + k * 0.28, 0]}>
-              <mesh geometry={tailGeo} material={mats.tail} position={[0, 0, -0.01]} />
-              <mesh position={[0, 0.022, 0.032]} material={mats.tailBar}>
-                <boxGeometry args={[0.32, 0.018, 0.006]} />
-              </mesh>
-              <mesh position={[k * -0.15, -0.012, 0.032]} material={mats.tailBar}>
-                <boxGeometry args={[0.018, 0.06, 0.006]} />
-              </mesh>
-            </group>
-            <mesh position={[0.7, 1.03, k * 0.93]} scale={[0.075, 0.05, 0.085]} material={mats.solid}>
-              <sphereGeometry args={[1, 12, 10]} />
-            </mesh>
-            <mesh position={[1.9, 0.74, k * 0.898]} material={mats.amber}>
-              <boxGeometry args={[0.07, 0.022, 0.012]} />
-            </mesh>
-            {/* Schweller, Türfugen, Türgriffe, Fensterschachtleiste */}
-            <mesh position={[0, 0.33, k * 0.885]} material={mats.dark}>
-              <boxGeometry args={[1.86, 0.07, 0.04]} />
-            </mesh>
-            {B.seams.map((x) => (
-              <mesh key={x} position={[x, 0.68, k * 0.903]} material={mats.trim}>
-                <boxGeometry args={[0.01, 0.5, 0.012]} />
-              </mesh>
-            ))}
-            {B.handles.map((x) => (
-              <mesh key={x} position={[x, 0.9, k * 0.905]} material={mats.chrome}>
-                <boxGeometry args={[0.15, 0.026, 0.025]} />
-              </mesh>
-            ))}
-            <mesh position={[(0.77 + B.x0) / 2, 0.972, k * 0.862]} material={mats.chrome}>
-              <boxGeometry args={[0.77 - B.x0 - 0.06, 0.012, 0.012]} />
-            </mesh>
-          </group>
-        ))}
-        {/* Stoßfänger vorn */}
-        <mesh position={[2.3, 0.43, 0]} material={mats.trim}>
-          <boxGeometry args={[0.03, 0.1, 0.78]} />
-        </mesh>
-        <mesh position={[2.316, 0.535, 0]}>
-          <boxGeometry args={[0.012, 0.1, 0.46]} />
-          <meshStandardMaterial color="#f2f2ee" roughness={0.6} />
-        </mesh>
-        {/* Markengesicht: breiter Grill mit Chromspangen bzw. flacher Sportwagen-Einlass */}
-        {look.grille === 'wide' && (
-          <group position={[2.292, 0.645, 0]}>
-            <mesh material={mats.trim}>
-              <boxGeometry args={[0.03, 0.11, 0.6]} />
-            </mesh>
-            {[-0.03, 0, 0.03].map((y) => (
-              <mesh key={y} position={[0.017, y, 0]} material={mats.chrome}>
-                <boxGeometry args={[0.006, 0.008, 0.58]} />
-              </mesh>
-            ))}
-          </group>
-        )}
-        {look.grille === 'slot' && (
-          <mesh position={[2.3, 0.6, 0]} material={mats.trim}>
-            <boxGeometry args={[0.03, 0.05, 0.86]} />
-          </mesh>
-        )}
-        {look.chromeBumper &&
-          [2.325, -2.325 + rx].map((x) => (
-            <mesh key={x} position={[x, 0.5, 0]} material={mats.chrome}>
-              <boxGeometry args={[0.04, 0.05, 1.62]} />
-            </mesh>
-          ))}
-        {look.spoiler && (
-          <group position={[B.tail + 0.2, 1.0, 0]}>
-            <mesh position={[0, 0.1, 0]} material={mats.solid}>
-              <boxGeometry args={[0.2, 0.018, 1.5]} />
-            </mesh>
-            {[-0.5, 0.5].map((z) => (
-              <mesh key={z} position={[0, 0.045, z]} material={mats.trim}>
-                <boxGeometry args={[0.07, 0.1, 0.02]} />
-              </mesh>
-            ))}
-          </group>
-        )}
-        {/* Heck: Kennzeichenmulde, Chromleiste, Diffusor, Doppelrohr */}
-        <mesh position={[-2.305 + rx, 0.64, 0]}>
-          <boxGeometry args={[0.012, 0.1, 0.46]} />
-          <meshStandardMaterial color="#f2f2ee" roughness={0.6} />
-        </mesh>
-        <mesh position={[-2.3 + rx, 0.72, 0]} material={mats.chrome}>
-          <boxGeometry args={[0.014, 0.018, 0.62]} />
-        </mesh>
-        <mesh position={[-2.3 + rx, 0.43, 0]} material={mats.trim}>
-          <boxGeometry args={[0.03, 0.09, 1.3]} />
-        </mesh>
-        {/* Auspuff: ein Rohr beim Vierzylinder, Doppelrohr beim Sechszylinder, vier Rohre beim V8 */}
-        {(look.pipes === 4 ? [-0.56, -0.46, 0.46, 0.56] : look.pipes === 2 ? [-0.56, -0.46] : [-0.52]).map((zz) => (
-          <mesh key={zz} position={[-2.31 + rx, 0.37, zz]} rotation={[0, 0, Math.PI / 2]} material={mats.chrome}>
-            <cylinderGeometry args={[0.034, 0.034, 0.1, 14]} />
-          </mesh>
-        ))}
-        {body !== 'sport' && body !== 'classic' && (
-          <mesh position={[Math.max(B.x1 + 0.14, -1.02), B.roof + 0.036, 0]} scale={[0.11, 0.03, 0.022]} material={mats.solid}>
-            <sphereGeometry args={[1, 10, 8]} />
-          </mesh>
-        )}
-        {/* Innenraum – in flachen Autos sitzt man tiefer */}
-        <group position={[0, 0.43 * (1 - look.seatScale), 0]} scale={[1, look.seatScale, 1]}>
-        {[-0.36, 0.36].map((zz) => (
-          <group key={zz}>
-            <mesh position={[-0.02, 0.5, zz]} material={mats.seat}>
-              <boxGeometry args={[0.5, 0.14, 0.48]} />
-            </mesh>
-            <mesh position={[-0.32, 0.82, zz]} rotation={[0, 0, 0.16]} material={mats.seat}>
-              <boxGeometry args={[0.13, 0.62, 0.46]} />
-            </mesh>
-            <mesh position={[-0.4, 1.19, zz]} material={mats.seat}>
-              <boxGeometry args={[0.1, 0.16, 0.24]} />
-            </mesh>
-          </group>
-        ))}
-        <mesh position={[-1.02, 0.5, 0]} material={mats.seat}>
-          <boxGeometry args={[0.5, 0.14, 1.3]} />
-        </mesh>
-        {B.rearSeat && (
-          <mesh position={[-1.3, 0.8, 0]} rotation={[0, 0, 0.2]} material={mats.seat}>
-            <boxGeometry args={[0.13, 0.58, 1.3]} />
-          </mesh>
-        )}
-        </group>
-        <mesh position={[0.6, 0.84, 0]} material={mats.dark}>
-          <boxGeometry args={[0.34, 0.3, 1.5]} />
-        </mesh>
-        <mesh position={[0.36, 0.96, -0.36]} rotation={[0, Math.PI / 2, 0.35]} material={mats.trim}>
-          <torusGeometry args={[0.16, 0.018, 8, 22]} />
+          <boxGeometry args={[0.03, 0.64, B.width * 1.66]} />
         </mesh>
       </group>
+      {/* Vordertüren: am Griff zu öffnen */}
+      {[0, 1].map((k) => {
+        const s = k ? 1 : -1;
+        const hx = B.handles[0];
+        const hy = S.beltY(hx) - 0.085;
+        return (
+          <group key={k} ref={k ? doorR : doorL} position={[hinge[0], 0, s * hinge[1]]}>
+            <group onClick={bodyTap} userData={{ label: handlers && !full ? 'Karosserie' : undefined }}>
+              <mesh geometry={geo.doors[k]} material={cabinMats} castShadow />
+              <mesh geometry={doorTrim[k]} material={trimMats} />
+            </group>
+            {car && handlers && (
+              <group
+                position={[hx - hinge[0], hy, s * (S.sideZ(hx, hy) + 0.02 - hinge[1])]}
+                userData={{ label: doorsOpen[k] ? 'Tür schließen' : 'Tür öffnen' }}
+                onClick={tap(() => {
+                  if (useGame.getState().tool !== 'hand') return handlers.onBody(k ? 'right' : 'left');
+                  useDoors.setState({ [`${doorKey}:${k}`]: !doorsOpen[k] });
+                })}
+              >
+                <Hit r={0.075} />
+              </group>
+            )}
+          </group>
+        );
+      })}
       {/* Hinterräder (nicht demontierbar) */}
       {[-1, 1].map((k) => (
-        <group key={k} position={[-WX, WY, k * WZ]} onClick={wheelTap}>
-          <WheelMeshes geo={geo.tire} out={k} dirt={wheelDirt} style={look.rim} />
+        <group key={k} position={[B.rearAxle, WY, k * (WZ + B.trackR)]} onClick={wheelTap}>
+          <WheelMeshes out={k} dirt={wheelDirt} style={look.rim} lugs />
           <mesh position={[0, 0, -k * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.16, 0.16, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
+          </mesh>
+          <mesh position={[-0.06, 0.11, -k * 0.075]}>
+            <boxGeometry args={[0.13, 0.09, 0.07]} />
+            <meshStandardMaterial color="#7d848c" metalness={0.7} roughness={0.45} />
           </mesh>
         </group>
       ))}
@@ -744,38 +732,27 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
-            {/* Motorblock; der Zylinderkopf darüber ist ein eigenes, ausbaubares Teil (beim V-Motor der Kopf der Bank 1) */}
-            <mesh position={[1.3, 0.535, 0]}>
-              <boxGeometry args={[0.7, 0.17, 0.36 + wide * 2]} />
-              <meshStandardMaterial color={diesel ? '#5d6166' : '#70767d'} metalness={0.6} roughness={0.55} />
-            </mesh>
+            {/* Fest verbaute Teile (Block, Krümmer, Saugrohr, Kühler, Dome …) als ein Netz; Tipps fangen unsichtbare Körper ab */}
+            <mesh geometry={engineDecor(engine, G.detail)} material={bayMaterials()} raycast={noRay} />
+            <Proxy s={[0.7, 0.17, 0.36 + wide * 2]} p={[1.3, 0.535, 0]} />
+            <Proxy s={[0.66, 0.09, 0.32]} p={[1.3, 0.405, 0]} />
+            <Proxy s={[0.3, 0.16, 0.2]} p={[1.28, 0.6, 0.44]} />
+            <Proxy s={[0.05, 0.34, 1.2]} p={[1.95, 0.6, 0]} />
+            {/* Zylinderkopf der zweiten Bank (der ausbaubare Kopf ist beim V-Motor der der Bank 1) */}
             {vee && (
-              <mesh position={[1.3, 0.65, 0.115]}>
-                <boxGeometry args={[0.7, 0.06, 0.23]} />
-                <meshStandardMaterial color="#8a9097" metalness={0.65} roughness={0.5} />
+              <Bank bank={1}>
+                <RB s={[0.7, 0.06, 0.23]} r={0.012} p={[1.3, 0.65, 0.115]}>
+                  <meshStandardMaterial color="#8a9097" metalness={0.65} roughness={0.5} />
+                </RB>
+              </Bank>
+            )}
+            {/* Haubenstütze */}
+            {hoodOpen && (
+              <mesh position={[1.585, 1.305, 0.62]} rotation={[0, 0, 0.658]} raycast={noRay}>
+                <cylinderGeometry args={[0.006, 0.006, 1.23, 5]} />
+                <meshStandardMaterial color="#b9bec5" metalness={0.9} roughness={0.3} />
               </mesh>
             )}
-            {vee && (
-              <mesh position={[1.3, 0.72, 0]}>
-                <boxGeometry args={[0.66, 0.05, 0.036]} />
-                <meshStandardMaterial color="#3a3d42" metalness={0.5} roughness={0.6} />
-              </mesh>
-            )}
-            <mesh position={[1.3, 0.405, 0]} material={mats.dark}>
-              <boxGeometry args={[0.66, 0.09, 0.32]} />
-            </mesh>
-            <mesh position={[1.28, 0.6, 0.44]}>
-              <boxGeometry args={[0.3, 0.16, 0.2]} />
-              <meshStandardMaterial color="#1b1c1f" roughness={0.7} />
-            </mesh>
-            <mesh position={[1.95, 0.6, 0]}>
-              <boxGeometry args={[0.05, 0.34, 1.2]} />
-              <meshStandardMaterial color="#2a2c30" metalness={0.5} roughness={0.6} />
-            </mesh>
-            <mesh position={[1.69, 0.5, 0]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.065, 0.065, 0.03, 20]} />
-              <meshStandardMaterial color="#8d9399" metalness={0.8} roughness={0.4} />
-            </mesh>
             {/* Sichtbare Spuren von Lecks */}
             {(['gasket', 'gasket_b'] as const).map(
               (g) =>
@@ -828,12 +805,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             'coolant',
             'Kühlmittel-Ausgleichsbehälter',
             <>
-              <mesh position={[1.82, 0.58, -0.52]}>
-                <boxGeometry args={[0.16, 0.2, 0.16]} />
-                <meshStandardMaterial color="#e9e6d8" roughness={0.5} transparent opacity={0.9} />
+              <RB s={[0.16, 0.2, 0.16]} r={0.04} p={[1.82, 0.58, -0.52]}>
+                <meshStandardMaterial color="#e9e6d8" roughness={0.35} transparent opacity={0.72} />
+              </RB>
+              <mesh position={[1.82, 0.545, -0.52]} raycast={noRay}>
+                <boxGeometry args={[0.135, 0.1, 0.135]} />
+                <meshStandardMaterial color="#3fae6a" roughness={0.3} />
               </mesh>
               <mesh position={[1.82, 0.695, -0.52]}>
-                <cylinderGeometry args={[0.035, 0.035, 0.03, 12]} />
+                <cylinderGeometry args={[0.035, 0.038, 0.03, 14]} />
                 <meshStandardMaterial color="#1f6fb2" roughness={0.5} />
               </mesh>
             </>,
@@ -842,12 +822,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             'brake',
             'Bremsflüssigkeitsbehälter',
             <>
-              <mesh position={[0.92, 0.72, -0.46]}>
-                <boxGeometry args={[0.13, 0.1, 0.11]} />
-                <meshStandardMaterial color="#ece9da" roughness={0.5} transparent opacity={0.92} />
+              <RB s={[0.13, 0.1, 0.11]} r={0.02} p={[0.92, 0.72, -0.46]}>
+                <meshStandardMaterial color="#ece9da" roughness={0.35} transparent opacity={0.78} />
+              </RB>
+              <mesh position={[0.92, 0.7, -0.46]} raycast={noRay}>
+                <boxGeometry args={[0.11, 0.05, 0.09]} />
+                <meshStandardMaterial color="#b98a2a" roughness={0.3} />
               </mesh>
               <mesh position={[0.92, 0.78, -0.46]}>
-                <cylinderGeometry args={[0.032, 0.032, 0.025, 12]} />
+                <cylinderGeometry args={[0.032, 0.035, 0.025, 14]} />
                 <meshStandardMaterial color="#e3a81c" roughness={0.5} />
               </mesh>
             </>,
@@ -856,13 +839,27 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'battery',
             <>
-              <mesh position={[0.98, 0.57, 0.5]}>
-                <boxGeometry args={[0.28, 0.22, 0.2]} />
-                <Mat color="#15161a" rough={0.6} />
+              <RB s={[0.28, 0.2, 0.2]} r={0.012} p={[0.98, 0.56, 0.5]}>
+                <Mat color="#15161a" rough={0.55} />
+              </RB>
+              <RB s={[0.286, 0.03, 0.206]} r={0.01} p={[0.98, 0.665, 0.5]}>
+                <Mat color="#2a2d33" rough={0.5} />
+              </RB>
+              {/* Aufkleber, Pluspol mit roter Kappe, Minuspol */}
+              <mesh position={[0.98, 0.57, 0.602]}>
+                <boxGeometry args={[0.2, 0.09, 0.003]} />
+                <Mat color="#d9dde2" rough={0.6} />
               </mesh>
-              <mesh position={[0.9, 0.69, 0.5]}>
-                <cylinderGeometry args={[0.016, 0.016, 0.03, 8]} />
+              <mesh position={[0.98, 0.59, 0.604]}>
+                <boxGeometry args={[0.2, 0.03, 0.003]} />
+                <Mat color="#c8501e" rough={0.6} />
+              </mesh>
+              <RB s={[0.05, 0.035, 0.05]} r={0.012} p={[0.89, 0.692, 0.44]}>
                 <Mat color="#b3261e" rough={0.5} />
+              </RB>
+              <mesh position={[0.89, 0.69, 0.56]}>
+                <cylinderGeometry args={[0.014, 0.017, 0.03, 8]} />
+                <Mat color="#8d9399" metal={0.8} rough={0.4} />
               </mesh>
             </>,
           )}
@@ -882,19 +879,22 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           )}
           {part(
             'head_gasket',
-            <mesh position={[1.3, 0.624, vee ? -0.115 : 0]}>
-              <boxGeometry args={[0.68, 0.008, vee ? 0.21 : 0.34]} />
-              <Mat color={st('head_gasket')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
-            </mesh>,
+            <Bank bank={vee ? -1 : 0}>
+              <mesh position={[1.3, 0.624, vee ? -0.115 : 0]}>
+                <boxGeometry args={[0.68, 0.008, vee ? 0.21 : 0.34]} />
+                <Mat color={st('head_gasket')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
+              </mesh>
+            </Bank>,
           )}
           {part(
             'cyl_head',
-            <mesh position={[1.3, 0.65, vee ? -0.115 : 0]}>
-              <boxGeometry args={[0.7, 0.06, vee ? 0.23 : 0.36]} />
-              <Mat color="#8a9097" metal={0.65} rough={0.5} />
-            </mesh>,
+            <Bank bank={vee ? -1 : 0}>
+              <RB s={[0.7, 0.06, vee ? 0.23 : 0.36]} r={0.012} p={[1.3, 0.65, vee ? -0.115 : 0]}>
+                <Mat color="#8a9097" metal={0.65} rough={0.5} />
+              </RB>
+            </Bank>,
           )}
-          {!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => [-0.07, 0.07].map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}
+          <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => [-0.07, 0.07].map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
           {/* Getriebe hinter dem Motor – nur von unten und nur mit dem Getriebeheber */}
           {part(
             'gearbox',
@@ -913,7 +913,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {bolts('gearbox', [[0.58, 0.122, -0.11], [0.78, 0.122, -0.03], [0.58, 0.122, 0.11], [0.78, 0.122, 0.03]], 'y-')}
           {/* Zylinderkopf: Reihenmotor ein Ventildeckel, V-Motor je Bank einer */}
           {(vee ? ([['valve_cover', 'gasket', -1], ['valve_cover_b', 'gasket_b', 1]] as const) : ([['valve_cover', 'gasket', 0]] as const)).map(([cover, gasket, bank]) => (
-            <group key={cover}>
+            <Bank key={cover} bank={bank}>
               {part(
                 gasket,
                 <mesh position={[1.3, 0.69, bank * 0.105]}>
@@ -923,31 +923,69 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               )}
               {part(
                 cover,
-                <mesh position={[1.3, 0.74, bank * 0.105]}>
-                  <boxGeometry args={[0.7, 0.08, bank ? 0.17 : 0.36]} />
-                  <Mat color={diesel ? '#23252a' : '#2b2e33'} metal={0.5} rough={0.5} />
-                </mesh>,
+                <>
+                  <RB s={[0.7, 0.08, bank ? 0.17 : 0.36]} r={0.022} p={[1.3, 0.74, bank * 0.105]}>
+                    <Mat color={diesel ? '#23252a' : '#2b2e33'} metal={0.5} rough={0.45} />
+                  </RB>
+                  {/* Versteifungsrippen und Öleinfülldeckel */}
+                  {[1.06, 1.3, 1.54].map((x) => (
+                    <RB key={x} s={[0.02, 0.012, bank ? 0.13 : 0.3]} r={0.005} p={[x + 0.06, 0.781, bank * 0.105]}>
+                      <Mat color={diesel ? '#2b2e33' : '#34383e'} metal={0.5} rough={0.45} />
+                    </RB>
+                  ))}
+                  {bank <= 0 && (
+                    <group position={[1.15, 0.79, bank ? -0.165 : -0.135]}>
+                      <mesh>
+                        <cylinderGeometry args={[0.03, 0.034, 0.022, 12]} />
+                        <Mat color="#0e0f11" rough={0.6} />
+                      </mesh>
+                      <mesh position={[0, 0.012, 0]}>
+                        <boxGeometry args={[0.05, 0.008, 0.012]} />
+                        <Mat color="#e3b21c" rough={0.6} />
+                      </mesh>
+                    </group>
+                  )}
+                </>,
               )}
               {bolts(cover, bank ? bankBolts(bank, engine.cylinders) : COVER_BOLTS)}
-            </group>
+            </Bank>
           ))}
           {/* Ventiltrieb unter dem Ventildeckel (beim V-Motor unter dem der Bank 1) */}
-          {!installed('valve_cover') &&
-            part(
-              'rocker',
-              <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]}>
-                <boxGeometry args={[0.62, 0.04, 0.07]} />
-                <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#aeb3ba'} metal={0.85} rough={0.35} />
-              </mesh>,
-            )}
-          {!installed('valve_cover') && bolts('rocker', [[1.12, 0.74, vee ? -0.105 : 0.1], [1.48, 0.74, vee ? -0.105 : 0.1]])}
+          <Bank bank={vee ? -1 : 0}>
+            {!installed('valve_cover') &&
+              part(
+                'rocker',
+                <>
+                  <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]} rotation={[0, 0, Math.PI / 2]}>
+                    <cylinderGeometry args={[0.016, 0.016, 0.62, 8]} />
+                    <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#aeb3ba'} metal={0.85} rough={0.35} />
+                  </mesh>
+                  {/* Nocken und Lagerböcke */}
+                  {slots.filter((c) => c.bank <= 0).map((c) => (
+                    <RB key={c.n} s={[0.04, 0.045, 0.05]} r={0.012} p={[c.x + 0.04, 0.72, vee ? -0.105 : 0.1]}>
+                      <Mat color={st('rocker')?.condition === 'defect' ? '#6e5a4a' : '#c2c7cd'} metal={0.9} rough={0.3} />
+                    </RB>
+                  ))}
+                  <mesh position={[1.3, 0.72, vee ? -0.105 : 0.1]}>
+                    <boxGeometry args={[0.62, 0.04, 0.07]} />
+                    <primitive object={HIT_MAT} attach="material" />
+                  </mesh>
+                </>,
+              )}
+            {!installed('valve_cover') && bolts('rocker', [[1.12, 0.74, vee ? -0.105 : 0.1], [1.48, 0.74, vee ? -0.105 : 0.1]])}
+          </Bank>
           {part(
             'engine_cover',
             <>
-              <mesh position={[1.28, 0.862, 0]}>
-                <boxGeometry args={[0.66, 0.02, vee ? 0.46 : 0.34]} />
-                <Mat color="#1c1e22" rough={0.55} />
-              </mesh>
+              <RB s={[0.66, 0.024, vee ? 0.46 : 0.34]} r={0.011} p={[1.28, 0.862, 0]}>
+                <Mat color="#1c1e22" rough={0.5} />
+              </RB>
+              {/* Eine Sicke je Zylinder */}
+              {slots.map((c) => (
+                <RB key={c.n} s={[0.05, 0.01, vee ? 0.15 : 0.12]} r={0.004} p={[c.x - 0.02, 0.875, vee ? c.bank * 0.14 : 0.105 * (c.n % 2 ? 1 : -1)]}>
+                  <Mat color="#25282d" rough={0.45} />
+                </RB>
+              ))}
               {/* Zierleisten verraten die Bauart: eine je Zylinderbank, beim Diesel blau, beim Turbo rot abgesetzt */}
               {(vee ? [-0.12, 0.12] : [0]).map((z) => (
                 <mesh key={z} position={[1.28, 0.874, z]}>
@@ -996,7 +1034,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             // Ohne Zylinderkopf gibt es an dieser Bank nichts einzusetzen.
             if (bank <= 0 && !installed('cyl_head')) return null;
             return (
-              <group key={n}>
+              <Bank key={n} bank={bank}>
                 {!installed(top) &&
                   part(
                     low,
@@ -1009,6 +1047,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                         <cylinderGeometry args={diesel ? [0.016, 0.016, 0.022, 6] : [0.022, 0.022, 0.025, 6]} />
                         <Mat color="#b9bec5" metal={0.9} rough={0.3} />
                       </mesh>
+                      {!diesel && (
+                        <mesh position={[x, 0.825, z]}>
+                          <cylinderGeometry args={[0.006, 0.008, 0.02, 6]} />
+                          <Mat color="#8d9399" metal={0.9} rough={0.3} />
+                        </mesh>
+                      )}
                       <group position={[x, 0.79, z]}>
                         <Hit r={0.032} />
                       </group>
@@ -1035,19 +1079,22 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                   ) : (
                     <>
                       <mesh position={[x, 0.8, z]}>
-                        <cylinderGeometry args={[0.036, 0.036, 0.06, 12]} />
+                        <cylinderGeometry args={[0.034, 0.036, 0.06, 14]} />
                         <Mat color="#101113" rough={0.5} />
                       </mesh>
-                      <mesh position={[x, 0.835, z + out * 0.02]}>
-                        <boxGeometry args={[0.06, 0.03, 0.11]} />
-                        <Mat color="#c8501e" rough={0.6} />
+                      <RB s={[0.06, 0.03, 0.11]} r={0.009} p={[x, 0.835, z + out * 0.02]}>
+                        <Mat color="#c8501e" rough={0.55} />
+                      </RB>
+                      <mesh position={[x, 0.851, z + out * 0.005]}>
+                        <boxGeometry args={[0.04, 0.003, 0.05]} />
+                        <Mat color="#1b1d21" rough={0.6} />
                       </mesh>
                     </>
                   ),
                 )}
                 {bolts(top, [boltPos])}
                 {connector(top, [x, 0.838, z + out * 0.095], [0, 0.03, out * 0.06])}
-              </group>
+              </Bank>
             );
           })}
 
@@ -1071,17 +1118,32 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'turbo',
               <>
-                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.085, 0.085, 0.07, 18]} />
+                {/* Verdichter (Alu) mit Schneckengehäuse und Ansaugstutzen */}
+                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, Math.PI / 2, 0]}>
+                  <torusGeometry args={[0.058, 0.03, 8, 20]} />
                   <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
                 </mesh>
-                <mesh position={[1.73, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.07, 0.07, 0.07, 18]} />
+                <mesh position={[1.8, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.06, 0.06, 0.06, 16]} />
+                  <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
+                </mesh>
+                {/* Turbine (Guss) und Lagergehäuse */}
+                <mesh position={[1.72, 0.66, 0.46]} rotation={[0, Math.PI / 2, 0]}>
+                  <torusGeometry args={[0.048, 0.027, 8, 18]} />
+                  <Mat color="#5a4a3c" metal={0.7} rough={0.65} />
+                </mesh>
+                <mesh position={[1.74, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.045, 0.045, 0.09, 14]} />
                   <Mat color="#5a4a3c" metal={0.7} rough={0.6} />
                 </mesh>
                 <mesh position={[1.85, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
-                  <cylinderGeometry args={[0.035, 0.035, 0.04, 14]} />
+                  <cylinderGeometry args={[0.035, 0.04, 0.04, 14]} />
                   <Mat color="#1b1d21" rough={0.5} />
+                </mesh>
+                {/* Ladedruckdose */}
+                <mesh position={[1.8, 0.6, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.03, 0.03, 0.035, 10]} />
+                  <Mat color="#c9a54a" metal={0.8} rough={0.4} />
                 </mesh>
               </>,
             )}
@@ -1125,19 +1187,19 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'belt',
             <>
-              <mesh position={[1.69, 0.627, -0.015]}>
-                <boxGeometry args={[0.028, 0.012, 0.58]} />
+              <mesh geometry={beltGeometry()} position={[1.69, 0, 0]}>
                 <Mat color={beltBad ? '#3b332b' : '#0d0d0e'} rough={0.95} />
               </mesh>
-              {[-1, 1].map((k) => (
-                <mesh key={k} position={[1.69, 0.495, k * 0.165]} rotation={[k * 0.42, 0, 0]}>
-                  <boxGeometry args={[0.028, 0.012, 0.27]} />
-                  <Mat color={beltBad ? '#3b332b' : '#0d0d0e'} rough={0.95} />
-                </mesh>
-              ))}
+              {beltBad &&
+                [-0.18, -0.05, 0.1, 0.21].map((z) => (
+                  <mesh key={z} position={[1.69, 0.636, z]}>
+                    <boxGeometry args={[0.03, 0.004, 0.006]} />
+                    <meshStandardMaterial color="#8a7f70" roughness={1} />
+                  </mesh>
+                ))}
               <mesh position={[1.7, 0.55, 0]}>
                 <boxGeometry args={[0.05, 0.2, 0.56]} />
-                <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                <primitive object={HIT_MAT} attach="material" />
               </mesh>
             </>,
           )}
@@ -1148,10 +1210,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 <cylinderGeometry args={[0.075, 0.075, 0.15, 18]} />
                 <Mat color="#b4b9bf" metal={0.8} rough={0.45} />
               </mesh>
-              <mesh position={[1.58, 0.665, 0.27]}>
-                <boxGeometry args={[0.16, 0.03, 0.09]} />
+              {[-0.05, -0.025, 0, 0.025, 0.05].map((dx) => (
+                <mesh key={dx} position={[1.58 + dx, 0.58, 0.27]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.079, 0.079, 0.008, 18]} />
+                  <Mat color="#8a9097" metal={0.8} rough={0.5} />
+                </mesh>
+              ))}
+              <RB s={[0.16, 0.03, 0.09]} r={0.01} p={[1.58, 0.665, 0.27]}>
                 <Mat color="#8a9097" metal={0.7} rough={0.5} />
-              </mesh>
+              </RB>
               <mesh position={[1.69, 0.58, 0.27]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.042, 0.042, 0.03, 16]} />
                 <Mat color="#6f757c" metal={0.8} rough={0.4} />
@@ -1163,9 +1230,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'water_pump',
             <>
-              <mesh position={[1.58, 0.58, -0.3]}>
-                <boxGeometry args={[0.14, 0.16, 0.16]} />
+              <RB s={[0.14, 0.16, 0.16]} r={0.035} p={[1.58, 0.58, -0.3]}>
                 <Mat color="#9aa0a7" metal={0.7} rough={0.5} />
+              </RB>
+              <mesh position={[1.645, 0.58, -0.3]} rotation={[0, 0, Math.PI / 2]}>
+                <cylinderGeometry args={[0.062, 0.07, 0.03, 16]} />
+                <Mat color="#aeb3ba" metal={0.75} rough={0.45} />
               </mesh>
               <mesh position={[1.69, 0.58, -0.3]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.048, 0.048, 0.03, 16]} />
@@ -1176,10 +1246,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {bolts('water_pump', [[1.53, 0.66, -0.35], [1.63, 0.66, -0.35], [1.53, 0.66, -0.25], [1.63, 0.66, -0.25]])}
           {part(
             'thermostat',
-            <mesh position={[1.3, 0.6, -0.235 - wide]}>
-              <boxGeometry args={[0.17, 0.1, 0.1]} />
-              <Mat color="#a7adb4" metal={0.75} rough={0.45} />
-            </mesh>,
+            <>
+              <RB s={[0.17, 0.1, 0.1]} r={0.03} p={[1.3, 0.6, -0.235 - wide]}>
+                <Mat color="#a7adb4" metal={0.75} rough={0.45} />
+              </RB>
+              <mesh position={[1.32, 0.63, -0.3 - wide]} rotation={[0.9, 0, 0]}>
+                <cylinderGeometry args={[0.028, 0.028, 0.09, 10]} />
+                <Mat color="#a7adb4" metal={0.75} rough={0.45} />
+              </mesh>
+            </>,
           )}
           {bolts('thermostat', [[1.235, 0.65, -0.235 - wide], [1.365, 0.65, -0.235 - wide]])}
           {part(
@@ -1189,14 +1264,31 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 <cylinderGeometry args={[0.03, 0.03, 0.47, 12]} />
                 <Mat color="#151517" rough={0.85} />
               </mesh>
-              <mesh position={[1.34, 0.675, -0.375]}>
-                <boxGeometry args={[0.06, 0.06, 0.2]} />
+              <mesh position={[1.34, 0.675, -0.375]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[0.03, 0.03, 0.2, 10]} />
                 <Mat color="#151517" rough={0.85} />
               </mesh>
+              <mesh position={[1.335, 0.69, -0.45]}>
+                <sphereGeometry args={[0.031, 10, 8]} />
+                <Mat color="#151517" rough={0.85} />
+              </mesh>
+              {/* Schlauchschellen */}
+              {[1.4, 1.76].map((x) => (
+                <mesh key={x} position={[x, 0.69, -0.45]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.033, 0.033, 0.014, 12]} />
+                  <Mat color="#c9cdd2" metal={0.9} rough={0.3} />
+                </mesh>
+              ))}
             </>,
           )}
           {bolts('hose', [[1.42, 0.72, -0.45]])}
 
+          {draining && (
+            <mesh position={[1.4, 0.185 - 0.84, 0.08]} raycast={noRay}>
+              <cylinderGeometry args={[0.009, 0.005, 1.68, 6]} />
+              <meshStandardMaterial color="#0d0905" metalness={0.9} roughness={0.08} />
+            </mesh>
+          )}
           {/* Unter dem Motor – nur von der Hebebühne aus erreichbar */}
           {part(
             'oil_pan_gasket',
@@ -1216,10 +1308,18 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {!installed('oil_pan') && bolts('bearing', [[1.3, 0.23, -0.06], [1.3, 0.23, 0.06]], 'y-')}
           {part(
             'oil_pan',
-            <mesh position={[1.3, 0.235, 0]}>
-              <boxGeometry args={[0.5, 0.066, 0.3]} />
-              <Mat color={oilLeak ? '#3d3a35' : '#7b8188'} metal={0.7} rough={oilLeak ? 0.25 : 0.5} />
-            </mesh>,
+            <>
+              <RB s={[0.5, 0.066, 0.3]} r={0.02} p={[1.3, 0.235, 0]}>
+                <Mat color={oilLeak ? '#3d3a35' : '#7b8188'} metal={0.7} rough={oilLeak ? 0.25 : 0.5} />
+              </RB>
+              {/* Kühlrippen an der Unterseite */}
+              {[1.16, 1.23, 1.3].map((x) => (
+                <mesh key={x} position={[x, 0.2, -0.02]}>
+                  <boxGeometry args={[0.012, 0.01, 0.2]} />
+                  <Mat color={oilLeak ? '#3d3a35' : '#70767d'} metal={0.7} rough={0.5} />
+                </mesh>
+              ))}
+            </>,
           )}
           {bolts('oil_pan', [[1.1, 0.202, -0.12], [1.5, 0.202, -0.12], [1.1, 0.202, 0.12], [1.5, 0.202, 0.12]], 'y-')}
           {installed('oil_pan') &&
@@ -1240,10 +1340,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       )}
 
       {/* Motorhaube, Scharnier an der Windschutzscheibe */}
-      <group ref={hood} position={[HOOD_X0, topY(HOOD_X0), 0]}>
+      <group ref={hood} position={[HOOD_X0, S.crown(HOOD_X0), 0]}>
         <mesh
           geometry={geo.hood}
-          material={mats.paint}
+          material={hoodMats}
           castShadow
           userData={{ label: interactive || (hoodTap && handlers) ? (hoodOpen ? 'Motorhaube schließen' : 'Motorhaube öffnen') : undefined }}
           onClick={interactive || (hoodTap && handlers) ? tap(handlers!.onHood) : bodyTap}
