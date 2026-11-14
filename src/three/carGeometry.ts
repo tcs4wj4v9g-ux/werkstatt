@@ -86,6 +86,11 @@ export interface BodySpec {
   planPR?: number;
   /** Scharnier der Motorhaube: hinten an der Scheibe (Standard) oder vorn (Haube öffnet von hinten nach vorn). */
   hoodHinge?: 'rear' | 'front';
+  /** Öffnung über dem Motor (Standard: Motorhaube vorn). Beim Heckmotor der Motordeckel hinten (x-Bereich). */
+  lidX0?: number;
+  lidX1?: number;
+  /** Hochgezogene Kotflügel über den Rädern (Höhe am Außenrand). */
+  haunch?: number;
 }
 
 /** Vorderwagen einer Karosserie (Standardwerte = gemeinsamer Vorderwagen aller bisherigen Formen). */
@@ -99,6 +104,9 @@ export const frontOf = (B: BodySpec) => ({
   cabinX1: B.cabinX1 ?? CABIN_X1,
   aBase: B.aBase ?? A_BASE,
   dome: B.dome ?? 0.014,
+  /** Öffnung über dem Motor und Lage der Motorhaube bzw. des Motordeckels. */
+  openX0: B.lidX0 ?? B.hoodX0 ?? HOOD_X0,
+  openX1: B.lidX1 ?? B.hoodX1 ?? HOOD_X1,
 });
 
 const FOUR_DOOR = { seams: [0.74, -0.32, -1.24], handles: [-0.14, -1.06] };
@@ -136,6 +144,15 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     deck: 1.0, noseMid: 0.71, noseP: 6, tailMid: 0.79, tailP: 6, tailLen: 0.05, planP: 7.5, planPR: 6.5, ground: 0.26, tumble: 0.1, bowF: 0.06, bowR: 0.05,
     flare: 0.008, crease: 0.82, creaseDepth: 0.018, blackPillars: true, pillars: [[-0.64, -0.57]], glassRear: -1.38, rearSeat: true,
     seams: [0.74, -0.6], handles: [-0.42], hoodSlope: 0.03, hoodCurve: 0.075, dome: 0.004, cabinK: 0.93, roofArc: 0.006, hoodHinge: 'front',
+  },
+  // Rundliches Sportcoupé der 50er mit Heckmotor: 3,95 m, Radstand 2,10 m, flache Fronthaube zwischen hochgezogenen Kotflügeln,
+  // gewölbtes Dach, langes abfallendes Fließheck mit Motordeckel, kräftige hintere Kotflügel. Zwei Türen.
+  tub: {
+    ...BASE, tail: -1.62, nose: 2.33, width: 0.83, rearAxle: -0.72, trackF: -0.155, trackR: -0.13, roof: 1.31, x0: -1.02, x1: -0.38, x2: 0.3,
+    deck: 0.86, noseMid: 0.42, noseP: 2.2, tailMid: 0.55, tailP: 2.4, tailLen: 0.75, planP: 2.2, planPR: 2.4, ground: 0.22, tumble: 0.16, bowF: 0.05, bowR: 0.08,
+    flare: 0.012, crease: 0.6, creaseDepth: 0, blackPillars: false, pillars: [], glassRear: -0.62, rearSeat: false,
+    seams: [0.78, -0.42], handles: [-0.3], cowlX: 0.84, cowlY: 0.86, hoodSlope: 0.06, hoodCurve: 0.12, hoodX0: 0.86, hoodX1: 2.0, cabinX1: 0.86, aBase: 0.62,
+    dome: 0, cabinK: 0.9, roofArc: 0.03, lidX0: -1.5, lidX1: -0.86, hoodHinge: 'front', haunch: 0.07,
   },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
@@ -200,9 +217,17 @@ export class Shape {
     return b;
   }
 
+  /** Hochgezogene Kotflügel: zum Außenrand hin ansteigend, über den Rädern am höchsten. */
+  haunch(x: number, z: number, w: number) {
+    const h = this.B.haunch;
+    if (!h) return 0;
+    const along = Math.max(...[WHEEL_X, this.B.rearAxle].map((xc) => Math.exp(-(((x - xc) / 0.5) ** 2))));
+    return h * along * Math.min(1, Math.abs(z / w)) ** 3;
+  }
+
   topSurf(x: number, z: number) {
     const w = Math.max(0.05, this.width(x));
-    return this.crown(x) - 0.03 * (z / w) ** 2;
+    return this.crown(x) - 0.03 * (z / w) ** 2 + this.haunch(x, z, w);
   }
 
   private flare(x: number, y: number) {
@@ -227,9 +252,9 @@ export class Shape {
     const pts: [number, number][] = [];
     for (let i = 0; i <= NT; i++) {
       const z = (i / NT) * 0.8 * w;
-      pts.push([z, top - 0.03 * (z / w) ** 2]);
+      pts.push([z, top - 0.03 * (z / w) ** 2 + this.haunch(x, z, w)]);
     }
-    const y08 = top - 0.03 * 0.64;
+    const y08 = top - 0.03 * 0.64 + this.haunch(x, 0.8 * w, w);
     for (let i = 1; i <= 4; i++) {
       const a = (i / 4) * (Math.PI / 2);
       const y = y08 - sh * (1 - Math.cos(a));
@@ -433,7 +458,7 @@ function stations(S: Shape, step: number, arch: number) {
   const B = S.B;
   const F = S.F;
   const inArch = (x: number) => [WHEEL_X, B.rearAxle].some((xc) => Math.abs(x - xc) < ARCH_R + 0.02);
-  const xs = [...range(B.tail + 0.02, B.nose - 0.02, step).filter((x) => !inArch(x) && x < F.hoodX1 + 0.02 && x > B.tail + B.tailLen - 0.02), F.hoodX0, F.hoodX1, B.x0 + B.bowR, F.cabinX1, ...B.seams];
+  const xs = [...range(B.tail + 0.02, B.nose - 0.02, step).filter((x) => !inArch(x) && x < F.hoodX1 + 0.02 && x > B.tail + B.tailLen - 0.02), F.openX0, F.openX1, B.x0 + B.bowR, F.cabinX1, ...B.seams];
   const n = Math.round(arch * 0.7);
   for (let k = 0; k <= n; k++) {
     const f = 1 - k / n;
@@ -487,7 +512,7 @@ function buildBody(S: Shape, detail: number): Built {
   for (let s = 0; s < xs.length - 1; s++) {
     const xa = xs[s];
     const xb = xs[s + 1];
-    const inHood = xa >= F.hoodX0 - 1e-6 && xb <= F.hoodX1 + 1e-6;
+    const inHood = xa >= F.openX0 - 1e-6 && xb <= F.openX1 + 1e-6;
     const inCabin = xa >= open0 - 1e-6 && xb <= F.cabinX1 + 1e-6 && !inHood;
     const inDoor = xa >= d1 - 1e-6 && xb <= d0 + 1e-6;
     for (let j = 0; j < R; j++) {
@@ -552,22 +577,22 @@ function buildBody(S: Shape, detail: number): Built {
   const doors = [0, 1].map((k) => finish(all, doorIdx[k], [hinge[0], 0, (k ? 1 : -1) * hinge[1]])) as [THREE.BufferGeometry, THREE.BufferGeometry];
 
   // ---- Motorhaube: Außenhaut (Gruppe 0) und dunkle Innenseite (Gruppe 1) ----
-  const hx = range(F.hoodX0 + 0.006, F.hoodX1 - 0.006, detail ? 0.06 : 0.1);
+  const hx = range(F.openX0 + 0.006, F.openX1 - 0.006, detail ? 0.06 : 0.1);
   const N = detail ? 19 : 11;
   const pos: number[] = [];
   const outer: number[] = [];
   const innerIdx: number[] = [];
-  const y0 = S.crown(F.hoodX0);
+  const y0 = S.crown(F.openX0);
   for (const layer of [0, 1]) {
     hx.forEach((x) => {
       const w = S.width(x);
       for (let i = 0; i < N; i++) {
         const z = (i / (N - 1) - 0.5) * 2 * (0.8 * w - 0.006);
         // Powerdome: zwei Sicken, die zur Front hin zusammenlaufen.
-        const hw = 0.36 - 0.1 * ((x - F.hoodX0) / (F.hoodX1 - F.hoodX0));
+        const hw = 0.36 - 0.1 * ((x - F.openX0) / (F.openX1 - F.openX0));
         const dome = Math.abs(z) < hw ? F.dome * Math.cos(((z / hw) * Math.PI) / 2) ** 0.6 : 0;
-        const edge = Math.min(1, (0.8 * w - Math.abs(z)) / 0.06, (x - F.hoodX0) / 0.05, (F.hoodX1 - x) / 0.05);
-        pos.push(x - F.hoodX0, S.topSurf(x, z) - y0 + 0.003 + dome - (layer ? 0.004 + 0.022 * smooth(edge) : 0), z);
+        const edge = Math.min(1, (0.8 * w - Math.abs(z)) / 0.06, (x - F.openX0) / 0.05, (F.openX1 - x) / 0.05);
+        pos.push(x - F.openX0, S.topSurf(x, z) - y0 + 0.003 + dome - (layer ? 0.004 + 0.022 * smooth(edge) : 0), z);
       }
     });
   }

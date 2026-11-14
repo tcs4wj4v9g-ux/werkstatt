@@ -1,4 +1,4 @@
-import { CAR_MODELS, CLASS_FACTOR } from './data/cars';
+import { CAR_MODELS, CLASS_FACTOR, REAR_ENGINE } from './data/cars';
 import { COMPONENT_MAP, defOf, defsOf, engineComponents, engineOf, modelEngine, motorOf } from './data/components';
 import { DEFECTS, DEFECT_LIST, defectComponents } from './data/defects';
 import { ENGINES, isV, type EngineDef } from './data/engines';
@@ -36,14 +36,14 @@ export interface UsedPart {
 
 /** Gewicht des Motors mit Anbauteilen (kg) – geht ins Fahrzeuggewicht ein. */
 export function engineWeight(e: EngineDef) {
-  const base = e.layout === 'R4' ? 140 : e.layout === 'R6' ? 195 : e.layout === 'V6' ? 175 : 225;
+  const base = e.layout === 'B4' ? 105 : e.layout === 'R4' ? 140 : e.layout === 'R6' ? 195 : e.layout === 'V6' ? 175 : 225;
   return base + (e.fuel === 'diesel' ? 25 : 0) + (e.turbo ? 12 : 0);
 }
 
 /** Baulänge-Klasse: 1 = kurz (R4, V6), 2 = lang (R6), 3 = breit und schwer (V8). */
-const SIZE: Record<EngineDef['layout'], number> = { R4: 1, V6: 1.5, R6: 2, V8: 3 };
+const SIZE: Record<EngineDef['layout'], number> = { B4: 1, R4: 1, V6: 1.5, R6: 2, V8: 3 };
 /** Wie viel Motor passt in den Motorraum dieser Karosserie? */
-const BAY: Record<string, number> = { hatch: 1.5, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
+const BAY: Record<string, number> = { mono: 1.2, hatch: 1.5, box: 2.2, tub: 1.2, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
 
 export interface SwapPlan {
   possible: boolean;
@@ -65,7 +65,11 @@ export function swapPlan(car: Pick<CarInstance, 'modelId'>, engineId: string): S
   const reasons: string[] = [];
   const parts = new Set<PartId>();
   if (!e) return { possible: false, level: 9, label: 'Unbekannter Motor', needs: [], reasons: ['Motor unbekannt.'] };
-  if (SIZE[e.layout] > BAY[model.body]) {
+  // Heckmotor-Autos nehmen nur einen Boxer, Frontmotor-Autos keinen (Einbaulage und Getriebe passen nicht).
+  if (REAR_ENGINE.has(model.body) !== (e.layout === 'B4')) {
+    return { possible: false, level: 9, label: 'Passt nicht', needs: [], reasons: [REAR_ENGINE.has(model.body) ? 'In den Heckmotorraum passt nur ein flacher Boxermotor.' : 'Ein Boxer mit Heckgetriebe passt nicht in einen Frontmotorraum.'] };
+  }
+  if (SIZE[e.layout] > (BAY[model.body] ?? 3)) {
     return { possible: false, level: 9, label: 'Passt nicht', needs: [], reasons: [`Ein ${e.layout} passt nicht in den Motorraum dieser Karosserie.`] };
   }
   if (e.id === orig.id) return { possible: true, level: 0, label: 'Originalmotor', needs: [], reasons: ['Gleicher Motortyp wie ab Werk – direkt einbaubar.'] };

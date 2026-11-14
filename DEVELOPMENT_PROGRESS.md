@@ -111,7 +111,7 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests, alle Browser-Durchläufe; am Kleinwagen Radschrauben vorn/hinten und Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Raddurchmesser ist bei allen Autos gleich (für einen Kleinwagen eher groß); Lider sind feste Anbauteile und öffnen nicht mit der Haube.
 
-## Fahrzeug 2: Bavaria 323i Zweitürer (an den BMW E30 angelehnt) – wartet auf Freigabe
+## Fahrzeug 2: Bavaria 323i Zweitürer (an den BMW E30 angelehnt) – freigegeben
 
 - Neue Karosserieform `box`: 4,33 m, Radstand 2,57 m, flache leicht abfallende Haube, stumpfe Front, steile Scheiben, schmale Säulen mit B-Säule, kurzer flacher Kofferraum, scharfe Seitenkante, eckige Draufsicht.
 - Front: glänzend schwarzes Frontband mit vier runden Scheinwerfern, schmale Doppelniere mit Chromrahmen und Stäben, schwarzer Stoßfänger mit Chromleiste, Blinker im Stoßfänger, Nebelscheinwerfer im Spoiler.
@@ -120,3 +120,14 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests, alle Browser-Durchläufe (karriere einmal zeitbedingt, Wiederholung grün). Kein echter iPad-Test.
 - Motorhaube vorn angeschlagen (öffnet von hinten nach vorn, wie beim Vorbild); Arbeitsansicht „Motor von oben“ statt „von vorn“.
 - Grenzen: kein Knick an der hinteren Fensterkante (die Seitenscheibe endet gerade); Front steht senkrecht statt leicht nach vorn geneigt.
+
+## Fahrzeug 3: Zuffen 365 Coupé (an den Porsche 356 angelehnt) – wartet auf Freigabe
+
+- Neue Motorbauart **Boxer** (`B4`): zwei fast waagerecht liegende Zylinderbänke (Neigung je Motor, `bankTilt`), verrippte Zylinder, flaches Kurbelgehäuse, Gebläsegehäuse; eigener Klang. Alle Bauteile wie beim V-Motor je Bank (Ventildeckel, Köpfe, Spulen, Kolben).
+- **Luftgekühlt** (`air`): keine Wasserpumpe, kein Thermostat, kein Kühlmittelschlauch; Kühlmittel wird weder angezeigt noch geprüft.
+- **Heckmotor** (`REAR_ENGINE`, Form `tub`): derselbe Motorraum gedreht hinter der Hinterachse und abgesenkt (`REAR_BAY`), Motordeckel mit Lüftungsgitter oben angeschlagen, Kofferraum vorn (Fuge), Spritzwand hinter den Sitzen. Arbeitsansichten „Motor von hinten“, links, rechts und Unterboden gespiegelt.
+- **Umbau:** Heckmotor-Autos nehmen nur einen Boxer, Frontmotor-Autos keinen. Dabei korrigiert: Twingle und 323i hatten noch keine Motorraumgröße (hätten jeden Motor genommen).
+- **Karosserie `tub`:** 3,95 m, Radstand 2,10 m, flache Fronthaube zwischen hochgezogenen Kotflügeln (`haunch`), gewölbtes Dach, langes Fließheck, runde Scheinwerfertöpfe, Hupengitter, schlanke Stoßstangen in Wagenfarbe mit Chromleiste und Hörnern, kleine runde Rückleuchten, Doppelendrohre, Chromradkappen, rote Sitze.
+- Armaturenbrett und Spritzwand passen sich der Höhe der Karosserie an (vorher ragten sie beim niedrigen Coupé heraus).
+- Geprüft: Logiktests (Boxer am Ständer zerlegen/zusammenbauen, Umbauregeln, Freiraum unter dem Motordeckel), alle Browser-Durchläufe; am Heckmotor die Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
+- Grenzen: Der Heckmotor nutzt den gemeinsamen Motorraum (Batterie und Bremsflüssigkeitsbehälter sitzen mit im Heck, Motorabdeckung wie bei den anderen Motoren); die Zündspulen liegen seitlich an den Zylinderköpfen und sind im Auto nur aus den Seitenansichten gut erreichbar.

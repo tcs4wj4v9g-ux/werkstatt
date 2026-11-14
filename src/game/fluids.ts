@@ -1,4 +1,6 @@
 import { CAR_MODELS } from './data/cars';
+import { ENGINES } from './data/engines';
+import { engineOf } from './data/components';
 import { BRAKE_CAPACITY, FLUID_PRODUCTS } from './data/fluids';
 import { isComplete } from './repair';
 import type { ActionResult, CarInstance, FluidId, FluidProduct, Fluids, FluidStock, Toolset } from './types';
@@ -25,7 +27,8 @@ export function createFluids(modelId: string, wear: number, rng: () => number): 
   const q = (base: number) => Math.max(0.05, Math.min(1, base - wear * (0.5 + rng() * 0.4)));
   return {
     oil: { level: r1(m.oilCapacity * (1 - wear * (0.15 + rng() * 0.3))), quality: q(0.85), product: m.oilSpec, filterFresh: false },
-    coolant: { level: r1(m.coolantCapacity * (1 - wear * (0.1 + rng() * 0.25))), quality: q(0.9), air: false },
+    // Luftgekühlte Motoren haben keinen Kühlkreislauf: der Wert bleibt einfach voll und wird nirgends angezeigt.
+    coolant: { level: ENGINES[m.engineId]?.air ? m.coolantCapacity : r1(m.coolantCapacity * (1 - wear * (0.1 + rng() * 0.25))), quality: q(0.9), air: false },
     brake: { level: r1(BRAKE_CAPACITY * (1 - wear * 0.3)), quality: q(0.8), air: wear > 0.85, bled: { fl: false, fr: false } },
   };
 }
@@ -70,6 +73,7 @@ export function addFluid(car: CarInstance, stock: FluidStock, id: FluidId, produ
   if (id === 'oil' && !car.components.drain_plug.installed) return fail('Die Ölablassschraube ist noch draußen – das Öl liefe unten wieder heraus.');
   if (id === 'oil' && !isComplete(car, 'oil_pan')) return fail('Erst die Ölwanne montieren.');
   if (id === 'oil' && !car.components.oil_filter.installed) return fail('Erst einen Ölfilter einsetzen.');
+  if (id === 'coolant' && engineOf(car).air) return fail('Luftgekühlter Motor – er braucht kein Kühlmittel.');
   if (id === 'coolant' && ['water_pump', 'thermostat', 'hose'].some((c) => !isComplete(car, c))) return fail('Das Kühlsystem ist noch offen – erst Pumpe, Thermostat und Schlauch montieren.');
   if (stock[product] < 0.05) return fail(`Kein ${FLUID_PRODUCTS[product].name} im Lager – am Computer bestellen.`);
   const f = car.fluids[id];

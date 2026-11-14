@@ -7,7 +7,8 @@ import { dirtLevel, shineLevel, visibleDirt } from '../game/detail';
 import { beneath, blockersRemoved, installReady, removable } from '../game/repair';
 import { useGame } from '../game/store';
 import type { BodyStyle, CarInstance, FluidId, ToolId, VisualTune, ZoneId } from '../game/types';
-import { CAR_MODELS } from '../game/data/cars';
+import { CAR_MODELS, REAR_ENGINE } from '../game/data/cars';
+import { REAR_BAY } from './player';
 import { BODY_SPECS, carGeometry, doorHinge } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
@@ -15,7 +16,7 @@ import { dropOf } from '../game/data/visual';
 import { fastenerText } from '../game/data/tools';
 import { Mesher } from './mesher';
 import { junkPartPrice } from '../game/motor';
-import { bayMaterials, beltGeometry, camGeometry, chainGeometry, crankGeometry, engineDecor, exhaustGeometry, intakeGeometry, mainCapsGeometry, oilPumpGeometry, pistonGeometry, V_PIVOT, V_TILT } from './engineBay';
+import { bayMaterials, beltGeometry, camGeometry, chainGeometry, crankGeometry, engineDecor, exhaustGeometry, intakeGeometry, mainCapsGeometry, oilPumpGeometry, pistonGeometry, V_PIVOT, V_TILT, bankTilt } from './engineBay';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // Selbst gebautes Fahrzeug (keine Markenlogos, kein Fremdmodell). Fahrtrichtung = +X.
@@ -172,10 +173,12 @@ const Proxy = ({ s, p }: { s: V3; p: V3 }) => (
   </mesh>
 );
 /** Geneigte Zylinderbank eines V-Motors. */
+const BankTilt = createContext(V_TILT);
 function Bank({ bank, children }: { bank: number; children: ReactNode }) {
+  const tilt = useContext(BankTilt);
   if (!bank) return <>{children}</>;
   return (
-    <group position={[0, V_PIVOT, 0]} rotation={[bank * V_TILT, 0, 0]}>
+    <group position={[0, V_PIVOT, 0]} rotation={[bank * tilt, 0, 0]}>
       <group position={[0, -V_PIVOT, 0]}>{children}</group>
     </group>
   );
@@ -403,6 +406,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const shared = useMemo(() => carGeometry(body, G.detail, flares), [body, G.detail, flares]);
   const S = shared.shape;
   const hoodFront = S.B.hoodHinge === 'front';
+  /** Heckmotor: der ganze Motorraum liegt gedreht und etwas tiefer hinter der Hinterachse. */
+  const rearEngine = REAR_ENGINE.has(body);
   const B = shared.shape.B;
   /** Tieferlegung: Karosserie und Motor sinken, die Räder bleiben stehen. */
   const drop = car && !car.bare ? dropOf(car.visual) / 100 : 0;
@@ -429,7 +434,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   useEffect(() => {
     tint(geo.shell, car, color);
     tint(geo.cabin, car, color);
-    tint(geo.hood, car, color, S.F.hoodX0, S.crown(S.F.hoodX0));
+    tint(geo.hood, car, color, S.F.openX0, S.crown(S.F.openX0));
     geo.doors.forEach((d, k) => tint(d, car, color, hinge[0], 0, (k ? 1 : -1) * hinge[1]));
   }, [geo, color, zoneKey]);
 
@@ -772,9 +777,16 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <mesh position={[(B.nose + B.tail) / 2, B.ground + 0.05, 0]} material={mats.dark}>
           <boxGeometry args={[B.nose - B.tail - 0.4, 0.08, 1.3]} />
         </mesh>
-        <mesh position={[0.79, 0.67, 0]} material={mats.dark}>
-          <boxGeometry args={[0.03, 0.64, B.width * 1.66]} />
-        </mesh>
+        {/* Spritzwand vor dem Motorraum; beim Heckmotor hinter den Sitzen. Nie höher als die Karosserie an dieser Stelle. */}
+        {(() => {
+          const x = rearEngine ? -0.75 : 0.79;
+          const top = Math.min(0.99, (rearEngine ? S.crown(x) : S.F.cowlY) - 0.02);
+          return (
+            <mesh position={[x, (0.35 + top) / 2, 0]} material={mats.dark}>
+              <boxGeometry args={[0.03, top - 0.35, B.width * 1.66]} />
+            </mesh>
+          );
+        })()}
       </group>
       {/* Schrottauto: Anbauteile mit Tuning-Wert lassen sich abschrauben */}
       {car?.junk && handlers?.onVisual && (
@@ -840,7 +852,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       </>
       )}
       {full && (
-        <group position={bare ? [0, 0.95, 0] : [0, -drop, 0]} rotation={[bare && car!.lifted ? Math.PI : 0, 0, 0]}>
+        <BankTilt.Provider value={bankTilt(engine)}>
+        <group position={bare ? [0, 0.95, 0] : rearEngine ? [REAR_BAY.x, REAR_BAY.y - drop, 0] : [0, -drop, 0]} rotation={[bare && car!.lifted ? Math.PI : 0, rearEngine && !bare ? Math.PI : 0, 0]}>
         <group position={bare ? [-1.3, -0.55, 0] : undefined}>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
@@ -852,8 +865,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             {bare && !vee && <Proxy s={[0.7, 0.17, 0.36]} p={[1.3, 0.535, 0]} />}
             {bare && vee && <Proxy s={[0.7, 0.15, 0.46]} p={[1.3, 0.51, 0]} />}
             {bare && vee && <Proxy s={[0.7, 0.025, 0.08]} p={[1.3, 0.588, 0]} />}
-            {!bare && <Proxy s={[0.3, 0.16, 0.2]} p={[1.28, 0.6, 0.44]} />}
-            {!bare && <Proxy s={[0.05, 0.34, 1.2]} p={[1.95, 0.6, 0]} />}
+            {!bare && !rearEngine && <Proxy s={[0.3, 0.16, 0.2]} p={[1.28, 0.6, 0.44]} />}
+            {!bare && !rearEngine && <Proxy s={[0.05, 0.34, 1.2]} p={[1.95, 0.6, 0]} />}
             {/* Haubenstütze */}
             {hoodOpen && !bare && !hoodFront && (
               <mesh position={[1.585, 1.305, 0.62]} rotation={[0, 0, 0.658]} raycast={noRay}>
@@ -909,7 +922,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               </group>
             </group>,
           )}
-          {!bare && fluidPoint(
+          {!bare && !engine.air && fluidPoint(
             'coolant',
             'Kühlmittel-Ausgleichsbehälter',
             <>
@@ -1587,13 +1600,38 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             )}
         </group>
         </group>
+        </BankTilt.Provider>
       )}
 
       {!bare && (
       <>
       {/* Motorhaube: Scharnier an der Windschutzscheibe, bei vorn angeschlagener Haube an der Vorderkante */}
-      <group ref={hood} position={hoodFront ? [S.F.hoodX1, S.crown(S.F.hoodX1) - drop, 0] : [S.F.hoodX0, S.crown(S.F.hoodX0) - drop, 0]}>
-      <group position={hoodFront ? [S.F.hoodX0 - S.F.hoodX1, S.crown(S.F.hoodX0) - S.crown(S.F.hoodX1), 0] : [0, 0, 0]}>
+      <group ref={hood} position={hoodFront ? [S.F.openX1, S.crown(S.F.openX1) - drop, 0] : [S.F.openX0, S.crown(S.F.openX0) - drop, 0]}>
+      <group position={hoodFront ? [S.F.openX0 - S.F.openX1, S.crown(S.F.openX0) - S.crown(S.F.openX1), 0] : [0, 0, 0]}>
+        {/* Heckmotor: Lüftungsgitter mit Chromstäben auf dem Motordeckel (schwenkt mit) */}
+        {rearEngine && (() => {
+          const xa = S.F.openX1 - 0.32;
+          const xb = S.F.openX1 - 0.08;
+          const y0 = S.crown(S.F.openX0);
+          const ya = S.crown(xa) - y0;
+          const yb = S.crown(xb) - y0;
+          const len = Math.hypot(xb - xa, yb - ya);
+          const ang = Math.atan2(yb - ya, xb - xa);
+          const mx = (xa + xb) / 2 - S.F.openX0;
+          const my = (ya + yb) / 2 + 0.006;
+          return (
+            <group position={[mx, my, 0]} rotation={[0, 0, ang]}>
+              <mesh material={mats.dark} raycast={noRay}>
+                <boxGeometry args={[len + 0.02, 0.008, 0.34]} />
+              </mesh>
+              {[-7, -5, -3, -1, 1, 3, 5, 7].map((i) => (
+                <mesh key={i} position={[0, 0.008, i * 0.02]} material={mats.chrome} raycast={noRay}>
+                  <boxGeometry args={[len, 0.01, 0.01]} />
+                </mesh>
+              ))}
+            </group>
+          );
+        })()}
         {car?.visual?.hood === 1 && (
           <mesh position={[0.5, 0.035, 0]} material={mats.solid} raycast={noRay}>
             <boxGeometry args={[0.55, 0.05, 0.42]} />
@@ -1609,7 +1647,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           geometry={geo.hood}
           material={hoodMats}
           castShadow
-          userData={{ label: interactive || (hoodTap && handlers) ? (hoodOpen ? 'Motorhaube schließen' : 'Motorhaube öffnen') : undefined }}
+          userData={{ label: interactive || (hoodTap && handlers) ? `${rearEngine ? 'Motordeckel' : 'Motorhaube'} ${hoodOpen ? 'schließen' : 'öffnen'}` : undefined }}
           onClick={interactive || (hoodTap && handlers) ? tap(handlers!.onHood) : bodyTap}
         />
       </group>

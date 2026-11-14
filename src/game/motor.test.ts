@@ -246,3 +246,21 @@ describe('Motorständer: Nockenwellen vor dem Zylinderkopf', () => {
     expect(stand.components.cyl_head.installed && stand.components.camshaft.installed).toBe(true);
   });
 });
+
+describe('Heckmotor-Boxer', () => {
+  it('Boxer auf dem Ständer bis zum Kolben zerlegen und wieder zusammenbauen; Umbau nur Boxer ↔ Heckmotor', () => {
+    const car = mk('zuffen_365');
+    expect(engineOf(car).layout).toBe('B4');
+    expect(car.components.water_pump).toBeUndefined();
+    const stand = asStand(extractEngine(car), 'zuffen_365');
+    strip(stand, 'drain_plug');
+    strip(stand, 'piston1');
+    strip(stand, 'piston4');
+    expect(stand.components.piston1.installed || stand.components.piston4.installed).toBe(false);
+    for (const id of Object.keys(stand.components)) mount(stand, id);
+    expect(r.isAssembled(stand)).toBe(true);
+    expect(swapPlan(car, 'r4_20').possible).toBe(false);
+    expect(swapPlan(mk('bavaria_320'), 'b4_16').possible).toBe(false);
+    expect(swapPlan(car, 'b4_16').possible).toBe(true);
+  });
+});

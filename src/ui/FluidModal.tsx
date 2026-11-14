@@ -1,3 +1,4 @@
+import { engineOf } from '../game/data/components';
 import { CAR_MODELS } from '../game/data/cars';
 import { FLUID_PRODUCTS } from '../game/data/fluids';
 import { capacity, FLUID_NAMES } from '../game/fluids';
@@ -25,8 +26,8 @@ export function FluidModal() {
   };
   return (
     <Modal title={`Betriebsflüssigkeiten – ${model.name}`} onClose={() => s.setPanel(null)} wide>
-      <p className="meta">{model.engine} · Motoröl {model.oilCapacity} l {FLUID_PRODUCTS[model.oilSpec].name} · Kühlmittel {model.coolantCapacity} l</p>
-      {(['oil', 'coolant', 'brake'] as FluidId[]).map((id) => {
+      <p className="meta">{model.engine} · Motoröl {model.oilCapacity} l {FLUID_PRODUCTS[model.oilSpec].name}{engineOf(car).air ? ' · luftgekühlt' : ` · Kühlmittel ${model.coolantCapacity} l`}</p>
+      {(['oil', 'coolant', 'brake'] as FluidId[]).filter((id) => id !== 'coolant' || !engineOf(car).air).map((id) => {
         const seen = car.checked[id];
         const cap = capacity(car, id);
         return (

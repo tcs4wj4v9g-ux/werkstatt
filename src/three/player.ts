@@ -64,8 +64,14 @@ export const WORK_LABELS: Record<WorkView, string> = {
 };
 
 /** Feste Arbeitsansicht nah am Bauteil. Der Spieler steht dabei still und kann sich nur umsehen. */
+/**
+ * Heckmotor: der Motorraum wird um die Hochachse gedreht hinter die Hinterachse gesetzt (x' = REAR_BAY.x − x, z' = −z)
+ * und um REAR_BAY.y abgesenkt.
+ */
+export const REAR_BAY = { x: 0.19, y: -0.1 };
+
 /** `rearX`: Lage der Hinterachse des Autos (je Karosserie verschieden). */
-export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront = false): WorkPose {
+export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront = false, rearEngine = false): WorkPose {
   const z0 = SLOTS[bay].z;
   const h = LIFT_HEIGHT;
   const table: Record<WorkView, [[number, number, number], [number, number, number]]> = {
@@ -79,7 +85,13 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     rear_right: [[rearX, h + 0.42, z0 + 1.85], [rearX, h + 0.36, z0 + 0.8]],
     under: [[2.25, 1.2, z0], [1.3, h + 0.22, z0]],
   };
-  const [pos, to] = table[view];
+  let [pos, to] = table[view];
+  // Heckmotor: Motoransichten gespiegelt nach hinten (Blick von hinten bzw. von den Seiten auf den Motor), Unterboden ebenso
+  if (rearEngine && (view.startsWith('engine') || view === 'under')) {
+    const m = (p: [number, number, number]): [number, number, number] => [REAR_BAY.x - p[0], p[1] + (view === 'under' ? 0 : REAR_BAY.y), z0 - (p[2] - z0)];
+    [pos, to] = [m(pos), m(to)];
+    if (view === 'engine') [pos, to] = [[REAR_BAY.x - 2.45, 1.45, z0], [REAR_BAY.x - 1.3, 0.62, z0]];
+  }
   const dx = to[0] - pos[0];
   const dz = to[2] - pos[2];
   return { id: `${view}:${bay}`, pos, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(to[1] - pos[1], Math.hypot(dx, dz)) };

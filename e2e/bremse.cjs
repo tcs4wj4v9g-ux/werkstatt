@@ -108,6 +108,17 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const t2 = await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text);
   expect(views.some((v) => v.includes('Motor von oben')) && /Motorabdeckung/.test(t2 || ''), 'Vorn angeschlagene Haube: Ansicht „Motor von oben“, Motorabdeckung antippbar – ' + t2);
   await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  // ---------- Heckmotor (Boxer, luftgekühlt): Motordeckel hinten, Ansichten, Teile erreichbar, kein Kühlmittel ----------
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar('zuffen_365', [], Math.random, {}); c.hoodOpen = true; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [false, false], tool: 'hand', panel: null }); Object.assign(window.__gkPlayer, { x: -2.3, z: -2.7, yaw: -Math.PI / 2, work: null }); });
+  await p.waitForTimeout(900);
+  const rv = await p.$$eval('.car-actions button', (b) => b.map((x) => x.textContent));
+  await p.locator('.car-actions button', { hasText: 'Motor von hinten' }).click(); await p.waitForTimeout(900);
+  const rc = (await findBolts('Motorabdeckung')).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+  if (rc[0]) { await p.evaluate(() => window.__gk.setState({ toast: null })); await p.mouse.click(rc[0].x, rc[0].y); await p.waitForTimeout(300); }
+  const t3 = await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text);
+  const air = await p.evaluate(() => { const c = window.__gk.getState().cars[0].components; return !c.water_pump && !c.hose && !c.thermostat && !!c.valve_cover_b && Object.keys(c).filter((k) => /^coil\d$/.test(k)).length === 4; });
+  expect(rv.some((v) => v.includes('Motor von hinten')) && /Motorabdeckung/.test(t3 || '') && air, 'Heckmotor-Boxer: Ansicht „Motor von hinten“, Motorabdeckung antippbar, luftgekühlt ohne Kühlteile, zwei Bänke mit vier Spulen – ' + t3);
+  await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

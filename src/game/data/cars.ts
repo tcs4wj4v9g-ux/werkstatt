@@ -28,6 +28,9 @@ export interface CarModelDef {
   blurb: string;
 }
 
+/** Karosserien mit Motor im Heck (Motordeckel hinten, Kofferraum vorn). */
+export const REAR_ENGINE = new Set<BodyStyle>(['tub']);
+
 export const CLASS_NAMES: Record<CarClass, string> = {
   budget: 'Günstige Gebrauchte',
   mid: 'Mittelklasse',
@@ -75,6 +78,7 @@ const list: CarModelDef[] = [
   m({ id: 'bavaria_328_klassik', brand: 'Bavaria', name: 'Bavaria 328 Klassik', body: 'sedan', cls: 'mid', baseValue: 15500, engineId: 'r6_28k', weight: 1420, rare: true, years: [1996, 2000], colors: ['#5b6f8f', '#7d1a1f', '#d9d2bd'], blurb: 'Youngtimer mit dem legendären 2,8-Liter.' }),
   m({ id: 'bavaria_330_sport', brand: 'Bavaria', name: 'Bavaria 330 Sport-Kombi', body: 'wagon', cls: 'mid', baseValue: 17500, engineId: 'r6_30', weight: 1620, rare: true, years: [2006, 2008], colors: ['#1d3fae', '#f2f2ee', '#101114'], blurb: 'Kombi mit Sportpaket – nur wenige gebaut.' }),
   // --- Extrem seltene Sammlerfahrzeuge ---
+  m({ id: 'zuffen_365', brand: 'Zuffen', name: 'Zuffen 365 Coupé', body: 'tub', cls: 'collector', baseValue: 85000, engineId: 'b4_16', weight: 830, colors: ['#b9bdc2', '#e8e0c8', '#a3201b', '#1b1c1f', '#5c7186'], years: [1950, 1965], collector: true, blurb: 'Rundes Sportcoupé der 50er mit luftgekühltem Boxer im Heck – leicht, handlich und heute heiß begehrt.' }),
   m({ id: 'bavaria_30cs', brand: 'Bavaria', name: 'Bavaria 3.0 CS Coupé', body: 'classic', cls: 'collector', baseValue: 320000, engineId: 'r6_30cs', weight: 1400, collector: true, years: [1971, 1975], colors: ['#d9d2bd', '#c8501e', '#5b6f8f'], blurb: 'Filigranes Coupé der Siebziger – hochbegehrt.' }),
   m({ id: 'veloce_250', brand: 'Veloce', name: 'Veloce 250 Corsa', body: 'classic', cls: 'collector', baseValue: 980000, engineId: 'v8_30k', weight: 1100, collector: true, years: [1962, 1965], colors: ['#c81e1e', '#d9d2bd'], blurb: 'Rennsport-Ikone der Sechziger. Weltweit eine Handvoll Exemplare.' }),
 ];

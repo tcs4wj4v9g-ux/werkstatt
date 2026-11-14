@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { engineAudio } from '../game/audio';
-import { CAR_MODELS } from '../game/data/cars';
+import { CAR_MODELS, REAR_ENGINE } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { fitOf, splitKey } from '../game/fitment';
 import { MarketTab } from './MarketTab';
@@ -42,7 +42,7 @@ export function GarageUI() {
   const enter = (view: WorkView, bay: number) => {
     const c = useGame.getState().cars[bay];
     const spec = c ? BODY_SPECS[CAR_MODELS[c.modelId].body] : undefined;
-    player.work = workPose(view, bay, spec?.rearAxle, spec?.hoodHinge === 'front');
+    player.work = workPose(view, bay, spec?.rearAxle, spec?.hoodHinge === 'front' && !(c && REAR_ENGINE.has(CAR_MODELS[c.modelId].body)), !!c && REAR_ENGINE.has(CAR_MODELS[c.modelId].body));
     setWork(player.work.id);
   };
   // Motor wird warm; die Arbeitsansicht endet, wenn das Auto dafür nicht mehr passt.
@@ -129,7 +129,7 @@ export function GarageUI() {
               )}
               {views.map((v) => (
                 <button key={v} className={`btn ${work === `${v}:${nearBay}` ? 'active' : ''}`} onClick={() => enter(v, nearBay)}>
-                  🎯 {v === 'engine' && near && BODY_SPECS[CAR_MODELS[near.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v]}
+                  🎯 {v === 'engine' && near && REAR_ENGINE.has(CAR_MODELS[near.modelId].body) ? 'Motor von hinten' : v === 'engine' && near && BODY_SPECS[CAR_MODELS[near.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v]}
                 </button>
               ))}
             </div>

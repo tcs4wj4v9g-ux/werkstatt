@@ -8,6 +8,8 @@ import { mat, Mesher, type V3 } from './mesher';
 /** Neigung der Zylinderbänke eines V-Motors gegenüber der Senkrechten (Bogenmaß) und Drehpunkt (Höhe). */
 export const V_TILT = 0.2;
 export const V_PIVOT = 0.62;
+/** Neigung der Zylinderbänke: V-Motor leicht, Boxer fast waagerecht (Köpfe zeigen nach außen und etwas nach oben). */
+export const bankTilt = (e: EngineDef) => (e.layout === 'B4' ? 1.25 : V_TILT);
 
 export const BAY = { alu: 0, plastic: 1, steel: 2, rubber: 3, iron: 4, painted: 5, core: 6, yellow: 7 } as const;
 
@@ -45,7 +47,27 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
   const slots = cylinderSlots(e);
   const xs = [...new Set(slots.map((s) => s.x))];
   const seg = detail ? 14 : 8;
-  if (mode !== 'bare') {
+  const boxer = e.layout === 'B4';
+  if (mode !== 'bare' && boxer) {
+    // ---- Heckmotorraum des Boxers (wird im Auto gedreht hinter die Hinterachse gesetzt): Gebläsegehäuse, Luftführung, Motorbleche ----
+    if (mode === 'car') {
+      m.cyl(BAY.painted, 0.17, 0.17, 0.09, [1.72, 0.66, 0], Z90, detail ? 24 : 14);
+      m.cyl(BAY.core, 0.12, 0.12, 0.092, [1.72, 0.66, 0], Z90, detail ? 20 : 12);
+      for (let i = 0; i < 9; i++) m.box(BAY.painted, [0.094, 0.006, 0.11], [1.72, 0.66 + Math.cos((i / 9) * 6.283) * 0.06, Math.sin((i / 9) * 6.283) * 0.06], [(i / 9) * 6.283, 0, 0]);
+      for (const s of [-1, 1]) {
+        m.rbox(BAY.painted, [0.62, 0.05, 0.16], 0.02, [1.3, 0.69, s * 0.22], [s * 0.35, 0, 0]);
+        m.tube(BAY.painted, [[1.68, 0.66, s * 0.12], [1.6, 0.66, s * 0.2], [1.5, 0.66, s * 0.24]], 0.05, 8);
+        m.rbox(BAY.painted, [0.7, 0.012, 0.2], 0.004, [1.3, 0.38, s * 0.42]);
+      }
+    }
+    if (mode === 'empty') {
+      m.cyl(BAY.alu, 0.13, 0.15, 0.1, [0.9, 0.36, 0], Z90, seg);
+      g = m.build();
+      cache.set(key, g);
+      return g;
+    }
+  }
+  if (mode !== 'bare' && !boxer) {
 
   // ---- Vorderwagen: Längsträger, Federbeindome, Spritzwand, Schlossträger ----
   for (const s of [-1, 1]) {
@@ -97,7 +119,17 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
   }
   // ---- Motorblock ----
   const blockColor = BAY.alu;
-  if (vee) {
+  if (boxer) {
+    // Flaches Kurbelgehäuse, je Zylinder ein verrippter Zylinder, der mit der Bank nach außen liegt
+    m.rbox(blockColor, [0.6, 0.2, 0.26], 0.03, [1.27, 0.5, 0]);
+    const tilt = bankTilt(e);
+    for (const c of slots) {
+      m.base.makeTranslation(0, V_PIVOT, 0).multiply(new THREE.Matrix4().makeRotationX(c.bank * tilt)).multiply(new THREE.Matrix4().makeTranslation(0, -V_PIVOT, 0));
+      m.cyl(blockColor, 0.06, 0.06, 0.16, [c.x, 0.54, c.z], undefined, seg);
+      for (const y of [0.48, 0.505, 0.53, 0.555, 0.58, 0.605]) m.cyl(blockColor, 0.078, 0.078, 0.008, [c.x, y, c.z], undefined, seg);
+      m.base.identity();
+    }
+  } else if (vee) {
     const sh = new THREE.Shape();
     const pts: [number, number][] = [[-0.15, 0.43], [0.15, 0.43], [0.245, 0.545], [0.235, 0.585], [0.035, 0.625], [0, 0.6], [-0.035, 0.625], [-0.235, 0.585], [-0.245, 0.545]];
     pts.forEach(([z, y], i) => (i ? sh.lineTo(z, y) : sh.moveTo(z, y)));
@@ -120,9 +152,9 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
     if (mode === 'car') m.cyl(BAY.rubber, 0.04, 0.045, 0.05, [1.3, 0.43, s * (0.28 + wide)], undefined, 10);
   }
   // Klimakompressor
-  m.cyl(BAY.alu, 0.052, 0.052, 0.14, [1.58, 0.435, 0.25 + wide], Z90, seg);
-  m.cyl(BAY.painted, 0.05, 0.05, 0.022, [1.69, 0.435, 0.25 + wide], Z90, seg);
-  if (mode === 'car') m.tube(BAY.steel, [[1.5, 0.46, 0.3 + wide], [1.2, 0.47, 0.62], [0.98, 0.7, 0.67], [0.84, 0.76, 0.62]], 0.008, 4);
+  if (!boxer) m.cyl(BAY.alu, 0.052, 0.052, 0.14, [1.58, 0.435, 0.25 + wide], Z90, seg);
+  if (!boxer) m.cyl(BAY.painted, 0.05, 0.05, 0.022, [1.69, 0.435, 0.25 + wide], Z90, seg);
+  if (mode === 'car' && !boxer) m.tube(BAY.steel, [[1.5, 0.46, 0.3 + wide], [1.2, 0.47, 0.62], [0.98, 0.7, 0.67], [0.84, 0.76, 0.62]], 0.008, 4);
   // Diesel: Hochdruckleitung (Common Rail) neben den Einspritzdüsen
   if (diesel) {
     if (vee) for (const s of [-1, 1]) m.cyl(BAY.steel, 0.009, 0.009, xs[xs.length - 1] - xs[0] + 0.08, [(xs[0] + xs[xs.length - 1]) / 2, 0.745, s * 0.045], Z90, 6);

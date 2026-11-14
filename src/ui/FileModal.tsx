@@ -78,7 +78,7 @@ export function FileModal() {
         </div>
       ))}
       <h4>Flüssigkeiten (zuletzt abgelesen)</h4>
-      {(['oil', 'coolant', 'brake'] as FluidId[]).map((id) => {
+      {(['oil', 'coolant', 'brake'] as FluidId[]).filter((id) => id !== 'coolant' || !engineOf(car).air).map((id) => {
         const c = car.checked[id];
         return <div key={id} className="meta">{FLUID_NAMES[id]}: {c ? `${c.level.toLocaleString('de-DE')} von ${capacity(car, id)} l (Tag ${c.day})` : 'noch nicht abgelesen'}</div>;
       })}

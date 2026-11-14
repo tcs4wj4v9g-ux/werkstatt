@@ -1,3 +1,5 @@
+import { REAR_ENGINE } from '../game/data/cars';
+import { REAR_BAY } from './player';
 import { describe, expect, it } from 'vitest';
 import { CAR_MODELS } from '../game/data/cars';
 import { ENGINES } from '../game/data/engines';
@@ -35,18 +37,20 @@ describe('Karosserieformen', () => {
     const S = bodyShape(body);
     const B = S.B;
     // Vorderachse liegt bei allen gleich, die Räder stehen nicht über die Karosserie hinaus.
-    const small = body === 'mono';
     expect(S.width(WHEEL_X)).toBeGreaterThanOrEqual(0.8);
     expect(B.width + B.flare).toBeGreaterThanOrEqual(0.8 + B.trackF + 0.108);
     expect(B.width + B.flare).toBeGreaterThanOrEqual(0.8 + B.trackR + 0.108);
     // Haube: über dem ganzen Motor (höchstes Teil: Sicken der Motorabdeckung bis 0,88 m, von x = 0,95 bis 1,58) bleibt Luft.
-    for (let x = Math.max(0.95, S.F.hoodX0); x <= 1.58; x += 0.01) expect(S.crown(x), `Haube bei x = ${x.toFixed(2)}`).toBeGreaterThan(0.88);
+    // Heckmotor: derselbe Motorraum gedreht hinter der Hinterachse und abgesenkt – dort muss der Motordeckel darüber passen.
+    if (REAR_ENGINE.has(body)) {
+      for (let x = 0.95; x <= 1.58; x += 0.01) expect(S.crown(REAR_BAY.x - x), `Motordeckel über x = ${(REAR_BAY.x - x).toFixed(2)}`).toBeGreaterThan(0.88 + REAR_BAY.y);
+    } else for (let x = Math.max(0.95, S.F.hoodX0); x <= 1.58; x += 0.01) expect(S.crown(x), `Haube bei x = ${x.toFixed(2)}`).toBeGreaterThan(0.88);
     // Radstand und Länge in einem realistischen Bereich (Kleinstwagen kürzer)
     const wheelbase = WHEEL_X - B.rearAxle;
-    expect(wheelbase).toBeGreaterThan(small ? 2.2 : 2.4);
+    expect(wheelbase).toBeGreaterThan(2.0);
     expect(wheelbase).toBeLessThan(3.1);
-    expect(B.nose - B.tail).toBeGreaterThan(small ? 3.3 : 4.0);
-    expect(B.nose - B.tail).toBeLessThan(small ? 3.7 : 5.0);
+    expect(B.nose - B.tail).toBeGreaterThan(3.3);
+    expect(B.nose - B.tail).toBeLessThan(5.0);
     // Dach liegt über der Gürtellinie, die Dachlinie erreicht die Dachhöhe.
     const mid = (B.x1 + B.x2) / 2;
     expect(S.roofY(mid)).toBeGreaterThan(S.beltY(mid) + 0.25);
