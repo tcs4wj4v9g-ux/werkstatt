@@ -49,6 +49,7 @@ export const ENGINES: Record<string, EngineDef> = Object.fromEntries(
     e('r4_12', '1,2-l-Vierzylinder', 'R4', 'benzin', false, 1.2, 58, 93, 'R4', 0.7),
     e('r4_20', '2,0-l-Vierzylinder', 'R4', 'benzin', false, 2.0, 150, 200, 'R4', 1),
     e('r4t_18', '1,8-l-Vierzylinder-Turbo', 'R4', 'benzin', true, 1.8, 180, 235, 'R4-Turbo', 1.3),
+    e('r4t_18l', '1,8-l-Vierzylinder-Turbo (150 PS)', 'R4', 'benzin', true, 1.8, 150, 210, 'R4-Turbo', 1.25),
     e('r5t_22', '2,2-l-Fünfzylinder-Turbo', 'R5', 'benzin', true, 2.2, 220, 309, 'R5-Turbo', 2.2),
     e('r4d_20', '2,0-l-Vierzylinder-Turbodiesel', 'R4', 'diesel', true, 2.0, 163, 340, 'R4-Diesel', 1.25),
     e('r6_23', '2,3-l-Reihensechszylinder', 'R6', 'benzin', false, 2.3, 150, 205, 'R6', 1.2),

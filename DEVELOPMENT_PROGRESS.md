@@ -164,7 +164,7 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Nachgebildete Autos tragen leicht abgewandelte Originalnamen (privates Spiel): Renolt Twingo, BMV 323i (E30), Porshe 356, Porshe 911 Carrera (964/992), Audy TT (8N); alle bisherigen Bavaria-Modelle heißen BMV. Modellkennungen bleiben gleich – Spielstände sind nicht betroffen.
 - Audy TT: Emblem aus drei verschlungenen Chromringen vorn und hinten.
 
-## Fahrzeug 7: Audy Sport quattro S1 (an den Audi Sport quattro S1 in Rallye-Optik angelehnt) – wartet auf Freigabe
+## Fahrzeug 7: Audy Sport quattro S1 (an den Audi Sport quattro S1 in Rallye-Optik angelehnt) – freigegeben
 
 - Auf Wunsch umgebaut zur Rallye-Optik nach Vorlagebild: kürzer und kastiger (Radstand 2,22 m), großer Frontsplitter, sechs runde Zusatzscheinwerfer, kleine Rechteckscheinwerfer, großer Heckflügel, Lufteinlässe mit Gitter hinter den Türen, weiße Grundfarbe mit gelbem Unterteil und Zierstreifen (feste Lackierung, ohne Sponsoren), weiße Sechsspeichenfelgen. Modellkennung unverändert.
 
@@ -174,3 +174,11 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Front: große rechteckige Scheinwerfer mit Blinker, Grill mit Chrom-Querlamellen und drei Ringen, schwarzer Stoßfänger mit Nebelscheinwerfern. Heck: schwarze Leuchtenblende über die ganze Breite mit gerippten Rückleuchten, Kennzeichen in der Blende, Ringe, schwarzer Stoßfänger, ein Endrohr. Seiten: schwarze Schutzleiste. Silberne Scheibenfelgen.
 - Nebenbei korrigiert: Die Akte nannte Boxermotoren „V-Motor“ – jetzt „Boxer“.
 - Geprüft: Logiktests, Browser-Durchlauf Bremse (inkl. Fünfzylinder: fünf Spulen, Motorabdeckung im Bild angetippt). Kein echter iPad-Test.
+
+## Fahrzeug 8: Audy A4 1.8T (B5) (an den Audi A4 B5 Limousine angelehnt) – wartet auf Freigabe
+
+- Neue Form `b5`: viertürige Limousine, 4,48 m, Radstand 2,62 m, runde Front, sanft gewölbte Haube, schwarze B-Säulen, Fondsitzbank, kurzer Kofferraum mit runder Heckkante.
+- Front: Chromrahmen-Grill mit vier Lamellen und drei Ringen, Klarglas-Scheinwerfer mit zwei Reflektoren und Blinker, Nebelscheinwerfer im Stoßfänger. Heck: breite Rückleuchten, Chromleiste, Ringe, Kennzeichen in der Kofferraummulde, schwarze Stoßfängerleisten, ein Endrohr links. Silberne Speichenfelgen.
+- Neuer Motor `r4t_18l`: 1,8-l-Turbo-Vierzylinder mit 150 PS (Teilefamilie R4-Turbo, wie im TT), Frontmotor, Haube hinten angeschlagen.
+- Günstiger Alltagswagen (ab ca. 4.200 €), Farben Schwarz, Silber, Dunkelblau, Dunkelrot, Dunkelgrün.
+- Geprüft: Logiktests, Browser-Durchläufe Bremse und Markt. Kein echter iPad-Test.

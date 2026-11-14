@@ -50,8 +50,9 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const nine2 = body === 'nine2';
   const tt = body === 'tt';
   const quattro = body === 'quattro';
+  const b5 = body === 'b5';
   return {
-    rim: quattro ? 'rally' : tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'BMV' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    rim: b5 ? 'classic' : quattro ? 'rally' : tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'BMV' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
     // BMV: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
     grille: sport ? 'slot' : classic ? 'classic' : brand === 'BMV' ? 'twin' : lux ? 'tall' : 'wide',
     lamps: classic ? 'round' : sport ? 'slim' : brand === 'BMV' ? 'twin' : 'block',
@@ -60,8 +61,8 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     chromeTrim: classic || lux || box || tub || tt,
     spoiler: sport || model?.id === 'bavaria_340_ms',
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
-    seat: quattro ? '#1d2f6b' : tt ? '#b98a5a' : nine2 ? '#8a5a3c' : nine ? '#2a2b2f' : tub ? '#7a2b22' : box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
-    seat2: quattro ? '#14161a' : tt ? '#5a3d26' : nine2 ? '#1b1c1f' : nine ? '#1b1c1f' : tub ? '#5c2019' : box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
+    seat: b5 ? '#4a4c52' : quattro ? '#1d2f6b' : tt ? '#b98a5a' : nine2 ? '#8a5a3c' : nine ? '#2a2b2f' : tub ? '#7a2b22' : box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
+    seat2: b5 ? '#2e3035' : quattro ? '#14161a' : tt ? '#5a3d26' : nine2 ? '#1b1c1f' : nine ? '#1b1c1f' : tub ? '#5c2019' : box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
     front: visual?.front ?? 0,
     rear: visual?.rear ?? 0,
     skirts: !!visual?.skirts,
@@ -599,6 +600,73 @@ function sideBand(m: Mesher, S: Shape, slot: number, side: 1 | -1, x0: number, x
   m.add(slot, g);
 }
 
+/**
+ * Front und Heck der Mittelklasse-Limousine der 90er (`b5`): Klarglas-Scheinwerfer mit zwei runden Reflektoren, die nach innen
+ * schmaler werden, Grill mit Chromrahmen und Querstreben, Stoßfänger in Wagenfarbe mit schwarzer Leiste; hinten breite Leuchten
+ * bis in die Flanke, Kennzeichen in der Kofferraumklappe mit Chromleiste darüber.
+ */
+function b5Ends(m: Mesher, S: Shape, N: (n: number) => number) {
+  const B = S.B;
+  const disc = (dir: 1 | -1, slot: number, z: number, y: number, r: number, lift: number) => endPatch(m, slot, S, dir, z, y, r * 2, r * 2, 1, lift, N(10), N(8));
+  // ---- Front ----
+  const yL = 0.67;
+  for (const s of [-1, 1] as const) {
+    // Scheinwerfer: außen hoch, innen schmal (zwei übereinandergelegte Flächen ergeben die Keilform)
+    const a = Math.atan2(s * 0.56, 0.96);
+    wrapPatch(m, SLOT.gloss, S, 1, a, 0.5, yL, 0.13, 0.35, 0.004, N(12), N(5));
+    wrapPatch(m, SLOT.lens, S, 1, a + s * 0.04, 0.42, yL + 0.005, 0.11, 0.35, 0.008, N(12), N(5));
+    wrapPatch(m, SLOT.lens, S, 1, a - s * 0.17, 0.12, yL + 0.02, 0.07, 0.35, 0.008, N(5), N(4));
+    for (const k of [-1, 1]) {
+      const ak = a + s * 0.02 + k * 0.08;
+      wrapPatch(m, SLOT.chrome, S, 1, ak, 0.11, yL + 0.003, 0.085, 1, 0.011, N(8), N(8));
+      wrapPatch(m, SLOT.glow, S, 1, ak, 0.035, yL + 0.003, 0.028, 1, 0.014, N(6), N(6));
+    }
+    // Blinker außen im Scheinwerfer (Klarglas mit gelbem Kern)
+    wrapPatch(m, SLOT.amber, S, 1, a + s * 0.22, 0.05, yL - 0.01, 0.06, 0.5, 0.012, 3, 3);
+    // Nebelscheinwerfer im Stoßfänger
+    disc(1, SLOT.gloss, s * 0.52, 0.4, 0.045, 0.006);
+    disc(1, SLOT.lens, s * 0.52, 0.4, 0.035, 0.01);
+  }
+  // Grill: Chromrahmen, schwarz, Querstreben, Ringe
+  endPatch(m, SLOT.chrome, S, 1, 0, 0.66, 0.46, 0.15, 0.35, 0.006, N(12), N(5));
+  endPatch(m, SLOT.gloss, S, 1, 0, 0.66, 0.42, 0.12, 0.35, 0.01, N(12), N(5));
+  for (const o of [-0.04, -0.013, 0.013, 0.04]) endPatch(m, SLOT.chrome, S, 1, 0, 0.66 + o, 0.4, 0.005, 0, 0.013, N(10), 1);
+  ringsEmblem(m, S, N, 1, 0.66, 0.03);
+  // Stoßfänger in Wagenfarbe: schwarze Leiste, Kennzeichen, unterer Einlass
+  wrapPatch(m, SLOT.dark, S, 1, 0, 2.0, 0.52, 0.04, 0.2, 0.012, N(24), 1);
+  endPatch(m, SLOT.plate, S, 1, 0, 0.44, 0.48, 0.1, 0.06, 0.012, N(8), 2);
+  endPatch(m, SLOT.gloss, S, 1, 0, 0.33, 0.6, 0.06, 0.5, 0.006, N(12), 2);
+  wrapPatch(m, SLOT.dark, S, 1, 0, 1.6, B.ground + 0.04, 0.04, 0.4, 0.01, N(16), 2);
+  // ---- Heck ----
+  const yT = 0.84;
+  for (const s of [-1, 1] as const) {
+    const a = Math.atan2(s * 0.66, 0.96);
+    wrapPatch(m, SLOT.dark, S, -1, a, 0.6, yT, 0.15, 0.25, 0.004, N(12), N(5));
+    wrapPatch(m, SLOT.tail, S, -1, a, 0.56, yT + 0.02, 0.09, 0.25, 0.009, N(12), N(4));
+    wrapPatch(m, SLOT.tailBar, S, -1, a, 0.5, yT + 0.03, 0.025, 0.3, 0.013, N(10), 2);
+    wrapPatch(m, SLOT.amber, S, -1, a + s * 0.1, 0.24, yT - 0.045, 0.035, 0.2, 0.012, N(6), 2);
+    wrapPatch(m, SLOT.lens, S, -1, a - s * 0.13, 0.18, yT - 0.045, 0.035, 0.2, 0.012, N(6), 2);
+  }
+  // Kofferraumklappe: Chromleiste, Ringe, Kennzeichenmulde
+  endPatch(m, SLOT.chrome, S, -1, 0, yT + 0.06, 0.62, 0.012, 0.3, 0.008, N(10), 1);
+  ringsEmblem(m, S, N, -1, yT + 0.1, 0.024);
+  endPatch(m, SLOT.dark, S, -1, 0, yT - 0.02, 0.5, 0.13, 0.25, 0.005, N(8), 3);
+  endPatch(m, SLOT.plate, S, -1, 0, yT - 0.02, 0.44, 0.095, 0.06, 0.01, N(8), 2);
+  // Stoßfänger hinten mit schwarzer Leiste, Endrohr links
+  wrapPatch(m, SLOT.dark, S, -1, 0, 2.0, 0.55, 0.04, 0.2, 0.012, N(24), 1);
+  wrapPatch(m, SLOT.dark, S, -1, 0, 1.5, B.ground + 0.08, 0.06, 0.4, 0.006, N(16), 2);
+  const zp = -0.44;
+  const xp = S.endX(-1, B.ground + 0.08, zp);
+  m.add(SLOT.chrome, new THREE.CylinderGeometry(0.034, 0.034, 0.12, 16, 1, true), mat([xp + 0.03, B.ground + 0.07, zp], [0, 0, Math.PI / 2], [1, 1, 1.3]));
+  m.add(SLOT.dark, new THREE.CylinderGeometry(0.03, 0.03, 0.01, 12), mat([xp - 0.025, B.ground + 0.07, zp], [0, 0, Math.PI / 2], [1, 1, 1.3]));
+  // Flanken: schwarze Schutzleiste in Stoßfängerhöhe
+  for (const s of [-1, 1] as const) {
+    const xa = B.rearAxle + ARCH_R + 0.06;
+    const xb = WHEEL_X - ARCH_R - 0.06;
+    sidePatch(m, SLOT.dark, S, s, (xa + xb) / 2, 0.54, xb - xa, 0.035, 0, 0.01, N(14), 2);
+  }
+}
+
 /** Emblem aus drei verschlungenen Chromringen vorn (`dir` 1) oder hinten (-1) in Höhe y. */
 function ringsEmblem(m: Mesher, S: Shape, N: (n: number) => number, dir: 1 | -1, y: number, r = 0.03) {
   for (const k of [-1, 0, 1]) {
@@ -716,6 +784,7 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   else if (body === 'nine2') nine2Ends(m, S, N);
   else if (body === 'tt') ttEnds(m, S, N);
   else if (body === 'quattro') quattroEnds(m, S, N);
+  else if (body === 'b5') b5Ends(m, S, N);
   else {
     // ---- Front ----
     const yLamp = 0.7;

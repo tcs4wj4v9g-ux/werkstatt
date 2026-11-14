@@ -133,9 +133,10 @@ export type Access = 'hood' | 'lifted' | 'stand';
  * `nine` = Heckmotor-Sportcoupé der späten 80er (aufrechte Rundscheinwerfer, Fließheck, breite Hinterkotflügel),
  * `nine2` = aktuelles Heckmotor-Sportcoupé (breiter, länger, LED-Scheinwerfer, durchgehendes Leuchtenband),
  * `tt` = rundes Designer-Coupé (ein Dachbogen von der Scheibe bis zum Heck, kreisrunde Radhäuser, schmales Glashaus),
- * `quattro` = kantiges Rallye-Coupé der 80er (Kastenkotflügel, flache lange Haube, schräge Heckscheibe).
+ * `quattro` = kantiges Rallye-Coupé der 80er (Kastenkotflügel, flache lange Haube, schräge Heckscheibe),
+ * `b5` = weich gerundete Mittelklasse-Limousine der 90er (vier Türen, sanfter Dachbogen, runder Kofferraum).
  */
-export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro';
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro' | 'b5';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 

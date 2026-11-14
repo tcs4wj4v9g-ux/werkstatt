@@ -191,6 +191,14 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     flare: 0.09, crease: 0.74, creaseDepth: 0.012, blackPillars: true, pillars: [[-0.66, -0.58]], glassRear: -1.1, rearSeat: false,
     seams: [0.74, -0.54], handles: [-0.4], hoodSlope: 0.05, hoodCurve: 0.05, dome: 0.004, cabinK: 0.93, roofArc: 0.008,
   },
+  // Weich gerundete Mittelklasse-Limousine der 90er: 4,48 m, Radstand 2,62 m, runde Nase, sanfter Dachbogen, kurzer runder
+  // Kofferraum, glatte Flanken mit leichter Kante, vier Türen.
+  b5: {
+    ...BASE, tail: -2.18, nose: 2.3, width: 0.865, rearAxle: -1.24, trackF: -0.04, trackR: -0.04, roof: 1.41, x0: -1.62, x1: -0.95, x2: 0.1,
+    deck: 1.02, noseMid: 0.6, noseP: 3, tailMid: 0.82, tailP: 3.2, tailLen: 0.3, planP: 3.4, planPR: 3.6, ground: 0.26, tumble: 0.19, bowF: 0.14, bowR: 0.12,
+    flare: 0.018, crease: 0.78, creaseDepth: 0.008, blackPillars: true, pillars: [[-0.4, -0.29]], glassRear: -1.32, rearSeat: true,
+    seams: [0.74, -0.34, -1.26], handles: [-0.16, -1.08], dome: 0.008, roofArc: 0.03,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 
