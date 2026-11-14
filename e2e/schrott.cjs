@@ -220,7 +220,55 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   expect(dry.bearing === 'defect' && dry.cam === 'defect', 'Nach Sekunden ohne Öl: Pleuellager und Nockenwelle beschädigt – ' + dry.toast);
   await G(() => window.__gk.getState().toggleEngine(1));
 
+  // ---------- Weiterlaufen ohne Öl: Motorblock reißt, nur Motortausch hilft ----------
+  await G(() => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; const c = window.__gkLib.createCar('bavaria_320', [], Math.random, {}); c.hoodOpen = true; c.fluids.oil.level = 0; cars[1] = c; g.setState({ cars, panel: null, money: 50000 }); g.getState().toggleEngine(1); g.setState({ engineSince: Date.now() - 16000 }); });
+  await p.waitForTimeout(2300);
+  const crack = await G(() => { const s = window.__gk.getState(); return { cracked: !!s.cars[1].motor && s.cars[1].motor.cracked, bay: s.engineBay, toast: s.toast && s.toast.text }; });
+  expect(crack.cracked && crack.bay === -1, 'Motor ohne Öl weiterlaufen lassen: Block gerissen, Motor aus – ' + crack.toast);
+  await G(() => { const g = window.__gk; g.setState((s) => ({ cars: s.cars.map((c, i) => (i === 1 ? { ...c, fluids: { ...c.fluids, oil: { ...c.fluids.oil, level: 5 } } } : c)) })); g.getState().toggleEngine(1); });
+  const noStart = await G(() => ({ bay: window.__gk.getState().engineBay, toast: window.__gk.getState().toast && window.__gk.getState().toast.text }));
+  expect(noStart.bay === -1 && /Motorblock ist gerissen/.test(noStart.toast), 'Mit Öl startet er trotzdem nicht mehr: ' + noStart.toast);
+  await G(() => window.__gk.getState().setPanel('file', 1)); await p.waitForTimeout(300);
+  expect(await p.locator('[data-testid=cracked]').count() === 1, 'Akte zeigt: Motorblock gerissen, Motor tauschen');
+  await G(() => { const g = window.__gk; g.getState().setPanel(null); g.setState({ engines: [] }); });
+  const m1 = (await st()).money;
+  await G(() => window.__gk.getState().buyNewEngine('r4_20', 'bavaria_320'));
+  const fresh = await G(() => window.__gk.getState().engines.map((u) => u.motor));
+  expect(fresh.length === 1 && fresh[0].km === 0 && !fresh[0].cracked && (await st()).money < m1, `Austauschmotor neu bestellt (${m1 - (await st()).money} €), steht im Motorlager`);
+  await G(() => window.__gk.setState({ engines: [] }));
+
+  // ---------- Schrottplatz: Hebebühne, Räder und Unterboden ----------
+  await G(() => window.__gkLib.travel('schrott')); await p.waitForTimeout(1200);
+  await installHelpers();
+  await G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const c = L.createCar('bavaria_330', [], Math.random, {}); L.motor.junkify(c, () => 0.99, s.day); for (const k of Object.keys(c.components)) { c.components[k].missing = false; c.components[k].installed = true; c.components[k].bolts = c.components[k].bolts.map(() => 2); c.components[k].connected = true; } const cars = [...s.cars]; cars[16] = c; g.setState({ cars, money: 50000, tool: 'hand' }); Object.assign(window.__gkPlayer, { x: -57.6, z: -5.5, yaw: Math.PI / 2, pitch: -0.2, work: null, zoom: false }); });
+  await p.waitForTimeout(900);
+  await p.locator('[data-testid=junk-lift]').click(); await p.waitForTimeout(1500);
+  expect((await car(16)).lifted, 'Schrottauto auf die Hebebühne gefahren');
+  await p.getByRole('button', { name: /Rad vorne links/ }).click(); await p.waitForTimeout(900);
+  const pose = await G(() => window.__gkPlayer.work);
+  expect(pose && /^wheel_left:16/.test(pose.id) && Math.hypot(pose.pos[0] + 60, pose.pos[2] + 5.5) < 3, `Radansicht am Schrottplatz: Kamera am Auto (${pose && pose.pos.map((v) => v.toFixed(1)).join('/')})`);
+  await p.screenshot({ path: `${S}/schrott-buehne-rad.png` });
+  const wheelHit = await G(() => { const cam = window.__gkCamera; const v = new cam.position.constructor(); let r = null; window.__gkScene.traverse((o) => { if (!r && o.userData && o.userData.liveId && /^(wheel|caliper|disc)_fl$/.test(o.userData.liveId)) { o.getWorldPosition(v); r = v.distanceTo(cam.position); } }); return r; });
+  expect(wheelHit !== null && wheelHit < 2.5, `Vorderrad in Reichweite und antippbar (${wheelHit && wheelHit.toFixed(2)} m)`);
+  await G(() => window.__t.strip(16, 'fuel_pump'));
+  expect((await st()).used.some((u) => u.part === 'fuel_pump') && (await car(16)).components.fuel_pump.missing, 'Von unten ausgebaut und gekauft: Kraftstoffpumpe');
+  await p.locator('[data-testid=leave]').click();
+  await p.locator('[data-testid=junk-lift]').click(); await p.waitForTimeout(400);
+  expect(!(await car(16)).lifted, 'Schrottauto wieder abgelassen');
+
+  // ---------- Gekauftes Schrottauto: fehlendes Teil hat einen Platzhalter und lässt sich einbauen ----------
+  await G(() => { const g = window.__gk; const s = g.getState(); const c = structuredClone(s.cars[16]); c.components.battery = { ...c.components.battery, installed: false, missing: true, bolts: c.components.battery.bolts.map(() => 0), connected: false }; delete c.junk; c.hoodOpen = true; c.lifted = false; const cars = [...s.cars]; cars[0] = c; g.setState({ cars, panel: null, tool: 'hand' }); window.__gkLib.travel('werkstatt'); });
+  await p.waitForTimeout(1200);
+  await G(() => Object.assign(window.__gkPlayer, { x: 3.6, z: -2.7, yaw: Math.PI / 2, pitch: -0.6, work: null, zoom: false })); await p.waitForTimeout(900);
+  const ghost = await G(() => { let n = 0; window.__gkScene.traverse((o) => { if (o.userData && /^Batterie.* einbauen$/.test(o.userData.label || '')) n++; }); return n; });
+  expect(ghost > 0, 'Fehlende Batterie: grüner Platzhalter zum Einbauen sichtbar');
+  await G(() => { const g = window.__gk; g.getState().buyPart('battery', 0); g.getState().installWith(0, 'battery', { kind: 'new' }); });
+  const bat0 = await G(() => window.__gk.getState().cars[0].components.battery);
+  expect(bat0.installed && !bat0.missing && bat0.condition === 'ok', 'Neue Batterie in das fehlende Teil eingesetzt');
+
   // ---------- 17: Alter Einzelspieler-Spielstand (Version 5, 15 Stellplätze) ----------
+  // Ausstehendes Speichern der vorigen Schritte abwarten, sonst überschreibt es den eingeschleusten alten Spielstand.
+  await p.waitForTimeout(2500);
   await G(() => {
     const car = window.__gkLib.createCar('bavaria_320', ['coil'], Math.random, {}); car.purchasePrice = 3000;
     for (const k of ['wheel_rl', 'caliper_rl', 'pads_rl', 'disc_rl', 'wheel_rr', 'caliper_rr', 'pads_rr', 'disc_rr', 'harness', 'mounts', 'downpipe', 'fuel_pump', 'intake_manifold', 'exhaust_manifold', 'timing_chain', 'camshaft', 'oil_pump', 'mainbrg', 'crank', 'piston1', 'piston2', 'piston3', 'piston4']) delete car.components[k];

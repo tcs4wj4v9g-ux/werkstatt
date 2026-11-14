@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { ENGINES } from '../game/data/engines';
@@ -10,7 +11,8 @@ import { CarModel } from './CarModel';
 import { bayMaterials, engineDecor } from './engineBay';
 import { Interactable } from './Interactable';
 import { Mesher, type V3 } from './mesher';
-import { JUNK, JUNK_BOXES, travel, useFocus, type Box } from './player';
+import { BODY_SPECS } from './carGeometry';
+import { JUNK, JUNK_BOXES, LIFT_HEIGHT, travel, useFocus, type Box } from './player';
 import { asphaltTexture, textTexture } from './textures';
 import { DECO, decoMaterials } from './workshopDecor';
 
@@ -103,6 +105,48 @@ function Sign({ text, sub, p, rot, size, bg = '#16181d', fg = '#ffd23f' }: { tex
   );
 }
 
+// Mobile Säulenheber: vier gelbe Säulen schräg hinter bzw. vor den Rädern, Gabeln greifen unter die Reifen.
+// So bleiben Radhäuser, Bremsen und Unterboden frei sichtbar.
+const FRONT_AXLE = 1.38;
+const columnCache = new Map<string, THREE.BufferGeometry>();
+function columnLift(rearAxle: number) {
+  const key = `c${rearAxle}`;
+  let g = columnCache.get(key);
+  if (!g) {
+    const m = new Mesher(10);
+    for (const [x, dir] of [[FRONT_AXLE, 1], [rearAxle, -1]] as const) {
+      for (const z of [-1.22, 1.22]) {
+        const cx = x + dir * 0.55;
+        m.rbox(DECO.yellow, [0.16, 2.3, 0.16], 0.02, [cx, 1.15, z]);
+        m.rbox(DECO.yellow, [0.5, 0.05, 0.36], 0.01, [cx, 0.03, z]);
+        m.rbox(DECO.black, [0.12, 0.2, 0.08], 0.01, [cx, 1.1, z + Math.sign(z) * 0.1]);
+      }
+    }
+    g = m.build();
+    columnCache.set(key, g);
+  }
+  return g;
+}
+function liftForks(rearAxle: number) {
+  const key = `f${rearAxle}`;
+  let g = columnCache.get(key);
+  if (!g) {
+    const m = new Mesher(10);
+    for (const [x, dir] of [[FRONT_AXLE, 1], [rearAxle, -1]] as const) {
+      for (const z of [-1, 1]) {
+        const cx = x + dir * 0.55;
+        // Schlitten an der Säule, Arm zum Rad, Gabel unter dem Reifen
+        m.rbox(DECO.steelDark, [0.22, 0.14, 0.22], 0.01, [cx, 0.06, z * 1.22]);
+        m.rbox(DECO.steelDark, [0.6, 0.05, 0.08], 0.01, [x + dir * 0.27, 0.02, z * 1.0]);
+        for (const o of [-0.18, 0.18]) m.rbox(DECO.galv, [0.08, 0.04, 0.4], 0.01, [x + o, 0.02, z * 0.82]);
+      }
+    }
+    g = m.build();
+    columnCache.set(key, g);
+  }
+  return g;
+}
+
 /** Spenderauto: volles Modell in der Nähe (ausschlachten), sonst vereinfacht. */
 function JunkCar({ slot }: { slot: number }) {
   const car = useGame((s) => s.cars[slot]);
@@ -122,11 +166,21 @@ function JunkCar({ slot }: { slot: number }) {
       onVisual: (field: keyof VisualTune) => g().junkVisual(slot, field),
     };
   }, [slot]);
+  const carriage = useRef<THREE.Group>(null);
+  const up = !!car?.lifted;
+  useFrame((_, dt) => {
+    if (carriage.current) carriage.current.position.y += ((up ? LIFT_HEIGHT : 0) - carriage.current.position.y) * Math.min(1, dt * 2.6);
+  });
   if (!car) return null;
   const d = SLOTS[slot];
+  const body = CAR_MODELS[car.modelId].body;
   return (
     <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
-      <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} lod={near || car.hoodOpen ? 'full' : 'simple'} />
+      <mesh geometry={columnLift(BODY_SPECS[body].rearAxle)} material={decoMaterials()} castShadow raycast={() => null} />
+      <group ref={carriage}>
+        <mesh geometry={liftForks(BODY_SPECS[body].rearAxle)} material={decoMaterials()} raycast={() => null} />
+        <CarModel body={body} color={car.color} car={car} handlers={handlers} tool={tool} lod={near || car.hoodOpen || up ? 'full' : 'simple'} />
+      </group>
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
         <planeGeometry args={[5.2, 2.6]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.25} depthWrite={false} />

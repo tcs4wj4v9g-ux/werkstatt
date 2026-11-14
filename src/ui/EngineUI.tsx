@@ -22,6 +22,7 @@ function UnitLine({ u }: { u: EngineUnit }) {
   return (
     <div className="meta">
       <b>{e?.name ?? u.motor.engineId}</b> · {e?.layout} {e?.fuel === 'diesel' ? 'Diesel' : 'Benzin'}{e?.turbo || u.motor.turboKit ? ' Turbo' : ''} · {e?.liters} l · {e?.ps} PS · {u.motor.km.toLocaleString('de-DE')} km · aus {CAR_MODELS[u.motor.donor]?.name ?? u.motor.donor}
+      {u.motor.cracked && <span className="bad"> · Motorblock gerissen (nur Teileträger)</span>}
       {known.length > 0 && <span className="bad"> · bekannte Schäden: {known.map((d) => DEFECTS[d].name).join(', ')}</span>}
       {!unitComplete(u) && <span> · teilweise zerlegt</span>}
     </div>
@@ -165,7 +166,7 @@ export function JunkPanel() {
           <div key={slot} className="shop-row col" data-testid={`junk-${slot}`}>
             <b>{SLOTS[slot].label}: {carName(car)} – {car.junk.story}</b>
             <div className="meta">
-              {car.motor === null ? 'ohne Motor' : engineOf(car).name} · {(car.motor?.km ?? car.km).toLocaleString('de-DE')} km · {missing} Teile fehlen{tuned ? ` · ${tuned} Tuningteile` : ''} · steht bis Tag {car.junk.until}
+              {car.motor === null ? 'ohne Motor' : engineOf(car).name}{car.motor?.cracked ? ' (Block gerissen)' : ''} · {(car.motor?.km ?? car.km).toLocaleString('de-DE')} km · {missing} Teile fehlen{tuned ? ` · ${tuned} Tuningteile` : ''} · steht bis Tag {car.junk.until}
             </div>
             {car.motor !== null && (
               <>

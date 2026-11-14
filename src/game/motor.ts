@@ -1,7 +1,7 @@
-import { CAR_MODELS, CLASS_FACTOR } from './data/cars';
+import { CAR_MODELS, CLASS_FACTOR, REAR_ENGINE } from './data/cars';
 import { COMPONENT_MAP, defOf, defsOf, engineComponents, engineOf, modelEngine, motorOf } from './data/components';
 import { DEFECTS, DEFECT_LIST, defectComponents } from './data/defects';
-import { ENGINES, isV, type EngineDef } from './data/engines';
+import { ENGINES, isBoxer, isV, type EngineDef } from './data/engines';
 import { PARTS } from './data/parts';
 import { isComplete } from './repair';
 import { createZones } from './detail';
@@ -28,7 +28,7 @@ export interface UsedPart {
   known: boolean;
   health?: number;
   km: number;
-  /** Herkunft, z. B. „Bavaria 330 Limousine (Schrottplatz)“. */
+  /** Herkunft, z. B. „BMV 330 Limousine (Schrottplatz)“. */
   from: string;
   /** Was dafür bezahlt wurde. */
   price: number;
@@ -36,14 +36,14 @@ export interface UsedPart {
 
 /** Gewicht des Motors mit Anbauteilen (kg) – geht ins Fahrzeuggewicht ein. */
 export function engineWeight(e: EngineDef) {
-  const base = e.layout === 'R4' ? 140 : e.layout === 'R6' ? 195 : e.layout === 'V6' ? 175 : 225;
+  const base = e.layout === 'B6' ? 175 : e.layout === 'B4' ? 105 : e.layout === 'R4' ? 140 : e.layout === 'R5' ? 170 : e.layout === 'R6' ? 195 : e.layout === 'V6' ? 175 : 225;
   return base + (e.fuel === 'diesel' ? 25 : 0) + (e.turbo ? 12 : 0);
 }
 
 /** Baulänge-Klasse: 1 = kurz (R4, V6), 2 = lang (R6), 3 = breit und schwer (V8). */
-const SIZE: Record<EngineDef['layout'], number> = { R4: 1, V6: 1.5, R6: 2, V8: 3 };
+const SIZE: Record<EngineDef['layout'], number> = { B6: 1.4, B4: 1, R4: 1, R5: 1.6, V6: 1.5, R6: 2, V8: 3 };
 /** Wie viel Motor passt in den Motorraum dieser Karosserie? */
-const BAY: Record<string, number> = { hatch: 1.5, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
+const BAY: Record<string, number> = { mono: 1.2, hatch: 1.5, box: 2.2, tub: 1.2, nine: 1.4, nine2: 1.4, tt: 1.5, quattro: 2.2, b5: 2.6, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
 
 export interface SwapPlan {
   possible: boolean;
@@ -65,7 +65,11 @@ export function swapPlan(car: Pick<CarInstance, 'modelId'>, engineId: string): S
   const reasons: string[] = [];
   const parts = new Set<PartId>();
   if (!e) return { possible: false, level: 9, label: 'Unbekannter Motor', needs: [], reasons: ['Motor unbekannt.'] };
-  if (SIZE[e.layout] > BAY[model.body]) {
+  // Heckmotor-Autos nehmen nur einen Boxer, Frontmotor-Autos keinen (Einbaulage und Getriebe passen nicht).
+  if (REAR_ENGINE.has(model.body) !== isBoxer(e)) {
+    return { possible: false, level: 9, label: 'Passt nicht', needs: [], reasons: [REAR_ENGINE.has(model.body) ? 'In den Heckmotorraum passt nur ein flacher Boxermotor.' : 'Ein Boxer mit Heckgetriebe passt nicht in einen Frontmotorraum.'] };
+  }
+  if (SIZE[e.layout] > (BAY[model.body] ?? 3)) {
     return { possible: false, level: 9, label: 'Passt nicht', needs: [], reasons: [`Ein ${e.layout} passt nicht in den Motorraum dieser Karosserie.`] };
   }
   if (e.id === orig.id) return { possible: true, level: 0, label: 'Originalmotor', needs: [], reasons: ['Gleicher Motortyp wie ab Werk – direkt einbaubar.'] };
@@ -243,6 +247,10 @@ export function engineTest(unit: Pick<EngineUnit, 'motor' | 'components'>) {
   if (bad('mainbrg')) oilPressure -= 1.1;
   if (bad('crank')) oilPressure -= 0.5;
   const findings: string[] = [];
+  if (unit.motor.cracked) {
+    for (const i of [1, 2]) if (compression[i] !== undefined) compression[i] = Math.round(compression[i] * 0.4 * 10) / 10;
+    findings.push('Riss im Motorblock: Kühlmittel im Öl, Kompression bricht ein – nicht reparabel, der Motor muss getauscht werden.');
+  }
   const low = compression.map((v, i) => [v, i + 1] as const).filter(([v]) => v < nominal * 0.85);
   if (low.length) findings.push(`Kompression zu niedrig an Zylinder ${low.map(([, n]) => n).join(', ')}.`);
   if (oilPressure < 2.5) findings.push('Öldruck zu niedrig – Lager oder Ölpumpe verdächtig.');
@@ -256,6 +264,7 @@ export function engineHealth(unit: Pick<EngineUnit, 'motor' | 'components'>) {
   const defects = DEFECT_LIST.filter((d) => defectComponents({ components: unit.components }, d).some((id) => unit.components[id]?.condition === 'defect'));
   const penalty = defects.reduce((s, d) => s + d.penalty, 0);
   const kmFactor = Math.max(0.35, 1 - unit.motor.km / 450000);
+  if (unit.motor.cracked) return { defects: defects.map((d) => d.id), pct: 5 };
   return { defects: defects.map((d) => d.id), pct: Math.max(5, Math.round(100 * kmFactor - penalty / 120)) };
 }
 
@@ -263,6 +272,8 @@ export function engineHealth(unit: Pick<EngineUnit, 'motor' | 'components'>) {
 export function engineValue(unit: EngineUnit) {
   const e = ENGINES[unit.motor.engineId];
   const base = e.ps * 14 * (e.turbo ? 1.15 : 1) * (isV(e) ? 1.2 : 1);
+  // Gerissener Block: nur noch Teileträger bzw. Schrottwert
+  if (unit.motor.cracked) return Math.max(150, Math.round((base * 0.08) / 50) * 50);
   const h = engineHealth(unit);
   const missing = Object.values(unit.components).filter((c) => !c.installed).length;
   return Math.max(150, Math.round((base * (0.25 + 0.75 * (h.pct / 100)) - missing * 40) / 50) * 50);
@@ -285,6 +296,12 @@ export function junkPartPrice(car: CarInstance, id: string) {
   const fam = def.engine ? engineOf(car).partFactor : 1;
   const cond = st.condition === 'defect' ? 0.12 : st.health !== undefined ? 0.2 + 0.25 * (st.health / 100) : 0.38;
   return Math.max(5, Math.round((PARTS[part].price * cls * fam * cond) / 5) * 5);
+}
+
+/** Preis eines fabrikneuen Austauschmotors (deutlich teurer als vom Schrottplatz). */
+export function newEnginePrice(engineId: string) {
+  const e = ENGINES[engineId];
+  return Math.round((e.ps * 14 * (e.turbo ? 1.15 : 1) * (isV(e) ? 1.2 : 1) * 1.5 + 600) / 50) * 50;
 }
 
 /** Preis des kompletten Motors am Schrottplatz. */
@@ -331,6 +348,8 @@ export function junkify(car: CarInstance, rng: Rng, day: number): CarInstance {
   if (rng() < 0.2) {
     extractEngine(car);
     car.motor = null;
+  } else if (rng() < (story === 'Motorschaden gemeldet' ? 0.7 : 0.05)) {
+    crackBlock(car, `Schrottplatz: Motorblock gerissen`);
   }
   const value = car.cleanValue * (0.06 + rng() * 0.05) * (story.startsWith('Ausgeschlachtet') ? 0.6 : 1);
   car.junk = { price: Math.max(300, Math.round(value / 50) * 50), story, until: day + 4 + Math.floor(rng() * 5) };
@@ -360,10 +379,22 @@ export function tuningDamage(car: CarInstance, risks: { id: string; level: numbe
     const pistons = Object.keys(car.components).filter((k) => /^piston\d$/.test(k));
     if (r.id === 'knock') hit(pistons[Math.floor(rng() * pistons.length)] ?? 'head_gasket', 'Klopfen unter Volllast hat einen Kolben beschädigt – Kompression weg, Ölverbrauch.');
     if (r.id === 'heat') hit('head_gasket', 'Überhitzt: Die Zylinderkopfdichtung ist durchgebrannt.');
+    if (r.id === 'mech' && r.level >= 1.6 && car.motor !== null && !car.motor?.cracked && rng() < 0.5) {
+      crackBlock(car, 'Pleuel abgerissen – Motorblock durchschlagen');
+      out.push('Viel zu viel Drehmoment: Ein Pleuel ist abgerissen und hat den Motorblock durchschlagen – der Motor muss getauscht werden.');
+      continue;
+    }
     if (r.id === 'mech') hit('bearing', 'Zu viel Drehmoment: Ein Pleuellager hat gefressen – es klopft.');
     if (r.id === 'turbo') hit('turbo', 'Der Turbolader hat den Druck nicht überlebt.');
   }
   return out;
+}
+
+/** Motorblock reißen lassen (Motor bleibt drin, ist aber nur noch Schrott bzw. Teileträger). */
+export function crackBlock(car: CarInstance, why: string) {
+  const m = motorOf(car);
+  if (!m) return;
+  car.motor = { ...m, cracked: true, history: [...m.history, why] };
 }
 
 export const motorLabel = (m: MotorMeta) => `${ENGINES[m.engineId]?.name ?? m.engineId}`;

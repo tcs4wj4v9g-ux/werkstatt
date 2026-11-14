@@ -115,9 +115,9 @@ Der Spielstand (beide Autos mit jeder einzelnen Schraube, Werkzeuge, Lager, Mark
 - **Standorte:** Profi-Werkstatt (Halle 2, dritte Hebebühne), Performance-Center (vierte Hebebühne, Prüfstand, Lackierkabine),
   Headquarters mit Showroom (ausgestellte Autos verkaufen sich teurer). Die Gebäude sind begehbar und schließen an die Stammhalle an.
 
-Bewusste Grenzen: Die Standorte erweitern dasselbe Gelände (kein getrennter zweiter Ort). Hinterachse und Hinterradbremsen sind nicht
-zerlegbar. Biturbo-Motoren haben ein Lader-Bauteil. Die Glühkerze sitzt spielmechanisch unter der Einspritzdüse. Alle Fahrzeuge,
-Marken und Motoren sind frei erfunden.
+Bewusste Grenzen: Die Standorte erweitern dasselbe Gelände (kein getrennter zweiter Ort). Biturbo-Motoren haben ein Lader-Bauteil.
+Die Glühkerze sitzt spielmechanisch unter der Einspritzdüse. Nachgebildete Autos tragen leicht abgewandelte Originalnamen
+(privates Spiel), die übrigen Fahrzeuge und Marken sind frei erfunden.
 
 ## Grafik-Update
 
@@ -203,4 +203,4 @@ Erweitern:
   Server laufen; der Store müsste Aktionen dann an den Server senden statt lokal auszuführen.
 
 Alle 3D-Modelle und Texturen werden im Code erzeugt (`three/carGeometry.ts`, `three/textures.ts`) – es werden keine
-fremden Modelle oder Bilddateien verwendet. „Bavaria“ ist eine erfundene Marke ohne fremde Logos.
+fremden Modelle oder Bilddateien verwendet. Embleme sind vereinfacht nachgebaut (z. B. drei Ringe), keine Originallogos als Bild.

@@ -470,6 +470,11 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
   );
   // Was gehört zum Motor? Alles außer Rädern, Bremsen, Batterie, Getriebe, Abgasanlage und den Anschlüssen am Fahrzeug.
   for (const d of out) d.engine = !CAR_SIDE.test(d.id);
+  // Luftgekühlt: kein Kühlmittelkreislauf
+  if (engine.air) {
+    const water = new Set(['water_pump', 'hose', 'thermostat']);
+    return out.filter((d) => !water.has(d.id)).map((d) => ({ ...d, blockedBy: d.blockedBy.filter((b) => !water.has(b)) }));
+  }
   return out;
 }
 

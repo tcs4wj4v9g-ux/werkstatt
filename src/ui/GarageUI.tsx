@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { engineAudio } from '../game/audio';
-import { CAR_MODELS } from '../game/data/cars';
+import { CAR_MODELS, REAR_ENGINE } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { fitOf, splitKey } from '../game/fitment';
 import { MarketTab } from './MarketTab';
@@ -14,7 +14,7 @@ import { marketLabel, RARITY_NAMES, valuate } from '../game/market';
 import { driveBlocker, isAssembled, knownDefects } from '../game/repair';
 import { useGame } from '../game/store';
 import type { CarInstance, PartId, ToolId } from '../game/types';
-import { player, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
+import { player, REAR_BAY, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
 import { AuctionsTab, EventsTab, MoveList, ShopList, UpgradesTab } from './ComputerTabs';
 import { FileModal } from './FileModal';
 import { FluidModal } from './FluidModal';
@@ -26,6 +26,10 @@ import { Joystick } from './Joystick';
 import { BODY_SPECS } from '../three/carGeometry';
 import { CranePanel, EnginesPanel, EngineTestPanel, JunkPanel, PartChoice, TuningPanel, UsedPartsList } from './EngineUI';
 import { engineOf } from '../game/data/components';
+
+/** Beschriftung der Arbeitsansicht: Heckmotor von hinten, vorn angeschlagene Haube von oben. */
+const viewLabel = (v: WorkView, car: CarInstance) =>
+  v === 'engine' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Motor von hinten' : v === 'engine' && BODY_SPECS[CAR_MODELS[car.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v];
 
 const carName = (c: CarInstance) => `${CAR_MODELS[c.modelId].name} (${c.year})`;
 
@@ -41,7 +45,9 @@ export function GarageUI() {
   };
   const enter = (view: WorkView, bay: number) => {
     const c = useGame.getState().cars[bay];
-    player.work = workPose(view, bay, c ? BODY_SPECS[CAR_MODELS[c.modelId].body].rearAxle : undefined);
+    const spec = c ? BODY_SPECS[CAR_MODELS[c.modelId].body] : undefined;
+    const rear = !!c && REAR_ENGINE.has(CAR_MODELS[c.modelId].body);
+    player.work = workPose(view, bay, spec?.rearAxle, spec?.hoodHinge === 'front' && !rear, rear ? spec?.bayX ?? REAR_BAY.x : undefined);
     setWork(player.work.id);
   };
   // Motor wird warm; die Arbeitsansicht endet, wenn das Auto dafür nicht mehr passt.
@@ -54,7 +60,7 @@ export function GarageUI() {
   const near = nearBay >= 0 ? s.cars[nearBay] : null;
   const running = nearBay >= 0 && s.engineBay === nearBay;
   const kind = nearBay >= 0 ? SLOTS[nearBay].kind : null;
-  const views: WorkView[] = !near || kind !== 'lift' ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'rear_left', 'rear_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
+  const views: WorkView[] = !near || (kind !== 'lift' && kind !== 'junk') ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'rear_left', 'rear_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
   // Am Waschplatz und in der Lackierkabine liegen andere Geräte bereit als am Werkzeuggürtel.
   const station: ToolId[] = kind === 'wash' ? WASH_TOOLS : kind === 'paint' ? PAINT_TOOLS : [];
   useEffect(() => {
@@ -86,8 +92,15 @@ export function GarageUI() {
           )}
           {near && kind === 'junk' && (
             <div className="car-actions">
+              {work && <button className="btn primary leave" data-testid="leave" onClick={leave}>✕ Ansicht verlassen</button>}
               <button className="btn primary" onClick={() => s.setPanel('junk')}>🏷 Preise & Kauf</button>
-              {near.motor !== null && <button className="btn" data-testid="junk-engine" onClick={() => s.liftEngine(nearBay)}>🏗 Motor ausbauen lassen</button>}
+              <button className="btn" data-testid="junk-lift" onClick={() => s.tapLift(nearBay)}>{near.lifted ? '▼ Hebebühne ablassen' : '▲ Auf die Hebebühne'}</button>
+              {near.motor !== null && !near.lifted && <button className="btn" data-testid="junk-engine" onClick={() => s.liftEngine(nearBay)}>🏗 Motor ausbauen lassen</button>}
+              {views.map((v) => (
+                <button key={v} className={`btn ${work === `${v}:${nearBay}` ? 'active' : ''}`} onClick={() => enter(v, nearBay)}>
+                  🎯 {viewLabel(v, near)}
+                </button>
+              ))}
             </div>
           )}
           {near && kind !== 'stand' && kind !== 'junk' && (
@@ -128,7 +141,7 @@ export function GarageUI() {
               )}
               {views.map((v) => (
                 <button key={v} className={`btn ${work === `${v}:${nearBay}` ? 'active' : ''}`} onClick={() => enter(v, nearBay)}>
-                  🎯 {WORK_LABELS[v]}
+                  🎯 {viewLabel(v, near)}
                 </button>
               ))}
             </div>
@@ -158,6 +171,7 @@ export function GarageUI() {
         <div className="panel left">
           <h3 className="small">Motorständer: {engineOf(near).name}</h3>
           <div className="meta">{near.motor?.km.toLocaleString('de-DE')} km · aus {CAR_MODELS[near.modelId].name}</div>
+          {near.motor?.cracked && <div className="finding">⚠ Motorblock gerissen – nicht reparabel</div>}
           <div className="meta">{near.lifted ? '↻ gedreht – Unterseite oben' : 'Oberseite oben'}</div>
           <div className="meta">{isAssembled(near) ? '✓ komplett montiert' : '✗ teilweise zerlegt'}</div>
           {knownDefects(near).map((d) => <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>)}
@@ -166,8 +180,9 @@ export function GarageUI() {
       {near && !open && kind === 'junk' && near.junk && (
         <div className="panel left">
           <h3 className="small">{CAR_MODELS[near.modelId].name} ({near.year})</h3>
-          <div className="meta">{near.junk.story} · {near.motor === null ? 'ohne Motor' : engineOf(near).name}</div>
+          <div className="meta">{near.junk.story} · {near.motor === null ? 'ohne Motor' : engineOf(near).name}{near.motor?.cracked ? ' (Block gerissen)' : ''}</div>
           <div className="meta">Ausgebaute Teile werden sofort bezahlt. Preis steht beim Anvisieren.</div>
+          <div className="meta">{near.lifted ? '▲ auf der Hebebühne – Räder, Bremsen und Unterboden erreichbar' : '▼ am Boden'}{near.hoodOpen ? ' · Haube offen' : ''}</div>
         </div>
       )}
       {near && !open && kind !== 'stand' && kind !== 'junk' && (
@@ -180,6 +195,7 @@ export function GarageUI() {
           {knownDefects(near).map((d) => (
             <div key={d} className="finding">⚠ {DEFECTS[d].name}</div>
           ))}
+          {near.motor?.cracked && <div className="finding">⚠ Motorblock gerissen – Motor tauschen</div>}
           <h4>Status</h4>
           <div className="meta">{isAssembled(near) ? '✓ komplett montiert' : '✗ Teile demontiert'}</div>
           {kind === 'lift' && <div className="meta">{near.lifted ? '▲ angehoben' : '▼ am Boden'} · {near.hoodOpen ? 'Haube offen' : 'Haube zu'}</div>}

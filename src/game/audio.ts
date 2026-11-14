@@ -122,7 +122,7 @@ export interface EngineSound {
   whine?: number;
   boostHiss?: number;
   /** Grundcharakter: Bauart, Zylinderzahl, Diesel, Aufladung. */
-  layout?: 'R4' | 'R6' | 'V6' | 'V8';
+  layout?: 'R4' | 'R5' | 'R6' | 'V6' | 'V8' | 'B4' | 'B6';
   cylinders?: number;
   diesel?: boolean;
   turbo?: boolean;
@@ -140,6 +140,12 @@ export const VOICES: Record<string, { ratios: number[]; gains: number[]; tone: n
   R6: { ratios: [1, 0.5, 2.0], gains: [0.4, 0.1, 0.24], tone: 340, exhaust: 0.85 },
   V6: { ratios: [1, 1 / 3, 1.5], gains: [0.45, 0.26, 0.14], tone: 285, exhaust: 1.1 },
   V8: { ratios: [1, 0.25, 0.5], gains: [0.38, 0.42, 0.34], tone: 215, exhaust: 1.7 },
+  // Boxer: rauer, luftiger Klang mit kräftiger halber Ordnung (Gebläse und ungleiche Abgasführung)
+  // Fünfzylinder: ungleichmäßiges Trällern durch die 2,5. Ordnung
+  R5: { ratios: [1, 0.4, 0.6], gains: [0.42, 0.3, 0.26], tone: 290, exhaust: 1.25 },
+  B4: { ratios: [1, 0.5, 1.5], gains: [0.42, 0.38, 0.16], tone: 240, exhaust: 1.2 },
+  // Sechszylinder-Boxer: heiseres, metallisches Kreischen mit kräftigen höheren Ordnungen
+  B6: { ratios: [1, 0.5, 2.0], gains: [0.4, 0.22, 0.3], tone: 330, exhaust: 1.35 },
 };
 /** Zündfrequenz in Hz: je zwei Kurbelumdrehungen zündet jeder Zylinder einmal. */
 export const firingHz = (rpm: number, cylinders = 4) => (rpm / 60) * (cylinders / 2);

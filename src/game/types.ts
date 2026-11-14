@@ -126,7 +126,17 @@ export type DefectId =
 
 /** hood = Motorraum (Auto unten), lifted = von unten (Auto angehoben), stand = nur am ausgebauten Motor auf dem Motorständer. */
 export type Access = 'hood' | 'lifted' | 'stand';
-export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic';
+/**
+ * Karosserieformen; `mono` = rundlicher Kleinstwagen in Monospace-Form (kurze, steile Haube, weit vorn liegende Scheibe),
+ * `box` = kantige Stufenheck-Limousine der 80er (zweitürig, schmale Säulen, flache Haube, Frontband mit vier Rundscheinwerfern),
+ * `tub` = rundliches Sportcoupé der 50er mit Heckmotor (Badewannenform, abfallendes Fließheck),
+ * `nine` = Heckmotor-Sportcoupé der späten 80er (aufrechte Rundscheinwerfer, Fließheck, breite Hinterkotflügel),
+ * `nine2` = aktuelles Heckmotor-Sportcoupé (breiter, länger, LED-Scheinwerfer, durchgehendes Leuchtenband),
+ * `tt` = rundes Designer-Coupé (ein Dachbogen von der Scheibe bis zum Heck, kreisrunde Radhäuser, schmales Glashaus),
+ * `quattro` = kantiges Rallye-Coupé der 80er (Kastenkotflügel, flache lange Haube, schräge Heckscheibe),
+ * `b5` = weich gerundete Mittelklasse-Limousine der 90er (vier Türen, sanfter Dachbogen, runder Kofferraum).
+ */
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro' | 'b5';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 
@@ -200,6 +210,8 @@ export interface MotorMeta {
   donor: string;
   /** Turbo-Nachrüstsatz montiert (Saugmotor bekommt Turbolader und Ladeluftrohr). */
   turboKit?: boolean;
+  /** Motorblock gerissen: nicht reparabel – der Motor muss getauscht werden (Austauschmotor oder Schrottplatz). */
+  cracked?: boolean;
   history: string[];
 }
 

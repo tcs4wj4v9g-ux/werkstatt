@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { heldMoney, minBid } from '../game/auctions';
 import { CAR_MODELS } from '../game/data/cars';
 import { FLUID_LIST } from '../game/data/fluids';
-import { defsOf, engineOf } from '../game/data/components';
+import { defsOf, engineOf, modelEngine } from '../game/data/components';
 import { PART_LIST, PARTS } from '../game/data/parts';
 import { fitOf, stockOf } from '../game/fitment';
 import { availableSlots, SLOTS, STAND_SLOT, UPGRADES, isJunk } from '../game/data/workshop';
-import { fromStand, swapPlan, withRemovedEngine, type EngineUnit } from '../game/motor';
+import { fromStand, newEnginePrice, swapPlan, withRemovedEngine, type EngineUnit } from '../game/motor';
 import { ENGINES } from '../game/data/engines';
 import { RARITY_NAMES } from '../game/market';
 import { fluidPrice, partPrice, removedEngines, useGame } from '../game/store';
@@ -177,6 +177,15 @@ export function ShopList() {
       )}
       {car && dept === 'swap' && (
         <>
+          <h4>Austauschmotor (fabrikneu)</h4>
+          <p className="meta">Wenn der Motorblock gerissen ist oder sich eine Revision nicht lohnt: neuer Motor, komplett montiert, ohne Öl. Wird ins Motorlager geliefert ({s.engines.length}/8 Paletten). Günstiger: ein Motor vom Schrottplatz.</p>
+          {[...new Set([modelEngine(car).id, engineOf(car).id])].map((id) => (
+            <div key={id} className="shop-row">
+              <div>{ENGINES[id].name} <span className="meta">– {ENGINES[id].ps} PS · neu, 0 km{id === modelEngine(car).id ? ' · Originalmotor' : ' · derzeit eingebaut'}</span></div>
+              <button className="btn primary" data-testid={`newengine-${id}`} disabled={s.money < newEnginePrice(id) || s.engines.length >= 8} onClick={() => s.buyNewEngine(id, car.modelId)}>Bestellen {eur(newEnginePrice(id))}</button>
+            </div>
+          ))}
+          <h4>Umbauteile</h4>
           <p className="meta">Umbauteile hängen davon ab, welcher Motor in welches Auto soll. Motoren am Kran, auf dem Ständer und im Lager:</p>
           {motors.length === 0 && <p className="meta">Kein ausgebauter Motor vorhanden – erst einen Motor ausbauen oder vom Schrottplatz holen.</p>}
           {motors.map((u) => {
