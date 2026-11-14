@@ -174,6 +174,23 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   const again = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.cars[0].motor.uid, sw: s.cars[0].swap, v: s.cars[0].visual, e: s.engines.map((u) => u.motor.uid), used: s.used.map((u) => u.id), stand: !!s.cars[15], ecu: s.cars[0].ecu }); });
   expect(keep === again, 'Nach Neuladen: Motor im Auto, Umbauteile, Optik, Motorlager, Gebrauchtteile, Steuergerät erhalten');
 
+  // ---------- Öl am Motorständer ablassen (ohne Auffangwanne, die Schale am Ständer fängt es auf) ----------
+  const putStand = () => G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; const c = L.createCar('bavaria_330', [], Math.random, {}); cars[15] = L.motor.asStand(L.motor.extractEngine(c), 'bavaria_330'); cars[15].fluids.oil.level = 5; g.setState({ cars, panel: null, carried: ['ratchet', 'socket17', 'wrench'], tool: 'ratchet', drainPan: s.drainPan.map(() => false) }); });
+  await putStand();
+  await G(() => window.__gk.getState().tapComponent(15, 'drain_plug'));
+  let oil = await G(() => ({ l: window.__gk.getState().cars[15].fluids.oil.level, plug: window.__gk.getState().cars[15].components.drain_plug.installed, t: window.__gk.getState().toast && window.__gk.getState().toast.text }));
+  expect(oil.l === 0 && !oil.plug && /Ölschale am Motorständer/.test(oil.t), 'Ablassschraube am Ständer (Motor aufrecht) heraus, Öl in der Schale: ' + oil.t);
+  await putStand();
+  await G(() => window.__gk.getState().flipEngine()); await p.waitForTimeout(500);
+  await G(() => Object.assign(window.__gkPlayer, { x: 4.4, z: -0.55, yaw: Math.PI / 2, pitch: -0.5, work: null, zoom: false })); await p.waitForTimeout(500);
+  const plugAt = await G(() => { let r = null; const cam = window.__gkCamera; const v = new cam.position.constructor(); window.__gkScene.traverse((o) => { if (!r && o.userData && o.userData.label && /^Ölablassschraube/.test(o.userData.label)) { let mesh = null; o.traverse((m) => { if (!mesh && m.isMesh && m.material && m.material.visible !== false) mesh = m; }); if (!mesh) return; mesh.getWorldPosition(v); if (Math.hypot(v.x - 3.1, v.z + 0.55) > 1.2) return; v.project(cam); r = { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; } }); return r; });
+  if (plugAt) { await p.mouse.click(plugAt.x, plugAt.y); await p.waitForTimeout(300); }
+  oil = await G(() => ({ l: window.__gk.getState().cars[15].fluids.oil.level, t: window.__gk.getState().toast && window.__gk.getState().toast.text }));
+  expect(!!plugAt && oil.l === 0, 'Motor gedreht: Ablassschraube im Bild angetippt, Öl abgelassen – ' + oil.t);
+  await G(() => { const g = window.__gk; g.setState({ tool: 'ratchet' }); g.getState().tapComponent(15, 'drain_plug'); });
+  const back = await G(() => window.__gk.getState().cars[15].components.drain_plug.installed);
+  expect(back, 'Ablassschraube wieder eingedreht');
+
   // ---------- Akte bei ausgebautem Motor: Motorursachen bleiben sichtbar ----------
   await G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; const c = L.createCar('bavaria_330', [], Math.random, {}); c.observed = ['blue_smoke']; const u = L.motor.extractEngine(c); c.motorOut = u.motor.uid; cars[1] = c; g.setState({ cars, crane: u, panel: null }); g.getState().setPanel('file', 1); });
   await p.waitForTimeout(400);

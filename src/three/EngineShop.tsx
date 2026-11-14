@@ -39,6 +39,9 @@ function standGeometry() {
     m.rbox(DECO.red, [0.08, 0.88, 0.08], 0.01, [-0.62, 0.52, 0]);
     m.rbox(DECO.red, [0.24, 0.08, 0.08], 0.01, [-0.55, 0.95, 0]);
     m.cyl(DECO.steelDark, 0.07, 0.07, 0.06, [-0.42, 0.95, 0], [0, 0, Math.PI / 2], 16);
+    // Ölauffangschale auf dem Fahrgestell, unter der Ölwanne
+    m.rbox(DECO.black, [0.46, 0.035, 0.4], 0.008, [0.08, 0.13, 0.06]);
+    m.rbox(DECO.steelDark, [0.42, 0.01, 0.36], 0.004, [0.08, 0.15, 0.06]);
     // Drehgriff
     m.cyl(DECO.chrome, 0.012, 0.012, 0.22, [-0.62, 0.95, 0.12], [Math.PI / 2, 0, 0], 6);
     m.sphere(DECO.black, 0.025, [-0.62, 0.95, 0.24], 1, 8);

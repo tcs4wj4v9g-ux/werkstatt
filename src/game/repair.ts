@@ -45,7 +45,8 @@ function checkAccess(car: CarInstance, id: string): string | null {
   if (car.bare) {
     // Am Motorständer: „angehoben“ heißt gedreht (Unterseite oben).
     if (def.access === 'hood' && car.lifted) return 'Das liegt oben am Motor – erst den Motor zurückdrehen.';
-    if (def.access === 'lifted' && !car.lifted) return 'Das liegt an der Unterseite – erst den Motor auf dem Ständer drehen.';
+    // Die Ablassschraube erreicht man am Ständer in beiden Lagen; die Schale am Ständer fängt das Öl auf.
+    if (def.access === 'lifted' && !car.lifted && id !== 'drain_plug') return 'Das liegt an der Unterseite – erst den Motor auf dem Ständer drehen.';
     return null;
   }
   if (car.junk) {
@@ -213,7 +214,7 @@ export function componentAction(
       car.fluids.oil.level = 0;
       car.fluids.oil.quality = 1;
       car.checked.oil = undefined;
-      return done(`Ablassschraube heraus – ${liters.toLocaleString('de-DE')} l Altöl laufen in die Auffangwanne.`);
+      return done(`Ablassschraube heraus – ${liters.toLocaleString('de-DE')} l Altöl laufen in die ${car.bare ? 'Ölschale am Motorständer' : 'Auffangwanne'}.`);
     }
     if (['water_pump', 'thermostat', 'hose', 'cyl_head'].includes(id)) {
       // Kühlsystem geöffnet: ein Großteil läuft aus, danach ist Luft im System.
