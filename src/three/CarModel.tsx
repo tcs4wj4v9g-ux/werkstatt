@@ -447,6 +447,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   /** Heckmotor: der ganze Motorraum liegt gedreht und etwas tiefer hinter der Hinterachse. */
   const rearEngine = REAR_ENGINE.has(body);
   const B = shared.shape.B;
+  /** Hosenrohr hängt immer sichtbar unter dem Wagenboden (tiefe Autos wie der B5 haben weniger Bodenfreiheit). */
+  const dpY = Math.min(0.3, B.ground - 0.01);
   /** Tieferlegung: Karosserie und Motor sinken, die Räder bleiben stehen. */
   const drop = car && !car.bare ? dropOf(car.visual) / 100 : 0;
   const hinge = useMemo(() => doorHinge(S), [S]);
@@ -1435,19 +1437,19 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             part(
               'dpf',
               <>
-                <mesh position={[0.72, 0.215, -0.28]} rotation={[0, 0, Math.PI / 2]}>
+                <mesh position={[0.72, 0.215, -0.34]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.075, 0.075, 0.36, 16]} />
                   <Mat color={st('dpf')?.condition === 'defect' ? '#3d3a35' : '#8d9399'} metal={0.8} rough={0.5} />
                 </mesh>
                 {[-1, 1].map((k) => (
-                  <mesh key={k} position={[0.72 + k * 0.23, 0.215, -0.28]} rotation={[0, 0, Math.PI / 2]}>
+                  <mesh key={k} position={[0.72 + k * 0.23, 0.215, -0.34]} rotation={[0, 0, Math.PI / 2]}>
                     <cylinderGeometry args={[0.03, 0.03, 0.12, 10]} />
                     <Mat color="#6f757c" metal={0.8} rough={0.5} />
                   </mesh>
                 ))}
               </>,
             )}
-          {st('dpf') && bolts('dpf', [[0.58, 0.15, -0.28], [0.86, 0.15, -0.28]], 'y-')}
+          {st('dpf') && bolts('dpf', [[0.58, 0.15, -0.34], [0.86, 0.15, -0.34]], 'y-')}
 
           {/* Riementrieb und Nebenaggregate */}
           {part(
@@ -1583,17 +1585,17 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'downpipe',
             <>
-              <mesh position={[0.56, 0.3, -0.19]} rotation={[0, 0, Math.PI / 2]}>
+              <mesh position={[0.56, dpY, -0.19]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={has('downpipe', 'exhaust_sport') ? [0.042, 0.042, 0.55, 12] : [0.034, 0.034, 0.55, 10]} />
                 <Mat color={has('downpipe', 'exhaust_sport') ? '#cfd3d8' : '#5f4c40'} metal={0.8} rough={has('downpipe', 'exhaust_sport') ? 0.25 : 0.7} />
               </mesh>
-              <mesh position={[0.84, 0.3, -0.19]} rotation={[0, 0, Math.PI / 2]}>
+              <mesh position={[0.84, dpY, -0.19]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.05, 0.05, 0.02, 12]} />
                 <Mat color="#8d9399" metal={0.8} rough={0.4} />
               </mesh>
             </>,
           )}
-          {!bare && bolts('downpipe', [[0.86, 0.255, -0.22], [0.86, 0.255, -0.16]], 'y-')}
+          {!bare && bolts('downpipe', [[0.86, dpY - 0.045, -0.22], [0.86, dpY - 0.045, -0.16]], 'y-')}
           {part(
             'fuel_pump',
             <>

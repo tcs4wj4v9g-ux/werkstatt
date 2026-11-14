@@ -1418,7 +1418,8 @@ export const useGame = create<GameState>()(
           const old = mountedId(cur.visual, v.field);
           if (old) stock[old] = (stock[old] ?? 0) + 1;
           const cars = [...s.cars];
-          cars[slot] = { ...cur, visual: { ...cur.visual, [v.field]: v.value }, partsSpent: cur.partsSpent + Math.round(v.price * 0.5), dyno: undefined };
+          // Am Kundenauto zahlt der Kunde das Teil (voller Preis auf der Rechnung).
+          cars[slot] = { ...cur, visual: { ...cur.visual, [v.field]: v.value }, partsSpent: cur.partsSpent + (cur.job ? v.price : Math.round(v.price * 0.5)), dyno: undefined };
           sfx.clunk();
           set({ cars, visualStock: stock });
           s.say(`Montiert: ${v.name}${old ? ` – ${VISUAL_MAP[old].name} liegt im Optik-Lager` : ''}.`);

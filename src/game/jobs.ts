@@ -1,11 +1,12 @@
 import { modelsOfClass } from './data/cars';
 import { DEFECTS } from './data/defects';
-import { defectLabor } from './fitment';
+import { costFactor, defectLabor } from './fitment';
+import { performance } from './performance';
 import { applicableDefects, createCar, type Rng } from './market';
 import { CAR_MODELS } from './data/cars';
 import { fluidEngineBlocker, serviceState } from './fluids';
 import { activeDefects, isAssembled } from './repair';
-import type { CarInstance, DefectId, JobOffer } from './types';
+import type { CarInstance, DefectId, JobOffer, TuningGoal } from './types';
 
 // Kundenaufträge: Der Kunde beschreibt nur, was ihm auffällt. Bezahlt wird,
 // wenn die tatsächliche Ursache behoben und das Auto wieder komplett ist.
@@ -38,6 +39,57 @@ export const JOB_TEMPLATES: JobTemplate[] = [
   { category: 'Ölverlust', complaint: 'Ich habe Ölflecken in der Einfahrt. Wo kommt das her?', causes: [['gasket'], ['oil_pan']] },
 ];
 
+/** Tuningaufträge: Der Kunde sagt genau, was er will. Bezahlt werden Arbeitslohn und Teile, wenn alles verbaut ist. */
+interface TuningTemplate {
+  complaint: string;
+  goals: TuningGoal[];
+  /** Arbeitslohn für ein Mittelklasseauto. */
+  fee: number;
+}
+export const TUNING_TEMPLATES: TuningTemplate[] = [
+  { complaint: 'Ich will, dass man ihn hört! Bitte eine Sportabgasanlage einbauen.', goals: [{ kind: 'part', comp: 'downpipe', variant: 'exhaust_sport', text: 'Sportabgasanlage eingebaut' }], fee: 180 },
+  { complaint: 'Er soll besser atmen – bitte einen offenen Sportluftfilter.', goals: [{ kind: 'part', comp: 'intake_hose', variant: 'intake_sport', text: 'Sportluftfilter eingebaut' }], fee: 90 },
+  { complaint: 'Er soll spürbar mehr Leistung haben – mindestens 12 % mehr, aber standfest abgestimmt.', goals: [{ kind: 'power', pct: 12, text: 'Mindestens 12 % mehr Leistung, sauber abgestimmt' }], fee: 380 },
+  {
+    complaint: 'Neue Felgen und ein Sportfahrwerk – er soll tiefer und sportlicher dastehen.',
+    goals: [
+      { kind: 'visual', field: 'rim', text: 'Andere Felgen montiert' },
+      { kind: 'visual', field: 'suspension', values: ['sport', 'coilover'], text: 'Sport- oder Gewindefahrwerk' },
+    ],
+    fee: 220,
+  },
+  {
+    complaint: 'Mach ihn optisch scharf: Sport-Frontstoßstange und einen Heckspoiler, bitte.',
+    goals: [
+      { kind: 'visual', field: 'front', text: 'Sport-Frontstoßstange' },
+      { kind: 'visual', field: 'spoiler', text: 'Heckspoiler (Lippe, Bürzel oder Flügel)' },
+    ],
+    fee: 200,
+  },
+];
+
+/** Ist ein Tuningwunsch am Auto erfüllt? */
+export function tuningGoalMet(car: CarInstance, g: TuningGoal): boolean {
+  if (g.kind === 'part') return !!car.components[g.comp]?.installed && car.components[g.comp]?.variant === g.variant;
+  if (g.kind === 'visual') {
+    const v = car.visual?.[g.field];
+    return g.values ? g.values.includes(v as never) : v !== undefined && v !== 0 && v !== false && v !== 'stock' && v !== 'none' && v !== '';
+  }
+  const p = performance(car);
+  return p.ps >= p.ratedPs * (1 + g.pct / 100) && !p.output.risks.some((r) => r.level >= 0.5);
+}
+
+function createTuningOffer(rng: Rng): JobOffer {
+  // Tuningkunden kommen eher mit Mittelklasse- und Sportwagen.
+  const roll = rng();
+  const modelId = pick(modelsOfClass(roll < 0.25 ? 'budget' : roll < 0.75 ? 'mid' : 'sport'), rng);
+  const t = pick(TUNING_TEMPLATES, rng);
+  const car = createCar(modelId, [], rng, { origin: 'job' });
+  const fee = Math.round((t.fee * (1 + costFactor(car))) / 2 / 5) * 5;
+  car.job = { id: `job-${Date.now().toString(36)}-${counter++}`, customer: pick(CUSTOMERS, rng), complaint: t.complaint, category: 'Tuning', fee, required: [], initial: [], approved: [], tuning: t.goals };
+  return { id: car.job.id, car };
+}
+
 const CUSTOMERS = ['Frau Neumann', 'Herr Demir', 'Herr Schuster', 'Frau Ivanova', 'Herr Baumgartner', 'Frau Rossi', 'Herr Lang', 'Frau Hoxha'];
 const DIAGNOSIS_FEE = 40;
 const OIL_SERVICE_FEE = 65;
@@ -47,6 +99,8 @@ const PARTS_MARKUP = 1.15;
 let counter = 0;
 
 export function createJobOffer(rng: Rng): JobOffer {
+  // Etwa jede fünfte Anfrage ist ein Tuningwunsch.
+  if (rng() < 0.2) return createTuningOffer(rng);
   // Kunden kommen überwiegend mit Alltagsautos, gelegentlich mit etwas Teurerem.
   const roll = rng();
   const modelId = pick(modelsOfClass(roll < 0.5 ? 'budget' : roll < 0.85 ? 'mid' : roll < 0.96 ? 'sport' : 'luxury'), rng);
@@ -96,6 +150,7 @@ export function billJob(car: CarInstance, day = 0): JobBill {
   const active = activeDefects(car);
   const problems: string[] = [];
   if (job.required.some((d) => active.includes(d))) problems.push('Die Ursache der Beanstandung ist noch nicht behoben.');
+  for (const g of job.tuning ?? []) if (!tuningGoalMet(car, g)) problems.push(`Tuningwunsch noch offen: ${g.text}.`);
   if (job.service === 'oil_change' && !serviceState(car).oilChanged) problems.push('Ölwechsel noch nicht vollständig: frisches Öl der richtigen Sorte, neuer Filter, Stand in Ordnung.');
   if (fluidEngineBlocker(car)) problems.push('Im Motor fehlt Öl.');
   if (!isAssembled(car)) problems.push('Das Auto ist nicht komplett zusammengebaut.');

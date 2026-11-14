@@ -180,6 +180,22 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   }, armSide);
   expect(fixed.known.every(Boolean) && fixed.ok, 'Endtopf, Querlenker und Spurstangenkopf ausgebaut, als defekt erkannt, Neuteile eingebaut und festgezogen');
 
+  // ---------- Hosenrohr bei tiefer Karosserie (B5) und beim Diesel mit Partikelfilter: im Unterboden-Bild ausbaubar ----------
+  for (const model of ['audy_a4_b5', 'bavaria_320d']) {
+    await p.evaluate((model) => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar(model, [], Math.random, {}); c.lifted = true; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [true, false], tool: 'ratchet', carried: ['ratchet', 'socket13'], panel: null }); Object.assign(window.__gkPlayer, { x: 2.9, z: -2.7, yaw: Math.PI / 2, work: null }); }, model);
+    await p.waitForTimeout(900);
+    await p.locator('.car-actions button', { hasText: 'Unterboden' }).click(); await p.waitForTimeout(900);
+    const dpb = (await findBolts('Schraube – Hosenrohr')).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+    for (const b of dpb) { await p.mouse.click(b.x, b.y); await p.waitForTimeout(200); }
+    await p.evaluate(() => window.__gk.setState({ tool: 'hand' }));
+    for (const b of dpb) { await p.mouse.click(b.x, b.y); await p.waitForTimeout(200); }
+    const pipe = await p.evaluate(() => { let r = null; const cam = window.__gkCamera; const v = new cam.position.constructor(); window.__gkScene.traverse((o) => { if (!r && o.userData && o.userData.label === 'Hosenrohr (Abgasanlage)') o.traverse((m) => { if (!r && m.isMesh) { m.getWorldPosition(v); v.project(cam); r = { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; } }); }); return r; });
+    if (pipe) { await p.mouse.click(pipe.x, pipe.y); await p.waitForTimeout(300); }
+    const dp = await p.evaluate(() => window.__gk.getState().cars[0].components.downpipe);
+    expect(dpb.length === 2 && !dp.installed, `${model}: Hosenrohr-Schrauben und Rohr im Unterboden-Bild angetippt – ausgebaut`);
+    await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  }
+
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

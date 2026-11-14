@@ -106,6 +106,40 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   expect(after.day === day0 + 1 && after.left && (await btn.isDisabled()), `Neuer Tag ${after.day} beginnt, der Timer läuft wieder`);
   await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; window.__gk.getState().setPanel(null); });
 
+  // ---------- Tuning-Kundenauftrag: Sportauspuff einbauen, abrechnen ----------
+  await p.evaluate(() => {
+    const g = window.__gk; const L = window.__gkLib; const s = g.getState();
+    const car = L.createCar('bavaria_320', [], Math.random, { origin: 'job' });
+    car.job = { id: 'job-tuning-test', customer: 'Herr Lang', complaint: 'Ich will, dass man ihn hört! Bitte eine Sportabgasanlage einbauen.', category: 'Tuning', fee: 180, required: [], initial: [], approved: [], tuning: [{ kind: 'part', comp: 'downpipe', variant: 'exhaust_sport', text: 'Sportabgasanlage eingebaut' }] };
+    g.setState({ jobs: [{ id: car.job.id, car }, ...s.jobs.slice(1)], cars: s.cars.map((c, i) => (i < 2 ? null : c)), money: 20000, panel: 'computer' });
+  });
+  await p.locator('.modal button', { hasText: 'Aufträge' }).first().click(); await p.waitForTimeout(300);
+  expect(/Tuningauftrag/.test(await p.locator('.modal').textContent()), 'Tuningauftrag erscheint in den Anfragen');
+  await p.evaluate(() => window.__gk.getState().acceptJob(0)); await p.waitForTimeout(300);
+  const tslot = await p.evaluate(() => window.__gk.getState().cars.findIndex((c) => c && c.job && c.job.id === 'job-tuning-test'));
+  let tb = await p.evaluate((i) => window.__gkLib.motor && document.querySelector('.modal').textContent, tslot);
+  expect(tslot >= 0 && /○ Sportabgasanlage eingebaut/.test(tb), 'Auftrag angenommen, Wunsch noch offen markiert');
+  await p.evaluate((slot) => {
+    const g = window.__gk; const L = window.__gkLib;
+    const c = JSON.parse(JSON.stringify(g.getState().cars[slot])); c.lifted = true; const cars = [...g.getState().cars]; cars[slot] = c; g.setState({ cars });
+    const use = (t) => g.setState({ tool: t, carried: ['ratchet', 'socket13'] });
+    g.getState().cars[slot].components.downpipe.bolts.forEach((_, i) => { use('ratchet'); g.getState().tapBolt(slot, 'downpipe', i); use('hand'); g.getState().tapBolt(slot, 'downpipe', i); });
+    use('hand'); g.getState().tapComponent(slot, 'downpipe');
+    g.getState().buyPart('exhaust_sport', slot);
+    g.getState().installWith(slot, 'downpipe', { kind: 'variant', part: 'exhaust_sport' });
+    g.getState().cars[slot].components.downpipe.bolts.forEach((_, i) => { use('hand'); g.getState().tapBolt(slot, 'downpipe', i); use('ratchet'); g.getState().tapBolt(slot, 'downpipe', i); });
+    g.getState().tapLift(slot);
+  }, tslot);
+  await p.waitForTimeout(300);
+  tb = await p.evaluate(() => document.querySelector('.modal').textContent);
+  const dpv = await p.evaluate((i) => window.__gk.getState().cars[i].components.downpipe, tslot);
+  expect(dpv.variant === 'exhaust_sport' && /✓ Sportabgasanlage eingebaut/.test(tb), 'Sportabgasanlage eingebaut – Wunsch erfüllt ' + JSON.stringify({ v: dpv.variant, b: dpv.bolts }));
+  const m0 = await p.evaluate(() => window.__gk.getState().money);
+  await p.evaluate((i) => window.__gk.getState().returnJob(i), tslot); await p.waitForTimeout(300);
+  const m1 = await p.evaluate(() => window.__gk.getState().money);
+  expect(m1 - m0 > 180, `Tuningauftrag abgerechnet: ${m1 - m0} € (Arbeitslohn + Teile)`);
+  await p.evaluate(() => window.__gk.setState({ lastSale: null, panel: null }));
+
   console.log('errors:', errs.slice(0, 8)); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

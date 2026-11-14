@@ -1,6 +1,6 @@
 import { CAR_MODELS } from '../game/data/cars';
 import { availableSlots, SLOTS } from '../game/data/workshop';
-import { billJob } from '../game/jobs';
+import { billJob, tuningGoalMet } from '../game/jobs';
 import { useGame } from '../game/store';
 import { eur } from './common';
 
@@ -12,7 +12,7 @@ export function JobsTab() {
   return (
     <>
       <p className="meta">
-        Kunden beschreiben nur, was ihnen auffällt. Bezahlt wird, wenn die Ursache behoben ist. Erledigt: {s.jobsDone} · Ertrag: {eur(s.jobEarnings)}
+        Kunden beschreiben nur, was ihnen auffällt – Tuningkunden sagen genau, was sie wollen. Bezahlt wird, wenn alles erledigt ist. Erledigt: {s.jobsDone} · Ertrag: {eur(s.jobEarnings)}
       </p>
       <h4>Laufende Aufträge</h4>
       {active.length === 0 && <p className="meta">Kein Kundenfahrzeug in der Werkstatt.</p>}
@@ -26,6 +26,9 @@ export function JobsTab() {
               {SLOTS[bay].label}: {CAR_MODELS[car!.modelId].name} von {job.customer}{job.dueDay !== undefined ? ` · Eilauftrag bis Tag ${job.dueDay}` : ''} · {bill.done ? 'bereit zur Abholung' : touched ? 'in Bearbeitung' : 'angenommen'}
             </b>
             <p className="meta">„{job.complaint}“</p>
+            {(job.tuning ?? []).map((g) => (
+              <p key={g.text} className={`meta${tuningGoalMet(car!, g) ? '' : ' bad'}`}>{tuningGoalMet(car!, g) ? '✓' : '○'} {g.text}</p>
+            ))}
             <table className="val">
               <tbody>
                 {bill.lines.map((l) => (
@@ -51,6 +54,7 @@ export function JobsTab() {
           <div>
             <b>{j.car.job!.category}: {CAR_MODELS[j.car.modelId].name} ({j.car.year})</b>
             <div className="meta">{j.car.job!.customer}: „{j.car.job!.complaint}“</div>
+            {j.car.job!.tuning && <div className="meta">🛠 Tuningauftrag: Teile besorgst du, der Kunde zahlt sie mit 15 % Aufschlag.</div>}
             <div className="meta">Vereinbarter Arbeitslohn {eur(j.car.job!.fee)} zzgl. Teile mit 15 % Aufschlag</div>
           </div>
           <button className="btn primary" disabled={free === 0} onClick={() => s.acceptJob(i)}>Annehmen</button>

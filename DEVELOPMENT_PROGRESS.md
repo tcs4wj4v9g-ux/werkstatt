@@ -233,3 +233,23 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Der Timer zählt je Gerät (nicht im Koop geteilt). Beendet der Partner den Tag, beginnt er auch hier neu.
   - Im Testmodus (`?test`) wird nicht gewartet.
 - Geprüft: Logiktests; Browser-Durchläufe `bremse` (Sichtprüfung von unten, Querlenker-Schrauben im Unterboden-Bild, Ausbau und Neuteile) und `markt` (Timer); voller Satz. Kein echter iPad-Test.
+
+## Hosenrohr am B5, Tuning-Kundenaufträge
+
+- **Hosenrohr ließ sich am Audy A4 (B5) nicht ausbauen:** Der B5 sitzt tiefer (Bodenfreiheit 0,26 m). Dadurch lag das Rohr im Unterboden-Blech, und ein Tipp darauf traf nichts. Das Rohr hängt jetzt immer knapp unter dem Wagenboden.
+  - Bei allen 30 Modellen im Bild geprüft.
+  - Dabei gefunden: Beim Diesel lag der Partikelfilter über einer Hosenrohr-Schraube. Er sitzt jetzt etwas weiter außen.
+- **Tuning-Kundenaufträge:** Etwa jede fünfte Anfrage ist ein Tuningwunsch, eher an Mittelklasse- und Sportwagen. Es gibt fünf Arten:
+  - Sportabgasanlage
+  - Sportluftfilter
+  - mindestens 12 % mehr Leistung, sauber abgestimmt
+  - Felgen und Sport- oder Gewindefahrwerk
+  - Sport-Frontstoßstange und Heckspoiler
+- Abrechnung und Anzeige der Tuningaufträge:
+  - Der Auftrag zeigt jeden Wunsch mit ✓/○.
+  - Abgerechnet wird, wenn alle Wünsche verbaut sind: Arbeitslohn je Fahrzeugklasse plus Teile mit 15 % Aufschlag. Optikteile werden am Kundenauto zum vollen Preis berechnet.
+- Geprüft:
+  - Logiktests, darunter ein neuer Test für Tuningaufträge.
+  - `bremse`: Hosenrohr bei B5 und Diesel im Unterboden-Bild ausgebaut.
+  - `markt`: Tuningauftrag annehmen, Sportabgasanlage einbauen, abrechnen.
+  - Kein echter iPad-Test.
