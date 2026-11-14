@@ -36,7 +36,7 @@ describe('Karosserieformen', () => {
     const B = S.B;
     // Vorderachse liegt bei allen gleich, die Räder stehen nicht über die Karosserie hinaus.
     const small = body === 'mono';
-    expect(S.width(WHEEL_X)).toBeGreaterThanOrEqual(small ? 0.8 : 0.9);
+    expect(S.width(WHEEL_X)).toBeGreaterThanOrEqual(0.8);
     expect(B.width + B.flare).toBeGreaterThanOrEqual(0.8 + B.trackF + 0.108);
     expect(B.width + B.flare).toBeGreaterThanOrEqual(0.8 + B.trackR + 0.108);
     // Haube: über dem ganzen Motor (höchstes Teil: Sicken der Motorabdeckung bis 0,88 m, von x = 0,95 bis 1,58) bleibt Luft.

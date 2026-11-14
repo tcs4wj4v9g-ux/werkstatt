@@ -44,18 +44,19 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const sport = body === 'sport';
   const lux = cls === 'luxury' || body === 'luxury';
   const mono = body === 'mono';
+  const box = body === 'box';
   return {
-    rim: mono ? 'steel' : classic ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    rim: mono ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
     // Bavaria: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
     grille: sport ? 'slot' : classic ? 'classic' : brand === 'Bavaria' ? 'twin' : lux ? 'tall' : 'wide',
     lamps: classic ? 'round' : sport ? 'slim' : brand === 'Bavaria' ? 'twin' : 'block',
     chromeBumper: classic,
     blackBumper: cls === 'budget' && brand !== 'Bavaria',
-    chromeTrim: classic || lux,
+    chromeTrim: classic || lux || box,
     spoiler: sport || model?.id === 'bavaria_340_ms',
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
-    seat: mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
-    seat2: mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
+    seat: box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
+    seat2: box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
     front: visual?.front ?? 0,
     rear: visual?.rear ?? 0,
     skirts: !!visual?.skirts,
@@ -258,6 +259,70 @@ function monoEnds(m: Mesher, S: Shape, look: CarLook, N: (n: number) => number) 
   m.add(SLOT.dark, new THREE.CylinderGeometry(0.022, 0.022, 0.01, 12), mat([xp - 0.02, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
 }
 
+/**
+ * Front und Heck der kantigen Stufenheck-Limousine (`box`): dunkles Frontband mit vier runden Scheinwerfern und schmaler
+ * Doppelniere, schwarze Stoßfänger mit Chromleiste, waagerechte Rückleuchten mit Rippen, Kennzeichen in der Heckblende.
+ */
+function boxEnds(m: Mesher, S: Shape, N: (n: number) => number) {
+  const B = S.B;
+  const disc = (dir: 1 | -1, slot: number, z: number, y: number, r: number, lift: number) => endPatch(m, slot, S, dir, z, y, r * 2, r * 2, 1, lift, N(10), N(8));
+  // ---- Front ----
+  const yL = 0.71;
+  endPatch(m, SLOT.gloss, S, 1, 0, yL, 1.5, 0.15, 0.12, 0.004, N(16), N(4));
+  for (const s of [-1, 1] as const) {
+    for (const [z, r] of [[0.6, 0.078], [0.42, 0.07]] as const) {
+      disc(1, SLOT.chrome, s * z, yL, r, 0.008);
+      disc(1, SLOT.lens, s * z, yL, r - 0.012, 0.012);
+      disc(1, SLOT.chrome, s * z, yL, 0.022, 0.015);
+      disc(1, SLOT.glow, s * z, yL, 0.009, 0.018);
+    }
+    // Doppelniere: Chromrahmen, schwarze Füllung, senkrechte Stäbe
+    const zk = s * 0.075;
+    endPatch(m, SLOT.chrome, S, 1, zk, yL + 0.008, 0.115, 0.165, 0.55, 0.012, N(6), N(8));
+    endPatch(m, SLOT.gloss, S, 1, zk, yL + 0.008, 0.088, 0.135, 0.55, 0.016, N(6), N(8));
+    for (const o of [-0.024, 0, 0.024]) endPatch(m, SLOT.chrome, S, 1, zk + o, yL + 0.008, 0.006, 0.12, 0, 0.019, 1, 3);
+    // Blinker im Stoßfänger, Nebelscheinwerfer im Spoiler
+    wrapPatch(m, SLOT.amber, S, 1, Math.atan2(s * 0.62, 0.96), 0.13, 0.47, 0.05, 0.3, 0.02, 4, 2);
+    disc(1, SLOT.lens, s * 0.48, 0.33, 0.035, 0.016);
+  }
+  // Schwarzer Stoßfänger mit Chromleiste, Kennzeichen, Frontspoiler
+  wrapPatch(m, SLOT.dark, S, 1, 0, 2.0, 0.46, 0.13, 0.15, 0.014, N(24), N(4));
+  wrapPatch(m, SLOT.chrome, S, 1, 0, 1.96, 0.5, 0.016, 0.1, 0.022, N(24), 1);
+  endPatch(m, SLOT.plate, S, 1, 0, 0.43, 0.48, 0.1, 0.06, 0.024, N(8), 2);
+  wrapPatch(m, SLOT.dark, S, 1, 0, 1.6, 0.33, 0.12, 0.2, 0.008, N(18), N(3));
+  wrapPatch(m, SLOT.dark, S, 1, 0, 1.4, B.ground + 0.03, 0.04, 0.5, 0.014, N(16), 2);
+
+  // ---- Heck ----
+  const yT = 0.8;
+  for (const s of [-1, 1] as const) {
+    const a = Math.atan2(s * 0.58, 0.96);
+    // Rückleuchte: rotes Rücklicht oben (gerippt), unten Blinker und Rückfahrlicht
+    wrapPatch(m, SLOT.dark, S, -1, a, 0.56, yT, 0.17, 0.1, 0.004, N(10), N(4));
+    wrapPatch(m, SLOT.tail, S, -1, a, 0.53, yT + 0.035, 0.08, 0.1, 0.009, N(10), N(3));
+    for (const o of [-0.02, 0, 0.02]) wrapPatch(m, SLOT.tailBar, S, -1, a, 0.5, yT + 0.035 + o, 0.004, 0, 0.012, N(8), 1);
+    wrapPatch(m, SLOT.amber, S, -1, a + s * 0.12, 0.26, yT - 0.045, 0.06, 0.1, 0.009, N(6), 2);
+    wrapPatch(m, SLOT.lens, S, -1, a - s * 0.14, 0.22, yT - 0.045, 0.06, 0.1, 0.009, N(6), 2);
+  }
+  // Heckblende mit Kennzeichen zwischen den Leuchten
+  endPatch(m, SLOT.gloss, S, -1, 0, yT - 0.01, 0.6, 0.15, 0.05, 0.004, N(8), N(3));
+  endPatch(m, SLOT.plate, S, -1, 0, yT - 0.01, 0.48, 0.1, 0.06, 0.009, N(8), 2);
+  // Stoßfänger hinten schwarz mit Chromleiste, Auspuff links
+  wrapPatch(m, SLOT.dark, S, -1, 0, 2.0, 0.5, 0.13, 0.15, 0.014, N(24), N(4));
+  wrapPatch(m, SLOT.chrome, S, -1, 0, 1.96, 0.54, 0.016, 0.1, 0.022, N(24), 1);
+  wrapPatch(m, SLOT.dark, S, -1, 0, 1.4, B.ground + 0.1, 0.1, 0.4, 0.006, N(16), 2);
+  const zp = -0.46;
+  const xp = S.endX(-1, B.ground + 0.08, zp);
+  m.add(SLOT.chrome, new THREE.CylinderGeometry(0.03, 0.03, 0.14, 14, 1, true), mat([xp + 0.03, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
+  m.add(SLOT.dark, new THREE.CylinderGeometry(0.026, 0.026, 0.01, 12), mat([xp - 0.03, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
+  // ---- Flanken: schwarze Schutzleiste in Stoßfängerhöhe zwischen den Radläufen
+  for (const s of [-1, 1] as const) {
+    const xa = B.rearAxle + ARCH_R + 0.05;
+    const xb = WHEEL_X - ARCH_R - 0.05;
+    sidePatch(m, SLOT.dark, S, s, (xa + xb) / 2, 0.5, xb - xa, 0.04, 0, 0.012, N(14), 2);
+    sidePatch(m, SLOT.chrome, S, s, (xa + xb) / 2, 0.508, xb - xa, 0.006, 0, 0.016, N(14), 1);
+  }
+}
+
 /** Feste Anbauteile der Karosserie (alles außer den Vordertüren). */
 export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   const key = body + lookKey(look) + detail;
@@ -272,6 +337,7 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   const disc = (dir: 1 | -1, slot: number, a: number, y: number, r: number, lift: number) => wrapPatch(m, slot, S, dir, a, (r * 2) / 0.96, y, r * 2, 1, lift, N(8), N(8));
 
   if (body === 'mono') monoEnds(m, S, look, N);
+  else if (body === 'box') boxEnds(m, S, N);
   else {
     // ---- Front ----
     const yLamp = 0.7;

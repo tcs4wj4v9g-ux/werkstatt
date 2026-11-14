@@ -127,6 +127,14 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     flare: 0.01, crease: 0.62, creaseDepth: 0.004, blackPillars: true, pillars: [[-0.42, -0.33]], glassRear: -1.17, rearSeat: true,
     seams: [0.93, -0.33], handles: [-0.2], cowlX: 1.06, cowlY: 1.0, hoodSlope: 0.1, hoodCurve: 0.18, hoodX0: 1.08, hoodX1: 1.88, cabinX1: 1.09, aBase: 0.9, dome: 0, cabinK: 0.94, roofArc: 0.045, planPR: 5.5,
   },
+  // Kantige Stufenheck-Limousine der 80er (zweitürig): 4,33 m, Radstand 2,57 m, flache lange Haube, fast senkrechte Front,
+  // steile Scheiben, schmale Säulen mit Knick hinten, kurzer flacher Kofferraum, scharfe Seitenkante, eckige Draufsicht.
+  box: {
+    ...BASE, tail: -2.13, nose: 2.2, width: 0.82, rearAxle: -1.19, trackF: -0.095, trackR: -0.09, roof: 1.39, x0: -1.47, x1: -1.1, x2: 0.08,
+    deck: 1.0, noseMid: 0.71, noseP: 6, tailMid: 0.79, tailP: 6, tailLen: 0.05, planP: 5, planPR: 6, ground: 0.26, tumble: 0.1, bowF: 0.06, bowR: 0.05,
+    flare: 0.008, crease: 0.82, creaseDepth: 0.018, blackPillars: true, pillars: [[-0.64, -0.57]], glassRear: -1.38, rearSeat: true,
+    seams: [0.74, -0.6], handles: [-0.42], hoodSlope: 0.03, hoodCurve: 0.075, dome: 0.004, cabinK: 0.93, roofArc: 0.006,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 
