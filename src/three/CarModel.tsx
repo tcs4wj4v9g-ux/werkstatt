@@ -8,7 +8,7 @@ import { beneath, blockersRemoved, installReady, removable } from '../game/repai
 import { useGame } from '../game/store';
 import type { BodyStyle, CarInstance, FluidId, ToolId, VisualTune, ZoneId } from '../game/types';
 import { CAR_MODELS } from '../game/data/cars';
-import { BODY_SPECS, carGeometry, doorHinge, HOOD_X0 } from './carGeometry';
+import { BODY_SPECS, carGeometry, doorHinge } from './carGeometry';
 import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
 import { dropOf } from '../game/data/visual';
@@ -428,7 +428,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   useEffect(() => {
     tint(geo.shell, car, color);
     tint(geo.cabin, car, color);
-    tint(geo.hood, car, color, HOOD_X0, S.crown(HOOD_X0));
+    tint(geo.hood, car, color, S.F.hoodX0, S.crown(S.F.hoodX0));
     geo.doors.forEach((d, k) => tint(d, car, color, hinge[0], 0, (k ? 1 : -1) * hinge[1]));
   }, [geo, color, zoneKey]);
 
@@ -449,6 +449,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       tailBar: new THREE.MeshStandardMaterial({ color: '#ff3b30', emissive: '#ff2a1a', emissiveIntensity: 1.25 }),
       amber: new THREE.MeshStandardMaterial({ color: '#f0a020', emissive: '#f08a00', emissiveIntensity: 0.4, roughness: 0.3 }),
       plate: new THREE.MeshStandardMaterial({ color: '#f2f2ee', roughness: 0.55 }),
+      plastic: new THREE.MeshStandardMaterial({ color: '#5b5f64', roughness: 0.86, metalness: 0.05 }),
     };
     return m;
   }, [G.clearcoat]);
@@ -520,6 +521,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     list[SLOT.solid] = mats.solid;
     list[SLOT.seat] = mats.seat;
     list[SLOT.seat2] = mats.seat2;
+    list[SLOT.plastic] = mats.plastic;
     return list;
   }, [mats]);
   const cabinMats = useMemo(() => [mats.paint, mats.glass, mats.trim], [mats]);
@@ -1588,7 +1590,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       {!bare && (
       <>
       {/* Motorhaube, Scharnier an der Windschutzscheibe */}
-      <group ref={hood} position={[HOOD_X0, S.crown(HOOD_X0) - drop, 0]}>
+      <group ref={hood} position={[S.F.hoodX0, S.crown(S.F.hoodX0) - drop, 0]}>
         {car?.visual?.hood === 1 && (
           <mesh position={[0.5, 0.035, 0]} material={mats.solid} raycast={noRay}>
             <boxGeometry args={[0.55, 0.05, 0.42]} />

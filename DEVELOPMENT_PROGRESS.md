@@ -96,3 +96,17 @@ Supabase-Projekt anlegen, `supabase/schema.sql` ausführen, anonyme Anmeldung ei
 - ☑ Schrauben drehen beim Lösen gegen, beim Eindrehen und Festziehen im Uhrzeigersinn; neu eingesetzte Schrauben werden sichtbar hineingedreht
 - ☑ Hinterräder und Hinterbremsen (Rad, Sattel, Beläge, Scheibe) zerlegbar, eigene Arbeitsansichten, eigene Defekte und OBD-Code; alte Spielstände und Koop-Werkstätten werden ergänzt. Entlüften bleibt an der Vorderachse.
 - ☑ Motor ohne Öl startet mit Öldruckwarnung, nach 4 s Lagerschaden (Pleuel-, Hauptlager, Nockenwelle); falsches Öl nach 15 s Laufzeit Hydrostößel defekt. Losfahren ohne Öl bleibt gesperrt.
+
+# Fahrzeug-, Grafik- und Tiefgaragen-Update (Branch `claude/garage-kings-fahrzeuge`)
+
+Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Tiefgaragen erst nach den Fahrzeugen.
+
+## Fahrzeug 1: Renard Twingle 1.2 (an den Renault Twingo I angelehnt) – wartet auf Freigabe
+
+- Neue Karosserieform `mono`: 3,47 m, Radstand 2,35 m, schmale Spur, kurze gewölbte Haube, flach geneigte lange Windschutzscheibe weit vorn, gewölbtes Dach, steile Heckklappe, kastiges Heck.
+- Vorderwagen je Karosserie einstellbar (`cowlX/Y`, `hoodSlope`, `hoodCurve`, `hoodX0/1`, `cabinX1`, `aBase`, `dome`, `cabinK`, `roofArc`, `planPR`); alle bisherigen Formen unverändert (Standardwerte).
+- Front: runde Scheinwerfer mit Lidern, schmaler Einlass mit Rundemblem, grauer Kunststoff-Stoßfänger mit durchgehendem „Lächeln“. Heck: hohe Eckleuchten, Griffleiste, Kennzeichenmulde, grauer Stoßfänger.
+- Innenraum: weit vorn liegendes Armaturenbrett mit mittiger Digitalanzeige, runde Luftdüsen, blaue Sitze.
+- Technik: 1,2-l-Vierzylinder (58 PS, Teilefamilie R4), Motorraum mit allen Reparaturen; Test sichert Freiraum unter der Haube über die ganze Motorlänge für alle Karosserien.
+- Geprüft: Logiktests, alle Browser-Durchläufe; am Kleinwagen Radschrauben vorn/hinten und Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
+- Grenzen: Raddurchmesser ist bei allen Autos gleich (für einen Kleinwagen eher groß); Lider sind feste Anbauteile und öffnen nicht mit der Haube.

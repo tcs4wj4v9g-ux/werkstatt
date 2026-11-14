@@ -34,18 +34,19 @@ describe('Karosserieformen', () => {
   it.each(bodies)('%s: Proportionen sind plausibel', (body) => {
     const S = bodyShape(body);
     const B = S.B;
-    // Vorderachse und Motorraum liegen bei allen gleich, die Räder stehen nicht über die Karosserie hinaus.
-    expect(S.width(WHEEL_X)).toBeGreaterThanOrEqual(0.9);
+    // Vorderachse liegt bei allen gleich, die Räder stehen nicht über die Karosserie hinaus.
+    const small = body === 'mono';
+    expect(S.width(WHEEL_X)).toBeGreaterThanOrEqual(small ? 0.8 : 0.9);
     expect(B.width + B.flare).toBeGreaterThanOrEqual(0.8 + B.trackF + 0.108);
     expect(B.width + B.flare).toBeGreaterThanOrEqual(0.8 + B.trackR + 0.108);
-    // Haube: über dem Motor (höchstes Motorteil bei 0,88 m) bleibt Luft.
-    expect(S.crown(1.3)).toBeGreaterThan(0.9);
-    // Radstand und Länge in einem realistischen Bereich
+    // Haube: über dem ganzen Motor (höchstes Teil: Sicken der Motorabdeckung bis 0,88 m, von x = 0,95 bis 1,58) bleibt Luft.
+    for (let x = Math.max(0.95, S.F.hoodX0); x <= 1.58; x += 0.01) expect(S.crown(x), `Haube bei x = ${x.toFixed(2)}`).toBeGreaterThan(0.88);
+    // Radstand und Länge in einem realistischen Bereich (Kleinstwagen kürzer)
     const wheelbase = WHEEL_X - B.rearAxle;
-    expect(wheelbase).toBeGreaterThan(2.4);
+    expect(wheelbase).toBeGreaterThan(small ? 2.2 : 2.4);
     expect(wheelbase).toBeLessThan(3.1);
-    expect(B.nose - B.tail).toBeGreaterThan(4.0);
-    expect(B.nose - B.tail).toBeLessThan(5.0);
+    expect(B.nose - B.tail).toBeGreaterThan(small ? 3.3 : 4.0);
+    expect(B.nose - B.tail).toBeLessThan(small ? 3.7 : 5.0);
     // Dach liegt über der Gürtellinie, die Dachlinie erreicht die Dachhöhe.
     const mid = (B.x1 + B.x2) / 2;
     expect(S.roofY(mid)).toBeGreaterThan(S.beltY(mid) + 0.25);

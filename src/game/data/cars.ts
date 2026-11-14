@@ -48,6 +48,7 @@ const m = (s: Seed): CarModelDef => {
 // Frei erfundene Marken und Modelle, an reale Fahrzeugklassen angelehnt. Keine Logos, keine Originalnamen.
 const list: CarModelDef[] = [
   // --- Günstige Gebrauchte ---
+  m({ id: 'renard_twingle', brand: 'Renard', name: 'Renard Twingle 1.2', body: 'mono', cls: 'budget', baseValue: 2400, engineId: 'r4_12', weight: 840, colors: ['#e2603f', '#f0c12a', '#4f9b5c', '#2b4f9c', '#c9ccd1'], years: [1993, 2007], blurb: 'Kugelrunder Stadtflitzer mit Froschaugen und verschiebbarer Rückbank – innen erstaunlich viel Platz.' }),
   m({ id: 'tanaka_piccolo', brand: 'Tanaka', name: 'Tanaka Piccolo 1.4', body: 'hatch', cls: 'budget', baseValue: 2900, engineId: 'r4_14', weight: 980, colors: ['#c81e1e', '#e3a81c', '#c9ccd1', '#1f6fb2'], blurb: 'Kleiner Stadtflitzer, sparsam und anspruchslos.' }),
   m({ id: 'nordwind_245', brand: 'Nordwind', name: 'Nordwind 245 Kombi', body: 'wagon', cls: 'budget', baseValue: 3600, engineId: 'r4_20', weight: 1380, years: [1996, 2003], colors: ['#3d4a3f', '#6e2a2a', '#d9d2bd', '#24406e'], blurb: 'Kantiger Lastesel mit riesigem Kofferraum.' }),
   m({ id: 'bavaria_316_compact', brand: 'Bavaria', name: 'Bavaria 316 Compact', body: 'hatch', cls: 'budget', baseValue: 4300, engineId: 'r4_14', weight: 1250, colors: ['#1b1c1f', '#7a1f24', '#8c9299', '#2a3a5c'], blurb: 'Dreitürer mit Heckantrieb – der günstige Einstieg.' }),

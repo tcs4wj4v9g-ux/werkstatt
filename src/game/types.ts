@@ -126,7 +126,8 @@ export type DefectId =
 
 /** hood = Motorraum (Auto unten), lifted = von unten (Auto angehoben), stand = nur am ausgebauten Motor auf dem Motorständer. */
 export type Access = 'hood' | 'lifted' | 'stand';
-export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic';
+/** Karosserieformen; `mono` = rundlicher Kleinstwagen in Monospace-Form (kurze, steile Haube, weit vorn liegende Scheibe). */
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 

@@ -64,7 +64,40 @@ export interface BodySpec {
   handles: number[];
   /** Rücksitzlehne sichtbar (bei flachen Coupés ragte sie durch die Heckscheibe). */
   rearSeat: boolean;
+  /**
+   * Vorderwagen (optional, sonst wie bisher bei allen gleich): Knick zwischen Haube und Kabine (x, Höhe),
+   * Gefälle der Haube, Haubenvorder-/hinterkante, Fuß der Windschutzscheibe, Glasvorderkante der Tür, Haubenwölbung.
+   */
+  cowlX?: number;
+  cowlY?: number;
+  hoodSlope?: number;
+  /** Wölbung der Haube: zusätzlicher Abfall zur Front hin (quadratisch). */
+  hoodCurve?: number;
+  hoodX0?: number;
+  hoodX1?: number;
+  cabinX1?: number;
+  aBase?: number;
+  dome?: number;
+  /** Breite der Fahrgastzelle am Fensterfuß relativ zur Karosserie (Standard 0,89; größer = weniger Absatz). */
+  cabinK?: number;
+  /** Wölbung der Dachlinie (Standard 0,018). */
+  roofArc?: number;
+  /** Rundung der Heckecken in der Draufsicht (Standard planP + 0,4; größer = kastiger). */
+  planPR?: number;
 }
+
+/** Vorderwagen einer Karosserie (Standardwerte = gemeinsamer Vorderwagen aller bisherigen Formen). */
+export const frontOf = (B: BodySpec) => ({
+  cowlX: B.cowlX ?? 0.78,
+  cowlY: B.cowlY ?? 0.99,
+  slope: B.hoodSlope ?? 0.134,
+  curve: B.hoodCurve ?? 0,
+  hoodX0: B.hoodX0 ?? HOOD_X0,
+  hoodX1: B.hoodX1 ?? HOOD_X1,
+  cabinX1: B.cabinX1 ?? CABIN_X1,
+  aBase: B.aBase ?? A_BASE,
+  dome: B.dome ?? 0.014,
+});
 
 const FOUR_DOOR = { seams: [0.74, -0.32, -1.24], handles: [-0.14, -1.06] };
 const TWO_DOOR = { seams: [0.74, -0.56], handles: [-0.38] };
@@ -86,6 +119,14 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
   // Oberklasse: lang, breit, langer Radstand, hohe Schulter, stattliches Heck.
   luxury: { ...BASE, tail: -2.52, width: 0.94, rearAxle: -1.58, trackF: 0.03, trackR: 0.04, roof: 1.47, x0: -1.84, x1: -1.14, x2: 0.12, deck: 1.04, noseMid: 0.57, noseP: 3.2, tailMid: 0.66, tailP: 3.4, planP: 4.2, creaseDepth: 0.01, pillars: [[-0.4, -0.28]], glassRear: -1.42, rearSeat: true, seams: [0.74, -0.34, -1.42], handles: [-0.16, -1.22] },
   // Klassiker: schlanke Säulen, niedrige Gürtellinie, kantiger Bug mit Chromstoßstangen.
+  // Rundlicher Kleinstwagen (Monospace): 3,45 m, kurze steile Haube, flach geneigte lange Windschutzscheibe weit vorn,
+  // hohes flaches Dach, fast senkrechte Heckklappe, kurze Überhänge, schmale Spur. Drei Türen.
+  mono: {
+    ...BASE, tail: -1.4, nose: 2.07, width: 0.815, rearAxle: -0.97, trackF: -0.11, trackR: -0.13, roof: 1.43, x0: -1.33, x1: -0.98, x2: 0.22,
+    deck: 0.95, noseMid: 0.56, noseP: 2.7, tailMid: 0.62, tailP: 5, tailLen: 0.07, planP: 2.6, ground: 0.2, tumble: 0.08, bowF: 0.2, bowR: 0.03,
+    flare: 0.01, crease: 0.62, creaseDepth: 0.004, blackPillars: true, pillars: [[-0.42, -0.33]], glassRear: -1.17, rearSeat: true,
+    seams: [0.93, -0.33], handles: [-0.2], cowlX: 1.06, cowlY: 1.0, hoodSlope: 0.1, hoodCurve: 0.18, hoodX0: 1.08, hoodX1: 1.88, cabinX1: 1.09, aBase: 0.9, dome: 0, cabinK: 0.94, roofArc: 0.045, planPR: 5.5,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 
@@ -104,24 +145,29 @@ const SIDE1 = 16; // letztes Türsegment (Schwellerrundung)
 
 /** Geometrische Beschreibung einer Karosserie – liefert Querschnitte und Oberflächenpunkte für Anbauteile. */
 export class Shape {
-  constructor(readonly B: BodySpec) {}
+  readonly F: ReturnType<typeof frontOf>;
+  constructor(readonly B: BodySpec) {
+    this.F = frontOf(B);
+  }
 
   width(x: number) {
     const B = this.B;
     const L = 0.78;
     if (x > B.nose - L) return B.width * sup((x - (B.nose - L)) / L, B.planP);
-    if (x < B.tail + L) return B.width * sup((B.tail + L - x) / L, B.planP + 0.4);
+    if (x < B.tail + L) return B.width * sup((B.tail + L - x) / L, B.planPR ?? B.planP + 0.4);
     return B.width;
   }
 
   /** Oberkante auf der Mittellinie (Haube, Schulter unter der Kabine, Heckdeckel). */
   crown(x: number) {
     const B = this.B;
-    const edge = 0.99 - 0.134 * (HOOD_X1 - 0.78);
-    if (x > HOOD_X1) return B.noseMid + (edge - B.noseMid) * sup((x - HOOD_X1) / (B.nose - HOOD_X1), B.noseP);
-    if (x >= 0.78) return 0.99 - 0.134 * (x - 0.78);
+    const F = this.F;
+    const hood = (d: number) => F.cowlY - F.slope * d - F.curve * d * d;
+    const edge = hood(F.hoodX1 - F.cowlX);
+    if (x > F.hoodX1) return B.noseMid + (edge - B.noseMid) * sup((x - F.hoodX1) / (B.nose - F.hoodX1), B.noseP);
+    if (x >= F.cowlX) return hood(x - F.cowlX);
     const t0 = B.tail + B.tailLen;
-    if (x >= t0) return lerp(0.99, B.deck, smooth((0.78 - x) / (0.78 - t0)) * 0.6 + ((0.78 - x) / (0.78 - t0)) * 0.4);
+    if (x >= t0) return lerp(F.cowlY, B.deck, smooth((F.cowlX - x) / (F.cowlX - t0)) * 0.6 + ((F.cowlX - x) / (F.cowlX - t0)) * 0.4);
     return B.tailMid + (B.deck - B.tailMid) * sup((t0 - x) / B.tailLen, B.tailP);
   }
 
@@ -263,30 +309,31 @@ export class Shape {
   /** Unterkante der Verglasung. */
   beltY(x: number) {
     const B = this.B;
-    return this.crown(Math.min(0.78, Math.max(B.tail + B.tailLen, x))) - 0.06;
+    return this.crown(Math.min(this.F.cowlX, Math.max(B.tail + B.tailLen, x))) - 0.06;
   }
 
   roofY(x: number) {
     const B = this.B;
     const yb = this.beltY(x);
     const yb0 = this.beltY(B.x0);
-    const ybF = this.beltY(CABIN_X1);
+    const C1 = this.F.cabinX1;
+    const ybF = this.beltY(C1);
     const rear = yb0 + ((x - B.x0) * (B.roof - yb0)) / (B.x1 - B.x0);
-    const front = ybF + ((CABIN_X1 - x) * (B.roof - ybF)) / (CABIN_X1 - B.x2);
-    const flat = B.roof + 0.018 * Math.sin(clamp01((x - B.x1) / (B.x2 - B.x1)) * Math.PI);
+    const front = ybF + ((C1 - x) * (B.roof - ybF)) / (C1 - B.x2);
+    const flat = B.roof + (B.roofArc ?? 0.018) * Math.sin(clamp01((x - B.x1) / (B.x2 - B.x1)) * Math.PI);
     const k = 0.022;
     const y = -k * Math.log(Math.exp(-rear / k) + Math.exp(-front / k) + Math.exp(-flat / k));
     return Math.max(yb + 0.001, y);
   }
 
   cabinBase(x: number) {
-    return Math.max(0.05, Math.min(0.86, this.width(Math.max(x, this.B.tail + 0.5)) * 0.89));
+    return Math.max(0.05, Math.min(0.86, this.width(Math.max(x, this.B.tail + 0.5)) * (this.B.cabinK ?? 0.89)));
   }
 
   cabinDX(x: number, z: number) {
     const B = this.B;
     const q = (z / this.cabinBase(x)) ** 2;
-    return -B.bowF * q * smooth((x - B.x2) / (CABIN_X1 - B.x2)) + B.bowR * q * smooth((B.x1 - x) / (B.x1 - B.x0));
+    return -B.bowF * q * smooth((x - B.x2) / (this.F.cabinX1 - B.x2)) + B.bowR * q * smooth((B.x1 - x) / (B.x1 - B.x0));
   }
 
   /** Halber Querschnitt der Fahrgastzelle: Dachmitte bis Fensterunterkante. */
@@ -374,16 +421,17 @@ function finish(positions: number[], groups: number[][], offset: [number, number
 /** Stützstellen entlang x: an Bug, Heck und Radläufen verdichtet. */
 function stations(S: Shape, step: number, arch: number) {
   const B = S.B;
+  const F = S.F;
   const inArch = (x: number) => [WHEEL_X, B.rearAxle].some((xc) => Math.abs(x - xc) < ARCH_R + 0.02);
-  const xs = [...range(B.tail + 0.02, B.nose - 0.02, step).filter((x) => !inArch(x) && x < HOOD_X1 + 0.02 && x > B.tail + B.tailLen - 0.02), HOOD_X0, HOOD_X1, B.x0 + B.bowR, CABIN_X1, ...B.seams];
+  const xs = [...range(B.tail + 0.02, B.nose - 0.02, step).filter((x) => !inArch(x) && x < F.hoodX1 + 0.02 && x > B.tail + B.tailLen - 0.02), F.hoodX0, F.hoodX1, B.x0 + B.bowR, F.cabinX1, ...B.seams];
   const n = Math.round(arch * 0.7);
   for (let k = 0; k <= n; k++) {
     const f = 1 - k / n;
     const add = (start: number, end: number, p: number) => xs.push(start + (end - start) * Math.pow(1 - Math.pow(Math.max(f, 0.03), p), 1 / p));
-    add(HOOD_X1, B.nose, B.noseP);
+    add(F.hoodX1, B.nose, B.noseP);
     add(B.nose - 0.78, B.nose, B.planP);
     add(B.tail + B.tailLen, B.tail, B.tailP);
-    add(B.tail + 0.78, B.tail, B.planP + 0.4);
+    add(B.tail + 0.78, B.tail, B.planPR ?? B.planP + 0.4);
   }
   for (const xc of [WHEEL_X, B.rearAxle]) {
     // Gleichmäßig im Bogenmaß, an den steilen Enden zusätzlich verdichtet
@@ -395,7 +443,8 @@ function stations(S: Shape, step: number, arch: number) {
 
 function cabinStations(S: Shape, step: number) {
   const B = S.B;
-  return uniq([...range(B.x0, CABIN_X1, step), B.x1, B.x2, B.glassRear, A_BASE, B.seams[1], ...B.pillars.flat()].filter((x) => x >= B.x0 && x <= CABIN_X1));
+  const C1 = S.F.cabinX1;
+  return uniq([...range(B.x0, C1, step), B.x1, B.x2, B.glassRear, S.F.aBase, B.seams[1], ...B.pillars.flat()].filter((x) => x >= B.x0 && x <= C1));
 }
 
 const halfSeg = (j: number, mid: number) => (j >= mid ? j - mid : mid - j - 1);
@@ -410,6 +459,7 @@ interface Built {
 
 function buildBody(S: Shape, detail: number): Built {
   const B = S.B;
+  const F = S.F;
   const d0 = B.seams[0];
   const d1 = B.seams[1];
   const hinge = doorHinge(S);
@@ -427,8 +477,8 @@ function buildBody(S: Shape, detail: number): Built {
   for (let s = 0; s < xs.length - 1; s++) {
     const xa = xs[s];
     const xb = xs[s + 1];
-    const inHood = xa >= HOOD_X0 - 1e-6 && xb <= HOOD_X1 + 1e-6;
-    const inCabin = xa >= open0 - 1e-6 && xb <= CABIN_X1 + 1e-6 && !inHood;
+    const inHood = xa >= F.hoodX0 - 1e-6 && xb <= F.hoodX1 + 1e-6;
+    const inCabin = xa >= open0 - 1e-6 && xb <= F.cabinX1 + 1e-6 && !inHood;
     const inDoor = xa >= d1 - 1e-6 && xb <= d0 + 1e-6;
     for (let j = 0; j < R; j++) {
       const hs = halfSeg(j, mid);
@@ -468,13 +518,13 @@ function buildBody(S: Shape, detail: number): Built {
     const xm = (cx[s] + cx[s + 1]) / 2;
     const roof = xm > B.x1 && xm < B.x2;
     const pillar = B.pillars.some(([a, b]) => xm > a && xm < b);
-    const inDoor = xm > d1 && xm < A_BASE;
+    const inDoor = xm > d1 && xm < F.aBase;
     for (let j = 0; j < CR - 1; j++) {
       const hs = halfSeg(j, cmid);
       let m: number;
       if (hs < 4) m = roof ? 0 : 1; // Dachfläche bzw. Front-/Heckscheibe
       else if (hs < 6) m = 0; // Dachholm, A-/C-Säule
-      else if (xm < B.glassRear || xm > A_BASE) m = 0; // C-Säule bzw. Fuß der A-Säule
+      else if (xm < B.glassRear || xm > F.aBase) m = 0; // C-Säule bzw. Fuß der A-Säule
       else if (pillar) m = B.blackPillars ? 2 : 0;
       else if (hs === 6) m = B.blackPillars ? 2 : 0; // oberer Fensterrahmen
       else m = 1;
@@ -492,22 +542,22 @@ function buildBody(S: Shape, detail: number): Built {
   const doors = [0, 1].map((k) => finish(all, doorIdx[k], [hinge[0], 0, (k ? 1 : -1) * hinge[1]])) as [THREE.BufferGeometry, THREE.BufferGeometry];
 
   // ---- Motorhaube: Außenhaut (Gruppe 0) und dunkle Innenseite (Gruppe 1) ----
-  const hx = range(HOOD_X0 + 0.006, HOOD_X1 - 0.006, detail ? 0.06 : 0.1);
+  const hx = range(F.hoodX0 + 0.006, F.hoodX1 - 0.006, detail ? 0.06 : 0.1);
   const N = detail ? 19 : 11;
   const pos: number[] = [];
   const outer: number[] = [];
   const innerIdx: number[] = [];
-  const y0 = S.crown(HOOD_X0);
+  const y0 = S.crown(F.hoodX0);
   for (const layer of [0, 1]) {
     hx.forEach((x) => {
       const w = S.width(x);
       for (let i = 0; i < N; i++) {
         const z = (i / (N - 1) - 0.5) * 2 * (0.8 * w - 0.006);
         // Powerdome: zwei Sicken, die zur Front hin zusammenlaufen.
-        const hw = 0.36 - 0.1 * ((x - HOOD_X0) / (HOOD_X1 - HOOD_X0));
-        const dome = Math.abs(z) < hw ? 0.014 * Math.cos(((z / hw) * Math.PI) / 2) ** 0.6 : 0;
-        const edge = Math.min(1, (0.8 * w - Math.abs(z)) / 0.06, (x - HOOD_X0) / 0.05, (HOOD_X1 - x) / 0.05);
-        pos.push(x - HOOD_X0, S.topSurf(x, z) - y0 + 0.003 + dome - (layer ? 0.004 + 0.022 * smooth(edge) : 0), z);
+        const hw = 0.36 - 0.1 * ((x - F.hoodX0) / (F.hoodX1 - F.hoodX0));
+        const dome = Math.abs(z) < hw ? F.dome * Math.cos(((z / hw) * Math.PI) / 2) ** 0.6 : 0;
+        const edge = Math.min(1, (0.8 * w - Math.abs(z)) / 0.06, (x - F.hoodX0) / 0.05, (F.hoodX1 - x) / 0.05);
+        pos.push(x - F.hoodX0, S.topSurf(x, z) - y0 + 0.003 + dome - (layer ? 0.004 + 0.022 * smooth(edge) : 0), z);
       }
     });
   }

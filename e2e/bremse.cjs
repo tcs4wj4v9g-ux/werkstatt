@@ -79,6 +79,25 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   });
   expect(done.wheel && done.caliper && done.pads, 'Rad, Bremssattel und Beläge hinten links ausgebaut');
   expect(done.padsOk && done.back, 'Neue Beläge hinten links eingebaut, Sattel und Rad festgezogen – ' + JSON.stringify(done));
+  // ---------- Kleinstwagen (Monospace-Form): Räder vorn/hinten und Motorraum im Bild erreichbar ----------
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const car = window.__gkLib.createCar('renard_twingle', [], Math.random, {}); car.lifted = true; g.setState({ cars: [car, ...s.cars.slice(1)], liftUp: [true, false], tool: 'ratchet', carried: ['ratchet', 'socket17', 'socket10'], panel: null }); Object.assign(window.__gkPlayer, { x: -0.5, z: -5.2, yaw: 0, work: null }); });
+  await p.waitForTimeout(900);
+  for (const view of ['Rad vorne links', 'Rad hinten links']) {
+    await p.locator('.car-actions button', { hasText: view }).click(); await p.waitForTimeout(800);
+    const bolts = (await findBolts('Schraube – ' + view.replace('Rad', 'Rad'))).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+    const id = view.includes('hinten') ? 'wheel_rl' : 'wheel_fl';
+    if (bolts[0]) { await p.mouse.click(bolts[0].x, bolts[0].y); await p.waitForTimeout(300); }
+    const st0 = await p.evaluate((id) => window.__gk.getState().cars[0].components[id].bolts, id);
+    expect(bolts.length === 5 && st0.includes(1), `Kleinstwagen: ${view} – Radschraube im Bild angetippt und gelöst`);
+    await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  }
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const c = { ...s.cars[0], lifted: false, hoodOpen: true }; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [false, false], tool: 'hand' }); Object.assign(window.__gkPlayer, { x: 3.2, z: -2.7, yaw: Math.PI / 2, work: null }); });
+  await p.waitForTimeout(900);
+  await p.locator('.car-actions button', { hasText: 'Motor von vorn' }).click(); await p.waitForTimeout(900);
+  const cover = (await findBolts('Motorabdeckung')).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+  if (cover[0]) { await p.evaluate(() => window.__gk.setState({ toast: null })); await p.mouse.click(cover[0].x, cover[0].y); await p.waitForTimeout(300); }
+  const t = await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text);
+  expect(cover.length > 0 && !!t, 'Kleinstwagen: Motorabdeckung unter der kurzen Haube im Bild antippbar – ' + t);
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();
