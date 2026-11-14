@@ -165,6 +165,15 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     seams: [0.78, -0.45], handles: [-0.32], cowlX: 0.84, cowlY: 0.9, hoodSlope: 0.07, hoodCurve: 0.1, hoodX0: 0.86, hoodX1: 2.0, cabinX1: 0.86, aBase: 0.64,
     dome: 0, cabinK: 0.9, roofArc: 0.025, lidX0: -1.84, lidX1: -1.16, hoodHinge: 'front', haunch: 0.06, bayX: 0,
   },
+  // Aktuelles Heckmotor-Sportcoupé: 4,52 m, Radstand 2,45 m, breiter (1,85 m), flache Fronthaube zwischen aufrechten Scheinwerfern,
+  // Dachlinie im Bogen bis zum Heck, kräftige Hinterkotflügel, glatte Flächen.
+  nine2: {
+    ...BASE, tail: -2.1, nose: 2.42, width: 0.9, rearAxle: -1.07, trackF: -0.06, trackR: -0.02, roof: 1.3, x0: -1.3, x1: -0.45, x2: 0.24,
+    deck: 1.0, noseMid: 0.48, noseP: 2.6, tailMid: 0.5, tailP: 1.7, tailLen: 0.95, planP: 2.8, planPR: 4, ground: 0.17, tumble: 0.16, bowF: 0.05, bowR: 0.08,
+    flare: 0.05, crease: 0.6, creaseDepth: 0, blackPillars: true, pillars: [], glassRear: -0.85, rearSeat: false,
+    seams: [0.78, -0.55], handles: [-0.38], cowlX: 0.82, cowlY: 0.9, hoodSlope: 0.07, hoodCurve: 0.1, hoodX0: 0.84, hoodX1: 2.05, cabinX1: 0.84, aBase: 0.62,
+    dome: 0, cabinK: 0.9, roofArc: 0.025, lidX0: -2.0, lidX1: -1.32, hoodHinge: 'front', haunch: 0.07, bayX: -0.15,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 

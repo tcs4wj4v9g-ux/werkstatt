@@ -1622,10 +1622,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           return (
             <group position={[mx, my, 0]} rotation={[0, 0, ang]}>
               <mesh material={mats.dark} raycast={noRay}>
-                <boxGeometry args={[len + 0.02, 0.008, body === 'nine' ? 0.5 : 0.34]} />
+                <boxGeometry args={[len + 0.02, 0.008, body === 'nine2' ? 0.7 : body === 'nine' ? 0.5 : 0.34]} />
               </mesh>
-              {(body === 'nine' ? [-11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11] : [-7, -5, -3, -1, 1, 3, 5, 7]).map((i) => (
-                <mesh key={i} position={[0, 0.008, i * 0.02]} material={body === 'nine' ? mats.trim : mats.chrome} raycast={noRay}>
+              {body === 'nine2' && (
+                <mesh position={[len / 2 - 0.02, 0.012, 0]} material={mats.tailBar} raycast={noRay}>
+                  <boxGeometry args={[0.02, 0.012, 0.3]} />
+                </mesh>
+              )}
+              {(body === 'nine2' ? Array.from({ length: 31 }, (_, i) => (i - 15) * 0.72) : body === 'nine' ? [-11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11] : [-7, -5, -3, -1, 1, 3, 5, 7]).map((i) => (
+                <mesh key={i} position={[0, 0.008, i * 0.02]} material={body === 'tub' ? mats.chrome : mats.trim} raycast={noRay}>
                   <boxGeometry args={[len, 0.01, 0.01]} />
                 </mesh>
               ))}

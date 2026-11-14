@@ -37,7 +37,7 @@ const Z90: V3 = [0, 0, Math.PI / 2];
  * `empty` = Motorraum ohne Motor (nach dem Ausbau). Krümmer sind eigene, ausbaubare Teile (siehe unten).
  */
 export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' | 'empty' = 'car') {
-  const key = `${e.layout}${e.fuel}${+!!e.turbo}${detail}${mode}`;
+  const key = `${e.layout}${e.fuel}${+!!e.turbo}${+!!e.air}${detail}${mode}`;
   let g = cache.get(key);
   if (g) return g;
   const m = new Mesher(8);
@@ -50,7 +50,7 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
   const boxer = e.layout === 'B4' || e.layout === 'B6';
   if (mode !== 'bare' && boxer) {
     // ---- Heckmotorraum des Boxers (wird im Auto gedreht hinter die Hinterachse gesetzt): Gebläsegehäuse, Luftführung, Motorbleche ----
-    if (mode === 'car') {
+    if (mode === 'car' && e.air) {
       m.cyl(BAY.painted, 0.17, 0.17, 0.09, [1.72, 0.66, 0], Z90, detail ? 24 : 14);
       m.cyl(BAY.core, 0.12, 0.12, 0.092, [1.72, 0.66, 0], Z90, detail ? 20 : 12);
       for (let i = 0; i < 9; i++) m.box(BAY.painted, [0.094, 0.006, 0.11], [1.72, 0.66 + Math.cos((i / 9) * 6.283) * 0.06, Math.sin((i / 9) * 6.283) * 0.06], [(i / 9) * 6.283, 0, 0]);
@@ -125,8 +125,9 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
     const tilt = bankTilt(e);
     for (const c of slots) {
       m.base.makeTranslation(0, V_PIVOT, 0).multiply(new THREE.Matrix4().makeRotationX(c.bank * tilt)).multiply(new THREE.Matrix4().makeTranslation(0, -V_PIVOT, 0));
-      m.cyl(blockColor, 0.06, 0.06, 0.16, [c.x, 0.54, c.z], undefined, seg);
-      for (const y of [0.48, 0.505, 0.53, 0.555, 0.58, 0.605]) m.cyl(blockColor, 0.078, 0.078, 0.008, [c.x, y, c.z], undefined, seg);
+      m.cyl(blockColor, e.air ? 0.06 : 0.075, e.air ? 0.06 : 0.075, 0.16, [c.x, 0.54, c.z], undefined, seg);
+      // Luftgekühlt: Kühlrippen; wassergekühlt: glatter Zylinderblock
+      if (e.air) for (const y of [0.48, 0.505, 0.53, 0.555, 0.58, 0.605]) m.cyl(blockColor, 0.078, 0.078, 0.008, [c.x, y, c.z], undefined, seg);
       m.base.identity();
     }
   } else if (vee) {

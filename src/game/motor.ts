@@ -43,7 +43,7 @@ export function engineWeight(e: EngineDef) {
 /** Baulänge-Klasse: 1 = kurz (R4, V6), 2 = lang (R6), 3 = breit und schwer (V8). */
 const SIZE: Record<EngineDef['layout'], number> = { B6: 1.4, B4: 1, R4: 1, V6: 1.5, R6: 2, V8: 3 };
 /** Wie viel Motor passt in den Motorraum dieser Karosserie? */
-const BAY: Record<string, number> = { mono: 1.2, hatch: 1.5, box: 2.2, tub: 1.2, nine: 1.4, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
+const BAY: Record<string, number> = { mono: 1.2, hatch: 1.5, box: 2.2, tub: 1.2, nine: 1.4, nine2: 1.4, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
 
 export interface SwapPlan {
   possible: boolean;

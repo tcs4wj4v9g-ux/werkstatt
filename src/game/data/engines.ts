@@ -64,6 +64,7 @@ export const ENGINES: Record<string, EngineDef> = Object.fromEntries(
     e('v8_30k', '3,0-l-V8 (Rennsport-Klassiker)', 'V8', 'benzin', false, 3.0, 280, 290, 'V8-Klassik', 9),
     e('b4_16', '1,6-l-Boxer (luftgekühlt)', 'B4', 'benzin', false, 1.6, 75, 117, 'Boxer-Klassik', 3.5, true),
     e('b6_36', '3,6-l-Sechszylinder-Boxer (luftgekühlt)', 'B6', 'benzin', false, 3.6, 250, 310, 'Boxer-6', 4, true),
+    e('b6t_30', '3,0-l-Sechszylinder-Boxer Biturbo', 'B6', 'benzin', true, 3.0, 385, 450, 'Boxer-6-Turbo', 5),
   ].map((x) => [x.id, x]),
 );
 

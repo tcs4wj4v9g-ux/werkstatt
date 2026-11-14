@@ -29,7 +29,7 @@ export interface CarModelDef {
 }
 
 /** Karosserien mit Motor im Heck (Motordeckel hinten, Kofferraum vorn). */
-export const REAR_ENGINE = new Set<BodyStyle>(['tub', 'nine']);
+export const REAR_ENGINE = new Set<BodyStyle>(['tub', 'nine', 'nine2']);
 
 export const CLASS_NAMES: Record<CarClass, string> = {
   budget: 'Günstige Gebrauchte',
@@ -78,6 +78,7 @@ const list: CarModelDef[] = [
   m({ id: 'bavaria_328_klassik', brand: 'Bavaria', name: 'Bavaria 328 Klassik', body: 'sedan', cls: 'mid', baseValue: 15500, engineId: 'r6_28k', weight: 1420, rare: true, years: [1996, 2000], colors: ['#5b6f8f', '#7d1a1f', '#d9d2bd'], blurb: 'Youngtimer mit dem legendären 2,8-Liter.' }),
   m({ id: 'bavaria_330_sport', brand: 'Bavaria', name: 'Bavaria 330 Sport-Kombi', body: 'wagon', cls: 'mid', baseValue: 17500, engineId: 'r6_30', weight: 1620, rare: true, years: [2006, 2008], colors: ['#1d3fae', '#f2f2ee', '#101114'], blurb: 'Kombi mit Sportpaket – nur wenige gebaut.' }),
   // --- Extrem seltene Sammlerfahrzeuge ---
+  m({ id: 'zuffen_929', brand: 'Zuffen', name: 'Zuffen 929 Coupé', body: 'nine2', cls: 'luxury', baseValue: 125000, engineId: 'b6t_30', weight: 1505, colors: ['#c9cdd1', '#1c3f8f', '#e8b90f', '#1b1c1f', '#f2f2f0'], years: [2019, 2024], blurb: 'Aktueller Heckmotor-Sportwagen mit Biturbo-Boxer, LED-Leuchtenband und Allrad-Gefühl – schnell, breit und alltagstauglich.' }),
   m({ id: 'zuffen_946', brand: 'Zuffen', name: 'Zuffen 946 Coupé', body: 'nine', cls: 'luxury', baseValue: 78000, engineId: 'b6_36', weight: 1350, colors: ['#c4161c', '#1b1c1f', '#a7adb3', '#efefea', '#1d2b4f'], years: [1989, 1994], blurb: 'Heckmotor-Sportwagen der späten 80er mit luftgekühltem Sechszylinder-Boxer – der Klassiker unter den Youngtimern.' }),
   m({ id: 'zuffen_365', brand: 'Zuffen', name: 'Zuffen 365 Coupé', body: 'tub', cls: 'collector', baseValue: 125000, engineId: 'b4_16', weight: 830, colors: ['#b9bdc2', '#e8e0c8', '#a3201b', '#1b1c1f', '#5c7186'], years: [1950, 1965], collector: true, blurb: 'Rundes Sportcoupé der 50er mit luftgekühltem Boxer im Heck – leicht, handlich und heute heiß begehrt.' }),
   m({ id: 'bavaria_30cs', brand: 'Bavaria', name: 'Bavaria 3.0 CS Coupé', body: 'classic', cls: 'collector', baseValue: 320000, engineId: 'r6_30cs', weight: 1400, collector: true, years: [1971, 1975], colors: ['#d9d2bd', '#c8501e', '#5b6f8f'], blurb: 'Filigranes Coupé der Siebziger – hochbegehrt.' }),
