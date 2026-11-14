@@ -98,6 +98,16 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   if (cover[0]) { await p.evaluate(() => window.__gk.setState({ toast: null })); await p.mouse.click(cover[0].x, cover[0].y); await p.waitForTimeout(300); }
   const t = await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text);
   expect(cover.length > 0 && !!t, 'Kleinstwagen: Motorabdeckung unter der kurzen Haube im Bild antippbar – ' + t);
+  // ---------- Vorn angeschlagene Motorhaube (Zweitürer der 80er): Ansicht „Motor von oben“, Teile erreichbar ----------
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar('bavaria_323i', [], Math.random, {}); c.hoodOpen = true; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [false, false], tool: 'hand', panel: null }); Object.assign(window.__gkPlayer, { x: 0.6, z: -1.0, yaw: Math.PI, work: null }); });
+  await p.waitForTimeout(900);
+  const views = await p.$$eval('.car-actions button', (b) => b.map((x) => x.textContent));
+  await p.locator('.car-actions button', { hasText: 'Motor von oben' }).click(); await p.waitForTimeout(900);
+  const cov = (await findBolts('Motorabdeckung')).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+  if (cov[0]) { await p.evaluate(() => window.__gk.setState({ toast: null })); await p.mouse.click(cov[0].x, cov[0].y); await p.waitForTimeout(300); }
+  const t2 = await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text);
+  expect(views.some((v) => v.includes('Motor von oben')) && /Motorabdeckung/.test(t2 || ''), 'Vorn angeschlagene Haube: Ansicht „Motor von oben“, Motorabdeckung antippbar – ' + t2);
+  await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

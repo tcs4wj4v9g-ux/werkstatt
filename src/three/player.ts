@@ -65,11 +65,12 @@ export const WORK_LABELS: Record<WorkView, string> = {
 
 /** Feste Arbeitsansicht nah am Bauteil. Der Spieler steht dabei still und kann sich nur umsehen. */
 /** `rearX`: Lage der Hinterachse des Autos (je Karosserie verschieden). */
-export function workPose(view: WorkView, bay: number, rearX = -1.38): WorkPose {
+export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront = false): WorkPose {
   const z0 = SLOTS[bay].z;
   const h = LIFT_HEIGHT;
   const table: Record<WorkView, [[number, number, number], [number, number, number]]> = {
-    engine: [[2.3, 1.5, z0], [1.32, 0.72, z0]],
+    // Vorn angeschlagene Haube steht vor dem Auto: dann von der Scheibe her von oben in den Motorraum
+    engine: hoodFront ? [[0.5, 1.75, z0], [1.42, 0.7, z0]] : [[2.3, 1.5, z0], [1.32, 0.72, z0]],
     engine_left: [[1.42, 1.4, z0 - 1.15], [1.42, 0.62, z0 - 0.28]],
     engine_right: [[1.42, 1.4, z0 + 1.15], [1.42, 0.62, z0 + 0.28]],
     wheel_left: [[1.38, h + 0.42, z0 - 1.85], [1.38, h + 0.36, z0 - 0.8]],

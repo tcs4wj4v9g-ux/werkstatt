@@ -84,6 +84,8 @@ export interface BodySpec {
   roofArc?: number;
   /** Rundung der Heckecken in der Draufsicht (Standard planP + 0,4; größer = kastiger). */
   planPR?: number;
+  /** Scharnier der Motorhaube: hinten an der Scheibe (Standard) oder vorn (Haube öffnet von hinten nach vorn). */
+  hoodHinge?: 'rear' | 'front';
 }
 
 /** Vorderwagen einer Karosserie (Standardwerte = gemeinsamer Vorderwagen aller bisherigen Formen). */
@@ -133,7 +135,7 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     ...BASE, tail: -2.13, nose: 2.2, width: 0.82, rearAxle: -1.19, trackF: -0.095, trackR: -0.09, roof: 1.39, x0: -1.47, x1: -1.1, x2: 0.08,
     deck: 1.0, noseMid: 0.71, noseP: 6, tailMid: 0.79, tailP: 6, tailLen: 0.05, planP: 7.5, planPR: 6.5, ground: 0.26, tumble: 0.1, bowF: 0.06, bowR: 0.05,
     flare: 0.008, crease: 0.82, creaseDepth: 0.018, blackPillars: true, pillars: [[-0.64, -0.57]], glassRear: -1.38, rearSeat: true,
-    seams: [0.74, -0.6], handles: [-0.42], hoodSlope: 0.03, hoodCurve: 0.075, dome: 0.004, cabinK: 0.93, roofArc: 0.006,
+    seams: [0.74, -0.6], handles: [-0.42], hoodSlope: 0.03, hoodCurve: 0.075, dome: 0.004, cabinK: 0.93, roofArc: 0.006, hoodHinge: 'front',
   },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };

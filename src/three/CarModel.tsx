@@ -402,6 +402,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const flares = !!car?.visual?.flares;
   const shared = useMemo(() => carGeometry(body, G.detail, flares), [body, G.detail, flares]);
   const S = shared.shape;
+  const hoodFront = S.B.hoodHinge === 'front';
   const B = shared.shape.B;
   /** Tieferlegung: Karosserie und Motor sinken, die Räder bleiben stehen. */
   const drop = car && !car.bare ? dropOf(car.visual) / 100 : 0;
@@ -486,7 +487,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
 
   useFrame((_, dt) => {
     if (hood.current) {
-      const target = hoodOpen ? 1.12 : 0;
+      // Vorn angeschlagen: die Hinterkante hebt sich, die Haube steht fast senkrecht.
+      const target = hoodOpen ? (hoodFront ? -1.3 : 1.12) : 0;
       hood.current.rotation.z += (target - hood.current.rotation.z) * Math.min(1, dt * 7);
     }
     if (steer) {
@@ -853,7 +855,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             {!bare && <Proxy s={[0.3, 0.16, 0.2]} p={[1.28, 0.6, 0.44]} />}
             {!bare && <Proxy s={[0.05, 0.34, 1.2]} p={[1.95, 0.6, 0]} />}
             {/* Haubenstütze */}
-            {hoodOpen && !bare && (
+            {hoodOpen && !bare && !hoodFront && (
               <mesh position={[1.585, 1.305, 0.62]} rotation={[0, 0, 0.658]} raycast={noRay}>
                 <cylinderGeometry args={[0.006, 0.006, 1.23, 5]} />
                 <meshStandardMaterial color="#b9bec5" metalness={0.9} roughness={0.3} />
@@ -1589,8 +1591,9 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
 
       {!bare && (
       <>
-      {/* Motorhaube, Scharnier an der Windschutzscheibe */}
-      <group ref={hood} position={[S.F.hoodX0, S.crown(S.F.hoodX0) - drop, 0]}>
+      {/* Motorhaube: Scharnier an der Windschutzscheibe, bei vorn angeschlagener Haube an der Vorderkante */}
+      <group ref={hood} position={hoodFront ? [S.F.hoodX1, S.crown(S.F.hoodX1) - drop, 0] : [S.F.hoodX0, S.crown(S.F.hoodX0) - drop, 0]}>
+      <group position={hoodFront ? [S.F.hoodX0 - S.F.hoodX1, S.crown(S.F.hoodX0) - S.crown(S.F.hoodX1), 0] : [0, 0, 0]}>
         {car?.visual?.hood === 1 && (
           <mesh position={[0.5, 0.035, 0]} material={mats.solid} raycast={noRay}>
             <boxGeometry args={[0.55, 0.05, 0.42]} />
@@ -1609,6 +1612,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           userData={{ label: interactive || (hoodTap && handlers) ? (hoodOpen ? 'Motorhaube schließen' : 'Motorhaube öffnen') : undefined }}
           onClick={interactive || (hoodTap && handlers) ? tap(handlers!.onHood) : bodyTap}
         />
+      </group>
       </group>
 
       {corner('fl')}

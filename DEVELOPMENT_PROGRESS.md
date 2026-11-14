@@ -118,4 +118,5 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Heck: waagerechte Rückleuchten mit Rippen (rot oben, Blinker und Rückfahrlicht unten), schwarze Heckblende mit Kennzeichen, Stoßfänger mit Chromleiste. Seiten: schwarze Schutzleiste mit Chromstreifen, Chrom-Fensterrahmen, Kreuzspeichenfelgen.
 - Technik: 2,3-l-Reihensechszylinder (150 PS, Teilefamilie R6), Standard-Motorraum mit allen Reparaturen, Innenraum mit Instrumentenhutze vor dem Fahrer.
 - Geprüft: Logiktests, alle Browser-Durchläufe (karriere einmal zeitbedingt, Wiederholung grün). Kein echter iPad-Test.
+- Motorhaube vorn angeschlagen (öffnet von hinten nach vorn, wie beim Vorbild); Arbeitsansicht „Motor von oben“ statt „von vorn“.
 - Grenzen: kein Knick an der hinteren Fensterkante (die Seitenscheibe endet gerade); Front steht senkrecht statt leicht nach vorn geneigt.

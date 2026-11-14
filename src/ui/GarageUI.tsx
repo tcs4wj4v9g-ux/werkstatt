@@ -41,7 +41,8 @@ export function GarageUI() {
   };
   const enter = (view: WorkView, bay: number) => {
     const c = useGame.getState().cars[bay];
-    player.work = workPose(view, bay, c ? BODY_SPECS[CAR_MODELS[c.modelId].body].rearAxle : undefined);
+    const spec = c ? BODY_SPECS[CAR_MODELS[c.modelId].body] : undefined;
+    player.work = workPose(view, bay, spec?.rearAxle, spec?.hoodHinge === 'front');
     setWork(player.work.id);
   };
   // Motor wird warm; die Arbeitsansicht endet, wenn das Auto dafür nicht mehr passt.
@@ -128,7 +129,7 @@ export function GarageUI() {
               )}
               {views.map((v) => (
                 <button key={v} className={`btn ${work === `${v}:${nearBay}` ? 'active' : ''}`} onClick={() => enter(v, nearBay)}>
-                  🎯 {WORK_LABELS[v]}
+                  🎯 {v === 'engine' && near && BODY_SPECS[CAR_MODELS[near.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v]}
                 </button>
               ))}
             </div>
