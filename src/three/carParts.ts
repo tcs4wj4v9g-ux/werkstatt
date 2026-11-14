@@ -49,7 +49,7 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const nine = body === 'nine';
   const nine2 = body === 'nine2';
   return {
-    rim: nine2 ? 'five' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    rim: nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
     // Bavaria: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
     grille: sport ? 'slot' : classic ? 'classic' : brand === 'Bavaria' ? 'twin' : lux ? 'tall' : 'wide',
     lamps: classic ? 'round' : sport ? 'slim' : brand === 'Bavaria' ? 'twin' : 'block',
@@ -66,7 +66,7 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     wing: visual?.spoiler ?? (sport || model?.id === 'bavaria_340_ms' ? 3 : 0),
     flares: !!visual?.flares,
     tips: visual?.tips ?? 'stock',
-    rimSize: visual?.rimSize ?? (nine2 ? 2 : 0),
+    rimSize: visual?.rimSize ?? (nine2 ? 1 : 0),
     sportSeats: visual?.seats === 'sport',
     sportWheel: visual?.wheel === 'sport',
     ...(visual?.rim ? { rim: visual.rim as RimStyle } : {}),
