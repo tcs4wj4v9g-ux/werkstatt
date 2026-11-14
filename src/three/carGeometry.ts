@@ -199,6 +199,14 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     flare: 0.018, crease: 0.78, creaseDepth: 0.008, blackPillars: true, pillars: [[-0.4, -0.29]], glassRear: -1.32, rearSeat: true,
     seams: [0.74, -0.34, -1.26], handles: [-0.16, -1.08], dome: 0.008, roofArc: 0.03,
   },
+  // Sportliche Oberklasse-Limousine um 1990: 4,72 m, Radstand 2,76 m, lange flache Haube (vorn angeschlagen), leicht vorgeneigte
+  // Haifischnase, steile schmale Säulen, langer gerader Kofferraum, glatte Flanken mit feiner Kante.
+  e34: {
+    ...BASE, tail: -2.36, nose: 2.34, width: 0.875, rearAxle: -1.38, trackF: -0.05, trackR: -0.05, roof: 1.39, x0: -1.82, x1: -1.24, x2: 0.08,
+    deck: 0.99, noseMid: 0.68, noseP: 7, tailMid: 0.8, tailP: 7, tailLen: 0.08, planP: 6.5, planPR: 7, ground: 0.24, tumble: 0.1, bowF: 0.07, bowR: 0.06,
+    flare: 0.012, crease: 0.8, creaseDepth: 0.01, blackPillars: true, pillars: [[-0.47, -0.37]], glassRear: -1.62, rearSeat: true,
+    seams: [0.74, -0.41, -1.42], handles: [-0.23, -1.24], hoodSlope: 0.035, hoodCurve: 0.06, dome: 0.006, cabinK: 0.93, roofArc: 0.012, hoodHinge: 'front',
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 

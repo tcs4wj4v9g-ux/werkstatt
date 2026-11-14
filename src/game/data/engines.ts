@@ -57,6 +57,7 @@ export const ENGINES: Record<string, EngineDef> = Object.fromEntries(
     e('r6_28k', '2,8-l-Reihensechszylinder', 'R6', 'benzin', false, 2.8, 193, 280, 'R6', 1.6),
     e('r6_30', '3,0-l-Reihensechszylinder', 'R6', 'benzin', false, 3.0, 258, 300, 'R6', 1.4),
     e('r6_30cs', '3,0-l-Reihensechszylinder (Vergaser)', 'R6', 'benzin', false, 3.0, 180, 255, 'R6-Klassik', 4.5),
+    e('r6_36m', '3,6-l-Reihensechszylinder (M, Einzeldrossel)', 'R6', 'benzin', false, 3.6, 315, 360, 'R6-M', 2.6),
     e('r6t_30', '3,0-l-Reihensechszylinder Biturbo', 'R6', 'benzin', true, 3.0, 306, 400, 'R6-Turbo', 1.8),
     e('r6d_30', '3,0-l-Reihensechszylinder-Turbodiesel', 'R6', 'diesel', true, 3.0, 245, 520, 'R6-Diesel', 1.7),
     e('v6_35', '3,5-l-V6', 'V6', 'benzin', false, 3.5, 272, 350, 'V6', 1.6),

@@ -498,6 +498,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       plastic: new THREE.MeshStandardMaterial({ color: '#5b5f64', roughness: 0.86, metalness: 0.05 }),
       livery: new THREE.MeshPhysicalMaterial({ color: '#f0b400', roughness: 0.32, metalness: 0.1, clearcoat: 1 }),
       stripe: new THREE.MeshStandardMaterial({ color: '#c8461b', roughness: 0.35 }),
+      blue: new THREE.MeshStandardMaterial({ color: '#1c5fc8', roughness: 0.3 }),
     };
     return m;
   }, [G.clearcoat]);
@@ -573,6 +574,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     list[SLOT.plastic] = mats.plastic;
     list[SLOT.livery] = mats.livery;
     list[SLOT.stripe] = mats.stripe;
+    list[SLOT.blue] = mats.blue;
     return list;
   }, [mats]);
   const cabinMats = useMemo(() => [mats.paint, mats.glass, mats.trim], [mats]);

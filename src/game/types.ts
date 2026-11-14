@@ -141,8 +141,9 @@ export type Access = 'hood' | 'lifted' | 'stand';
  * `tt` = rundes Designer-Coupé (ein Dachbogen von der Scheibe bis zum Heck, kreisrunde Radhäuser, schmales Glashaus),
  * `quattro` = kantiges Rallye-Coupé der 80er (Kastenkotflügel, flache lange Haube, schräge Heckscheibe),
  * `b5` = weich gerundete Mittelklasse-Limousine der 90er (vier Türen, sanfter Dachbogen, runder Kofferraum).
+ * `e34` = sportliche Oberklasse-Limousine um 1990 (lange flache Haube, Doppelscheinwerfer, schmale Säulen, langer Kofferraum).
  */
-export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro' | 'b5';
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro' | 'b5' | 'e34';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 
