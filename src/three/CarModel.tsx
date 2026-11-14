@@ -844,6 +844,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             <mesh geometry={engineDecor(engine, G.detail, bare ? 'bare' : noEngine ? 'empty' : 'car')} material={bayMaterials()} raycast={noRay} />
             {!bare && !noEngine && <Proxy s={[0.7, 0.17, 0.36 + wide * 2]} p={[1.3, 0.535, 0]} />}
             {!bare && !noEngine && <Proxy s={[0.66, 0.09, 0.32]} p={[1.3, 0.405, 0]} />}
+            {/* Motorständer: Block fängt Tipps ab (sonst ginge der Tipp durch ihn zu Teilen darunter); Kolbenböden liegen darüber */}
+            {bare && !vee && <Proxy s={[0.7, 0.17, 0.36]} p={[1.3, 0.535, 0]} />}
+            {bare && vee && <Proxy s={[0.7, 0.15, 0.46]} p={[1.3, 0.51, 0]} />}
+            {bare && vee && <Proxy s={[0.7, 0.025, 0.08]} p={[1.3, 0.588, 0]} />}
             {!bare && <Proxy s={[0.3, 0.16, 0.2]} p={[1.28, 0.6, 0.44]} />}
             {!bare && <Proxy s={[0.05, 0.34, 1.2]} p={[1.95, 0.6, 0]} />}
             {/* Haubenstütze */}
@@ -1514,7 +1518,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 if (installed(hg) && installed('oil_pan')) return null;
                 return (
                   <Bank key={c.n} bank={c.bank}>
-                    {part(`piston${c.n}`, <mesh geometry={pistonGeometry(has(`piston${c.n}`, 'piston_forged'))} material={bayMaterials()} position={[c.x, 0.618, c.bank * 0.105]} />)}
+                    {part(`piston${c.n}`, <mesh geometry={pistonGeometry(has(`piston${c.n}`, 'piston_forged'))} material={bayMaterials()} position={[c.x, c.bank ? 0.638 : 0.627, c.bank * 0.105]} />)}
                   </Bank>
                 );
               })}

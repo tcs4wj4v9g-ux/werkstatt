@@ -16,7 +16,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   await p.goto(URL); await p.waitForTimeout(1500);
   await p.getByText('Neues Spiel').click(); await p.getByText("Los geht's").click(); await p.waitForTimeout(600);
   // Hilfsfunktionen im Spiel: Bauteil samt allem davor mit dem richtigen Werkzeug ausbauen bzw. wieder einbauen
-  await G(() => {
+  const installHelpers = () => G(() => {
     const kit = ['ratchet', 'socket10', 'socket13', 'socket16', 'socket17', 'wrench', 'screwdriver', 'obd', 'torque'];
     const g = window.__gk; const L = window.__gkLib;
     const use = (t) => g.setState({ tool: t, carried: kit.filter((x) => x !== 'obd' && x !== 'torque').slice(0, 99) });
@@ -24,7 +24,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
       strip(slot, id) {
         const c = g.getState().cars[slot]; const d = L.defOf(c, id); const s0 = c.components[id];
         if (!s0 || !s0.installed || s0.missing) return;
-        for (const x of d.blockedBy) this.strip(slot, x);
+        for (const x of L.blockersOf(g.getState().cars[slot], id)) this.strip(slot, x);
         const cc = () => g.getState().cars[slot];
         if (cc().bare && cc().lifted !== !!(d.access === 'lifted' || d.under)) g.getState().flipEngine();
         if (!cc().bare && !cc().junk && (d.access === 'lifted') !== cc().lifted) g.getState().tapLift(slot);
@@ -36,7 +36,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
       mount(slot, id, choice) {
         const c = g.getState().cars[slot]; const d = L.defOf(c, id); const s0 = c.components[id];
         if (!s0 || s0.installed) return;
-        for (const x of L.defsOf(c).filter((x) => x.blockedBy.includes(id))) this.mount(slot, x.id);
+        for (const x of L.defsOf(c).filter((x) => L.blockersOf(c, x.id).includes(id))) this.mount(slot, x.id);
         const cc = () => g.getState().cars[slot];
         if (cc().bare && cc().lifted !== !!(d.access === 'lifted' || d.under)) g.getState().flipEngine();
         if (!cc().bare && (d.access === 'lifted') !== cc().lifted) g.getState().tapLift(slot);
@@ -48,6 +48,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
       },
     };
   });
+  await installHelpers();
 
   // ---------- 1: Schrottplatz, Teil ausbauen und kaufen ----------
   expect(await G(() => window.__gk.getState().cars.slice(16, 22).filter(Boolean).length) === 6, 'Schrottplatz: sechs Spenderautos stehen bereit');
@@ -173,6 +174,18 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   await p.waitForTimeout(500); await p.reload(); await p.waitForTimeout(1500);
   const again = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.cars[0].motor.uid, sw: s.cars[0].swap, v: s.cars[0].visual, e: s.engines.map((u) => u.motor.uid), used: s.used.map((u) => u.id), stand: !!s.cars[15], ecu: s.cars[0].ecu }); });
   expect(keep === again, 'Nach Neuladen: Motor im Auto, Umbauteile, Optik, Motorlager, Gebrauchtteile, Steuergerät erhalten');
+
+  await installHelpers();
+  // ---------- Kolben von oben sichtbar und antippbar (R6 und V8), Kopf erst nach den Nockenwellen ----------
+  for (const model of ['bavaria_330', 'bavaria_340_ms']) {
+    await G((model) => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; cars[15] = L.motor.asStand(L.motor.extractEngine(L.createCar(model, [], Math.random, {})), model); g.setState({ cars, panel: null }); window.__t.strip(15, 'head_gasket'); if (cars[15].components.head_gasket_b) window.__t.strip(15, 'head_gasket_b'); if (g.getState().cars[15].lifted) g.getState().flipEngine(); g.setState({ tool: 'hand' }); Object.assign(window.__gkPlayer, { x: 4.2, z: -0.55, yaw: Math.PI / 2, pitch: -0.62, work: null, zoom: false }); }, model);
+    await p.waitForTimeout(800);
+    const cam = await G(() => window.__gk.getState().cars[15].components.camshaft.installed);
+    const pis = await G(() => { const out = []; const cam = window.__gkCamera; const v = new cam.position.constructor(); window.__gkScene.traverse((o) => { if (o.userData && o.userData.label && /^Kolben mit Pleuel/.test(o.userData.label)) { let m = null; o.traverse((x) => { if (!m && x.isMesh) m = x; }); if (!m) return; m.getWorldPosition(v); v.project(cam); out.push({ x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }); } }); return out; });
+    const hits = [];
+    for (const pt of pis) { await G(() => window.__gk.setState({ toast: null })); await p.mouse.click(pt.x, pt.y); await p.waitForTimeout(120); hits.push(await G(() => window.__gk.getState().toast && window.__gk.getState().toast.text)); }
+    expect(!cam && pis.length >= 6 && hits.every((t) => /Pleuellager/.test(t || '')), `${model}: Nockenwellen vor dem Kopf ausgebaut, ${pis.length} Kolben von oben antippbar (${hits[0]})`);
+  }
 
   // ---------- Öl am Motorständer ablassen (ohne Auffangwanne, die Schale am Ständer fängt es auf) ----------
   const putStand = () => G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; const c = L.createCar('bavaria_330', [], Math.random, {}); cars[15] = L.motor.asStand(L.motor.extractEngine(c), 'bavaria_330'); cars[15].fluids.oil.level = 5; g.setState({ cars, panel: null, carried: ['ratchet', 'socket17', 'wrench'], tool: 'ratchet', drainPan: s.drainPan.map(() => false) }); });

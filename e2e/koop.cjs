@@ -233,7 +233,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
       strip(slot, id) {
         const c = g.getState().cars[slot]; const d = L.defOf(c, id); const s0 = c.components[id];
         if (!s0 || !s0.installed) return;
-        for (const x of d.blockedBy) this.strip(slot, x);
+        for (const x of L.blockersOf(g.getState().cars[slot], id)) this.strip(slot, x);
         const cc = () => g.getState().cars[slot];
         if (cc().bare && cc().lifted !== !!(d.access === 'lifted' || d.under)) g.getState().flipEngine();
         cc().components[id].bolts.forEach((b, i) => { if (b === 0) return; if (b === 2) { use(d.fastener.driver); g.getState().tapBolt(slot, id, i); } use('hand'); g.getState().tapBolt(slot, id, i); });
