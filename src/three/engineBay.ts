@@ -129,7 +129,7 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
     else m.cyl(BAY.steel, 0.01, 0.01, xs[xs.length - 1] - xs[0] + 0.08, [(xs[0] + xs[xs.length - 1]) / 2, 0.815, -0.125], Z90, 6);
   }
   // Motorständer: Bohrungen in der Zylinderlaufbahn sind von oben zu sehen, wenn der Kopf ab ist (dunkle Ringe)
-  if (mode === 'bare') for (const c of slots) if (!vee) m.cyl(BAY.core, 0.046, 0.046, 0.004, [c.x, 0.622, 0], undefined, 16, true);
+  if (mode === 'bare') for (const c of slots) if (!vee) m.torus(BAY.core, 0.046, 0.005, [c.x, 0.621, 0], [Math.PI / 2, 0, 0], 18);
   g = m.build();
   cache.set(key, g);
   return g;
@@ -188,6 +188,8 @@ export const exhaustGeometry = (e: EngineDef, sport: boolean) =>
 export const pistonGeometry = (forged: boolean) =>
   once(`pi${+forged}`, (m) => {
     m.cyl(forged ? BAY.steel : BAY.alu, 0.042, 0.041, 0.06, [0, -0.03, 0], undefined, 18);
+    // Blanker Kolbenboden: hebt sich von oben gegen den Block ab
+    m.cyl(BAY.steel, 0.04, 0.041, 0.005, [0, 0.0025, 0], undefined, 18);
     for (const y of [-0.008, -0.016, -0.024]) m.torus(BAY.painted, 0.0415, 0.0025, [0, y, 0], [Math.PI / 2, 0, 0], 18);
     m.cyl(BAY.steel, 0.012, 0.012, 0.09, [0, -0.04, 0], Z90, 8);
     m.rbox(forged ? BAY.steel : BAY.iron, [0.024, 0.2, 0.016], 0.006, [0, -0.16, 0]);

@@ -16,7 +16,7 @@ function strip(car: CarInstance, id: string): void {
   const def = defOf(car, id);
   const st = car.components[id];
   if (!st || !st.installed) return;
-  for (const b of def.blockedBy) strip(car, b);
+  for (const b of r.blockersOf(car, id)) strip(car, b);
   if (car.bare && car.lifted !== !!(def.access === 'lifted' || def.under)) car.lifted = !!(def.access === 'lifted' || def.under);
   st.bolts.forEach((b, i) => {
     if (b === 2) expect(r.boltAction(car, id, i, tool(def.fastener!.driver as ToolId)).ok, `${id} lösen`).toBe(true);
@@ -31,7 +31,7 @@ function mount(car: CarInstance, id: string, source?: any): void {
   const def = defOf(car, id);
   const st = car.components[id];
   if (!st || st.installed) return;
-  for (const d of defsOf(car).filter((x) => x.blockedBy.includes(id))) mount(car, d.id);
+  for (const d of defsOf(car).filter((x) => r.blockersOf(car, x.id).includes(id))) mount(car, d.id);
   if (car.bare) car.lifted = !!(def.access === 'lifted' || def.under);
   const res = r.componentAction(car, {}, id, tool(def.removeWith ? (def.removeWith.driver as ToolId) : 'hand'), source ? { source } : { useOldPart: true });
   expect(res.ok, `${id}: ${res.message}`).toBe(true);
@@ -230,5 +230,19 @@ describe('Ausgebauter Motor gehört weiter zum Auto', () => {
     // Auf den Ständer gesetzt: gleicher Motor, gleiche Teile
     const stand = asStand(unit, 'bavaria_330');
     expect(Object.keys(withRemovedEngine(car, [fromStand(stand)]).components)).toContain('piston1');
+  });
+});
+
+describe('Motorständer: Nockenwellen vor dem Zylinderkopf', () => {
+  it('Kopf erst ab, wenn die Nockenwellen raus sind; Nockenwellen nur auf den Kopf', () => {
+    const car = mk('bavaria_330');
+    const stand = asStand(extractEngine(car), 'bavaria_330');
+    expect(r.blockersOf(stand, 'cyl_head')).toContain('camshaft');
+    expect(r.blockersOf(car, 'cyl_head')).not.toContain('camshaft'); // im Auto: Kopfdichtung ohne Ständer
+    strip(stand, 'cyl_head');
+    expect(stand.components.camshaft.installed).toBe(false);
+    expect(r.installReady(stand, 'camshaft')).toBe(false);
+    mount(stand, 'camshaft');
+    expect(stand.components.cyl_head.installed && stand.components.camshaft.installed).toBe(true);
   });
 });

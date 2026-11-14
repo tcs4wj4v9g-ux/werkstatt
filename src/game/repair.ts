@@ -18,11 +18,21 @@ export const isComplete = (car: CarInstance, id: string) => {
   return c.installed && c.bolts.every((b) => b === TIGHT) && (!defOf(car, id).connector || c.connected);
 };
 
+/**
+ * Was vor einem Bauteil sitzt. Am Motorständer liegen die Nockenwellen (Bank 1) auf dem Zylinderkopf:
+ * erst sie ausbauen, dann den Kopf – und sie gehen nur auf einen aufgesetzten Kopf wieder drauf.
+ * Im Auto bleiben sie unsichtbar am Kopf (Kopfdichtungswechsel im Auto ohne Motorständer).
+ */
+export const blockersOf = (car: CarInstance, id: string): string[] => {
+  const base = defOf(car, id).blockedBy;
+  return car.bare && id === 'cyl_head' && car.components.camshaft ? [...base, 'camshaft'] : base;
+};
+
 export const blockersRemoved = (car: CarInstance, id: string) =>
-  defOf(car, id).blockedBy.every((b) => !car.components[b]?.installed);
+  blockersOf(car, id).every((b) => !car.components[b]?.installed);
 
 /** Bauteile, die unter `id` liegen und vorher fertig montiert sein müssen. */
-const dependents = (car: CarInstance, id: string) => defsOf(car).filter((c) => c.blockedBy.includes(id) && car.components[c.id]).map((c) => c.id);
+const dependents = (car: CarInstance, id: string) => defsOf(car).filter((c) => blockersOf(car, c.id).includes(id) && car.components[c.id]).map((c) => c.id);
 
 /** Kann das Bauteil jetzt sofort herausgenommen werden? */
 export const removable = (car: CarInstance, id: string) => {
@@ -63,7 +73,7 @@ function checkAccess(car: CarInstance, id: string): string | null {
 }
 
 function blockedMessage(car: CarInstance, id: string): string | null {
-  const b = defOf(car, id).blockedBy.find((x) => car.components[x]?.installed);
+  const b = blockersOf(car, id).find((x) => car.components[x]?.installed);
   return b ? `Nicht zugänglich – erst ausbauen: ${defOf(car, b).name}.` : null;
 }
 
