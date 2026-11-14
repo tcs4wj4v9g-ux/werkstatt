@@ -5,7 +5,7 @@ import type { FluidProduct } from '../types';
 // wie das Auto fährt. Neue Motoren = neuer Eintrag hier.
 
 /** Reihe, V-Motor oder Boxer (B4: zwei liegende Zylinderbänke, links und rechts der Kurbelwelle). */
-export type EngineLayout = 'R4' | 'R6' | 'V6' | 'V8' | 'B4' | 'B6';
+export type EngineLayout = 'R4' | 'R5' | 'R6' | 'V6' | 'V8' | 'B4' | 'B6';
 export type Fuel = 'benzin' | 'diesel';
 
 export interface EngineDef {
@@ -34,12 +34,12 @@ const e = (
   id: string, name: string, layout: EngineLayout, fuel: Fuel, turbo: boolean, liters: number, ps: number, nm: number,
   family: string, partFactor: number, air = false,
 ): EngineDef => {
-  const cylinders = layout === 'R4' || layout === 'B4' ? 4 : layout === 'V8' ? 8 : 6;
+  const cylinders = layout === 'R4' || layout === 'B4' ? 4 : layout === 'R5' ? 5 : layout === 'V8' ? 8 : 6;
   return {
     id, name, layout, fuel, turbo, cylinders, liters, ps, nm, family, partFactor, ...(air ? { air } : {}),
-    oilCapacity: cylinders === 4 ? (fuel === 'diesel' ? 5 : 4.5) : cylinders === 6 ? 6.5 : 8.5,
-    coolantCapacity: cylinders === 4 ? 7 : cylinders === 6 ? 8.5 : 11,
-    oilSpec: cylinders === 4 ? 'oil_5w30' : 'oil_5w40',
+    oilCapacity: cylinders === 4 ? (fuel === 'diesel' ? 5 : 4.5) : cylinders === 5 ? 5.5 : cylinders === 6 ? 6.5 : 8.5,
+    coolantCapacity: cylinders === 4 ? 7 : cylinders === 5 ? 8 : cylinders === 6 ? 8.5 : 11,
+    oilSpec: cylinders <= 4 ? 'oil_5w30' : 'oil_5w40',
   };
 };
 
@@ -49,6 +49,7 @@ export const ENGINES: Record<string, EngineDef> = Object.fromEntries(
     e('r4_12', '1,2-l-Vierzylinder', 'R4', 'benzin', false, 1.2, 58, 93, 'R4', 0.7),
     e('r4_20', '2,0-l-Vierzylinder', 'R4', 'benzin', false, 2.0, 150, 200, 'R4', 1),
     e('r4t_18', '1,8-l-Vierzylinder-Turbo', 'R4', 'benzin', true, 1.8, 180, 235, 'R4-Turbo', 1.3),
+    e('r5t_22', '2,2-l-Fünfzylinder-Turbo', 'R5', 'benzin', true, 2.2, 220, 309, 'R5-Turbo', 2.2),
     e('r4d_20', '2,0-l-Vierzylinder-Turbodiesel', 'R4', 'diesel', true, 2.0, 163, 340, 'R4-Diesel', 1.25),
     e('r6_23', '2,3-l-Reihensechszylinder', 'R6', 'benzin', false, 2.3, 150, 205, 'R6', 1.2),
     e('r6_25', '2,5-l-Reihensechszylinder', 'R6', 'benzin', false, 2.5, 218, 250, 'R6', 1.35),
@@ -80,6 +81,7 @@ export interface CylinderSlot {
 /** Wo die Zylinder im Motorraum sitzen (Fahrzeugkoordinaten, Front = +x). */
 export function cylinderSlots(engine: EngineDef): CylinderSlot[] {
   if (engine.layout === 'R4') return [1.03, 1.21, 1.39, 1.57].map((x, i) => ({ n: i + 1, x, z: 0, bank: 0 }));
+  if (engine.layout === 'R5') return [1.02, 1.16, 1.3, 1.44, 1.58].map((x, i) => ({ n: i + 1, x, z: 0, bank: 0 }));
   if (engine.layout === 'R6') return [1.0, 1.115, 1.23, 1.345, 1.46, 1.575].map((x, i) => ({ n: i + 1, x, z: 0, bank: 0 }));
   const xs = engine.layout === 'V6' ? [1.1, 1.3, 1.5] : engine.layout === 'B4' ? [1.12, 1.42] : engine.layout === 'B6' ? [1.05, 1.27, 1.49] : [1.06, 1.22, 1.38, 1.54];
   // Bank 1 (links, -z) trägt die Zylinder 1…n/2, Bank 2 (rechts, +z) den Rest.

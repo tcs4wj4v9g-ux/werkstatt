@@ -183,6 +183,14 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     seams: [0.86, -0.42], handles: [-0.28], cowlX: 0.95, cowlY: 1.0, hoodSlope: 0.05, hoodCurve: 0.12, hoodX0: 0.97, cabinX1: 0.97, aBase: 0.72,
     dome: 0, cabinK: 0.83, roofArc: 0.045,
   },
+  // Kantiges Rallye-Coupé der 80er: 4,40 m, Radstand 2,52 m, flache lange Haube, steile Scheibe, schräge Heckscheibe mit kurzem
+  // Kofferraumdeckel, scharfe Kanten in der Draufsicht, kastenförmig ausgestellte Radläufe.
+  quattro: {
+    ...BASE, tail: -1.93, nose: 2.33, width: 0.86, rearAxle: -1.14, trackF: -0.06, trackR: -0.06, roof: 1.36, x0: -1.45, x1: -0.62, x2: 0.08,
+    deck: 1.02, noseMid: 0.62, noseP: 5, tailMid: 0.72, tailP: 6, tailLen: 0.08, planP: 6.5, planPR: 6.5, ground: 0.24, tumble: 0.12, bowF: 0.05, bowR: 0.05,
+    flare: 0.06, crease: 0.74, creaseDepth: 0.012, blackPillars: true, pillars: [[-0.68, -0.6]], glassRear: -1.32, rearSeat: true,
+    seams: [0.74, -0.56], handles: [-0.4], hoodSlope: 0.05, hoodCurve: 0.05, dome: 0.004, cabinK: 0.92, roofArc: 0.01,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 

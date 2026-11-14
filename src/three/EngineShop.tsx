@@ -150,7 +150,7 @@ function palletEngine(layout: string, turbo: boolean) {
   let g = palletEngines.get(key);
   if (!g) {
     const m = new Mesher(10);
-    const len = layout === 'R4' ? 0.52 : layout === 'R6' ? 0.72 : layout === 'V6' ? 0.5 : 0.6;
+    const len = layout === 'R4' ? 0.52 : layout === 'R5' ? 0.62 : layout === 'R6' ? 0.72 : layout === 'V6' ? 0.5 : 0.6;
     const v = layout.startsWith('V');
     m.rbox(DECO.galv, [len, 0.3, v ? 0.42 : 0.26], 0.02, [0, 0.33, 0]);
     m.rbox(DECO.steelDark, [len * 0.92, 0.1, v ? 0.36 : 0.24], 0.02, [0, 0.13, 0]);

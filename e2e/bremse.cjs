@@ -139,6 +139,17 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const wc = await p.evaluate(() => { const c = window.__gk.getState().cars[0].components; return !!c.water_pump && !!c.turbo && Object.keys(c).filter((k) => /^coil\d$/.test(k)).length === 6; });
   expect(/Motorabdeckung/.test(t5 || '') && wc, 'Biturbo-Boxer im Heck: Motorabdeckung antippbar, Wasserpumpe und Turbolader vorhanden, sechs Spulen – ' + t5);
   await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  // ---------- Fünfzylinder-Turbo vorn (Rallye-Coupé der 80er) ----------
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar('audy_urquattro', [], Math.random, {}); c.hoodOpen = true; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [false, false], tool: 'hand', panel: null, toast: null }); Object.assign(window.__gkPlayer, { x: 3.2, z: -2.7, yaw: Math.PI / 2, work: null }); });
+  await p.waitForTimeout(900);
+  await p.locator('.car-actions button', { hasText: 'Motor von vorn' }).click(); await p.waitForTimeout(900);
+  await p.screenshot({ path: S + '/r5-motor.png' });
+  const fc = (await findBolts('Motorabdeckung')).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+  if (fc[0]) { await p.mouse.click(fc[0].x, fc[0].y); await p.waitForTimeout(300); }
+  const t6 = await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text);
+  const five = await p.evaluate(() => Object.keys(window.__gk.getState().cars[0].components).filter((k) => /^coil\d$/.test(k)).length);
+  expect(/Motorabdeckung/.test(t6 || '') && five === 5, `Fünfzylinder-Turbo: ${five} Zündspulen, Motorabdeckung antippbar – ${t6}`);
+  await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

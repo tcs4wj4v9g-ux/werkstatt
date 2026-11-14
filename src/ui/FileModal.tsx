@@ -38,7 +38,7 @@ export function FileModal() {
     <Modal title={`Fahrzeugakte – ${SLOTS[s.panelBay].label}: ${CAR_MODELS[car.modelId].name}`} onClose={() => s.setPanel(null)} wide>
       <p className="meta">{model.engine} · Bj. {car.year} · {car.km.toLocaleString('de-DE')} km{car.rarity > 0 ? ` · ${RARITY_NAMES[car.rarity]}` : ''}</p>
       <p className="meta">
-        Motor: {e.layout === 'R4' || e.layout === 'R6' ? 'Reihe' : 'V-Motor'}, {e.cylinders} Zylinder · {e.fuel === 'diesel' ? 'Diesel' : 'Benzin'} ·{' '}
+        Motor: {e.layout[0] === 'R' ? 'Reihe' : e.layout[0] === 'B' ? 'Boxer' : 'V-Motor'}, {e.cylinders} Zylinder · {e.fuel === 'diesel' ? 'Diesel' : 'Benzin'} ·{' '}
         {e.turbo ? 'Turbo' : 'Sauger'} · {e.liters.toLocaleString('de-DE')} l · {e.ps} PS · {e.nm} Nm · {model.weight.toLocaleString('de-DE')} kg · Teilefamilie {e.family}
       </p>
       {car.job && (
