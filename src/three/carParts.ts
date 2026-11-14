@@ -48,18 +48,19 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const tub = body === 'tub';
   const nine = body === 'nine';
   const nine2 = body === 'nine2';
+  const tt = body === 'tt';
   return {
-    rim: nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    rim: tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
     // Bavaria: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
     grille: sport ? 'slot' : classic ? 'classic' : brand === 'Bavaria' ? 'twin' : lux ? 'tall' : 'wide',
     lamps: classic ? 'round' : sport ? 'slim' : brand === 'Bavaria' ? 'twin' : 'block',
     chromeBumper: classic,
     blackBumper: cls === 'budget' && brand !== 'Bavaria',
-    chromeTrim: classic || lux || box || tub,
+    chromeTrim: classic || lux || box || tub || tt,
     spoiler: sport || model?.id === 'bavaria_340_ms',
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
-    seat: nine2 ? '#8a5a3c' : nine ? '#2a2b2f' : tub ? '#7a2b22' : box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
-    seat2: nine2 ? '#1b1c1f' : nine ? '#1b1c1f' : tub ? '#5c2019' : box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
+    seat: tt ? '#b98a5a' : nine2 ? '#8a5a3c' : nine ? '#2a2b2f' : tub ? '#7a2b22' : box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
+    seat2: tt ? '#5a3d26' : nine2 ? '#1b1c1f' : nine ? '#1b1c1f' : tub ? '#5c2019' : box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
     front: visual?.front ?? 0,
     rear: visual?.rear ?? 0,
     skirts: !!visual?.skirts,
@@ -498,6 +499,77 @@ function nine2Ends(m: Mesher, S: Shape, N: (n: number) => number) {
   topPatchLine(m, S, fx0, 0, 0.006, 0.92);
 }
 
+/**
+ * Front und Heck des runden Designer-Coupés (`tt`): ovaler Grill mit Chromrahmen und Querstreben, schmale Scheinwerfer mit je
+ * zwei runden Projektoren, große untere Einlässe mit Nebelscheinwerfern; hinten waagerechte ovale Leuchten, Abrisslippe,
+ * zwei Endrohre, runder Alu-Tankdeckel rechts hinten.
+ */
+function ttEnds(m: Mesher, S: Shape, N: (n: number) => number) {
+  const B = S.B;
+  const disc = (dir: 1 | -1, slot: number, z: number, y: number, r: number, lift: number, sy = 1) => endPatch(m, slot, S, dir, z, y, r * 2, r * 2 * sy, 1, lift, N(10), N(8));
+  // ---- Front ----
+  const yL = 0.67;
+  for (const s of [-1, 1] as const) {
+    const a = Math.atan2(s * 0.56, 0.96);
+    wrapPatch(m, SLOT.gloss, S, 1, a, 0.5, yL, 0.11, 0.85, 0.004, N(12), N(5));
+    wrapPatch(m, SLOT.lens, S, 1, a, 0.46, yL, 0.088, 0.85, 0.008, N(12), N(5));
+    for (const k of [-1, 1]) {
+      const ak = a + k * 0.09;
+      wrapPatch(m, SLOT.chrome, S, 1, ak, 0.085, yL, 0.07, 1, 0.011, N(8), N(8));
+      wrapPatch(m, SLOT.glow, S, 1, ak, 0.04, yL, 0.033, 1, 0.014, N(6), N(6));
+    }
+    wrapPatch(m, SLOT.amber, S, 1, a + s * 0.2, 0.06, yL - 0.01, 0.05, 0.6, 0.012, 3, 3);
+    // Seitliche Einlässe mit runden Nebelscheinwerfern
+    wrapPatch(m, SLOT.gloss, S, 1, Math.atan2(s * 0.52, 0.96), 0.26, 0.4, 0.11, 0.7, 0.006, N(8), N(4));
+    disc(1, SLOT.lens, s * 0.52, 0.4, 0.035, 0.012);
+  }
+  // Ovaler Grill: Chromrahmen, schwarz, Querstreben, rundes Emblem
+  // Breiter Trapezgrill: Chromrahmen, schwarz, Querstreben, rundes Emblem
+  {
+    const n = N(10);
+    for (let i = 0; i < n; i++) {
+      const v = (i + 0.5) / n;
+      const y = 0.42 + v * 0.26;
+      const w = 0.6 - v * 0.12;
+      endPatch(m, SLOT.chrome, S, 1, 0, y, w + 0.035, 0.26 / n + 0.002, 0.2, 0.006, N(12), 1);
+      endPatch(m, SLOT.gloss, S, 1, 0, y, w, 0.26 / n + 0.002, 0.2, 0.01, N(12), 1);
+    }
+    for (const o of [0.47, 0.53, 0.59, 0.65]) endPatch(m, SLOT.chrome, S, 1, 0, o, 0.58 - (o - 0.42) * 0.46, 0.006, 0, 0.013, N(10), 1);
+    disc(1, SLOT.chrome, 0, 0.6, 0.036, 0.016);
+  }
+  // Unterer Einlass, Kennzeichen, Spoilerlippe
+  endPatch(m, SLOT.plate, S, 1, 0, 0.46, 0.44, 0.09, 0.06, 0.02, N(8), 2);
+  wrapPatch(m, SLOT.gloss, S, 1, 0, 1.6, B.ground + 0.04, 0.05, 0.4, 0.012, N(16), 2);
+  // ---- Heck ----
+  const yT = 0.8;
+  for (const s of [-1, 1] as const) {
+    const a = Math.atan2(s * 0.62, 0.96);
+    wrapPatch(m, SLOT.dark, S, -1, a, 0.5, yT, 0.12, 0.85, 0.004, N(12), N(5));
+    wrapPatch(m, SLOT.tail, S, -1, a, 0.47, yT, 0.1, 0.85, 0.009, N(12), N(5));
+    wrapPatch(m, SLOT.tailBar, S, -1, a + s * 0.06, 0.2, yT + 0.015, 0.03, 0.8, 0.013, N(6), 2);
+    wrapPatch(m, SLOT.lens, S, -1, a - s * 0.13, 0.1, yT - 0.025, 0.035, 0.8, 0.013, 4, 2);
+  }
+  // Heckklappe: Abrisslippe, Emblem, Kennzeichen im Stoßfänger, Diffusor, zwei Endrohre
+  const xl = B.tail + B.tailLen * 0.4;
+  m.rbox(SLOT.solid, [0.12, 0.025, B.width * 1.3], 0.012, [xl, S.crown(xl) + 0.012, 0], [0, 0, 0.25]);
+  disc(-1, SLOT.chrome, 0, 0.8, 0.03, 0.012);
+  endPatch(m, SLOT.dark, S, -1, 0, 0.55, 0.5, 0.13, 0.25, 0.006, N(8), 3);
+  endPatch(m, SLOT.plate, S, -1, 0, 0.55, 0.44, 0.095, 0.06, 0.01, N(8), 2);
+  wrapPatch(m, SLOT.gloss, S, -1, 0, 1.6, B.ground + 0.1, 0.11, 0.4, 0.008, N(16), 3);
+  for (const s of [-1, 1]) {
+    const zp = s * 0.38;
+    const xp = S.endX(-1, B.ground + 0.1, zp);
+    m.add(SLOT.chrome, new THREE.CylinderGeometry(0.034, 0.034, 0.12, 16, 1, true), mat([xp + 0.03, B.ground + 0.1, zp], [0, 0, Math.PI / 2]));
+    m.add(SLOT.dark, new THREE.CylinderGeometry(0.03, 0.03, 0.01, 12), mat([xp - 0.025, B.ground + 0.1, zp], [0, 0, Math.PI / 2]));
+  }
+  // Runder Alu-Tankdeckel rechts hinten mit Schrauben
+  const xf = B.rearAxle + 0.05;
+  const yf = 0.86;
+  const zf = S.sideZ(xf, yf) + 0.006;
+  m.cyl(SLOT.chrome, 0.06, 0.06, 0.012, [xf, yf, zf], [Math.PI / 2, 0, 0], N(20));
+  for (let i = 0; i < 6; i++) m.cyl(SLOT.dark, 0.006, 0.006, 0.006, [xf + Math.cos((i / 6) * 6.283) * 0.045, yf + Math.sin((i / 6) * 6.283) * 0.045, zf + 0.007], [Math.PI / 2, 0, 0], 6);
+}
+
 /** Schmale dunkle Fuge auf der Oberseite (Mitte x/z, Länge in x, Breite in z). */
 function topPatchLine(m: Mesher, S: Shape, xc: number, zc: number, w: number, d: number) {
   topPatch(m, SLOT.dark, S, xc, zc, w, d, 0, 0.003, Math.max(2, Math.round(w / 0.05)), Math.max(1, Math.round(d / 0.05)));
@@ -521,6 +593,7 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
   else if (body === 'tub') tubEnds(m, S, N);
   else if (body === 'nine') nineEnds(m, S, N);
   else if (body === 'nine2') nine2Ends(m, S, N);
+  else if (body === 'tt') ttEnds(m, S, N);
   else {
     // ---- Front ----
     const yLamp = 0.7;

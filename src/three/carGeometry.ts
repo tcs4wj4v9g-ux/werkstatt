@@ -174,6 +174,15 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     seams: [0.78, -0.55], handles: [-0.38], cowlX: 0.82, cowlY: 0.9, hoodSlope: 0.07, hoodCurve: 0.1, hoodX0: 0.84, hoodX1: 2.05, cabinX1: 0.84, aBase: 0.62,
     dome: 0, cabinK: 0.9, roofArc: 0.025, lidX0: -2.0, lidX1: -1.32, hoodHinge: 'front', haunch: 0.07, bayX: -0.15,
   },
+  // Rundes Designer-Coupé: 4,04 m, Radstand 2,42 m, ein Dachbogen von der Scheibe bis zum kurzen Heck, kreisrunde ausgestellte
+  // Radhäuser, schmales, stark eingezogenes Glashaus, runde Haube.
+  tt: {
+    ...BASE, tail: -1.83, nose: 2.21, width: 0.88, rearAxle: -1.04, trackF: -0.05, trackR: -0.05, roof: 1.36, x0: -1.6, x1: -0.55, x2: 0.22,
+    deck: 1.04, noseMid: 0.56, noseP: 2.4, tailMid: 0.55, tailP: 2.6, tailLen: 0.3, planP: 2.6, planPR: 3, ground: 0.2, tumble: 0.3, bowF: 0.1, bowR: 0.14,
+    flare: 0.07, crease: 0.62, creaseDepth: 0, blackPillars: true, pillars: [], glassRear: -1.15, rearSeat: false,
+    seams: [0.86, -0.42], handles: [-0.28], cowlX: 0.95, cowlY: 1.0, hoodSlope: 0.05, hoodCurve: 0.12, hoodX0: 0.97, cabinX1: 0.97, aBase: 0.72,
+    dome: 0, cabinK: 0.83, roofArc: 0.045,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 

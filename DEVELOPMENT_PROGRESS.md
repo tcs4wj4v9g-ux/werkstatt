@@ -142,10 +142,19 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests, alle Browser-Durchläufe; am Sechszylinder-Heckmotor die Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Spoiler ist nicht ausfahrbar; Instrumente innen wie bei den anderen Autos (zwei Rundinstrumente statt fünf).
 
-## Fahrzeug 5: Zuffen 929 Coupé (an den Porsche 992 angelehnt) – wartet auf Freigabe
+## Fahrzeug 5: Zuffen 929 Coupé (an den Porsche 992 angelehnt) – freigegeben
 
 - Neuer Motor: 3,0-l-Sechszylinder-Boxer Biturbo (385 PS, wassergekühlt): mit Kühlkreislauf und Turbolader; der Boxer zeigt bei Wasserkühlung glatte Zylinder statt Kühlrippen und kein Gebläsegehäuse.
 - Neue Form `nine2`: 4,52 m, Radstand 2,45 m, 1,80 m breit, kräftige Hinterkotflügel, Motor noch etwas weiter hinten (`bayX`).
 - Front: aufrechte LED-Scheinwerfer mit vier Tagfahrlicht-Punkten, große seitliche Lufteinlässe mit Lamellen, schmale Blinkerstreifen. Heck: schmales durchgehendes LED-Band, Eckleuchten, breites Motordeckelgitter mit Senkrechtlamellen und dritter Bremsleuchte, Diffusor, zwei ovale Endrohre. Silberne Doppelspeichenfelgen eine Nummer größer.
 - Geprüft: Logiktests, alle Browser-Durchläufe; am Biturbo-Heckmotor die Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Spoiler fährt nicht aus; Kühler sitzen nicht wie beim Vorbild vorn, sondern gehören mit zum Heckmotorraum.
+
+## Fahrzeug 6: Ingol TC Coupé 1.8T (an den Audi TT der ersten Generation angelehnt) – wartet auf Freigabe
+
+Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplante Reihenfolge, je mit Freigabe: Audi TT, Audi Ur-quattro, VW Golf 4, Mercedes W124, BMW E36, BMW E46, Audi 80/90, Porsche 944, BMW E90, BMW F30, Porsche 997.
+
+- Neue Form `tt`: 4,04 m, Radstand 2,42 m, kurze gewölbte Haube, Dachbogen von der Scheibe bis zum kurzen Heck, schmales stark eingezogenes Glashaus, kräftig ausgestellte runde Radhäuser.
+- Front: breiter Trapezgrill mit Chromrahmen, Querstreben und rundem Emblem (kein Original-Logo), Scheinwerfer mit je zwei runden Projektoren, Nebelscheinwerfer in seitlichen Einlässen. Heck: waagerechte ovale Leuchten, Abrisslippe, zwei Endrohre, runder Alu-Tankdeckel mit Schrauben rechts hinten. Leder in Cognac.
+- Neuer Motor: 1,8-l-Vierzylinder-Turbo (180 PS, Teilefamilie „R4-Turbo“), Frontmotor mit allen Reparaturen.
+- Geprüft: Logiktests, Browser-Durchläufe Markt und Bremse. Kein echter iPad-Test.
