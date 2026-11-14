@@ -131,7 +131,7 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
   // steile Scheiben, schmale Säulen mit Knick hinten, kurzer flacher Kofferraum, scharfe Seitenkante, eckige Draufsicht.
   box: {
     ...BASE, tail: -2.13, nose: 2.2, width: 0.82, rearAxle: -1.19, trackF: -0.095, trackR: -0.09, roof: 1.39, x0: -1.47, x1: -1.1, x2: 0.08,
-    deck: 1.0, noseMid: 0.71, noseP: 6, tailMid: 0.79, tailP: 6, tailLen: 0.05, planP: 5, planPR: 6, ground: 0.26, tumble: 0.1, bowF: 0.06, bowR: 0.05,
+    deck: 1.0, noseMid: 0.71, noseP: 6, tailMid: 0.79, tailP: 6, tailLen: 0.05, planP: 7.5, planPR: 6.5, ground: 0.26, tumble: 0.1, bowF: 0.06, bowR: 0.05,
     flare: 0.008, crease: 0.82, creaseDepth: 0.018, blackPillars: true, pillars: [[-0.64, -0.57]], glassRear: -1.38, rearSeat: true,
     seams: [0.74, -0.6], handles: [-0.42], hoodSlope: 0.03, hoodCurve: 0.075, dome: 0.004, cabinK: 0.93, roofArc: 0.006,
   },

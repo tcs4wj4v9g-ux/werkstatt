@@ -268,9 +268,9 @@ function boxEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   const disc = (dir: 1 | -1, slot: number, z: number, y: number, r: number, lift: number) => endPatch(m, slot, S, dir, z, y, r * 2, r * 2, 1, lift, N(10), N(8));
   // ---- Front ----
   const yL = 0.71;
-  endPatch(m, SLOT.gloss, S, 1, 0, yL, 1.5, 0.15, 0.12, 0.004, N(16), N(4));
+  endPatch(m, SLOT.gloss, S, 1, 0, yL, 1.36, 0.15, 0.12, 0.004, N(16), N(4));
   for (const s of [-1, 1] as const) {
-    for (const [z, r] of [[0.6, 0.078], [0.42, 0.07]] as const) {
+    for (const [z, r] of [[0.555, 0.076], [0.38, 0.07]] as const) {
       disc(1, SLOT.chrome, s * z, yL, r, 0.008);
       disc(1, SLOT.lens, s * z, yL, r - 0.012, 0.012);
       disc(1, SLOT.chrome, s * z, yL, 0.022, 0.015);
