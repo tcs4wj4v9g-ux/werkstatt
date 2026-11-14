@@ -7,6 +7,28 @@ import { cylinderSlots, ENGINES, isV, type EngineDef } from './engines';
 const S10: ToolNeed = { driver: 'ratchet', socket: 'socket10' };
 const S13: ToolNeed = { driver: 'ratchet', socket: 'socket13' };
 const S17: ToolNeed = { driver: 'ratchet', socket: 'socket17' };
+const S16: ToolNeed = { driver: 'ratchet', socket: 'socket16' };
+
+/** Unterboden: Endschalldämpfer und Vorderachse (Querlenker, Spurstangenköpfe). Gehört zur Karosserie, nicht zum Motor. */
+const chassis = (): ComponentDef[] => [
+  {
+    id: 'muffler', name: 'Endschalldämpfer', bolts: 2, fastener: S13, blockedBy: [], access: 'lifted', partId: 'muffler',
+    okText: 'Endtopf dicht, Schelle und Gummiaufhängung in Ordnung.', defectText: 'Endtopf durchgerostet – Löcher im Mantel, er dröhnt!',
+  },
+  ...(['fl', 'fr'] as const).flatMap((s): ComponentDef[] => {
+    const label = s === 'fl' ? 'links' : 'rechts';
+    return [
+      {
+        id: `arm_${s}`, name: `Querlenker vorne ${label}`, bolts: 2, fastener: S17, blockedBy: [], access: 'lifted', partId: 'control_arm',
+        okText: 'Gummilager fest, Traggelenk ohne Spiel.', defectText: 'Gummilager gerissen und ausgeschlagen – der Lenker hat Spiel!',
+      },
+      {
+        id: `tie_${s}`, name: `Spurstangenkopf vorne ${label}`, bolts: 1, fastener: S16, blockedBy: [], access: 'lifted', partId: 'tie_rod_end',
+        okText: 'Gelenk spielfrei, Manschette dicht.', defectText: 'Manschette gerissen, Kugelgelenk ausgeschlagen – Spiel in der Lenkung!',
+      },
+    ];
+  }),
+];
 
 /** Je Zylinder zwei Bauteile: Benziner Zündspule + Zündkerze, Diesel Einspritzdüse + Glühkerze. */
 const cylinder = (n: number, diesel: boolean): ComponentDef[] =>
@@ -351,6 +373,7 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
   ...corner('fr', 'rechts'),
   ...corner('rl', 'links'),
   ...corner('rr', 'rechts'),
+  ...chassis(),
   ];
   if (v) {
     out.push(

@@ -89,6 +89,23 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   expect(prof && prof.layout === 'V8', 'Auf der Strecke klingt er als V8');
   console.log('  Tempo nach 6 s Vollgas:', (v * 3.6).toFixed(0), 'km/h');
   await p.screenshot({ path: S + '/s5-track.png' });
+  // ---------- Feierabend erst nach Ablauf des Spieltags (Timer) ----------
+  await p.evaluate(() => { const g = window.__gk; window.__gkLib.dayClock.ms = 180000; g.setState({ dayStartedAt: Date.now(), screen: 'garage', panel: 'computer' }); });
+  await p.waitForTimeout(400);
+  await p.locator('.modal button', { hasText: 'Gebrauchtwagen' }).first().click(); await p.waitForTimeout(400);
+  const btn = p.locator('[data-testid=nextday]');
+  const day0 = await p.evaluate(() => window.__gk.getState().day);
+  const dayTxt = (await btn.count()) ? await btn.textContent() : '';
+  expect((await btn.count()) === 1 && (await btn.isDisabled()) && /Feierabend in [23]:\d\d/.test(dayTxt), 'Feierabend-Knopf gesperrt, Countdown läuft: ' + dayTxt);
+  await p.evaluate(() => window.__gk.getState().nextDay());
+  expect(await p.evaluate(() => window.__gk.getState().day) === day0, 'Vor Ablauf kein Tageswechsel – ' + (await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text)));
+  await p.evaluate(() => window.__gk.setState({ dayStartedAt: Date.now() - 181000 })); await p.waitForTimeout(1200);
+  expect(!(await btn.isDisabled()), 'Nach drei Minuten ist Feierabend möglich');
+  await btn.click(); await p.waitForTimeout(400);
+  const after = await p.evaluate(() => ({ day: window.__gk.getState().day, left: window.__gk.getState().dayStartedAt > Date.now() - 5000 }));
+  expect(after.day === day0 + 1 && after.left && (await btn.isDisabled()), `Neuer Tag ${after.day} beginnt, der Timer läuft wieder`);
+  await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; window.__gk.getState().setPanel(null); });
+
   console.log('errors:', errs.slice(0, 8)); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

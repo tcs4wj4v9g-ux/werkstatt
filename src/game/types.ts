@@ -68,6 +68,9 @@ export type PartId =
   | 'downpipe'
   | 'fuel_pump'
   | 'harness'
+  | 'muffler'
+  | 'control_arm'
+  | 'tie_rod_end'
   // Motorumbau
   | 'swap_mounts'
   | 'swap_adapter'
@@ -122,7 +125,10 @@ export type DefectId =
   | 'main_bearing'
   | 'oil_pump'
   | 'camshaft'
-  | 'timing_chain';
+  | 'timing_chain'
+  | 'muffler'
+  | 'control_arm'
+  | 'tie_rod';
 
 /** hood = Motorraum (Auto unten), lifted = von unten (Auto angehoben), stand = nur am ausgebauten Motor auf dem Motorständer. */
 export type Access = 'hood' | 'lifted' | 'stand';

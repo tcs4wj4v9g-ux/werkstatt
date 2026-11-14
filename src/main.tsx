@@ -25,7 +25,7 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
 // Für automatisierte Tests und Fehlersuche.
-import { useGame } from './game/store';
+import { dayClock, useGame } from './game/store';
 (window as any).__gk = useGame;
 import { player, place, stationActions, travel, useFocus } from './three/player';
 (window as any).__gkPlayer = player;
@@ -33,4 +33,4 @@ import { engineAudio } from './game/audio';
 (window as any).__gkAudio = engineAudio;
 import { createCar } from './game/market';
 import { movePlayer } from './three/player';
-(window as any).__gkLib = { createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus };
+(window as any).__gkLib = { createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock };

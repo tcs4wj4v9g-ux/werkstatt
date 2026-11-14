@@ -150,6 +150,36 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const five = await p.evaluate(() => Object.keys(window.__gk.getState().cars[0].components).filter((k) => /^coil\d$/.test(k)).length);
   expect(/Motorabdeckung/.test(t6 || '') && five === 5, `Fünfzylinder-Turbo: ${five} Zündspulen, Motorabdeckung antippbar – ${t6}`);
   await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  // ---------- Unterboden: Endschalldämpfer, Querlenker, Spurstangenköpfe ----------
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const car = window.__gkLib.createCar('renard_twingle', ['muffler', 'control_arm', 'tie_rod'], () => 0.1, {}); car.lifted = true; car.hoodOpen = false; g.setState({ cars: [car, ...s.cars.slice(1)], liftUp: [true, false], tool: 'lamp', carried: ['ratchet', 'socket17', 'socket16', 'socket13'], panel: null, money: 9000 }); Object.assign(window.__gkPlayer, { x: 2.9, z: -2.7, yaw: Math.PI / 2, pitch: 0, work: null }); });
+  await p.waitForTimeout(900);
+  await p.evaluate(() => window.__gk.getState().tapBody(0));
+  const seen = await p.evaluate(() => window.__gk.getState().cars[0].observed);
+  expect(['exhaust_look', 'arm_look', 'tie_look'].every((x) => seen.includes(x)), 'Sichtprüfung von unten: Endtopf, Querlenkerlager und Spurstangenkopf auffällig – ' + seen.join(', '));
+  const armSide = await p.evaluate(() => (window.__gk.getState().cars[0].components.arm_fl.condition === 'defect' ? 'fl' : 'fr'));
+  await p.locator('.car-actions button', { hasText: 'Unterboden' }).click(); await p.waitForTimeout(900);
+  await p.evaluate(() => window.__gk.setState({ tool: 'ratchet' }));
+  const armBolts = (await findBolts(`Schraube – Querlenker vorne ${armSide === 'fl' ? 'links' : 'rechts'}`)).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
+  for (const b of armBolts) { await p.mouse.click(b.x, b.y); await p.waitForTimeout(250); }
+  const ab = await p.evaluate((s) => window.__gk.getState().cars[0].components[`arm_${s}`].bolts, armSide);
+  expect(armBolts.length === 2 && ab.every((x) => x === 1), `Querlenker ${armSide}: beide Schrauben im Unterboden-Bild angetippt und gelöst (${ab})`);
+  await p.screenshot({ path: S + '/unterboden.png' });
+  await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  // Ausbauen, prüfen, Neuteile einbauen (über die Spielaktionen, wie beim Tippen)
+  const fixed = await p.evaluate((armSide) => {
+    const g = window.__gk; const L = window.__gkLib;
+    const use = (t) => g.setState({ tool: t });
+    const out = (id) => { const c = g.getState().cars[0]; const d = L.defOf(c, id); c.components[id].bolts.forEach((b, i) => { if (b === 2) { use(d.fastener.driver); g.setState({ carried: ['ratchet', d.fastener.socket] }); g.getState().tapBolt(0, id, i); } use('hand'); g.getState().tapBolt(0, id, i); }); use('hand'); g.getState().tapComponent(0, id); };
+    const back = (id) => { const c = g.getState().cars[0]; const d = L.defOf(c, id); g.getState().buyPart(d.partId, 0); use('hand'); g.getState().installWith(0, id, { kind: 'new' }); g.getState().cars[0].components[id].bolts.forEach((_, i) => { use('hand'); g.getState().tapBolt(0, id, i); use(d.fastener.driver); g.setState({ carried: ['ratchet', d.fastener.socket] }); g.getState().tapBolt(0, id, i); }); };
+    const tie = g.getState().cars[0].components.tie_fl.condition === 'defect' ? 'tie_fl' : 'tie_fr';
+    const ids = ['muffler', `arm_${armSide}`, tie];
+    const known = [];
+    for (const id of ids) { out(id); known.push(g.getState().cars[0].components[id].known && !g.getState().cars[0].components[id].installed); back(id); }
+    const c = g.getState().cars[0].components;
+    return { known, ok: ids.every((id) => c[id].installed && c[id].condition === 'ok' && c[id].bolts.every((b) => b === 2)), active: L.motor ? null : null };
+  }, armSide);
+  expect(fixed.known.every(Boolean) && fixed.ok, 'Endtopf, Querlenker und Spurstangenkopf ausgebaut, als defekt erkannt, Neuteile eingebaut und festgezogen');
+
   console.log('errors:', errs); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();

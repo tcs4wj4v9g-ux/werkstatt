@@ -55,6 +55,12 @@ const list: SymptomDef[] = [
   { id: 'black_smoke', channel: 'drive', text: 'Beim Beschleunigen stößt er eine schwarze Rußwolke aus.', argument: 'Schwarzer Rauch' },
   { id: 'limp_mode', channel: 'drive', warm: true, text: 'Nach kurzer Fahrt geht er in den Notlauf und dreht nicht mehr aus.', argument: 'Notlauf' },
   { id: 'dpf_lamp', channel: 'dash', text: 'Die Partikelfilter-Warnleuchte brennt.', argument: 'DPF-Warnleuchte' },
+  { id: 'exhaust_loud', channel: 'sound', text: 'Der Auspuff dröhnt hinten laut und knattert beim Gaswegnehmen.', argument: 'Auspuff dröhnt' },
+  { id: 'exhaust_look', channel: 'under', text: 'Der Endtopf ist braun verrostet, an den Nähten schwarze Rußfahnen.', argument: 'Auspuff durchgerostet' },
+  { id: 'clunk_bump', channel: 'drive', text: 'Über Kanten und Schlaglöcher poltert es vorn, beim Bremsen zieht er leicht zur Seite.', argument: 'Fahrwerk poltert' },
+  { id: 'arm_look', channel: 'under', text: 'Am vorderen Querlenker ist ein Gummilager rissig und sichtbar ausgewandert.', argument: 'Querlenkerlager rissig' },
+  { id: 'steer_play', channel: 'drive', text: 'Die Lenkung hat Spiel um die Mitte, geradeaus muss man ständig nachkorrigieren.', argument: 'Lenkung hat Spiel' },
+  { id: 'tie_look', channel: 'under', text: 'Die Manschette am Spurstangenkopf ist eingerissen, das Gelenk ist trocken.', argument: 'Spurstangenkopf defekt' },
   { id: 'brake_judder', channel: 'drive', text: 'Beim Bremsen rubbelt und vibriert das Lenkrad.', argument: 'Bremse rubbelt' },
 ];
 

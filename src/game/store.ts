@@ -104,6 +104,8 @@ export interface GameState {
   /** Stellplatz mit laufendem Motor, -1 = keiner. */
   engineBay: number;
   engineSince: number;
+  /** Wann der aktuelle Spieltag begonnen hat (ms). Feierabend geht erst nach `dayClock.ms`. Nur auf diesem Gerät. */
+  dayStartedAt: number;
   engineWarm: boolean;
   toast: Toast | null;
   partPrompt: { bay: number; compId: string; partId: PartId; choose?: boolean } | null;
@@ -314,6 +316,11 @@ const describe = (o: Observation, quiet: string) =>
     .filter(Boolean)
     .join(' ') || quiet;
 
+/** Länge eines Spieltags in Echtzeit. Im Testmodus (`?test`) kein Warten. */
+export const dayClock = { ms: typeof location !== 'undefined' && new URLSearchParams(location.search).has('test') ? 0 : 3 * 60_000 };
+/** Wie lange es noch bis zum Feierabend dauert (ms). */
+export const dayLeft = (s: Pick<GameState, 'dayStartedAt'>) => Math.max(0, (s.dayStartedAt ?? 0) + dayClock.ms - Date.now());
+
 export const useGame = create<GameState>()(
   persist(
     (set, get) => {
@@ -519,6 +526,7 @@ export const useGame = create<GameState>()(
         driveBay: 0,
         engineBay: -1,
         engineSince: 0,
+        dayStartedAt: Date.now(),
         engineWarm: false,
         toast: null,
         partPrompt: null,
@@ -532,6 +540,7 @@ export const useGame = create<GameState>()(
         newGame: () => {
           stopEngine();
           set({
+            dayStartedAt: Date.now(),
             money: START_MONEY,
             cars: refreshJunk(Array(SLOT_COUNT).fill(null), Math.random, 1),
             engines: [],
@@ -649,6 +658,12 @@ export const useGame = create<GameState>()(
 
         nextDay: () => {
           const s = get();
+          const left = dayLeft(s);
+          if (left > 0) {
+            sfx.error();
+            const sec = Math.ceil(left / 1000);
+            return s.say(`Noch nicht Feierabend – der Tag läuft noch ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} Minuten.`, true);
+          }
           const marketIndex = nextMarketIndex(s.marketIndex, Math.random);
           sfx.click();
           const day = s.day + 1;
@@ -692,6 +707,7 @@ export const useGame = create<GameState>()(
             listings: refreshListings(s.listings, money, Math.random, marketIndex, day),
             jobs: refreshJobs(s.jobs, Math.random),
             selected: 0,
+            dayStartedAt: Date.now(),
           });
           get().say(`Tag ${day}: neue Angebote, Auktionen und Kundenanfragen.${fresh.length ? ` Neuigkeit: ${fresh[0].title}.` : ''}${meet ? ` Heute: ${meet.title}.` : ''}`);
         },
@@ -1553,6 +1569,7 @@ export const useGame = create<GameState>()(
         const p = persisted ?? {};
         const merged = { ...current, ...p } as GameState;
         merged.cars = Array.from({ length: SLOT_COUNT }, (_, i) => normalizeCar(p.cars?.[i] ?? null));
+        merged.dayStartedAt = typeof p.dayStartedAt === 'number' && p.dayStartedAt <= Date.now() ? p.dayStartedAt : Date.now();
         merged.liftUp = SLOTS.map((x) => isLift(x.id) && (merged.cars[x.id] ? merged.cars[x.id]!.lifted : !!p.liftUp?.[x.id]));
         merged.upgrades = (p.upgrades ?? []).filter((u: UpgradeId) => UPGRADES.some((x) => x.id === u));
         merged.fluidStock = { ...emptyStock(), ...(p.fluidStock ?? {}) };
@@ -1593,6 +1610,7 @@ export const useGame = create<GameState>()(
         money: s.money,
         screen: s.screen === 'track' || s.screen === 'market' ? 'garage' : s.screen,
         cars: s.cars,
+        dayStartedAt: s.dayStartedAt,
         upgrades: s.upgrades,
         fluidStock: s.fluidStock,
         drainPan: s.drainPan,
@@ -1641,6 +1659,10 @@ function checkAchievements(s: GameState) {
   });
 }
 useGame.subscribe(checkAchievements);
+// Hat der Koop-Partner den Tag beendet, beginnt der neue Tag auch hier – mit vollem Timer.
+useGame.subscribe((s, p) => {
+  if (s.day !== p.day && s.dayStartedAt === p.dayStartedAt) useGame.setState({ dayStartedAt: Date.now() });
+});
 // Ältere Spielstände: was dort schon erreicht ist, wird direkt nach dem Laden einmalig nachgetragen.
 useGame.persist?.onFinishHydration?.((s) => checkAchievements(s));
 if (useGame.persist?.hasHydrated?.()) checkAchievements(useGame.getState());

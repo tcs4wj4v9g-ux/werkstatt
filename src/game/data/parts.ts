@@ -52,6 +52,9 @@ export const PARTS: Record<PartId, PartDef> = {
   engine_mount: { id: 'engine_mount', name: 'Motorlager-Satz', price: 120, units: 1, desc: 'Gummilager links und rechts' },
   downpipe: { id: 'downpipe', name: 'Hosenrohr', price: 160, units: 1, desc: 'mit Flanschdichtung' },
   fuel_pump: { id: 'fuel_pump', name: 'Kraftstoffpumpe', price: 180, units: 1, desc: 'Tankpumpe mit Sieb' },
+  muffler: { id: 'muffler', name: 'Endschalldämpfer', price: 130, units: 1, desc: 'Endtopf mit Schelle und Gummiaufhängung' },
+  control_arm: { id: 'control_arm', name: 'Querlenker', price: 95, units: 1, desc: 'mit Gummilagern und Traggelenk – je Seite' },
+  tie_rod_end: { id: 'tie_rod_end', name: 'Spurstangenkopf', price: 38, units: 1, desc: 'mit Manschette und Mutter – je Seite' },
   harness: { id: 'harness', name: 'Motorkabelbaum', price: 320, units: 1, desc: 'Hauptstecker mit Leitungen' },
   // Motorumbau
   swap_mounts: { id: 'swap_mounts', name: 'Angepasste Motorhalter', price: 380, units: 1, desc: 'Adapterkonsolen für den neuen Motor', kind: 'swap' },
@@ -78,5 +81,5 @@ export const PARTS: Record<PartId, PartDef> = {
 export const PART_LIST = Object.values(PARTS);
 
 /** Teile, die zum Fahrwerk gehören und nach Fahrzeugklasse passen; alles andere außer der Batterie gehört zum Motor. */
-export const CHASSIS_PARTS: PartId[] = ['brake_pads', 'brake_disc', 'tire'];
+export const CHASSIS_PARTS: PartId[] = ['brake_pads', 'brake_disc', 'tire', 'muffler', 'control_arm', 'tie_rod_end'];
 export const UNIVERSAL_PARTS: PartId[] = ['battery', 'turbo_kit', 'intake_sport', 'swap_harness', 'swap_ecu', 'swap_radiator', 'swap_fuel', 'clutch_hd', 'fuel_pump', 'fuelpump_hp'];
