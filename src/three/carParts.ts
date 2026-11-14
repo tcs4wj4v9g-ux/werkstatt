@@ -396,9 +396,11 @@ function nineEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   for (const s of [-1, 1] as const) {
     const z = s * 0.57;
     // Aufrechter Scheinwerfer: Topf in Wagenfarbe, schwarzer Ring, Glas mit Reflektor
-    const x = S.endX(1, yL, z) - 0.09;
+    const x = S.endX(1, yL, z) - 0.08;
     const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + 0.08]);
-    m.add(SLOT.solid, new THREE.CylinderGeometry(0.11, 0.135, 0.16, N(22), 1, false), r.clone().multiply(mat([0, -0.02, 0], [0, 0, 0], [1, 1, 0.92])));
+    // Kotflügelbuckel: läuft nach hinten flach in den Kotflügel aus und nimmt vorn den Scheinwerfer auf
+    m.sphere(SLOT.solid, 1, [x - 0.17, yL - 0.01, z], [0.24, 0.112, 0.118], N(22));
+    m.add(SLOT.solid, new THREE.CylinderGeometry(0.108, 0.112, 0.1, N(22), 1, false), r.clone().multiply(mat([0, 0.005, 0], [0, 0, 0], [1, 1, 0.92])));
     m.add(SLOT.gloss, new THREE.TorusGeometry(0.1, 0.012, 6, N(24)), r.clone().multiply(mat([0, 0.06, 0], [Math.PI / 2, 0, 0], [1, 0.92, 1])));
     m.add(SLOT.lens, new THREE.SphereGeometry(0.098, N(20), N(8), 0, Math.PI * 2, 0, 0.45), r.clone().multiply(mat([0, 0.015, 0], [0, 0, 0], [1, 0.8, 0.92])));
     m.add(SLOT.chrome, new THREE.SphereGeometry(0.028, 10, 8), r.clone().multiply(mat([0, 0.08, 0], [0, 0, 0], [1, 0.4, 1])));
