@@ -11,7 +11,7 @@ export const V_PIVOT = 0.62;
 /** Neigung der Zylinderbänke: V-Motor leicht, Boxer fast waagerecht (Köpfe zeigen nach außen und etwas nach oben). */
 export const bankTilt = (e: EngineDef) => (e.layout === 'B4' || e.layout === 'B6' ? 1.25 : V_TILT);
 
-export const BAY = { alu: 0, plastic: 1, steel: 2, rubber: 3, iron: 4, painted: 5, core: 6, yellow: 7 } as const;
+export const BAY = { alu: 0, plastic: 1, steel: 2, rubber: 3, iron: 4, painted: 5, core: 6, yellow: 7, heat: 8 } as const;
 
 let mats: THREE.Material[] | null = null;
 export function bayMaterials() {
@@ -25,6 +25,8 @@ export function bayMaterials() {
     mats[BAY.painted] = new THREE.MeshStandardMaterial({ color: '#26282c', metalness: 0.5, roughness: 0.55 });
     mats[BAY.core] = new THREE.MeshStandardMaterial({ color: '#1c1e21', metalness: 0.85, roughness: 0.42 });
     mats[BAY.yellow] = new THREE.MeshStandardMaterial({ color: '#e3b21c', roughness: 0.5 });
+    // Edelstahl mit blau-goldenen Anlauffarben (Tuning-Fächerkrümmer)
+    mats[BAY.heat] = new THREE.MeshStandardMaterial({ color: '#8f86c9', metalness: 1, roughness: 0.22, emissive: '#3a2a10', emissiveIntensity: 0.25 });
   }
   return mats;
 }
@@ -174,7 +176,7 @@ const geos = new Map<string, THREE.BufferGeometry>();
 const once = (key: string, make: (m: Mesher) => void) => {
   let g = geos.get(key);
   if (!g) {
-    const m = new Mesher(8);
+    const m = new Mesher(9);
     make(m);
     geos.set(key, (g = m.build()));
   }
@@ -204,8 +206,8 @@ export const intakeGeometry = (e: EngineDef) =>
 export const exhaustGeometry = (e: EngineDef, sport: boolean) =>
   once(`ex${e.layout}${+sport}`, (m) => {
     const xs = xsOf(e);
-    const slot = sport ? BAY.steel : BAY.iron;
-    const r = sport ? 0.017 : 0.02;
+    const slot = sport ? BAY.heat : BAY.iron;
+    const r = sport ? 0.019 : 0.02;
     const sides = isV(e) ? [-1, 1] : [-1];
     for (const s of sides) {
       const z0 = isV(e) ? 0.24 : 0.18;
@@ -213,7 +215,11 @@ export const exhaustGeometry = (e: EngineDef, sport: boolean) =>
         if (sport) m.tube(slot, [[x, 0.545 - (isV(e) ? 0 : 0.04), s * z0], [x + 0.02, 0.49, s * (z0 + 0.06)], [x - 0.02, 0.44, s * (z0 + 0.08)], [xs[0] - 0.08, 0.4, s * (z0 + 0.07)]], r, 6);
         else m.tube(slot, [[x, 0.545 - (isV(e) ? 0 : 0.04), s * z0], [x - 0.015, 0.47, s * (z0 + 0.055)], [x - 0.05, 0.43, s * (z0 + 0.08)]], r, 5);
       }
-      m.tube(slot, [[xs[xs.length - 1] - 0.04, 0.43, s * (z0 + 0.08)], [xs[0] - 0.06, 0.425, s * (z0 + 0.08)], [0.9, 0.36, s * (z0 + 0.06)], [0.82, 0.3, s * (z0 + 0.03)]], sport ? 0.034 : 0.032, 6);
+      if (sport) {
+        // Sammler: blank poliert, mit Flansch am Übergang – so sieht man den Fächerkrümmer sofort
+        m.tube(BAY.steel, [[xs[0] - 0.08, 0.4, s * (z0 + 0.07)], [0.95, 0.37, s * (z0 + 0.065)], [0.86, 0.32, s * (z0 + 0.04)], [0.82, 0.3, s * (z0 + 0.03)]], 0.036, 8);
+        m.cyl(BAY.steel, 0.05, 0.05, 0.016, [xs[0] - 0.08, 0.4, s * (z0 + 0.07)], [0, 0, Math.PI / 2], 12);
+      } else m.tube(slot, [[xs[xs.length - 1] - 0.04, 0.43, s * (z0 + 0.08)], [xs[0] - 0.06, 0.425, s * (z0 + 0.08)], [0.9, 0.36, s * (z0 + 0.06)], [0.82, 0.3, s * (z0 + 0.03)]], 0.032, 6);
     }
   });
 
@@ -222,7 +228,7 @@ export const pistonGeometry = (forged: boolean) =>
   once(`pi${+forged}`, (m) => {
     m.cyl(forged ? BAY.steel : BAY.alu, 0.042, 0.041, 0.06, [0, -0.03, 0], undefined, 18);
     // Blanker Kolbenboden: hebt sich von oben gegen den Block ab
-    m.cyl(BAY.steel, 0.04, 0.041, 0.005, [0, 0.0025, 0], undefined, 18);
+    m.cyl(forged ? BAY.heat : BAY.steel, 0.04, 0.041, 0.005, [0, 0.0025, 0], undefined, 18);
     for (const y of [-0.008, -0.016, -0.024]) m.torus(BAY.painted, 0.0415, 0.0025, [0, y, 0], [Math.PI / 2, 0, 0], 18);
     m.cyl(BAY.steel, 0.012, 0.012, 0.09, [0, -0.04, 0], Z90, 8);
     m.rbox(forged ? BAY.steel : BAY.iron, [0.024, 0.2, 0.016], 0.006, [0, -0.16, 0]);

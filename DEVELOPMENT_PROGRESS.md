@@ -254,7 +254,7 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - `markt`: Tuningauftrag annehmen, Sportabgasanlage einbauen, abrechnen.
   - Kein echter iPad-Test.
 
-## Fahrzeug 9: BMV M5 (E34) (an den BMW E34 M5 angelehnt) – wartet auf Freigabe
+## Fahrzeug 9: BMV M5 (E34) (an den BMW E34 M5 angelehnt) – freigegeben
 
 - Neue Form `e34`: Sportliche Oberklasse-Limousine um 1990.
   - Maße: 4,70 m lang, Radstand 2,76 m.
@@ -275,3 +275,14 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Browser-Durchläufe `markt` und `bremse`.
   - Motorraum über „Motor von oben“ angesehen.
   - Kein echter iPad-Test.
+
+## Tuningteile im Motorraum erkennbar
+
+- Beim Anvisieren nennt die Beschriftung das Tuningteil, z. B. „Abgaskrümmer – Fächerkrümmer (Tuning)“ oder „Turbolader – Größerer Turbolader (Tuning)“.
+- Eigene Optik je Tuningteil:
+  - Fächerkrümmer: Edelstahl mit blau-goldenen Anlauffarben (neues Material `heat`), dazu ein blanker Sammler mit Flansch statt braunem Guss.
+  - Größerer Turbolader: blau eloxiertes Verdichtergehäuse (und größer).
+  - Hochleistungs-Einspritzdüsen: rot.
+  - Geschmiedete Kolben: angelaufener Kolbenboden und Stahlpleuel.
+  - Schon vorher unterschiedlich: Sportluftfilter (rot), Sportabgasanlage (blank), Sportnockenwellen (gelb), Hochleistungs-Kraftstoffpumpe (rot), Ladeluftkühler-Kit.
+- Geprüft: Logiktests; Browser-Durchläufe `motoren` (neuer Schritt: Tuning-Beschriftung), `schrott`, `mechanik`; Bilder des Motorraums mit und ohne Tuning angesehen. Kein echter iPad-Test.

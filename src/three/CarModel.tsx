@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { COMPONENT_MAP, defOf, engineOf } from '../game/data/components';
 import { cylinderSlots, ENGINES, isV } from '../game/data/engines';
 import { dirtLevel, shineLevel, visibleDirt } from '../game/detail';
+import { PARTS } from '../game/data/parts';
 import { beneath, blockersRemoved, installReady, removable } from '../game/repair';
 import { useGame } from '../game/store';
 import type { BodyStyle, CarInstance, FluidId, ToolId, VisualTune, ZoneId } from '../game/types';
@@ -611,7 +612,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     // Teil gibt es hier nicht (Motorständer ohne Fahrzeugteile, Auto ohne Motor) oder es fehlt am Schrottauto ganz.
     // Am gekauften Schrottauto fehlt es zwar auch, aber dort erscheint der grüne Platzhalter zum Einbau eines Ersatzteils.
     if (car && (!s || (s.missing && car.junk))) return null;
-    const name = car?.junk && def(id).partId && s?.installed ? `${def(id).name} – ${junkPartPrice(car, id)} €` : def(id).name;
+    const base = s?.variant && s.installed && !s.missing && PARTS[s.variant] ? `${def(id).name} – ${PARTS[s.variant].name} (Tuning)` : def(id).name;
+    const name = car?.junk && def(id).partId && s?.installed ? `${base} – ${junkPartPrice(car, id)} €` : base;
     const isIn = !s || (s.installed && !s.missing);
     const defect = !!s && s.known && s.condition === 'defect';
     const live = interactive && isIn && removable(car!, id) && toolFitsPart(id) ? id : undefined;
@@ -1320,7 +1322,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                     <>
                       <mesh position={[x, 0.805, z]}>
                         <cylinderGeometry args={[0.024, 0.03, 0.075, 10]} />
-                        <Mat color="#aeb3ba" metal={0.85} rough={0.3} />
+                        <Mat color={has(top, 'injector_hp') ? '#c0262a' : '#aeb3ba'} metal={0.85} rough={0.3} />
                       </mesh>
                       <mesh position={[x, 0.85, z + out * 0.02]}>
                         <boxGeometry args={[0.04, 0.022, 0.09]} />
@@ -1390,11 +1392,11 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 {/* Verdichter (Alu) mit Schneckengehäuse und Ansaugstutzen */}
                 <mesh position={[1.8, 0.66, 0.46]} rotation={[0, Math.PI / 2, 0]}>
                   <torusGeometry args={[0.058, 0.03, 8, 20]} />
-                  <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
+                  <Mat color={has('turbo', 'turbo_big') ? '#2f6bd8' : '#b4b9bf'} metal={0.9} rough={0.35} />
                 </mesh>
                 <mesh position={[1.8, 0.66, 0.46]} rotation={[0, 0, Math.PI / 2]}>
                   <cylinderGeometry args={[0.06, 0.06, 0.06, 16]} />
-                  <Mat color="#b4b9bf" metal={0.9} rough={0.35} />
+                  <Mat color={has('turbo', 'turbo_big') ? '#2f6bd8' : '#b4b9bf'} metal={0.9} rough={0.35} />
                 </mesh>
                 {/* Turbine (Guss) und Lagergehäuse */}
                 <mesh position={[1.72, 0.66, 0.46]} rotation={[0, Math.PI / 2, 0]}>

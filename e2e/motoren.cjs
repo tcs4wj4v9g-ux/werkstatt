@@ -162,6 +162,12 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   r = await sound();
   expect(r.pr && r.pr.whine === 0 && r.pr.turbo, 'Turbo: Motor läuft, Lader pfeift normal');
   }
+  // ---------- Tuningteile im Motorraum erkennbar: Beschriftung und Material ----------
+  await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar('bavaria_335_coupe', [], Math.random, {}); c.hoodOpen = true; c.components.turbo.variant = 'turbo_big'; c.components.intake_hose.variant = 'intake_sport'; g.setState({ cars: [c, ...s.cars.slice(1)], panel: null, tool: 'hand' }); Object.assign(window.__gkPlayer, { x: 2.9, z: -2.7, yaw: Math.PI / 2, pitch: 0, work: null }); });
+  await p.waitForTimeout(900);
+  const tl = await p.evaluate(() => { const out = new Set(); window.__gkScene.traverse((o) => { const l = o.userData && o.userData.label; if (typeof l === 'string' && /\(Tuning\)/.test(l)) out.add(l); }); return [...out]; });
+  expect(tl.some((l) => /Turbolader – Größerer Turbolader \(Tuning\)/.test(l)) && tl.some((l) => /Sportluftfilter/.test(l)), 'Tuningteile tragen ihren Namen in der Beschriftung: ' + tl.join(' | '));
+
   console.log('errors:', errs.slice(0, 8)); console.log(fails ? 'FEHLER: ' + fails : 'ALLES OK');
   await b.close();
 })();
