@@ -12,7 +12,7 @@ export interface DefectDef {
   symptoms: string[];
   /** Arbeitslohn, den ein Kunde für die Behebung zahlt. */
   labor: number;
-  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung' | 'Antrieb';
+  category: 'Motor' | 'Bremsen' | 'Kühlung' | 'Elektrik' | 'Wartung' | 'Antrieb' | 'Fahrwerk' | 'Abgasanlage';
   /** Wie oft der Schaden zufällig vorkommt (1 = normal). Kapitale Schäden sind selten. */
   weight?: number;
   /** Kontrollleuchte während der Probefahrt. */
@@ -153,6 +153,19 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
   discs_rear: {
     id: 'discs_rear', name: 'Verschlissene Bremsscheiben hinten', components: ['disc_rl', 'disc_rr'], pick: 'all',
     penalty: 560, symptoms: ['brake_look'], labor: 150, category: 'Bremsen', weight: 0.6,
+  },
+  // Unterboden: Abgasanlage und Vorderachse
+  muffler: {
+    id: 'muffler', name: 'Durchgerosteter Endschalldämpfer', components: ['muffler'], pick: 'all',
+    penalty: 350, symptoms: ['exhaust_loud', 'exhaust_look'], labor: 80, category: 'Abgasanlage', weight: 0.9,
+  },
+  control_arm: {
+    id: 'control_arm', name: 'Ausgeschlagenes Querlenkerlager vorne', components: ['arm_fl', 'arm_fr'], pick: 'one',
+    penalty: 450, symptoms: ['clunk_bump', 'arm_look'], labor: 140, category: 'Fahrwerk', weight: 0.8,
+  },
+  tie_rod: {
+    id: 'tie_rod', name: 'Ausgeschlagener Spurstangenkopf', components: ['tie_fl', 'tie_fr'], pick: 'one',
+    penalty: 300, symptoms: ['steer_play', 'tie_look'], labor: 110, category: 'Fahrwerk', weight: 0.8,
   },
 };
 

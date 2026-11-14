@@ -180,7 +180,7 @@ describe('Reparatur', () => {
 
   it('alle Defekte zusammen: abzugsfrei erst nach Reparatur und Probefahrt', () => {
     const all = applicableDefects('bavaria_320').filter((d) => !standOnly(d));
-    expect(all.length).toBe(22);
+    expect(all.length).toBe(25);
     expect(applicableDefects('bavaria_320').filter((d) => standOnly(d)).sort()).toEqual(['camshaft', 'main_bearing', 'oil_pump', 'rings', 'timing_chain']);
     const car = mk('bavaria_320', all);
     const i = inv(8);
@@ -366,6 +366,37 @@ describe('Markt und Verhandlung', () => {
 });
 
 describe('Kundenaufträge', () => {
+  it('Tuningaufträge: bezahlt wird, wenn alle Wünsche verbaut sind – inklusive Teile', async () => {
+    const { TUNING_TEMPLATES, tuningGoalMet } = await import('./jobs');
+    const g = rng(11);
+    let tuning = 0;
+    for (let n = 0; n < 60; n++) {
+      const { car } = createJobOffer(g);
+      const job = car.job!;
+      if (!job.tuning) continue;
+      tuning++;
+      expect(job.category).toBe('Tuning');
+      expect(billJob(car).done).toBe(false);
+      for (const goal of job.tuning) {
+        if (goal.kind === 'part') car.components[goal.comp].variant = goal.variant;
+        if (goal.kind === 'visual') car.visual = { ...car.visual, [goal.field]: goal.values ? goal.values[0] : goal.field === 'rim' ? 'five' : 1 };
+        if (goal.kind === 'power') car.ecu = { map: 2, boost: car.ecu?.boost ?? 0, limiter: car.ecu?.limiter ?? 6500 };
+      }
+      const open = job.tuning.filter((x) => !tuningGoalMet(car, x));
+      if (open.length) {
+        // Leistungswunsch: nur mit Kennfeld allein nicht immer erreichbar – dann bleibt der Auftrag offen.
+        expect(open.every((x) => x.kind === 'power')).toBe(true);
+        continue;
+      }
+      car.partsSpent = 900;
+      const bill = billJob(car);
+      expect(bill.done, JSON.stringify(bill.problems)).toBe(true);
+      expect(bill.total).toBeGreaterThan(job.fee + 900);
+    }
+    expect(tuning).toBeGreaterThan(5);
+    expect(TUNING_TEMPLATES.length).toBeGreaterThanOrEqual(5);
+  });
+
   it('bezahlt wird erst, wenn die tatsächliche Ursache behoben und das Auto komplett ist', () => {
     const g = rng(3);
     for (let n = 0; n < 25; n++) {
@@ -373,6 +404,12 @@ describe('Kundenaufträge', () => {
       const job = car.job!;
       expect(job.complaint.length).toBeGreaterThan(10);
       expect(billJob(car).done, job.category).toBe(false);
+      if (job.tuning) {
+        // Tuningauftrag: keine Fehlersuche, erledigt sobald die Wünsche verbaut sind (eigener Test unten).
+        expect(job.required).toEqual([]);
+        expect(billJob(car).problems.some((p) => p.startsWith('Tuningwunsch'))).toBe(true);
+        continue;
+      }
       const i = inv(6);
       job.required.forEach((d) => fix(car, i, d));
       if (job.service === 'oil_change') {

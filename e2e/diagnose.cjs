@@ -145,7 +145,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
     const g = window.__gk; const s = g.getState(); const j = JSON.parse(JSON.stringify(s.jobs[0]));
     for (const c of Object.values(j.car.components)) c.condition = 'ok';
     j.car.components.belt.condition = 'defect';
-    j.car.job = { ...j.car.job, category: 'Wartung', complaint: 'Beim Anlassen quietscht es laut. Bitte nachsehen.', required: ['belt'], initial: ['belt'], fee: 100 };
+    j.car.job = { ...j.car.job, category: 'Wartung', complaint: 'Beim Anlassen quietscht es laut. Bitte nachsehen.', required: ['belt'], initial: ['belt'], fee: 100, service: undefined };
     g.setState({ jobs: [j, ...s.jobs.slice(1)] });
   });
   await computer();

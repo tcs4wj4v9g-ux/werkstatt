@@ -216,3 +216,40 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Systematisch geprüft: Jedes Bauteil einzeln ausgebaut, am Motorständer und im Auto, bei R4, V8, R5, Diesel, Heckmotor-Boxer und Twingo. Alle Platzhalter sind grün.
 - **Platzhalter über tieferen Teilen:** Ein Platzhalter (z. B. Zylinderkopfdichtung über den Kolben) ließ ein Teil darunter bisher nur vor, wenn gerade das passende Werkzeug in der Hand war. Mit der Ratsche vom Pleuellager noch in der Hand baute ein Tipp auf den Kolben deshalb unbemerkt die Kopfdichtung wieder ein. Jetzt geht ein Teil darunter vor, sobald es herausnehmbar ist, egal mit welchem Werkzeug. Der Tipp sagt dann, womit es geht. Beim Wiedereinbau, wenn das Teil darunter noch nicht heraus kann, bleibt der Platzhalter vorn.
 - Geprüft: neue Schritte im Durchlauf `schrott` (Kolben mit Ratsche durch den Platzhalter antippen, dann mit der Hand herausnehmen, ausgebauter Kolben als grüner Platzhalter). Voller Satz grün. Kein echter iPad-Test.
+
+## Twingo-Optik, Unterboden, Tages-Timer
+
+- **Twingo (Renolt Twingo 1.2) realistischer**, nach Fotos des Projektinhabers:
+  - Front: große runde „Froschaugen“-Scheinwerfer mit grauer Fassung und Klarglas statt der Lackhöcker darüber, drei Lüftungsschlitze vorn rechts in der Haube (schwenken mit), Raute als Emblem unter der Haubenkante, runde Blinkleuchten außen im grauen Stoßfänger.
+  - Die Haube fällt stärker ab (Van-Linie).
+  - Graue Schutzleiste an Tür und Seitenteil, Kennzeichen hinten in der Heckklappe.
+  - Graue Stoßfänger vorn und hinten bis ganz unten.
+- **Unterboden: drei neue Baugruppen**, jeweils mit Defekt, Symptomen, Ersatzteil (Fahrwerksteil, Passform je Fahrzeugklasse), Schrauben und 3D-Modell:
+  - Endschalldämpfer: Defekt „Durchgerosteter Endschalldämpfer“. Symptome: Der Auspuff dröhnt hörbar lauter, und von unten sind Rost und Ruß zu sehen.
+  - Querlenker vorne links und rechts: Defekt „Ausgeschlagenes Querlenkerlager“. Symptome: Poltern auf der Probefahrt, rissiges Lager von unten.
+  - Spurstangenköpfe vorne links und rechts: Defekt „Ausgeschlagener Spurstangenkopf“. Symptome: Lenkspiel auf der Probefahrt, gerissene Manschette von unten.
+  - Alte Spielstände und Koop-Werkstätten bekommen die Teile heil eingebaut dazu, auch an Inseraten, Auktionen und Aufträgen.
+- **Tages-Timer:** Ein Spieltag dauert 3 Minuten Echtzeit. Der Feierabend-Knopf zeigt den Countdown und ist bis dahin gesperrt.
+  - Der Timer zählt je Gerät (nicht im Koop geteilt). Beendet der Partner den Tag, beginnt er auch hier neu.
+  - Im Testmodus (`?test`) wird nicht gewartet.
+- Geprüft: Logiktests; Browser-Durchläufe `bremse` (Sichtprüfung von unten, Querlenker-Schrauben im Unterboden-Bild, Ausbau und Neuteile) und `markt` (Timer); voller Satz. Kein echter iPad-Test.
+
+## Hosenrohr am B5, Tuning-Kundenaufträge
+
+- **Hosenrohr ließ sich am Audy A4 (B5) nicht ausbauen:** Der B5 sitzt tiefer (Bodenfreiheit 0,26 m). Dadurch lag das Rohr im Unterboden-Blech, und ein Tipp darauf traf nichts. Das Rohr hängt jetzt immer knapp unter dem Wagenboden.
+  - Bei allen 30 Modellen im Bild geprüft.
+  - Dabei gefunden: Beim Diesel lag der Partikelfilter über einer Hosenrohr-Schraube. Er sitzt jetzt etwas weiter außen.
+- **Tuning-Kundenaufträge:** Etwa jede fünfte Anfrage ist ein Tuningwunsch, eher an Mittelklasse- und Sportwagen. Es gibt fünf Arten:
+  - Sportabgasanlage
+  - Sportluftfilter
+  - mindestens 12 % mehr Leistung, sauber abgestimmt
+  - Felgen und Sport- oder Gewindefahrwerk
+  - Sport-Frontstoßstange und Heckspoiler
+- Abrechnung und Anzeige der Tuningaufträge:
+  - Der Auftrag zeigt jeden Wunsch mit ✓/○.
+  - Abgerechnet wird, wenn alle Wünsche verbaut sind: Arbeitslohn je Fahrzeugklasse plus Teile mit 15 % Aufschlag. Optikteile werden am Kundenauto zum vollen Preis berechnet.
+- Geprüft:
+  - Logiktests, darunter ein neuer Test für Tuningaufträge.
+  - `bremse`: Hosenrohr bei B5 und Diesel im Unterboden-Bild ausgebaut.
+  - `markt`: Tuningauftrag annehmen, Sportabgasanlage einbauen, abrechnen.
+  - Kein echter iPad-Test.

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
 import { engineOf } from '../game/data/components';
 import { availableSlots } from '../game/data/workshop';
 import { marketLabel, RARITY_NAMES } from '../game/market';
 import { adCondition, brandsOf, DEFAULT_FILTER, filterListings, type MarketFilter } from '../game/marketFilter';
-import { useGame } from '../game/store';
+import { dayLeft, useGame } from '../game/store';
 import type { CarClass } from '../game/types';
 import { eur } from './common';
 
@@ -95,7 +95,24 @@ export function MarketTab() {
           </div>
         );
       })}
-      <button className="btn big" onClick={s.nextDay}>🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)</button>
+      <DayButton />
     </>
+  );
+}
+
+/** Feierabend erst, wenn der Spieltag abgelaufen ist – bis dahin läuft die Uhr sichtbar herunter. */
+function DayButton() {
+  const s = useGame();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const left = dayLeft(s);
+  const sec = Math.ceil(left / 1000);
+  return (
+    <button className="btn big" data-testid="nextday" disabled={left > 0} onClick={s.nextDay}>
+      {left > 0 ? `🕒 Feierabend in ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} – der Tag läuft noch` : '🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)'}
+    </button>
   );
 }

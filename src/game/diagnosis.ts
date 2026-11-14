@@ -119,7 +119,8 @@ export function soundProfile(car: CarInstance): SoundProfile {
     diesel: e.fuel === 'diesel',
     turbo: (e.turbo || !!car.components.turbo?.installed) && !has('turbo'),
     liters: e.liters,
-    sport: ['exhaust_sport', 'manifold_sport', 'intake_sport'].filter((v) => Object.values(car.components).some((c) => c.installed && c.variant === v)).length,
+    // Ein durchgerosteter Endtopf macht den Auspuff lauter als jede Sportanlage.
+    sport: ['exhaust_sport', 'manifold_sport', 'intake_sport'].filter((v) => Object.values(car.components).some((c) => c.installed && c.variant === v)).length + (has('muffler') ? 2 : 0),
   };
 }
 

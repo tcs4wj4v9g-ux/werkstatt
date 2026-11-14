@@ -185,31 +185,31 @@ function monoEnds(m: Mesher, S: Shape, look: CarLook, N: (n: number) => number) 
     endPatch(m, slot, S, dir, z, y, r * 2, r * 2 * sy, 1, lift, N(10), N(8));
 
   // ---- Front ----
-  const yL = yHood - 0.075;
-  const zL = 0.5;
+  const yL = yHood - 0.11;
+  const zL = 0.49;
   for (const s of [-1, 1] as const) {
     const z = s * zL;
-    // Scheinwerfer: Chromrand, Streuscheibe, Reflektor mit Birne, Blinker unten außen
-    // Scheinwerfer: schwarze Fassung, Chromrand, silberner Reflektor, Lampenkappe mit Birne
-    disc(1, SLOT.dark, z, yL, 0.112, 0.004, 0.88);
-    disc(1, SLOT.chrome, z, yL, 0.1, 0.008, 0.88);
-    disc(1, SLOT.lens, z, yL, 0.088, 0.012, 0.88);
-    disc(1, SLOT.chrome, z, yL, 0.03, 0.016);
-    disc(1, SLOT.glow, z, yL, 0.011, 0.019);
-    wrapPatch(m, SLOT.amber, S, 1, Math.atan2(s * 0.66, 0.96), 0.12, yL - 0.085, 0.035, 0.6, 0.008, 4, 2);
-    // Lid: die Haubenkante wölbt sich flach über den Scheinwerfer
-    // Nur die vordere obere Viertelschale – nach innen (Motorraum) bleibt nichts sichtbar.
-    const p = at(1, yL + 0.084, z, -0.004);
-    const lid = new THREE.SphereGeometry(1, N(16), N(8), Math.PI / 2, Math.PI, 0, Math.PI / 2);
-    m.add(SLOT.solid, lid, mat([p[0], p[1], p[2]], [0, 0, 0], [0.055, 0.03, 0.118]));
+    // Große runde „Froschaugen“: graue Fassung, Klarglas, silberner Reflektor mit Birne; die Lampe steht etwas vor
+    disc(1, SLOT.plastic, z, yL, 0.132, 0.006, 0.92);
+    disc(1, SLOT.dark, z, yL, 0.118, 0.01, 0.92);
+    disc(1, SLOT.chrome, z, yL, 0.108, 0.013, 0.92);
+    disc(1, SLOT.lens, z, yL, 0.1, 0.018, 0.92);
+    disc(1, SLOT.chrome, z, yL, 0.032, 0.022);
+    disc(1, SLOT.glow, z, yL, 0.012, 0.026);
+    // Runde Blink- und Nebelleuchte außen im Stoßfänger
+    disc(1, SLOT.dark, s * 0.6, 0.47, 0.05, 0.016);
+    disc(1, SLOT.amber, s * 0.6, 0.47, 0.04, 0.02);
   }
-  // Schmaler Lufteinlass zwischen den Scheinwerfern, darüber das runde Markenemblem
-  endPatch(m, SLOT.dark, S, 1, 0, yL - 0.02, 0.5, 0.032, 0.8, 0.005, N(12), 2);
-  disc(1, SLOT.chrome, 0, yL + 0.035, 0.038, 0.01);
-  disc(1, SLOT.gloss, 0, yL + 0.035, 0.026, 0.014);
+  // Markenraute mittig unter der Haubenkante in einer schmalen Mulde
+  endPatch(m, SLOT.dark, S, 1, 0, yL + 0.01, 0.2, 0.05, 0.6, 0.005, N(8), 2);
+  {
+    const p = at(1, yL + 0.01, 0, 0.012);
+    m.add(SLOT.chrome, new THREE.BoxGeometry(0.012, 0.05, 0.05), mat([p[0], p[1], 0], [Math.PI / 4, 0, 0]));
+    m.add(SLOT.gloss, new THREE.BoxGeometry(0.008, 0.03, 0.03), mat([p[0] + 0.005, p[1], 0], [Math.PI / 4, 0, 0]));
+  }
   // Stoßfänger aus grauem Kunststoff, der um die Ecken läuft
-  const yB = 0.39;
-  wrapPatch(m, SLOT.plastic, S, 1, 0, 2.3, yB, 0.25, 0.25, 0.012, N(26), N(5));
+  const yB = 0.4;
+  wrapPatch(m, SLOT.plastic, S, 1, 0, 2.4, yB - 0.025, 0.36, 0.2, 0.014, N(28), N(6));
   wrapPatch(m, SLOT.dark, S, 1, 0, 2.2, yB + 0.128, 0.014, 0.2, 0.016, N(24), 1);
   // „Lächeln“: breiter Lufteinlass als durchgehendes Band, zur Mitte am höchsten, an den Enden nach oben gezogen und spitz zulaufend
   {
@@ -251,13 +251,16 @@ function monoEnds(m: Mesher, S: Shape, look: CarLook, N: (n: number) => number) 
     wrapPatch(m, SLOT.lens, S, -1, a, 0.3, yT - 0.135, 0.065, 0.3, 0.009, N(6), 2);
     wrapPatch(m, SLOT.tailBar, S, -1, a, 0.22, yT + 0.12, 0.03, 0.4, 0.013, N(6), 2);
   }
-  // Heckklappe: Griffleiste mit Emblem, Kennzeichenmulde
-  endPatch(m, SLOT.dark, S, -1, 0, 0.8, 0.5, 0.04, 0.5, 0.005, N(10), 2);
-  disc(-1, SLOT.chrome, 0, 0.8, 0.03, 0.012);
-  endPatch(m, SLOT.dark, S, -1, 0, 0.63, 0.48, 0.14, 0.3, 0.005, N(8), 3);
-  endPatch(m, SLOT.plate, S, -1, 0, 0.63, 0.42, 0.095, 0.1, 0.01, N(8), 3);
+  // Heckklappe: Kennzeichen in der Klappe zwischen den Leuchten, darüber die Griffmulde mit Raute
+  endPatch(m, SLOT.dark, S, -1, 0, 0.83, 0.36, 0.035, 0.5, 0.005, N(10), 2);
+  {
+    const p = at(-1, 0.83, 0, 0.012);
+    m.add(SLOT.chrome, new THREE.BoxGeometry(0.012, 0.04, 0.04), mat([p[0], p[1], 0], [Math.PI / 4, 0, 0]));
+  }
+  endPatch(m, SLOT.dark, S, -1, 0, 0.68, 0.5, 0.14, 0.3, 0.005, N(8), 3);
+  endPatch(m, SLOT.plate, S, -1, 0, 0.68, 0.44, 0.1, 0.1, 0.01, N(8), 3);
   // Grauer Kunststoff-Stoßfänger hinten mit Rückstrahlern, Auspuff links unten
-  wrapPatch(m, SLOT.plastic, S, -1, 0, 2.3, 0.38, 0.24, 0.25, 0.012, N(26), N(5));
+  wrapPatch(m, SLOT.plastic, S, -1, 0, 2.4, 0.37, 0.34, 0.2, 0.014, N(28), N(6));
   wrapPatch(m, SLOT.dark, S, -1, 0, 2.2, 0.5, 0.014, 0.2, 0.016, N(24), 1);
   for (const s of [-1, 1]) endPatch(m, SLOT.tail, S, -1, s * 0.5, 0.42, 0.12, 0.028, 0.4, 0.018, 3, 2);
   const zp = -0.42;
@@ -927,7 +930,11 @@ export function trimGeometry(body: BodyStyle, look: CarLook, detail: number) {
     const xa = B.rearAxle + ARCH;
     const xb = WHEEL_X - ARCH;
     sidePatch(m, SLOT.dark, S, s, (xa + xb) / 2, B.ground + 0.045, xb - xa, 0.07, 0, 0.004, N(14), 2);
-    if (body === 'mono') sidePatch(m, SLOT.amber, S, s, 1.66, 0.66, 0.06, 0.03, 0.7, 0.004, 3, 2);
+    if (body === 'mono') {
+      sidePatch(m, SLOT.amber, S, s, 1.66, 0.66, 0.06, 0.03, 0.7, 0.004, 3, 2);
+      // Graue Schutzleiste über Tür und Seitenteil, zwischen den Radläufen
+      sidePatch(m, SLOT.plastic, S, s, (B.rearAxle + WHEEL_X) / 2 - 0.02, 0.6, WHEEL_X - B.rearAxle - 2 * (ARCH_R + 0.1), 0.055, 0.3, 0.008, N(16), 2);
+    }
     else sidePatch(m, SLOT.amber, S, s, 1.9, 0.79, 0.075, 0.022, 0.7, 0.004, 3, 2);
     for (const x of B.handles.slice(1)) handle(m, S, look.chromeTrim ? SLOT.chrome : SLOT.solid, s, x);
     beltStrip(m, S, look.chromeTrim ? SLOT.chrome : SLOT.gloss, s, B.glassRear + 0.02, B.seams[1] - 0.004);

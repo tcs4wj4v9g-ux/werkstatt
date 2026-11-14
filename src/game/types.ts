@@ -68,6 +68,9 @@ export type PartId =
   | 'downpipe'
   | 'fuel_pump'
   | 'harness'
+  | 'muffler'
+  | 'control_arm'
+  | 'tie_rod_end'
   // Motorumbau
   | 'swap_mounts'
   | 'swap_adapter'
@@ -122,7 +125,10 @@ export type DefectId =
   | 'main_bearing'
   | 'oil_pump'
   | 'camshaft'
-  | 'timing_chain';
+  | 'timing_chain'
+  | 'muffler'
+  | 'control_arm'
+  | 'tie_rod';
 
 /** hood = Motorraum (Auto unten), lifted = von unten (Auto angehoben), stand = nur am ausgebauten Motor auf dem Motorständer. */
 export type Access = 'hood' | 'lifted' | 'stand';
@@ -335,6 +341,12 @@ export interface ZoneState {
   paint?: string;
 }
 
+/** Tuningwunsch eines Kunden: ein bestimmtes Tuningteil, ein Optikteil oder eine Leistungssteigerung. */
+export type TuningGoal =
+  | { kind: 'part'; comp: string; variant: PartId; text: string }
+  | { kind: 'visual'; field: keyof VisualTune; values?: (string | number | boolean)[]; text: string }
+  | { kind: 'power'; pct: number; text: string };
+
 export interface JobInfo {
   id: string;
   customer: string;
@@ -350,6 +362,8 @@ export interface JobInfo {
   service?: 'oil_change';
   /** Vom Kunden freigegebene Zusatzarbeiten. */
   approved?: DefectId[];
+  /** Tuningauftrag: diese Wünsche müssen erfüllt sein. */
+  tuning?: TuningGoal[];
   /** Zusatzarbeiten, zu denen der Kunde schon gefragt wurde. */
   asked?: DefectId[];
   /** Eilauftrag: muss bis zu diesem Tag fertig sein. */
