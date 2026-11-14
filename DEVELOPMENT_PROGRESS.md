@@ -209,3 +209,10 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Neuer Browser-Durchlauf `tiefgarage`.
   - Koop-Szenario: Einparken sichtbar beim Partner, gleichzeitiges Umparken ohne doppeltes Auto.
   - Kein echter iPad-Test.
+
+## Platzhalter am Motor
+
+- **Innenteile wurden als Platzhalter nicht grün:** Kolben, Kurbelwelle, Nockenwellen, Steuerkette, Ölpumpe, Hauptlager sowie Ansaug- und Abgaskrümmer behielten nach dem Ausbau ihr normales Aussehen. Es sah aus, als wären sie noch eingebaut. Diese Teile nutzen jetzt `BayMesh`: als Platzhalter grün durchsichtig, bei bekanntem Defekt rot.
+  - Systematisch geprüft: Jedes Bauteil einzeln ausgebaut, am Motorständer und im Auto, bei R4, V8, R5, Diesel, Heckmotor-Boxer und Twingo. Alle Platzhalter sind grün.
+- **Platzhalter über tieferen Teilen:** Ein Platzhalter (z. B. Zylinderkopfdichtung über den Kolben) ließ ein Teil darunter bisher nur vor, wenn gerade das passende Werkzeug in der Hand war. Mit der Ratsche vom Pleuellager noch in der Hand baute ein Tipp auf den Kolben deshalb unbemerkt die Kopfdichtung wieder ein. Jetzt geht ein Teil darunter vor, sobald es herausnehmbar ist, egal mit welchem Werkzeug. Der Tipp sagt dann, womit es geht. Beim Wiedereinbau, wenn das Teil darunter noch nicht heraus kann, bleibt der Platzhalter vorn.
+- Geprüft: neue Schritte im Durchlauf `schrott` (Kolben mit Ratsche durch den Platzhalter antippen, dann mit der Hand herausnehmen, ausgebauter Kolben als grüner Platzhalter). Voller Satz grün. Kein echter iPad-Test.

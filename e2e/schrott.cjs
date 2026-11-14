@@ -187,6 +187,22 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
     expect(!cam && pis.length >= 6 && hits.every((t) => /Pleuellager/.test(t || '')), `${model}: Nockenwellen vor dem Kopf ausgebaut, ${pis.length} Kolben von oben antippbar (${hits[0]})`);
   }
 
+  // ---------- Kolben antippen, während noch die Ratsche in der Hand ist: Hinweis statt versehentlich eingebauter Kopfdichtung ----------
+  await G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; cars[15] = L.motor.asStand(L.motor.extractEngine(L.createCar('bavaria_320', [], Math.random, {})), 'bavaria_320'); cars[15].fluids.oil.level = 0; g.setState({ cars, panel: null }); window.__t.strip(15, 'head_gasket'); window.__t.strip(15, 'bearing'); if (g.getState().cars[15].lifted) g.getState().flipEngine(); g.setState({ tool: 'ratchet' }); Object.assign(window.__gkPlayer, { x: 4.2, z: -0.55, yaw: Math.PI / 2, pitch: -0.62, work: null, zoom: false }); });
+  await p.waitForTimeout(800);
+  const pist = await G(() => { const cam = window.__gkCamera; const v = new cam.position.constructor(); let r = null; let ghostOk = null; window.__gkScene.traverse((o) => { const l = o.userData && o.userData.label; if (!r && l === 'Kolben mit Pleuel Zyl. 2') { let m = null; o.traverse((x) => { if (!m && x.isMesh) m = x; }); m.getWorldPosition(v); v.project(cam); r = { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; } if (l === 'Zylinderkopfdichtung einbauen') o.traverse((m) => { if (m.isMesh) ghostOk = (ghostOk ?? true) && [].concat(m.material).every((x) => x.isMeshBasicMaterial && x.transparent); }); }); return { r, ghostOk }; });
+  await G(() => window.__gk.setState({ toast: null }));
+  if (pist.r) { await p.mouse.click(pist.r.x, pist.r.y); await p.waitForTimeout(200); }
+  const tapRes = await G(() => { const s = window.__gk.getState(); const c = s.cars[15].components; return { gasket: c.head_gasket.installed, piston: c.piston2.installed, toast: s.toast && s.toast.text }; });
+  expect(!!pist.r && pist.ghostOk === true && !tapRes.gasket && tapRes.piston && !/eingebaut/.test(tapRes.toast || ''), 'Kolben mit der Ratsche durch den grünen Platzhalter angetippt: Kopfdichtung bleibt draußen – ' + tapRes.toast);
+  await G(() => window.__gk.setState({ tool: 'hand', toast: null }));
+  if (pist.r) { await p.mouse.click(pist.r.x, pist.r.y); await p.waitForTimeout(200); }
+  expect(!(await car(15)).components.piston2.installed && !(await car(15)).components.head_gasket.installed, 'Mit der Hand: Kolben herausgenommen – ' + (await G(() => window.__gk.getState().toast && window.__gk.getState().toast.text)));
+  // Ausgebaute Innenteile erscheinen als grüne Platzhalter, nicht mehr wie eingebaut
+  await p.waitForTimeout(400);
+  const pg = await G(() => { let ok = null; window.__gkScene.traverse((o) => { if (o.userData && o.userData.label === 'Kolben mit Pleuel Zyl. 2 einbauen') o.traverse((m) => { if (m.isMesh) ok = (ok ?? true) && [].concat(m.material).every((x) => x.isMeshBasicMaterial && x.transparent); }); }); return ok; });
+  expect(pg === true && !(await car(15)).components.piston2.installed, `Ausgebauter Kolben: nur noch grüner Platzhalter zu sehen (${pg})`);
+
   // ---------- Öl am Motorständer ablassen (ohne Auffangwanne, die Schale am Ständer fängt es auf) ----------
   const putStand = () => G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; const c = L.createCar('bavaria_330', [], Math.random, {}); cars[15] = L.motor.asStand(L.motor.extractEngine(c), 'bavaria_330'); cars[15].fluids.oil.level = 5; g.setState({ cars, panel: null, carried: ['ratchet', 'socket17', 'wrench'], tool: 'ratchet', drainPan: s.drainPan.map(() => false) }); });
   await putStand();

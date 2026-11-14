@@ -1,5 +1,5 @@
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { COMPONENT_MAP, defOf, engineOf } from '../game/data/components';
 import { cylinderSlots, ENGINES, isV } from '../game/data/engines';
@@ -73,6 +73,26 @@ function Mat({ color, metal = 0.2, rough = 0.6 }: { color: string; metal?: numbe
   );
 }
 
+const ghostBayMats: Record<string, THREE.Material[]> = {};
+/** Motorraum-Netz mit mehreren Materialien, das sich wie `Mat` umfärbt (Platzhalter grün, bekannter Defekt rot). */
+function BayMesh(props: Omit<ComponentProps<'mesh'>, 'material'>) {
+  const mode = useContext(GhostCtx);
+  let mats = bayMaterials();
+  if (mode !== 'normal') {
+    ghostBayMats[mode] ??=
+      mode === 'ghost'
+        ? mats.map(() => new THREE.MeshBasicMaterial({ color: '#39e06f', transparent: true, opacity: 0.4, depthWrite: false }))
+        : mats.map((m) => {
+            const c = (m as THREE.MeshStandardMaterial).clone();
+            c.emissive = new THREE.Color('#ff2a1a');
+            c.emissiveIntensity = 0.6;
+            return c;
+          });
+    mats = ghostBayMats[mode];
+  }
+  return <mesh {...props} material={mats} />;
+}
+
 const tooFar = () => useGame.getState().say('Zu weit weg – geh näher heran.', true);
 const tap = (fn: (e: ThreeEvent<MouseEvent>) => void) => (e: ThreeEvent<MouseEvent>) => {
   e.stopPropagation();
@@ -82,14 +102,19 @@ const tap = (fn: (e: ThreeEvent<MouseEvent>) => void) => (e: ThreeEvent<MouseEve
 };
 
 const liveId = (o: THREE.Object3D | null): string | undefined => (o ? o.userData.liveId ?? liveId(o.parent) : undefined);
+/** Bauteil, das jetzt herausgenommen werden könnte – egal, welches Werkzeug gerade in der Hand ist. */
+const readyId = (o: THREE.Object3D | null): string | undefined => (o ? o.userData.readyId ?? readyId(o.parent) : undefined);
 /**
  * Tipp auf einen Einbau-Platzhalter. Liegt dahinter ein gerade bedienbares
  * Teil (oder dessen Schraube), das unter diesem Platzhalter verbaut ist, hat
  * es Vorrang – so verdeckt ein Platzhalter nie das Teil darunter.
  */
 const ghostTap = (car: CarInstance, id: string, fn: () => void) => (e: ThreeEvent<MouseEvent>) => {
+  // Das gilt auch, wenn gerade das falsche Werkzeug in der Hand ist (z. B. noch die Ratsche vom Pleuellager, wenn
+  // man den Kolben herausnehmen will): Dann sagt der Tipp aufs Teil, womit es geht – statt dass der Platzhalter
+  // darüber unbemerkt wieder eingebaut wird.
   const under = beneath(car, id);
-  if (e.intersections.some((i) => under.includes(liveId(i.object) ?? ''))) return;
+  if (e.intersections.some((i) => under.includes(liveId(i.object) ?? readyId(i.object) ?? ''))) return;
   tap(fn)(e);
 };
 
@@ -575,7 +600,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     const live = interactive && isIn && removable(car!, id) && toolFitsPart(id) ? id : undefined;
     const real = (
       <GhostCtx.Provider value={defect ? 'defect' : 'normal'}>
-        <group userData={{ liveId: live, label: interactive ? name : undefined }} onClick={interactive ? tap(() => handlers!.onComponent(id)) : undefined}>
+        <group userData={{ liveId: live, readyId: interactive && isIn && removable(car!, id) ? id : undefined, label: interactive ? name : undefined }} onClick={interactive ? tap(() => handlers!.onComponent(id)) : undefined}>
           {children}
         </group>
       </GhostCtx.Provider>
@@ -1493,9 +1518,9 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {!noEngine &&
             (bare ? (
               <>
-                {part('intake_manifold', <mesh geometry={intakeGeometry(engine)} material={bayMaterials()} />)}
+                {part('intake_manifold', <BayMesh geometry={intakeGeometry(engine)} />)}
                 {bolts('intake_manifold', vee ? [[1.05, 0.73, 0.03], [1.05, 0.73, -0.03], [1.55, 0.73, 0.03], [1.55, 0.73, -0.03]] : [[1.0, 0.6, 0.2], [1.15, 0.6, 0.2], [1.45, 0.6, 0.2], [1.6, 0.6, 0.2]], vee ? 'y' : 'z+')}
-                {part('exhaust_manifold', <mesh geometry={exhaustGeometry(engine, has('exhaust_manifold', 'manifold_sport'))} material={bayMaterials()} />)}
+                {part('exhaust_manifold', <BayMesh geometry={exhaustGeometry(engine, has('exhaust_manifold', 'manifold_sport'))} />)}
                 {bolts('exhaust_manifold', vee ? [[1.1, 0.56, -0.25], [1.5, 0.56, -0.25], [1.1, 0.56, 0.25], [1.5, 0.56, 0.25]] : [[1.0, 0.5, -0.19], [1.2, 0.5, -0.19], [1.4, 0.5, -0.19], [1.6, 0.5, -0.19]], vee ? 'y' : 'z-')}
               </>
             ) : (
@@ -1508,11 +1533,11 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {/* ---------- Motorinneres: nur am Motorständer sichtbar und zugänglich ---------- */}
           {bare && (
             <>
-              {part('timing_chain', <mesh geometry={chainGeometry(engine)} material={bayMaterials()} />)}
+              {part('timing_chain', <BayMesh geometry={chainGeometry(engine)} />)}
               {(vee ? ([['camshaft', 'valve_cover', -1], ['camshaft_b', 'valve_cover_b', 1]] as const) : ([['camshaft', 'valve_cover', 0]] as const)).map(([id, cover, bank]) =>
                 !installed(cover) ? (
                   <Bank key={id} bank={bank}>
-                    {part(id, <mesh geometry={camGeometry(engine, has(id, 'camshaft_sport'))} material={bayMaterials()} position={[0, 0.712, bank * 0.105 + (bank ? 0 : -0.04)]} />)}
+                    {part(id, <BayMesh geometry={camGeometry(engine, has(id, 'camshaft_sport'))} position={[0, 0.712, bank * 0.105 + (bank ? 0 : -0.04)]} />)}
                     {bolts(id, slots.filter((c) => c.bank === bank).filter((_, i, a) => i === 0 || i === a.length - 1).flatMap((c) => [-1, 1].map((k) => [c.x + 0.05, 0.735, bank * 0.105 + (bank ? 0 : -0.04) + k * 0.06] as V3)))}
                   </Bank>
                 ) : null,
@@ -1540,17 +1565,17 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 if (installed(hg) && installed('oil_pan')) return null;
                 return (
                   <Bank key={c.n} bank={c.bank}>
-                    {part(`piston${c.n}`, <mesh geometry={pistonGeometry(has(`piston${c.n}`, 'piston_forged'))} material={bayMaterials()} position={[c.x, c.bank ? 0.638 : 0.627, c.bank * 0.105]} />)}
+                    {part(`piston${c.n}`, <BayMesh geometry={pistonGeometry(has(`piston${c.n}`, 'piston_forged'))} position={[c.x, c.bank ? 0.638 : 0.627, c.bank * 0.105]} />)}
                   </Bank>
                 );
               })}
               {!installed('oil_pan') && (
                 <>
-                  {part('oil_pump', <mesh geometry={oilPumpGeometry()} material={bayMaterials()} />)}
+                  {part('oil_pump', <BayMesh geometry={oilPumpGeometry()} />)}
                   {bolts('oil_pump', [[1.53, 0.272, 0.06], [1.6, 0.272, 0.06], [1.56, 0.272, 0.12]], 'y-')}
-                  {part('mainbrg', <mesh geometry={mainCapsGeometry(engine)} material={bayMaterials()} />)}
+                  {part('mainbrg', <BayMesh geometry={mainCapsGeometry(engine)} />)}
                   {bolts('mainbrg', mainBolts(engine).slice(0, def('mainbrg').bolts), 'y-')}
-                  {part('crank', <mesh geometry={crankGeometry(engine)} material={bayMaterials()} />)}
+                  {part('crank', <BayMesh geometry={crankGeometry(engine)} />)}
                 </>
               )}
             </>
