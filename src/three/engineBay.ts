@@ -9,7 +9,7 @@ import { mat, Mesher, type V3 } from './mesher';
 export const V_TILT = 0.2;
 export const V_PIVOT = 0.62;
 /** Neigung der Zylinderbänke: V-Motor leicht, Boxer fast waagerecht (Köpfe zeigen nach außen und etwas nach oben). */
-export const bankTilt = (e: EngineDef) => (e.layout === 'B4' ? 1.25 : V_TILT);
+export const bankTilt = (e: EngineDef) => (e.layout === 'B4' || e.layout === 'B6' ? 1.25 : V_TILT);
 
 export const BAY = { alu: 0, plastic: 1, steel: 2, rubber: 3, iron: 4, painted: 5, core: 6, yellow: 7 } as const;
 
@@ -47,7 +47,7 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
   const slots = cylinderSlots(e);
   const xs = [...new Set(slots.map((s) => s.x))];
   const seg = detail ? 14 : 8;
-  const boxer = e.layout === 'B4';
+  const boxer = e.layout === 'B4' || e.layout === 'B6';
   if (mode !== 'bare' && boxer) {
     // ---- Heckmotorraum des Boxers (wird im Auto gedreht hinter die Hinterachse gesetzt): Gebläsegehäuse, Luftführung, Motorbleche ----
     if (mode === 'car') {

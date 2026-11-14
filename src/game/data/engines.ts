@@ -5,7 +5,7 @@ import type { FluidProduct } from '../types';
 // wie das Auto fährt. Neue Motoren = neuer Eintrag hier.
 
 /** Reihe, V-Motor oder Boxer (B4: zwei liegende Zylinderbänke, links und rechts der Kurbelwelle). */
-export type EngineLayout = 'R4' | 'R6' | 'V6' | 'V8' | 'B4';
+export type EngineLayout = 'R4' | 'R6' | 'V6' | 'V8' | 'B4' | 'B6';
 export type Fuel = 'benzin' | 'diesel';
 
 export interface EngineDef {
@@ -63,6 +63,7 @@ export const ENGINES: Record<string, EngineDef> = Object.fromEntries(
     e('v8_45s', '4,5-l-V8 Mittelmotor-Charakter', 'V8', 'benzin', false, 4.5, 570, 540, 'V8-Sport', 5),
     e('v8_30k', '3,0-l-V8 (Rennsport-Klassiker)', 'V8', 'benzin', false, 3.0, 280, 290, 'V8-Klassik', 9),
     e('b4_16', '1,6-l-Boxer (luftgekühlt)', 'B4', 'benzin', false, 1.6, 75, 117, 'Boxer-Klassik', 3.5, true),
+    e('b6_36', '3,6-l-Sechszylinder-Boxer (luftgekühlt)', 'B6', 'benzin', false, 3.6, 250, 310, 'Boxer-6', 4, true),
   ].map((x) => [x.id, x]),
 );
 
@@ -78,11 +79,11 @@ export interface CylinderSlot {
 export function cylinderSlots(engine: EngineDef): CylinderSlot[] {
   if (engine.layout === 'R4') return [1.03, 1.21, 1.39, 1.57].map((x, i) => ({ n: i + 1, x, z: 0, bank: 0 }));
   if (engine.layout === 'R6') return [1.0, 1.115, 1.23, 1.345, 1.46, 1.575].map((x, i) => ({ n: i + 1, x, z: 0, bank: 0 }));
-  const xs = engine.layout === 'V6' ? [1.1, 1.3, 1.5] : engine.layout === 'B4' ? [1.12, 1.42] : [1.06, 1.22, 1.38, 1.54];
+  const xs = engine.layout === 'V6' ? [1.1, 1.3, 1.5] : engine.layout === 'B4' ? [1.12, 1.42] : engine.layout === 'B6' ? [1.05, 1.27, 1.49] : [1.06, 1.22, 1.38, 1.54];
   // Bank 1 (links, -z) trägt die Zylinder 1…n/2, Bank 2 (rechts, +z) den Rest.
   return [-1, 1].flatMap((bank, b) => xs.map((x, i) => ({ n: b * xs.length + i + 1, x, z: bank * 0.105, bank })));
 }
 
 /** Zwei Zylinderbänke (V-Motor oder Boxer): zwei Ventildeckel, zwei Köpfe usw. */
-export const isV = (engine: EngineDef) => engine.layout === 'V6' || engine.layout === 'V8' || engine.layout === 'B4';
-export const isBoxer = (engine: EngineDef) => engine.layout === 'B4';
+export const isBoxer = (engine: EngineDef) => engine.layout === 'B4' || engine.layout === 'B6';
+export const isV = (engine: EngineDef) => engine.layout === 'V6' || engine.layout === 'V8' || isBoxer(engine);

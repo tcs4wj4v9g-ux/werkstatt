@@ -14,7 +14,7 @@ import { marketLabel, RARITY_NAMES, valuate } from '../game/market';
 import { driveBlocker, isAssembled, knownDefects } from '../game/repair';
 import { useGame } from '../game/store';
 import type { CarInstance, PartId, ToolId } from '../game/types';
-import { player, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
+import { player, REAR_BAY, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
 import { AuctionsTab, EventsTab, MoveList, ShopList, UpgradesTab } from './ComputerTabs';
 import { FileModal } from './FileModal';
 import { FluidModal } from './FluidModal';
@@ -42,7 +42,8 @@ export function GarageUI() {
   const enter = (view: WorkView, bay: number) => {
     const c = useGame.getState().cars[bay];
     const spec = c ? BODY_SPECS[CAR_MODELS[c.modelId].body] : undefined;
-    player.work = workPose(view, bay, spec?.rearAxle, spec?.hoodHinge === 'front' && !(c && REAR_ENGINE.has(CAR_MODELS[c.modelId].body)), !!c && REAR_ENGINE.has(CAR_MODELS[c.modelId].body));
+    const rear = !!c && REAR_ENGINE.has(CAR_MODELS[c.modelId].body);
+    player.work = workPose(view, bay, spec?.rearAxle, spec?.hoodHinge === 'front' && !rear, rear ? spec?.bayX ?? REAR_BAY.x : undefined);
     setWork(player.work.id);
   };
   // Motor wird warm; die Arbeitsansicht endet, wenn das Auto dafür nicht mehr passt.

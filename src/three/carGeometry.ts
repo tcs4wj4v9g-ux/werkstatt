@@ -91,6 +91,8 @@ export interface BodySpec {
   lidX1?: number;
   /** Hochgezogene Kotflügel über den Rädern (Höhe am Außenrand). */
   haunch?: number;
+  /** Heckmotor: Verschiebung des gedrehten Motorraums (größer = weiter vorn; Standard REAR_BAY.x). */
+  bayX?: number;
 }
 
 /** Vorderwagen einer Karosserie (Standardwerte = gemeinsamer Vorderwagen aller bisherigen Formen). */
@@ -153,6 +155,15 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     flare: 0.012, crease: 0.6, creaseDepth: 0, blackPillars: false, pillars: [], glassRear: -0.62, rearSeat: false,
     seams: [0.78, -0.42], handles: [-0.3], cowlX: 0.84, cowlY: 0.86, hoodSlope: 0.06, hoodCurve: 0.12, hoodX0: 0.86, hoodX1: 2.0, cabinX1: 0.86, aBase: 0.62,
     dome: 0, cabinK: 0.9, roofArc: 0.03, lidX0: -1.5, lidX1: -0.86, hoodHinge: 'front', haunch: 0.07,
+  },
+  // Heckmotor-Sportcoupé der späten 80er: 4,25 m, Radstand 2,27 m, abfallende Fronthaube zwischen aufrechten Scheinwerfern,
+  // flach geneigte Scheibe, Dachlinie fällt in einem Bogen bis zum Heck, breite Hinterkotflügel, glatte Stoßfänger.
+  nine: {
+    ...BASE, tail: -1.92, nose: 2.33, width: 0.83, rearAxle: -0.89, trackF: -0.13, trackR: -0.1, roof: 1.31, x0: -1.15, x1: -0.38, x2: 0.28,
+    deck: 1.0, noseMid: 0.5, noseP: 2.4, tailMid: 0.6, tailP: 1.6, tailLen: 0.9, planP: 2.6, planPR: 3.4, ground: 0.2, tumble: 0.14, bowF: 0.05, bowR: 0.08,
+    flare: 0.035, crease: 0.6, creaseDepth: 0, blackPillars: true, pillars: [], glassRear: -0.7, rearSeat: false,
+    seams: [0.78, -0.45], handles: [-0.32], cowlX: 0.84, cowlY: 0.9, hoodSlope: 0.07, hoodCurve: 0.1, hoodX0: 0.86, hoodX1: 2.0, cabinX1: 0.86, aBase: 0.64,
+    dome: 0, cabinK: 0.9, roofArc: 0.025, lidX0: -1.84, lidX1: -1.16, hoodHinge: 'front', haunch: 0.06, bayX: 0,
   },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };

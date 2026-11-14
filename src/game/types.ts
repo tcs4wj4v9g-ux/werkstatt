@@ -129,9 +129,10 @@ export type Access = 'hood' | 'lifted' | 'stand';
 /**
  * Karosserieformen; `mono` = rundlicher Kleinstwagen in Monospace-Form (kurze, steile Haube, weit vorn liegende Scheibe),
  * `box` = kantige Stufenheck-Limousine der 80er (zweitürig, schmale Säulen, flache Haube, Frontband mit vier Rundscheinwerfern),
- * `tub` = rundliches Sportcoupé der 50er mit Heckmotor (Badewannenform, abfallendes Fließheck).
+ * `tub` = rundliches Sportcoupé der 50er mit Heckmotor (Badewannenform, abfallendes Fließheck),
+ * `nine` = Heckmotor-Sportcoupé der späten 80er (aufrechte Rundscheinwerfer, Fließheck, breite Hinterkotflügel).
  */
-export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub';
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 

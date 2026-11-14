@@ -43,7 +43,8 @@ describe('Karosserieformen', () => {
     // Haube: über dem ganzen Motor (höchstes Teil: Sicken der Motorabdeckung bis 0,88 m, von x = 0,95 bis 1,58) bleibt Luft.
     // Heckmotor: derselbe Motorraum gedreht hinter der Hinterachse und abgesenkt – dort muss der Motordeckel darüber passen.
     if (REAR_ENGINE.has(body)) {
-      for (let x = 0.95; x <= 1.58; x += 0.01) expect(S.crown(REAR_BAY.x - x), `Motordeckel über x = ${(REAR_BAY.x - x).toFixed(2)}`).toBeGreaterThan(0.88 + REAR_BAY.y);
+      const bx = B.bayX ?? REAR_BAY.x;
+      for (let x = 0.95; x <= 1.58; x += 0.01) expect(S.crown(bx - x), `Motordeckel über x = ${(bx - x).toFixed(2)}`).toBeGreaterThan(0.88 + REAR_BAY.y);
     } else for (let x = Math.max(0.95, S.F.hoodX0); x <= 1.58; x += 0.01) expect(S.crown(x), `Haube bei x = ${x.toFixed(2)}`).toBeGreaterThan(0.88);
     // Radstand und Länge in einem realistischen Bereich (Kleinstwagen kürzer)
     const wheelbase = WHEEL_X - B.rearAxle;

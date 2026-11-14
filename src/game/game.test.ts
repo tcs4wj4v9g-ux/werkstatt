@@ -936,7 +936,7 @@ describe('Großer Markt', () => {
     const by = (cls: string) => ls.filter((l) => CAR_MODELS[l.car.modelId].cls === cls);
     for (const cls of Object.keys(CLASS_TARGETS)) expect(by(cls).length, cls).toBe(CLASS_TARGETS[cls as keyof typeof CLASS_TARGETS]);
     expect(new Set(ls.map((l) => l.car.modelId)).size).toBeGreaterThanOrEqual(12);
-    expect(new Set(ls.map((l) => engineOf(l.car).layout)).size).toBe(4);
+    expect(new Set(ls.map((l) => engineOf(l.car).layout)).size).toBeGreaterThanOrEqual(4);
     for (const l of by('budget')) expect(l.asking).toBeLessThan(13000);
     for (const l of by('luxury')) expect(l.asking).toBeGreaterThan(40000);
     for (const l of by('collector')) expect(l.asking).toBeGreaterThan(100000);

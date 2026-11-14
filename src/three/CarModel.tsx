@@ -853,7 +853,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       )}
       {full && (
         <BankTilt.Provider value={bankTilt(engine)}>
-        <group position={bare ? [0, 0.95, 0] : rearEngine ? [REAR_BAY.x, REAR_BAY.y - drop, 0] : [0, -drop, 0]} rotation={[bare && car!.lifted ? Math.PI : 0, rearEngine && !bare ? Math.PI : 0, 0]}>
+        <group position={bare ? [0, 0.95, 0] : rearEngine ? [B.bayX ?? REAR_BAY.x, REAR_BAY.y - drop, 0] : [0, -drop, 0]} rotation={[bare && car!.lifted ? Math.PI : 0, rearEngine && !bare ? Math.PI : 0, 0]}>
         <group position={bare ? [-1.3, -0.55, 0] : undefined}>
           {/* Motorraum: feste Teile */}
           <group onClick={bodyTap}>
@@ -1622,10 +1622,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           return (
             <group position={[mx, my, 0]} rotation={[0, 0, ang]}>
               <mesh material={mats.dark} raycast={noRay}>
-                <boxGeometry args={[len + 0.02, 0.008, 0.34]} />
+                <boxGeometry args={[len + 0.02, 0.008, body === 'nine' ? 0.5 : 0.34]} />
               </mesh>
-              {[-7, -5, -3, -1, 1, 3, 5, 7].map((i) => (
-                <mesh key={i} position={[0, 0.008, i * 0.02]} material={mats.chrome} raycast={noRay}>
+              {(body === 'nine' ? [-11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11] : [-7, -5, -3, -1, 1, 3, 5, 7]).map((i) => (
+                <mesh key={i} position={[0, 0.008, i * 0.02]} material={body === 'nine' ? mats.trim : mats.chrome} raycast={noRay}>
                   <boxGeometry args={[len, 0.01, 0.01]} />
                 </mesh>
               ))}
