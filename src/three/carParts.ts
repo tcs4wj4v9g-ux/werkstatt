@@ -690,32 +690,37 @@ function e34Ends(m: Mesher, S: Shape, N: (n: number) => number) {
   const B = S.B;
   const disc = (dir: 1 | -1, slot: number, z: number, y: number, r: number, lift: number) => endPatch(m, slot, S, dir, z, y, r * 2, r * 2, 1, lift, N(12), N(10));
   // ---- Front ----
+  // Schwarzes Band über die ganze Breite: außen Blinker, je ein großer und ein kleinerer Rundscheinwerfer,
+  // zwischen innerem Scheinwerfer und Niere waagerechte Lamellen, in der Mitte die breite flache Doppelniere.
   const yL = 0.66;
-  // Schwarzes Band zwischen Niere und Kotflügel, darin die Scheinwerfer
+  wrapPatch(m, SLOT.gloss, S, 1, 0, 1.58, yL, 0.15, 0.25, 0.005, N(28), N(5));
   for (const s of [-1, 1] as const) {
-    const zc = s * 0.39;
-    endPatch(m, SLOT.gloss, S, 1, zc, yL, 0.42, 0.155, 0.3, 0.005, N(12), N(5));
-    endPatch(m, SLOT.lens, S, 1, zc, yL, 0.4, 0.14, 0.3, 0.007, N(12), N(5));
-    for (const z of [0.29, 0.475]) {
-      disc(1, SLOT.chrome, s * z, yL, 0.066, 0.01);
-      disc(1, SLOT.lens, s * z, yL, 0.056, 0.013);
+    // Blinker außen, um die Ecke gezogen
+    wrapPatch(m, SLOT.amber, S, 1, Math.atan2(s * 0.7, 0.9), 0.075, yL, 0.12, 0.4, 0.009, N(6), N(4));
+    for (const [z, r] of [[0.52, 0.068], [0.355, 0.058]] as const) {
+      disc(1, SLOT.chrome, s * z, yL, r, 0.01);
+      disc(1, SLOT.lens, s * z, yL, r - 0.011, 0.013);
       disc(1, SLOT.chrome, s * z, yL, 0.02, 0.016);
       disc(1, SLOT.glow, s * z, yL, 0.008, 0.019);
     }
-    // Blinker unter den Scheinwerfern, seitlich herumgezogen
-    wrapPatch(m, SLOT.amber, S, 1, Math.atan2(s * 0.7, 0.9), 0.18, 0.54, 0.035, 0.4, 0.012, N(6), 2);
+    // Lamellen zwischen Scheinwerfer und Niere
+    for (const o of [-0.04, -0.013, 0.013, 0.04]) endPatch(m, SLOT.chrome, S, 1, s * 0.205, yL + o, 0.15, 0.006, 0, 0.012, N(6), 1);
     // Nebelscheinwerfer im Stoßfänger
     disc(1, SLOT.gloss, s * 0.5, 0.39, 0.042, 0.008);
     disc(1, SLOT.lens, s * 0.5, 0.39, 0.032, 0.012);
   }
-  // Doppelniere: schmal und hoch, Chromrahmen, senkrechte Stäbe
+  // Doppelniere: breit und flach, Chromrahmen, senkrechte Stäbe
   for (const s of [-1, 1] as const) {
-    const zk = s * 0.07;
-    endPatch(m, SLOT.chrome, S, 1, zk, yL + 0.005, 0.12, 0.19, 0.6, 0.012, N(6), N(8));
-    endPatch(m, SLOT.gloss, S, 1, zk, yL + 0.005, 0.094, 0.16, 0.6, 0.016, N(6), N(8));
-    for (const o of [-0.03, -0.01, 0.01, 0.03]) endPatch(m, SLOT.chrome, S, 1, zk + o, yL + 0.005, 0.005, 0.145, 0, 0.019, 1, 3);
+    const zk = s * 0.068;
+    endPatch(m, SLOT.chrome, S, 1, zk, yL + 0.004, 0.122, 0.138, 0.55, 0.012, N(6), N(8));
+    endPatch(m, SLOT.gloss, S, 1, zk, yL + 0.004, 0.098, 0.112, 0.55, 0.016, N(6), N(8));
+    for (const o of [-0.033, -0.011, 0.011, 0.033]) endPatch(m, SLOT.chrome, S, 1, zk + o, yL + 0.004, 0.005, 0.1, 0, 0.019, 1, 3);
   }
-  roundel(m, S, N, 1, yL + 0.14, 0.035);
+  roundel(m, S, N, 1, yL + 0.13, 0.034);
+  // Unten silbergrau abgesetzt: Stoßfängerunterteil vorn und hinten, Schweller
+  wrapPatch(m, SLOT.lens, S, 1, 0, 2.2, B.ground + 0.09, 0.13, 0.25, 0.009, N(26), N(3));
+  wrapPatch(m, SLOT.lens, S, -1, 0, 2.2, B.ground + 0.1, 0.15, 0.25, 0.009, N(26), N(3));
+  for (const s of [-1, 1] as const) sideBand(m, S, SLOT.lens, s, B.rearAxle + ARCH_R + 0.04, WHEEL_X - ARCH_R - 0.04, (x) => S.bottom(x) + 0.02, (x) => S.bottom(x) + 0.12, 0.008, N(40), 2);
   // Stoßfänger in Wagenfarbe: schwarze Leiste, Kennzeichen, mittlerer Lufteinlass, schwarze Spoilerlippe
   wrapPatch(m, SLOT.dark, S, 1, 0, 2.0, 0.5, 0.04, 0.2, 0.012, N(24), 1);
   endPatch(m, SLOT.plate, S, 1, 0, 0.44, 0.48, 0.1, 0.06, 0.014, N(8), 2);

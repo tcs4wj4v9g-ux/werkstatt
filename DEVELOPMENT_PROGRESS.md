@@ -260,7 +260,8 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Maße: 4,70 m lang, Radstand 2,76 m.
   - Lange flache Haube, vorn angeschlagen wie beim E30 („Motor von oben“).
   - Leicht vorgeneigte Haifischnase, lange Kabine mit schmalen schwarzen Säulen, kurzer gerader Kofferraum.
-- **Front:** vier runde Scheinwerfer, paarweise unter Klarglas in schwarzen Gehäusen. Dazu eine schmale hohe Doppelniere mit Chromrahmen und Stäben und ein rundes blau-weißes Emblem auf der Haubenspitze. Der Stoßfänger ist in Wagenfarbe, mit schwarzer Leiste, Lufteinlass, Spoilerlippe und Nebelscheinwerfern.
+- **Front (nach Fotos des Projektinhabers überarbeitet):** schwarzes Band über die ganze Breite. Darin außen die orangen Blinker, je ein großer und ein kleinerer Rundscheinwerfer mit Chromring, waagerechte Lamellen zur Mitte und eine breite flache Doppelniere. Rundes blau-weißes Emblem auf der Haubenspitze.
+- Unten silbergrau abgesetzt: Stoßfängerunterteil vorn und hinten, Schweller. Der Stoßfänger ist in Wagenfarbe, mit schwarzer Leiste, Lufteinlass, Spoilerlippe und Nebelscheinwerfern.
 - **Heck:** breite gerippte Rückleuchten bis in die Flanke, Emblem und Kennzeichen in der Kofferraumklappe, zwei Endrohre links.
 - **Seite und Räder:** schwarze Schutzleiste an der Seite, große Turbinen-Felgen (+1 Zoll).
 - **Neuer Motor `r6_36m`:** 3,6-l-Reihensechser mit Einzeldrosselklappen, 315 PS, 360 Nm. Eigene Teilefamilie „R6-M“ (teure Teile), Motorraum wie die anderen R6.
