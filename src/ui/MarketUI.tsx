@@ -31,7 +31,7 @@ function AuctionView() {
       <div className="tabs">
         {s.auctions.map((x, i) => (
           <button key={x.id} className={`btn tab ${i === s.selected ? 'active' : ''}`} onClick={() => s.selectListing(i)}>
-            {CAR_MODELS[x.car.modelId].name.replace('Bavaria ', '')}
+            {CAR_MODELS[x.car.modelId].name.replace('BMV ', '')}
             <small>{x.result ? 'beendet' : eur(x.current)}</small>
           </button>
         ))}

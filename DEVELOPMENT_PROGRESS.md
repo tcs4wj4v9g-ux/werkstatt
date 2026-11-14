@@ -101,7 +101,7 @@ Supabase-Projekt anlegen, `supabase/schema.sql` ausführen, anonyme Anmeldung ei
 
 Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Tiefgaragen erst nach den Fahrzeugen.
 
-## Fahrzeug 1: Renard Twingle 1.2 (an den Renault Twingo I angelehnt) – freigegeben
+## Fahrzeug 1: Renolt Twingo 1.2 (an den Renault Twingo I angelehnt) – freigegeben
 
 - Neue Karosserieform `mono`: 3,47 m, Radstand 2,35 m, schmale Spur, kurze gewölbte Haube, flach geneigte lange Windschutzscheibe weit vorn, gewölbtes Dach, steile Heckklappe, kastiges Heck.
 - Vorderwagen je Karosserie einstellbar (`cowlX/Y`, `hoodSlope`, `hoodCurve`, `hoodX0/1`, `cabinX1`, `aBase`, `dome`, `cabinK`, `roofArc`, `planPR`); alle bisherigen Formen unverändert (Standardwerte).
@@ -111,7 +111,7 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests, alle Browser-Durchläufe; am Kleinwagen Radschrauben vorn/hinten und Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Raddurchmesser ist bei allen Autos gleich (für einen Kleinwagen eher groß); Lider sind feste Anbauteile und öffnen nicht mit der Haube.
 
-## Fahrzeug 2: Bavaria 323i Zweitürer (an den BMW E30 angelehnt) – freigegeben
+## Fahrzeug 2: BMV 323i (E30) (an den BMW E30 angelehnt) – freigegeben
 
 - Neue Karosserieform `box`: 4,33 m, Radstand 2,57 m, flache leicht abfallende Haube, stumpfe Front, steile Scheiben, schmale Säulen mit B-Säule, kurzer flacher Kofferraum, scharfe Seitenkante, eckige Draufsicht.
 - Front: glänzend schwarzes Frontband mit vier runden Scheinwerfern, schmale Doppelniere mit Chromrahmen und Stäben, schwarzer Stoßfänger mit Chromleiste, Blinker im Stoßfänger, Nebelscheinwerfer im Spoiler.
@@ -121,7 +121,7 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Motorhaube vorn angeschlagen (öffnet von hinten nach vorn, wie beim Vorbild); Arbeitsansicht „Motor von oben“ statt „von vorn“.
 - Grenzen: kein Knick an der hinteren Fensterkante (die Seitenscheibe endet gerade); Front steht senkrecht statt leicht nach vorn geneigt.
 
-## Fahrzeug 3: Zuffen 365 Coupé (an den Porsche 356 angelehnt) – freigegeben
+## Fahrzeug 3: Porshe 356 Coupé (an den Porsche 356 angelehnt) – freigegeben
 
 - Neue Motorbauart **Boxer** (`B4`): zwei fast waagerecht liegende Zylinderbänke (Neigung je Motor, `bankTilt`), verrippte Zylinder, flaches Kurbelgehäuse, Gebläsegehäuse; eigener Klang. Alle Bauteile wie beim V-Motor je Bank (Ventildeckel, Köpfe, Spulen, Kolben).
 - **Luftgekühlt** (`air`): keine Wasserpumpe, kein Thermostat, kein Kühlmittelschlauch; Kühlmittel wird weder angezeigt noch geprüft.
@@ -132,7 +132,7 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests (Boxer am Ständer zerlegen/zusammenbauen, Umbauregeln, Freiraum unter dem Motordeckel), alle Browser-Durchläufe; am Heckmotor die Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Der Heckmotor nutzt den gemeinsamen Motorraum (Batterie und Bremsflüssigkeitsbehälter sitzen mit im Heck, Motorabdeckung wie bei den anderen Motoren); die Zündspulen liegen seitlich an den Zylinderköpfen und sind im Auto nur aus den Seitenansichten gut erreichbar.
 
-## Fahrzeug 4: Zuffen 946 Coupé (an den Porsche 964 angelehnt) – freigegeben
+## Fahrzeug 4: Porshe 911 Carrera (964) (an den Porsche 964 angelehnt) – freigegeben
 
 - Neue Motorbauart **Sechszylinder-Boxer** (`B6`, 3,6 l, 250 PS, luftgekühlt) mit eigenem Klang; Teilefamilie „Boxer-6“.
 - Neue Form `nine`: 4,25 m, Radstand 2,27 m, abfallende Fronthaube zwischen aufrechten ovalen Scheinwerfern, Dachlinie in einem Bogen bis zum Heck, ansteigende Gürtellinie, breite Hinterkotflügel, glatte Stoßfänger in Wagenfarbe mit schwarzer Gummileiste.
@@ -142,7 +142,7 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests, alle Browser-Durchläufe; am Sechszylinder-Heckmotor die Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Spoiler ist nicht ausfahrbar; Instrumente innen wie bei den anderen Autos (zwei Rundinstrumente statt fünf).
 
-## Fahrzeug 5: Zuffen 929 Coupé (an den Porsche 992 angelehnt) – freigegeben
+## Fahrzeug 5: Porshe 911 Carrera (992) (an den Porsche 992 angelehnt) – freigegeben
 
 - Neuer Motor: 3,0-l-Sechszylinder-Boxer Biturbo (385 PS, wassergekühlt): mit Kühlkreislauf und Turbolader; der Boxer zeigt bei Wasserkühlung glatte Zylinder statt Kühlrippen und kein Gebläsegehäuse.
 - Neue Form `nine2`: 4,52 m, Radstand 2,45 m, 1,80 m breit, kräftige Hinterkotflügel, Motor noch etwas weiter hinten (`bayX`).
@@ -150,7 +150,7 @@ Ablauf mit verpflichtender Freigabe je Fahrzeug („Fahrzeug freigegeben“). Ti
 - Geprüft: Logiktests, alle Browser-Durchläufe; am Biturbo-Heckmotor die Motorabdeckung im Bild angetippt. Kein echter iPad-Test.
 - Grenzen: Spoiler fährt nicht aus; Kühler sitzen nicht wie beim Vorbild vorn, sondern gehören mit zum Heckmotorraum.
 
-## Fahrzeug 6: Ingol TC Coupé 1.8T (an den Audi TT der ersten Generation angelehnt) – wartet auf Freigabe
+## Fahrzeug 6: Audy TT Coupé 1.8T (8N) (an den Audi TT der ersten Generation angelehnt) – wartet auf Freigabe
 
 Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplante Reihenfolge, je mit Freigabe: Audi TT, Audi Ur-quattro, VW Golf 4, Mercedes W124, BMW E36, BMW E46, Audi 80/90, Porsche 944, BMW E90, BMW F30, Porsche 997.
 
@@ -158,3 +158,8 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Front: breiter Trapezgrill mit Chromrahmen, Querstreben und rundem Emblem (kein Original-Logo), Scheinwerfer mit je zwei runden Projektoren, Nebelscheinwerfer in seitlichen Einlässen. Heck: waagerechte ovale Leuchten, Abrisslippe, zwei Endrohre, runder Alu-Tankdeckel mit Schrauben rechts hinten. Leder in Cognac.
 - Neuer Motor: 1,8-l-Vierzylinder-Turbo (180 PS, Teilefamilie „R4-Turbo“), Frontmotor mit allen Reparaturen.
 - Geprüft: Logiktests, Browser-Durchläufe Markt und Bremse. Kein echter iPad-Test.
+
+## Namen und Embleme
+
+- Nachgebildete Autos tragen leicht abgewandelte Originalnamen (privates Spiel): Renolt Twingo, BMV 323i (E30), Porshe 356, Porshe 911 Carrera (964/992), Audy TT (8N); alle bisherigen Bavaria-Modelle heißen BMV. Modellkennungen bleiben gleich – Spielstände sind nicht betroffen.
+- Audy TT: Emblem aus drei verschlungenen Chromringen vorn und hinten.

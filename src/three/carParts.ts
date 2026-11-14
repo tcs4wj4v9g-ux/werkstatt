@@ -39,7 +39,7 @@ export interface CarLook {
 
 export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: EngineDef, visual?: VisualTune): CarLook {
   const cls = model?.cls ?? 'budget';
-  const brand = model?.brand ?? 'Bavaria';
+  const brand = model?.brand ?? 'BMV';
   const classic = body === 'classic';
   const sport = body === 'sport';
   const lux = cls === 'luxury' || body === 'luxury';
@@ -50,12 +50,12 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const nine2 = body === 'nine2';
   const tt = body === 'tt';
   return {
-    rim: tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'Bavaria' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
-    // Bavaria: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
-    grille: sport ? 'slot' : classic ? 'classic' : brand === 'Bavaria' ? 'twin' : lux ? 'tall' : 'wide',
-    lamps: classic ? 'round' : sport ? 'slim' : brand === 'Bavaria' ? 'twin' : 'block',
+    rim: tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'BMV' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    // BMV: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
+    grille: sport ? 'slot' : classic ? 'classic' : brand === 'BMV' ? 'twin' : lux ? 'tall' : 'wide',
+    lamps: classic ? 'round' : sport ? 'slim' : brand === 'BMV' ? 'twin' : 'block',
     chromeBumper: classic,
-    blackBumper: cls === 'budget' && brand !== 'Bavaria',
+    blackBumper: cls === 'budget' && brand !== 'BMV',
     chromeTrim: classic || lux || box || tub || tt,
     spoiler: sport || model?.id === 'bavaria_340_ms',
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
@@ -535,8 +535,16 @@ function ttEnds(m: Mesher, S: Shape, N: (n: number) => number) {
       endPatch(m, SLOT.gloss, S, 1, 0, y, w, 0.26 / n + 0.002, 0.2, 0.01, N(12), 1);
     }
     for (const o of [0.47, 0.53, 0.59, 0.65]) endPatch(m, SLOT.chrome, S, 1, 0, o, 0.58 - (o - 0.42) * 0.46, 0.006, 0, 0.013, N(10), 1);
-    disc(1, SLOT.chrome, 0, 0.6, 0.036, 0.016);
   }
+  // Emblem: drei verschlungene Chromringe vorn auf dem Grill und hinten auf der Klappe
+  const rings = (dir: 1 | -1, y: number) => {
+    for (const k of [-1, 0, 1]) {
+      const z = k * 0.045;
+      const x = S.endX(dir, y, z) + dir * 0.022;
+      m.add(SLOT.chrome, new THREE.TorusGeometry(0.03, 0.0055, 6, N(20)), mat([x, y, z], [0, Math.PI / 2, 0]));
+    }
+  };
+  rings(1, 0.6);
   // Unterer Einlass, Kennzeichen, Spoilerlippe
   endPatch(m, SLOT.plate, S, 1, 0, 0.46, 0.44, 0.09, 0.06, 0.02, N(8), 2);
   wrapPatch(m, SLOT.gloss, S, 1, 0, 1.6, B.ground + 0.04, 0.05, 0.4, 0.012, N(16), 2);
@@ -552,7 +560,7 @@ function ttEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   // Heckklappe: Abrisslippe, Emblem, Kennzeichen im Stoßfänger, Diffusor, zwei Endrohre
   const xl = B.tail + B.tailLen * 0.4;
   m.rbox(SLOT.solid, [0.12, 0.025, B.width * 1.3], 0.012, [xl, S.crown(xl) + 0.012, 0], [0, 0, 0.25]);
-  disc(-1, SLOT.chrome, 0, 0.8, 0.03, 0.012);
+  rings(-1, 0.8);
   endPatch(m, SLOT.dark, S, -1, 0, 0.55, 0.5, 0.13, 0.25, 0.006, N(8), 3);
   endPatch(m, SLOT.plate, S, -1, 0, 0.55, 0.44, 0.095, 0.06, 0.01, N(8), 2);
   wrapPatch(m, SLOT.gloss, S, -1, 0, 1.6, B.ground + 0.1, 0.11, 0.4, 0.008, N(16), 3);

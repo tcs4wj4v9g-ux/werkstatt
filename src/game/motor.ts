@@ -28,7 +28,7 @@ export interface UsedPart {
   known: boolean;
   health?: number;
   km: number;
-  /** Herkunft, z. B. „Bavaria 330 Limousine (Schrottplatz)“. */
+  /** Herkunft, z. B. „BMV 330 Limousine (Schrottplatz)“. */
   from: string;
   /** Was dafür bezahlt wurde. */
   price: number;
