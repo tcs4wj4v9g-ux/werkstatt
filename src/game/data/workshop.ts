@@ -1,7 +1,7 @@
 // Stellplätze und Ausbaustufen der Werkstatt. Positionen in Weltkoordinaten
 // (Halle: x von -4,8 bis 6,4; der Hof liegt davor in Richtung -x).
 
-export type SlotKind = 'lift' | 'wash' | 'paint' | 'park' | 'show' | 'stand' | 'junk';
+export type SlotKind = 'lift' | 'wash' | 'paint' | 'park' | 'show' | 'stand' | 'junk' | 'garage';
 export interface SlotDef {
   id: number;
   kind: SlotKind;
@@ -12,9 +12,71 @@ export interface SlotDef {
   rot: number;
   /** Ausbau, der diesen Platz freischaltet; ohne Angabe von Anfang an da. */
   needs?: UpgradeId;
+  /** Ort, an dem der Platz liegt (ohne Angabe: Werkstatt mit Hof). */
+  place?: string;
 }
 
-export type UpgradeId = 'parking' | 'wash' | 'paint' | 'expansion' | 'hoist' | 'dyno' | 'loc_pro' | 'loc_center' | 'loc_hq';
+export type GarageId = 'tg_klein' | 'tg_mittel' | 'tg_gross' | 'tg_luxus';
+export type UpgradeId = 'parking' | 'wash' | 'paint' | 'expansion' | 'hoist' | 'dyno' | 'loc_pro' | 'loc_center' | 'loc_hq' | GarageId;
+
+// ---------------------------------------------------------------- Tiefgaragen
+// Vier kaufbare, begehbare Tiefgaragen als Fahrzeuglager und private Sammlung. Jede ist ein eigener Ort
+// (Einfahrt über die Rampe am Hofrand) mit eigenem Koordinatenbereich, damit sich nichts überschneidet.
+export interface GarageDef {
+  id: GarageId;
+  name: string;
+  slots: number;
+  price: number;
+  /** Nullpunkt in Weltkoordinaten (Fuß der Rampe, Mitte der ersten Fahrgasse). */
+  ox: number;
+}
+export const GARAGES: GarageDef[] = [
+  { id: 'tg_klein', name: 'Tiefgarage Klein', slots: 6, price: 25000, ox: 200 },
+  { id: 'tg_mittel', name: 'Tiefgarage Mittel', slots: 15, price: 65000, ox: 350 },
+  { id: 'tg_gross', name: 'Tiefgarage Groß', slots: 30, price: 150000, ox: 500 },
+  { id: 'tg_luxus', name: 'Tiefgarage Luxus', slots: 50, price: 350000, ox: 650 },
+];
+export const GARAGE_MAP = Object.fromEntries(GARAGES.map((g) => [g.id, g])) as Record<GarageId, GarageDef>;
+/** Maße einer Parkbucht (Breite längs der Fahrgasse, Tiefe), Breite der Fahrgasse, Abstand der ersten Bucht vom Rampenfuß. */
+export const BAY = { w: 2.7, depth: 5.4, aisle: 6.4, x0: 2.2 };
+export interface GarageRow {
+  /** Mitte der Buchtenreihe (z). */
+  z: number;
+  /** Drehung der Autos: Front von der Fahrgasse weg. */
+  rot: number;
+  count: number;
+}
+/** Aufteilung: bis 15 Plätze eine Fahrgasse mit zwei Reihen, darüber zwei Fahrgassen mit vier Reihen. */
+export function garageLayout(g: GarageDef) {
+  const R = Math.PI / 2;
+  const half = BAY.aisle / 2 + BAY.depth / 2;
+  const zs = g.slots <= 15 ? [[-half, R], [half, -R]] : [[-half, R], [half, -R], [half + BAY.depth, R], [2 * half + BAY.depth + half, -R]];
+  const per = Math.ceil(g.slots / zs.length);
+  let left = g.slots;
+  const rows: GarageRow[] = zs.map(([z, rot], i) => {
+    const count = Math.min(left, Math.ceil(left / (zs.length - i)));
+    left -= count;
+    return { z, rot, count };
+  });
+  const aisles = zs.length === 2 ? [0] : [0, 2 * half + BAY.depth];
+  const length = BAY.x0 + per * BAY.w + 1.2;
+  const bounds = { minX: g.ox - 1.8, maxX: g.ox + length, minZ: rows[0].z - BAY.depth / 2, maxZ: rows[rows.length - 1].z + BAY.depth / 2 };
+  return { rows, aisles, per, length, bounds };
+}
+function garageSlots(first: number): SlotDef[] {
+  const out: SlotDef[] = [];
+  for (const g of GARAGES) {
+    const { rows } = garageLayout(g);
+    let n = 0;
+    for (const row of rows) {
+      for (let i = 0; i < row.count; i++) {
+        n++;
+        out.push({ id: first + out.length, kind: 'garage', label: `${g.name} · Platz ${n}`, x: g.ox + BAY.x0 + BAY.w / 2 + i * BAY.w, z: row.z, rot: row.rot, needs: g.id, place: g.id });
+      }
+    }
+  }
+  return out;
+}
 
 const R = Math.PI / 2;
 export const SLOTS: SlotDef[] = [
@@ -44,6 +106,14 @@ export const SLOTS: SlotDef[] = [
   { id: 20, kind: 'junk', label: 'Schrottplatz Reihe B2', x: -65, z: 5.5, rot: -R },
   { id: 21, kind: 'junk', label: 'Schrottplatz Reihe B3', x: -70, z: 5.5, rot: -R },
 ];
+for (const s of SLOTS) if (s.kind === 'junk') s.place = 'schrott';
+// Tiefgaragen ab Platz 22: 6 + 15 + 30 + 50 Stellplätze
+SLOTS.push(...garageSlots(SLOTS.length));
+/** Ort eines Stellplatzes: Werkstatt, Schrottplatz oder eine Tiefgarage. */
+export const slotPlace = (slot: number) => SLOTS[slot]?.place ?? 'werkstatt';
+export const isGarage = (slot: number) => SLOTS[slot]?.kind === 'garage';
+/** Garage, zu der ein Platz gehört. */
+export const garageOf = (slot: number) => (isGarage(slot) ? GARAGE_MAP[SLOTS[slot].place as GarageId] : null);
 export const SLOT_COUNT = SLOTS.length;
 export const isLift = (slot: number) => SLOTS[slot]?.kind === 'lift';
 /** Platz für eigene Fahrzeuge (nicht Motorständer, nicht Schrottplatz). */
@@ -67,6 +137,8 @@ export interface UpgradeDef {
   location?: boolean;
   /** Was mit diesem Kauf ohne Aufpreis dazukommt. */
   grants?: UpgradeId[];
+  /** Tiefgarage (Fahrzeuglager). */
+  garage?: boolean;
 }
 
 export const UPGRADES: UpgradeDef[] = [
@@ -79,6 +151,14 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'loc_pro', stage: 6, location: true, name: 'Profi-Werkstatt (Halle 2)', price: 75000, desc: 'Anbau mit dritter Hebebühne – drei Autos gleichzeitig in Arbeit. Durchgang von der Stammhalle.', requires: 'expansion' },
   { id: 'loc_center', stage: 7, location: true, name: 'Performance-Center', price: 200000, desc: 'Halle 2 wird verlängert: vierte Hebebühne. Leistungsprüfstand, Waschplatz und Lackierkabine sind im Preis enthalten.', requires: 'loc_pro', grants: ['wash', 'paint', 'dyno'] },
   { id: 'loc_hq', stage: 8, location: true, name: 'Headquarters mit Showroom', price: 500000, desc: 'Verglaster Showroom mit drei Ausstellungsplätzen. Ausgestellte Autos verkaufen sich 4 % teurer und bringen der Sammlung mehr Ansehen.', requires: 'loc_center' },
+  ...GARAGES.map((g): UpgradeDef => ({
+    id: g.id,
+    stage: 0,
+    garage: true,
+    name: g.name,
+    price: g.price,
+    desc: `Begehbare Tiefgarage mit ${g.slots} Stellplätzen: Rampe am Hofrand, Beleuchtung, nummerierte Buchten. Lager und private Sammlung – jedes Auto lässt sich jederzeit wieder herausholen.`,
+  })),
 ];
 
 export const slotAvailable = (slot: SlotDef, upgrades: string[]) => !slot.needs || upgrades.includes(slot.needs);

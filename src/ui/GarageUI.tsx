@@ -15,7 +15,7 @@ import { driveBlocker, isAssembled, knownDefects } from '../game/repair';
 import { useGame } from '../game/store';
 import type { CarInstance, PartId, ToolId } from '../game/types';
 import { player, REAR_BAY, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
-import { AuctionsTab, EventsTab, MoveList, ShopList, UpgradesTab } from './ComputerTabs';
+import { AuctionsTab, EventsTab, GarageList, MoveList, ShopList, UpgradesTab } from './ComputerTabs';
 import { FileModal } from './FileModal';
 import { FluidModal } from './FluidModal';
 import { JobsTab } from './JobsTab';
@@ -259,6 +259,11 @@ export function GarageUI() {
       {s.panel === 'obd' && <ObdModal />}
       {s.panel === 'file' && <FileModal />}
       {s.panel === 'fluids' && <FluidModal />}
+      {s.panel === 'garages' && (
+        <Modal title="Tiefgaragen" onClose={() => s.setPanel(null)}>
+          <GarageList />
+        </Modal>
+      )}
       {s.panel === 'move' && (
         <Modal title="Auto umparken" onClose={() => s.setPanel(null)}>
           <MoveList from={s.panelBay} />
@@ -410,7 +415,7 @@ function ObdModal() {
 function ComputerModal() {
   const s = useGame();
   const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'contests' | 'news'>('market');
-  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
+  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage').length;
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
     <Modal title="Werkstatt-Computer" onClose={() => s.setPanel(null)} wide>

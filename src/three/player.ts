@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SLOTS } from '../game/data/workshop';
+import { BAY, GARAGE_MAP, GARAGES, garageLayout, SLOTS, type GarageId } from '../game/data/workshop';
 
 // Zustand des Spielers in der begehbaren Werkstatt. Liegt bewusst außerhalb
 // von React: Position und Blick ändern sich jeden Frame.
@@ -15,17 +15,39 @@ export const hall2 = (center: boolean) => ({ minX: ROOM.minX, maxX: ROOM.maxX, m
 export const SHOWROOM = { minX: ROOM.minX, maxX: ROOM.maxX, minZ: ROOM.maxZ, maxZ: 14.6 };
 /** Schrottplatz: eigener Ort, mit dem Lieferwagen erreichbar. */
 export const JUNK = { minX: -78, maxX: -51, minZ: -12, maxZ: 12 };
-export type Place = 'werkstatt' | 'schrott';
+export type Place = 'werkstatt' | 'schrott' | GarageId;
+export const isGaragePlace = (p: string): p is GarageId => p in GARAGE_MAP;
 /** Wo sich der Spieler gerade befindet (Werkstatt mit Hof oder Schrottplatz). */
 export const place = { at: 'werkstatt' as Place };
 export const usePlace = create<{ at: Place }>(() => ({ at: 'werkstatt' }));
 /** Hindernisse auf dem Schrottplatz (Büro, Regale, Container, Kran). */
 export const JUNK_BOXES: Box[] = [];
+/** Tor zur Tiefgaragen-Rampe am linken Hofrand. */
+export const RAMP_GATE = { x: -22.5, z: -6.65 };
+/** Säulen in den Tiefgaragen (Hindernisse). */
+export const GARAGE_BOXES: Record<string, Box[]> = Object.fromEntries(
+  GARAGES.map((g) => {
+    const { rows, per } = garageLayout(g);
+    const out: Box[] = [];
+    for (const row of rows) {
+      // Säule an der Rückseite der Bucht, alle drei Buchten
+      const back = row.z + (row.rot > 0 ? -1 : 1) * (BAY.depth / 2 - 0.25);
+      for (let i = 0; i <= per; i += 3) {
+        const x = g.ox + BAY.x0 + i * BAY.w;
+        out.push({ minX: x - 0.2, maxX: x + 0.2, minZ: back - 0.2, maxZ: back + 0.2 });
+      }
+    }
+    return [g.id, out];
+  }),
+);
 export function travel(to: Place) {
+  const from = place.at;
   place.at = to;
   usePlace.setState({ at: to });
   player.work = null;
   if (to === 'schrott') Object.assign(player, { x: -53.2, z: 0, yaw: Math.PI / 2, pitch: -0.1 });
+  else if (isGaragePlace(to)) Object.assign(player, { x: GARAGE_MAP[to].ox - 0.6, z: 0, yaw: -Math.PI / 2, pitch: -0.05 });
+  else if (from && isGaragePlace(from)) Object.assign(player, { x: RAMP_GATE.x + 0.3, z: RAMP_GATE.z, yaw: -Math.PI / 2, pitch: -0.1 });
   else Object.assign(player, { x: -19.5, z: 2.2, yaw: -Math.PI / 2, pitch: -0.1 });
 }
 /** Welche Gebäudeteile es gibt – wird aus den gekauften Standorten gesetzt. */
@@ -177,6 +199,10 @@ const hits = (x: number, z: number, b: Box) => x > b.minX - RADIUS && x < b.maxX
 
 /** Darf man hier stehen? Halle, Hof oder eines der beiden offenen Tore. */
 function inBounds(x: number, z: number) {
+  if (isGaragePlace(place.at)) {
+    const b = garageLayout(GARAGE_MAP[place.at]).bounds;
+    return x > b.minX + RADIUS && x < b.maxX - RADIUS && z > b.minZ + RADIUS && z < b.maxZ - RADIUS;
+  }
   if (place.at === 'schrott') return x > JUNK.minX + RADIUS && x < JUNK.maxX - RADIUS && z > JUNK.minZ + RADIUS && z < JUNK.maxZ - RADIUS;
   const inRoom = x > ROOM.minX + RADIUS && x < ROOM.maxX - RADIUS && z > ROOM.minZ + RADIUS && z < ROOM.maxZ - RADIUS;
   const inYard = x > YARD.minX + RADIUS && x < YARD.maxX - RADIUS && z > YARD.minZ + RADIUS && z < YARD.maxZ - RADIUS;
@@ -198,7 +224,7 @@ function inBounds(x: number, z: number) {
 
 /** Bewegt den Spieler und lässt ihn an Wänden und Hindernissen entlanggleiten. */
 export function movePlayer(dx: number, dz: number, dynamic: Box[]) {
-  const boxes = place.at === 'schrott' ? [...JUNK_BOXES, ...dynamic] : [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
+  const boxes = isGaragePlace(place.at) ? [...GARAGE_BOXES[place.at], ...dynamic] : place.at === 'schrott' ? [...JUNK_BOXES, ...dynamic] : [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
   const free = (x: number, z: number) => inBounds(x, z) && !boxes.some((b) => hits(x, z, b));
   // Steckt der Spieler (z. B. nach dem Ablassen der Bühne) in einem Hindernis, darf er heraus.
   const stuck = inBounds(player.x, player.z) && boxes.some((b) => hits(player.x, player.z, b));

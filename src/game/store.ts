@@ -32,7 +32,7 @@ export const START_MONEY = 6000;
 const noSlots = (): boolean[] => Array(SLOT_COUNT).fill(false);
 /** Sekunden, bis der Motor im Stand warm ist. */
 export const WARM_AFTER = 9;
-export type Panel = 'crane' | 'engines' | 'junk' | 'tuning' | 'enginetest' | 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | null;
+export type Panel = 'crane' | 'engines' | 'junk' | 'tuning' | 'enginetest' | 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | 'garages' | null;
 
 interface Toast {
   id: number;
