@@ -175,10 +175,18 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Nebenbei korrigiert: Die Akte nannte Boxermotoren „V-Motor“ – jetzt „Boxer“.
 - Geprüft: Logiktests, Browser-Durchlauf Bremse (inkl. Fünfzylinder: fünf Spulen, Motorabdeckung im Bild angetippt). Kein echter iPad-Test.
 
-## Fahrzeug 8: Audy A4 1.8T (B5) (an den Audi A4 B5 Limousine angelehnt) – wartet auf Freigabe
+## Fahrzeug 8: Audy A4 1.8T (B5) (an den Audi A4 B5 Limousine angelehnt) – freigegeben
 
 - Neue Form `b5`: viertürige Limousine, 4,48 m, Radstand 2,62 m, runde Front, sanft gewölbte Haube, schwarze B-Säulen, Fondsitzbank, kurzer Kofferraum mit runder Heckkante.
 - Front: Chromrahmen-Grill mit vier Lamellen und drei Ringen, Klarglas-Scheinwerfer mit zwei Reflektoren und Blinker, Nebelscheinwerfer im Stoßfänger. Heck: breite Rückleuchten, Chromleiste, Ringe, Kennzeichen in der Kofferraummulde, schwarze Stoßfängerleisten, ein Endrohr links. Silberne Speichenfelgen.
 - Neuer Motor `r4t_18l`: 1,8-l-Turbo-Vierzylinder mit 150 PS (Teilefamilie R4-Turbo, wie im TT), Frontmotor, Haube hinten angeschlagen.
 - Günstiger Alltagswagen (ab ca. 4.200 €), Farben Schwarz, Silber, Dunkelblau, Dunkelrot, Dunkelgrün.
 - Geprüft: Logiktests, Browser-Durchläufe Bremse und Markt. Kein echter iPad-Test.
+
+## Kleine Wünsche nach Fahrzeug 8
+
+- **Gerissener Motorblock:** Läuft ein Motor trotz Öldruckwarnung rund 15 Sekunden ohne Öl weiter, reißt ein Pleuel ab und schlägt durch den Block. Auch extremes Drehmoment-Tuning kann das auslösen, und Schrottautos mit „Motorschaden gemeldet“ haben meist einen gerissenen Block. Ein solcher Motor startet nicht mehr und ist nicht reparabel. Die Akte, das Motorlager und der Schrottplatz zeigen das an. Der Motor ist nur noch Teileträger (Schrottwert), und das Auto verliert beim Verkauf 45 %. Abhilfe ist ein Motortausch.
+- **Austauschmotor:** Im Werkstatt-Computer → Teile → Umbau gibt es jetzt fabrikneue Motoren (Original- bzw. eingebauter Motor, 0 km, ohne Öl). Sie werden ins Motorlager geliefert und sind deutlich teurer als ein Motor vom Schrottplatz.
+- **Hebebühne am Schrottplatz:** Jedes Spenderauto lässt sich mit mobilen Säulenhebern anheben („▲ Auf die Hebebühne“). Dann gibt es dort die Rad- und Unterbodenansichten, Räder, Bremsen, Hosenrohr, Kraftstoffpumpe usw. lassen sich ausbauen. Abgelassen wird auch ohne Räder.
+- **Fehlende Teile an gekauften Schrottautos:** Teile, die schon am Schrottplatz fehlten, zeigen jetzt den grünen Platzhalter und lassen sich mit Neu- oder Gebrauchtteil einbauen.
+- Geprüft: Logiktests (inkl. neuer Tests für Blockriss, Motortausch und fehlende Teile), Browser-Durchlauf Schrott mit neuen Schritten (Blockriss, Austauschmotor, Hebebühne mit Radansicht und Ausbau von unten, Platzhalter). Kein echter iPad-Test.

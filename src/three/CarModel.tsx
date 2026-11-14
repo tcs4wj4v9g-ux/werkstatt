@@ -567,9 +567,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const part = (id: string, children: ReactNode) => {
     const s = st(id);
     // Teil gibt es hier nicht (Motorständer ohne Fahrzeugteile, Auto ohne Motor) oder es fehlt am Schrottauto ganz.
-    if (car && (!s || s.missing)) return null;
+    // Am gekauften Schrottauto fehlt es zwar auch, aber dort erscheint der grüne Platzhalter zum Einbau eines Ersatzteils.
+    if (car && (!s || (s.missing && car.junk))) return null;
     const name = car?.junk && def(id).partId && s?.installed ? `${def(id).name} – ${junkPartPrice(car, id)} €` : def(id).name;
-    const isIn = !s || s.installed;
+    const isIn = !s || (s.installed && !s.missing);
     const defect = !!s && s.known && s.condition === 'defect';
     const live = interactive && isIn && removable(car!, id) && toolFitsPart(id) ? id : undefined;
     const real = (

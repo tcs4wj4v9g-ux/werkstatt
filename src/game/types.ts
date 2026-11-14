@@ -210,6 +210,8 @@ export interface MotorMeta {
   donor: string;
   /** Turbo-Nachrüstsatz montiert (Saugmotor bekommt Turbolader und Ladeluftrohr). */
   turboKit?: boolean;
+  /** Motorblock gerissen: nicht reparabel – der Motor muss getauscht werden (Austauschmotor oder Schrottplatz). */
+  cracked?: boolean;
   history: string[];
 }
 

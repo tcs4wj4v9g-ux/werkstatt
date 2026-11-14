@@ -7,6 +7,7 @@ Echte Tipps im laufenden Spiel (Playwright, Chromium mit Software-Grafik). Vorau
 | `diagnose` | Markt, Verhandlung, Symptome, OBD, Schrauben/Stecker, Probefahrt, Verkauf, Kundenauftrag | Diagnose, Reparaturlogik, Verhandlung, Aufträge |
 | `mechanik` | Ansaugschlauch, Kettenspanner, Hydrostößel, Pleuellager; Übernahme eines Version-2-Spielstands | Bauteile, 3D-Motorraum, Spielstand |
 | `werkstatt` | Flüssigkeiten, Ölwechsel, Hof, Waschen, Polieren, Lack, Auktionen, Scheunenfund, Ereignisse | Flüssigkeiten, Hof, Aufbereitung, Auktionen |
+| `schrott` | Schrottplatz: Ausbau und Kauf, Motor ausbauen, Motorständer, Umbau, Turbo, Prüfstand, Optik, Ölschäden, Blockriss und Austauschmotor, Hebebühne am Schrottplatz, Platzhalter für fehlende Teile, alter Spielstand | Schrottplatz, Motoren, Motorständer, Flüssigkeiten |
 | `bremse` | Entlüfternippel | Bremsen, Radbereich |
 | `motoren` | R6, V8, Diesel, Turbo: Zylinderteile, Passform, Klangbild | Motoren, Teile, 3D-Motorraum |
 | `markt` | 25 Inserate, Filter, Blättern, Teileshop je Auto, Akte, Karosserie-Bilder | Markt, Shop, Karosserien |

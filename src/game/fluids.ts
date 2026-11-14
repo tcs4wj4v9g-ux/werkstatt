@@ -173,15 +173,21 @@ export function serviceState(car: CarInstance): ServiceState {
 /** Ab wann ein laufender Motor ohne Öl bzw. mit falschem Öl Schaden nimmt (Millisekunden). */
 export const DRY_RUN_MS = 4000;
 export const WRONG_OIL_MS = 15000;
+/** Läuft der Motor so lange ohne Öl, reißt der Block. */
+export const CRACK_MS = 15000;
 /**
  * Schaden durch Öl: Ohne Öl reißt nach wenigen Sekunden der Schmierfilm – Pleuellager, Hauptlager und Nockenwelle fressen.
  * Mit falschem Öl (andere Viskosität oder Gemisch) laufen die Hydrostößel trocken und klappern.
  * Gibt nur Bauteile zurück, die noch nicht defekt sind.
  */
-export function oilHarm(car: CarInstance, runningMs: number): { ids: string[]; text: string } | null {
+export function oilHarm(car: CarInstance, runningMs: number): { ids: string[]; text: string; crack?: boolean } | null {
   const ok = (id: string) => car.components[id] && car.components[id].condition !== 'defect';
   if (fill(car, 'oil') < 0.1) {
     if (runningMs < DRY_RUN_MS) return null;
+    // Wer trotz Warnung weiterlaufen lässt: Ein Pleuel reißt ab und schlägt durch den Block.
+    if (runningMs >= CRACK_MS && !car.motor?.cracked) {
+      return { ids: ['bearing', 'mainbrg', 'camshaft'].filter(ok), text: 'Ein lauter Schlag – ein Pleuel ist abgerissen und hat den Motorblock durchschlagen! Der Motor ist hinüber und muss getauscht werden.', crack: true };
+    }
     const ids = ['bearing', 'mainbrg', 'camshaft'].filter(ok);
     return ids.length ? { ids, text: 'Ohne Öl gelaufen! Es klopft metallisch – Pleuellager und Nockenwelle haben Schaden genommen.' } : null;
   }

@@ -92,6 +92,17 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     [pos, to] = [m(pos), m(to)];
     if (view === 'engine') [pos, to] = [[rearBayX - 2.45, 1.45, z0], [rearBayX - 1.3, 0.62, z0]];
   }
+  // Plätze, die nicht wie die Hebebühnen bei x = 0 längs stehen (Schrottplatz): Pose in Platz-Koordinaten drehen und verschieben.
+  const slot = SLOTS[bay];
+  if (slot.x !== 0 || slot.rot !== 0) {
+    const c = Math.cos(slot.rot);
+    const s = Math.sin(slot.rot);
+    const tf = (p: [number, number, number]): [number, number, number] => {
+      const lz = p[2] - z0;
+      return [slot.x + p[0] * c + lz * s, p[1], z0 - p[0] * s + lz * c];
+    };
+    [pos, to] = [tf(pos), tf(to)];
+  }
   const dx = to[0] - pos[0];
   const dz = to[2] - pos[2];
   return { id: `${view}:${bay}`, pos, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(to[1] - pos[1], Math.hypot(dx, dz)) };

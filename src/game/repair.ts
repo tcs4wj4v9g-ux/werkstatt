@@ -303,6 +303,9 @@ export function knownDefects(car: CarInstance): DefectId[] {
 
 export const isAssembled = (car: CarInstance) => defsOf(car).every((c) => isComplete(car, c.id));
 
+/** Hinweis bei gerissenem Motorblock. */
+export const CRACKED_TEXT = 'Der Motorblock ist gerissen – dieser Motor ist nicht mehr zu retten. Motor tauschen: Austauschmotor bestellen (Werkstatt-Computer → Teile → Umbau) oder einen vom Schrottplatz holen.';
+
 export function driveBlocker(car: CarInstance): string | null {
   if (!isAssembled(car)) return 'Das Auto ist nicht komplett zusammengebaut.';
   if (car.fluids.oil.level / CAR_MODELS[car.modelId].oilCapacity < 0.1) return 'Die Öldruckleuchte leuchtet – ohne Öl fährst du nicht los.';
@@ -317,6 +320,7 @@ export function driveBlocker(car: CarInstance): string | null {
 export function engineBlocker(car: CarInstance): string | null {
   if (car.motor === null) return 'In diesem Auto ist kein Motor eingebaut.';
   if (car.bare) return 'Der Motor sitzt auf dem Motorständer – starten kannst du ihn erst im Auto.';
+  if (car.motor?.cracked) return CRACKED_TEXT;
   // Eine tote Batterie bemerkt man vor allem anderen: Es klackt nur das Relais.
   if (car.components.battery.condition === 'defect' && car.components.battery.installed) return 'Beim Startversuch klackt nur das Relais – der Anlasser dreht nicht.';
   const open = defsOf(car).find((c) => (c.access === 'hood' || c.access === 'stand' || c.id.startsWith('oil_pan') || c.id === 'bearing' || c.id === 'drain_plug' || c.id === 'dpf' || c.id === 'gearbox') && !isComplete(car, c.id));

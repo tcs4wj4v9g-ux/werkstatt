@@ -23,7 +23,7 @@ import { billJob, fillJobs, refreshJobs } from './jobs';
 import { BARN_TRANSPORT, fillListings, freshComponents, inspectListing, makeOffer, nextMarketIndex, refreshListings, valuate } from './market';
 import * as repair from './repair';
 import type { ActionResult, Auction, BoltState, CarInstance, DefectId, EcuTune, FluidId, FluidProduct, FluidStock, GameEvent, Inventory, JobOffer, Listing, PartId, Screen, ToolId, VisualTune, ZoneId } from './types';
-import { tuningDamage, asStand, engineTest, engineValue, extractEngine, fromStand, insertEngine, junkEnginePrice, junkPartPrice, motorLabel, removalSteps, swapPlan, unitComplete, withRemovedEngine, type EngineUnit, type UsedPart } from './motor';
+import { crackBlock, freshEngine, newEnginePrice, tuningDamage, asStand, engineTest, engineValue, extractEngine, fromStand, insertEngine, junkEnginePrice, junkPartPrice, motorLabel, removalSteps, swapPlan, unitComplete, withRemovedEngine, type EngineUnit, type UsedPart } from './motor';
 import { refreshJunk } from './junkyard';
 import { VISUAL_MAP, mountedId } from './data/visual';
 import { ENGINES } from './data/engines';
@@ -182,6 +182,8 @@ export interface GameState {
   flipEngine(): void;
   testEngine(): void;
   sellEngine(uid: string): void;
+  /** Fabrikneuen Austauschmotor bestellen – wird ins Motorlager geliefert. */
+  buyNewEngine(engineId: string, modelId: string): void;
   sellUsed(id: string): void;
   /** Gebrauchtteil an der Werkbank prüfen (zeigt versteckte Defekte). */
   checkUsed(id: string): void;
@@ -763,6 +765,17 @@ export const useGame = create<GameState>()(
         },
         tapLift: (bay) => {
           const s = get();
+          if (isJunk(bay)) {
+            // Schrottplatz: mobile Säulenheber. Abgelassen wird auch ohne Räder – das Auto gehört ohnehin dem Platz.
+            const cur = s.cars[bay];
+            if (!cur) return;
+            if (s.engineBay === bay) return s.say('Erst den Motor abstellen.', true);
+            const cars = [...s.cars];
+            cars[bay] = { ...cur, lifted: !cur.lifted };
+            sfx.clunk();
+            set({ cars });
+            return s.say(cur.lifted ? 'Auto abgelassen.' : 'Auto angehoben – jetzt kommst du an Räder, Bremsen und den Unterboden.');
+          }
           if (!isLift(bay)) return;
           if (s.cars[bay]) return void act(bay, (car) => repair.toggleLift(car), 'clunk');
           const liftUp = [...s.liftUp];
@@ -895,7 +908,16 @@ export const useGame = create<GameState>()(
             const cars = [...s.cars];
             const comps = { ...runCar.components };
             for (const id of harm.ids) comps[id] = { ...comps[id], condition: 'defect', known: false };
-            cars[s.engineBay] = { ...runCar, components: comps };
+            const hurt: CarInstance = { ...runCar, components: comps };
+            if (harm.crack) {
+              crackBlock(hurt, `Tag ${s.day}: ohne Öl gelaufen – Motorblock gerissen`);
+              cars[s.engineBay] = hurt;
+              set({ cars });
+              stopEngine();
+              sfx.error();
+              return s.say(harm.text, true);
+            }
+            cars[s.engineBay] = hurt;
             set({ cars });
             engineAudio.setProfile(soundProfile(cars[s.engineBay]!));
             sfx.error();
@@ -1248,6 +1270,23 @@ export const useGame = create<GameState>()(
             ...(t.oilPressure >= 3.5 ? ['Öldruck im Soll – Lager und Ölpumpe in Ordnung (in der Akte vermerkt).'] : []),
           ];
           set({ cars, engineReport: { title: motorLabel(car.motor!), ...t, findings: [...t.findings, ...notes] }, panel: 'enginetest' });
+        },
+        buyNewEngine: (engineId, modelId) => {
+          const s = get();
+          const e = ENGINES[engineId];
+          if (!e) return;
+          if (s.engines.length >= 8) return s.say('Das Motorlager ist voll (8 Paletten) – erst einen Motor verkaufen.', true);
+          const price = newEnginePrice(engineId);
+          if (s.money - heldMoney(s.auctions) < price) return s.say(`Der Austauschmotor kostet ${price.toLocaleString('de-DE')} € – dafür reicht das Geld nicht.`, true);
+          const unit: EngineUnit = {
+            motor: { uid: `new-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`, engineId, km: 0, donor: modelId, history: [`Tag ${s.day}: als Austauschmotor neu gekauft`] },
+            components: freshEngine(engineId),
+            oil: 0,
+          };
+          for (const c of Object.values(unit.components)) c.known = true;
+          sfx.cash();
+          set({ engines: [...s.engines, unit], money: s.money - price });
+          s.say(`Austauschmotor bestellt: ${e.name} für ${price.toLocaleString('de-DE')} €. Er steht auf einer Palette im Motorlager – ohne Öl.`);
         },
         sellEngine: (uid) => {
           const s = get();

@@ -247,6 +247,10 @@ export function engineTest(unit: Pick<EngineUnit, 'motor' | 'components'>) {
   if (bad('mainbrg')) oilPressure -= 1.1;
   if (bad('crank')) oilPressure -= 0.5;
   const findings: string[] = [];
+  if (unit.motor.cracked) {
+    for (const i of [1, 2]) if (compression[i] !== undefined) compression[i] = Math.round(compression[i] * 0.4 * 10) / 10;
+    findings.push('Riss im Motorblock: Kühlmittel im Öl, Kompression bricht ein – nicht reparabel, der Motor muss getauscht werden.');
+  }
   const low = compression.map((v, i) => [v, i + 1] as const).filter(([v]) => v < nominal * 0.85);
   if (low.length) findings.push(`Kompression zu niedrig an Zylinder ${low.map(([, n]) => n).join(', ')}.`);
   if (oilPressure < 2.5) findings.push('Öldruck zu niedrig – Lager oder Ölpumpe verdächtig.');
@@ -260,6 +264,7 @@ export function engineHealth(unit: Pick<EngineUnit, 'motor' | 'components'>) {
   const defects = DEFECT_LIST.filter((d) => defectComponents({ components: unit.components }, d).some((id) => unit.components[id]?.condition === 'defect'));
   const penalty = defects.reduce((s, d) => s + d.penalty, 0);
   const kmFactor = Math.max(0.35, 1 - unit.motor.km / 450000);
+  if (unit.motor.cracked) return { defects: defects.map((d) => d.id), pct: 5 };
   return { defects: defects.map((d) => d.id), pct: Math.max(5, Math.round(100 * kmFactor - penalty / 120)) };
 }
 
@@ -267,6 +272,8 @@ export function engineHealth(unit: Pick<EngineUnit, 'motor' | 'components'>) {
 export function engineValue(unit: EngineUnit) {
   const e = ENGINES[unit.motor.engineId];
   const base = e.ps * 14 * (e.turbo ? 1.15 : 1) * (isV(e) ? 1.2 : 1);
+  // Gerissener Block: nur noch Teileträger bzw. Schrottwert
+  if (unit.motor.cracked) return Math.max(150, Math.round((base * 0.08) / 50) * 50);
   const h = engineHealth(unit);
   const missing = Object.values(unit.components).filter((c) => !c.installed).length;
   return Math.max(150, Math.round((base * (0.25 + 0.75 * (h.pct / 100)) - missing * 40) / 50) * 50);
@@ -289,6 +296,12 @@ export function junkPartPrice(car: CarInstance, id: string) {
   const fam = def.engine ? engineOf(car).partFactor : 1;
   const cond = st.condition === 'defect' ? 0.12 : st.health !== undefined ? 0.2 + 0.25 * (st.health / 100) : 0.38;
   return Math.max(5, Math.round((PARTS[part].price * cls * fam * cond) / 5) * 5);
+}
+
+/** Preis eines fabrikneuen Austauschmotors (deutlich teurer als vom Schrottplatz). */
+export function newEnginePrice(engineId: string) {
+  const e = ENGINES[engineId];
+  return Math.round((e.ps * 14 * (e.turbo ? 1.15 : 1) * (isV(e) ? 1.2 : 1) * 1.5 + 600) / 50) * 50;
 }
 
 /** Preis des kompletten Motors am Schrottplatz. */
@@ -335,6 +348,8 @@ export function junkify(car: CarInstance, rng: Rng, day: number): CarInstance {
   if (rng() < 0.2) {
     extractEngine(car);
     car.motor = null;
+  } else if (rng() < (story === 'Motorschaden gemeldet' ? 0.7 : 0.05)) {
+    crackBlock(car, `Schrottplatz: Motorblock gerissen`);
   }
   const value = car.cleanValue * (0.06 + rng() * 0.05) * (story.startsWith('Ausgeschlachtet') ? 0.6 : 1);
   car.junk = { price: Math.max(300, Math.round(value / 50) * 50), story, until: day + 4 + Math.floor(rng() * 5) };
@@ -364,10 +379,22 @@ export function tuningDamage(car: CarInstance, risks: { id: string; level: numbe
     const pistons = Object.keys(car.components).filter((k) => /^piston\d$/.test(k));
     if (r.id === 'knock') hit(pistons[Math.floor(rng() * pistons.length)] ?? 'head_gasket', 'Klopfen unter Volllast hat einen Kolben beschädigt – Kompression weg, Ölverbrauch.');
     if (r.id === 'heat') hit('head_gasket', 'Überhitzt: Die Zylinderkopfdichtung ist durchgebrannt.');
+    if (r.id === 'mech' && r.level >= 1.6 && car.motor !== null && !car.motor?.cracked && rng() < 0.5) {
+      crackBlock(car, 'Pleuel abgerissen – Motorblock durchschlagen');
+      out.push('Viel zu viel Drehmoment: Ein Pleuel ist abgerissen und hat den Motorblock durchschlagen – der Motor muss getauscht werden.');
+      continue;
+    }
     if (r.id === 'mech') hit('bearing', 'Zu viel Drehmoment: Ein Pleuellager hat gefressen – es klopft.');
     if (r.id === 'turbo') hit('turbo', 'Der Turbolader hat den Druck nicht überlebt.');
   }
   return out;
+}
+
+/** Motorblock reißen lassen (Motor bleibt drin, ist aber nur noch Schrott bzw. Teileträger). */
+export function crackBlock(car: CarInstance, why: string) {
+  const m = motorOf(car);
+  if (!m) return;
+  car.motor = { ...m, cracked: true, history: [...m.history, why] };
 }
 
 export const motorLabel = (m: MotorMeta) => `${ENGINES[m.engineId]?.name ?? m.engineId}`;

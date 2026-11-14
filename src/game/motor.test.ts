@@ -264,3 +264,73 @@ describe('Heckmotor-Boxer', () => {
     expect(swapPlan(car, 'b4_16').possible).toBe(true);
   });
 });
+
+describe('Gerissener Motorblock', () => {
+  it('Ohne Öl weiterlaufen lassen reißt den Block – danach startet der Motor nicht mehr', async () => {
+    const { oilHarm, CRACK_MS } = await import('./fluids');
+    const { crackBlock } = await import('./motor');
+    const car = mk('bavaria_330');
+    car.fluids.oil.level = 0;
+    expect(oilHarm(car, CRACK_MS - 1)?.crack).toBeFalsy();
+    expect(oilHarm(car, CRACK_MS)!.crack).toBe(true);
+    crackBlock(car, 'Test');
+    expect(car.motor!.cracked).toBe(true);
+    expect(oilHarm(car, CRACK_MS * 2)?.crack).toBeFalsy();
+    car.fluids.oil.level = 5;
+    expect(r.engineBlocker(car)).toBe(r.CRACKED_TEXT);
+    expect(r.driveBlocker(car)).toBe(r.CRACKED_TEXT);
+  });
+  it('Gerissener Motor ist nur noch Schrott wert, das Auto verliert stark an Wert', async () => {
+    const { engineValue, crackBlock } = await import('./motor');
+    const { valuate } = await import('./market');
+    const car = mk('bavaria_330');
+    const before = valuate(car).value;
+    const unitOk = extractEngine(structuredClone(car));
+    crackBlock(car, 'Test');
+    const unitBad = extractEngine(structuredClone(car));
+    expect(engineValue(unitBad)).toBeLessThan(engineValue(unitOk) * 0.3);
+    expect(engineTest(unitBad).findings.join(' ')).toContain('Motorblock');
+    expect(valuate(car).value).toBeLessThan(before * 0.7);
+  });
+  it('Motortausch behebt den Schaden; Austauschmotor kostet mehr als einer vom Schrottplatz', async () => {
+    const { crackBlock, freshEngine, newEnginePrice, junkEnginePrice } = await import('./motor');
+    const car = mk('bavaria_330');
+    crackBlock(car, 'Test');
+    extractEngine(car);
+    const engineId = engineOf({ ...car, motor: undefined }).id;
+    insertEngine(car, { motor: { uid: 'neu', engineId, km: 0, donor: car.modelId, history: [] }, components: freshEngine(engineId), oil: 6 }, [], 3);
+    expect(car.motor!.cracked).toBeFalsy();
+    expect(r.engineBlocker(car)).toBeNull();
+    const used = extractEngine(structuredClone(mk('bavaria_330')));
+    expect(newEnginePrice(engineId)).toBeGreaterThan(junkEnginePrice(used) * 1.5);
+  });
+  it('Schrottautos mit gemeldetem Motorschaden haben oft einen gerissenen Block', () => {
+    let cracked = 0;
+    for (let i = 0; i < 60; i++) {
+      let seed = i * 7919 + 13;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const c = junkify(mk('bavaria_330'), rnd, 1);
+      if (c.motor?.cracked) {
+        cracked++;
+        expect(r.engineBlocker(c)).not.toBeNull();
+      }
+    }
+    expect(cracked).toBeGreaterThan(0);
+  });
+});
+
+describe('Schrottplatz: Hebebühne und fehlende Teile', () => {
+  it('Ein am Schrottplatz fehlendes Teil lässt sich mit einem Ersatzteil wieder einbauen', () => {
+    const car = mk('bavaria_330');
+    const st = car.components.battery;
+    Object.assign(st, { installed: false, missing: true, bolts: st.bolts.map(() => 0), connected: false });
+    car.hoodOpen = true;
+    // Ohne Teil: Hinweis auf Neuteil, mit Teil im Lager: eingebaut
+    const none = r.componentAction(car, {}, 'battery', tool('hand'));
+    expect(none.ok).toBe(false);
+    const res = r.componentAction(car, {}, 'battery', tool('hand'), { source: { condition: 'ok', known: true, cost: 50, label: 'Batterie' } as any });
+    expect(res.ok, res.message).toBe(true);
+    expect(car.components.battery.missing).toBeUndefined();
+    expect(car.components.battery.installed).toBe(true);
+  });
+});

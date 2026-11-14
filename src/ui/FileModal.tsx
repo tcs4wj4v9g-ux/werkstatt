@@ -41,6 +41,7 @@ export function FileModal() {
         Motor: {e.layout[0] === 'R' ? 'Reihe' : e.layout[0] === 'B' ? 'Boxer' : 'V-Motor'}, {e.cylinders} Zylinder · {e.fuel === 'diesel' ? 'Diesel' : 'Benzin'} ·{' '}
         {e.turbo ? 'Turbo' : 'Sauger'} · {e.liters.toLocaleString('de-DE')} l · {e.ps} PS · {e.nm} Nm · {model.weight.toLocaleString('de-DE')} kg · Teilefamilie {e.family}
       </p>
+      {car.motor?.cracked && <div className="finding" data-testid="cracked">⚠ Motorblock gerissen – nicht reparabel. Motor tauschen: Austauschmotor bestellen (Computer → Teile → Umbau) oder einen vom Schrottplatz holen.</div>}
       {car.job && (
         <div className="note">
           <b>Kundenauftrag von {car.job.customer}:</b> „{car.job.complaint}“
