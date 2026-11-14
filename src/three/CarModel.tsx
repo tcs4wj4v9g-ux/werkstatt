@@ -1403,7 +1403,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           )}
           {bolts('hose', [[1.42, 0.72, -0.45]])}
 
-          {draining && (
+          {draining && !bare && (
             <mesh position={[1.4, 0.185 - 0.84, 0.08]} raycast={noRay}>
               <cylinderGeometry args={[0.009, 0.005, 1.68, 6]} />
               <meshStandardMaterial color="#0d0905" metalness={0.9} roughness={0.08} />

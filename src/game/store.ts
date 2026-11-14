@@ -823,7 +823,7 @@ export const useGame = create<GameState>()(
             }
           }
           const before = get().cars[bay];
-          if (compId === 'drain_plug' && before?.components.drain_plug?.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
+          if (compId === 'drain_plug' && bay !== STAND_SLOT && before?.components.drain_plug?.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
             sfx.error();
             return get().say('Erst die Auffangwanne unter den Motor stellen – sonst läuft das Altöl auf den Boden.', true);
           }
