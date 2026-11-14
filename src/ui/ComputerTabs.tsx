@@ -5,7 +5,8 @@ import { FLUID_LIST } from '../game/data/fluids';
 import { defsOf, engineOf, modelEngine } from '../game/data/components';
 import { PART_LIST, PARTS } from '../game/data/parts';
 import { fitOf, stockOf } from '../game/fitment';
-import { availableSlots, SLOTS, STAND_SLOT, UPGRADES, isJunk } from '../game/data/workshop';
+import { availableSlots, GARAGES, SLOTS, STAND_SLOT, UPGRADES, isJunk } from '../game/data/workshop';
+import { travel } from '../three/player';
 import { fromStand, newEnginePrice, swapPlan, withRemovedEngine, type EngineUnit } from '../game/motor';
 import { ENGINES } from '../game/data/engines';
 import { RARITY_NAMES } from '../game/market';
@@ -87,12 +88,12 @@ export function UpgradesTab() {
         return (
           <div key={u.id} className="shop-row">
             <div>
-              <b>{u.equipment ? 'Spezialgerät' : u.location ? 'Standort' : `Stufe ${u.stage}`}: {u.name}</b>
+              <b>{u.equipment ? 'Spezialgerät' : u.location ? 'Standort' : u.garage ? 'Fahrzeuglager' : `Stufe ${u.stage}`}: {u.name}</b>
               <div className="meta">{u.desc}</div>
               {locked && <div className="meta bad">Voraussetzung: {UPGRADES.find((x) => x.id === u.requires)!.name}</div>}
             </div>
             <button className="btn primary" disabled={owned || locked || s.money < u.price} onClick={() => s.buyUpgrade(u.id)}>
-              {owned ? (u.equipment ? '✓ vorhanden' : u.location ? '✓ eröffnet' : '✓ gebaut') : eur(u.price)}
+              {owned ? (u.equipment ? '✓ vorhanden' : u.location ? '✓ eröffnet' : u.garage ? '✓ gekauft' : '✓ gebaut') : eur(u.price)}
             </button>
           </div>
         );
@@ -225,13 +226,54 @@ export function ShopList() {
 }
 
 /** Auto auf einen anderen freien Platz stellen. */
+/** Tiefgaragen: belegte Plätze, hinfahren oder kaufen. */
+export function GarageList() {
+  const s = useGame();
+  return (
+    <>
+      <p className="meta">Fahrzeuglager und private Sammlung. Autos stellst du über „Umparken“ ab und holst sie genauso jederzeit wieder heraus.</p>
+      {GARAGES.map((g) => {
+        const owned = s.upgrades.includes(g.id);
+        const used = SLOTS.filter((x) => x.place === g.id && s.cars[x.id]).length;
+        return (
+          <div key={g.id} className="shop-row">
+            <div>
+              <b>{g.name}</b>
+              <div className="meta">{owned ? `${used} von ${g.slots} Plätzen belegt` : `${g.slots} Stellplätze · ${eur(g.price)} – am Werkstatt-Computer unter „Ausbau“ kaufen`}</div>
+            </div>
+            <button
+              className="btn primary"
+              data-testid={`goto-${g.id}`}
+              disabled={!owned}
+              onClick={() => {
+                s.setPanel(null);
+                travel(g.id);
+              }}
+            >
+              {owned ? 'Hinunterfahren' : 'nicht gekauft'}
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export function MoveList({ from }: { from: number }) {
   const s = useGame();
-  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id]);
+  const all = availableSlots(s.upgrades).filter((x) => !s.cars[x.id]);
+  // Tiefgaragen erscheinen als eine Zeile je Garage (nächster freier Platz), nicht als 50 einzelne Knöpfe.
+  const free = all.filter((x) => x.kind !== 'garage');
+  const garages = GARAGES.map((g) => ({ g, slots: all.filter((x) => x.place === g.id) })).filter((x) => x.slots.length > 0);
   return (
     <>
       <p className="meta">Aktuell: {SLOTS[from].label}. Nicht fahrbereite Autos werden geschoben.</p>
-      {free.length === 0 && <p className="meta bad">Kein anderer Platz frei. Mehr Stellplätze gibt es am Computer unter „Ausbau“.</p>}
+      {all.length === 0 && <p className="meta bad">Kein anderer Platz frei. Mehr Stellplätze gibt es am Computer unter „Ausbau“.</p>}
+      {garages.map(({ g, slots }) => (
+        <button key={g.id} className="btn big" data-testid={`move-${g.id}`} onClick={() => s.moveCar(from, slots[0].id)}>
+          → {g.name} ({slots.length} von {g.slots} frei)
+        </button>
+      ))}
       {free.map((x) => (
         <button key={x.id} className="btn big" onClick={() => s.moveCar(from, x.id)}>
           → {x.label}{x.kind === 'wash' ? ' (waschen, polieren, Innenraum)' : x.kind === 'paint' ? ' (Rost, Lack)' : x.kind === 'lift' ? ' (reparieren, warten)' : x.kind === 'show' ? ' (ausstellen: +4 % beim Verkauf, mehr Ansehen)' : ''}

@@ -190,3 +190,22 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - **Hebebühne am Schrottplatz:** Jedes Spenderauto lässt sich mit mobilen Säulenhebern anheben („▲ Auf die Hebebühne“). Dann gibt es dort die Rad- und Unterbodenansichten, Räder, Bremsen, Hosenrohr, Kraftstoffpumpe usw. lassen sich ausbauen. Abgelassen wird auch ohne Räder.
 - **Fehlende Teile an gekauften Schrottautos:** Teile, die schon am Schrottplatz fehlten, zeigen jetzt den grünen Platzhalter und lassen sich mit Neu- oder Gebrauchtteil einbauen.
 - Geprüft: Logiktests (inkl. neuer Tests für Blockriss, Motortausch und fehlende Teile), Browser-Durchlauf Schrott mit neuen Schritten (Blockriss, Austauschmotor, Hebebühne mit Radansicht und Ausbau von unten, Platzhalter). Kein echter iPad-Test.
+
+## Tiefgaragen
+
+- **Daten:** `GARAGES` in `src/game/data/workshop.ts` legt vier Garagen an (6/15/30/50 Plätze, 25.000/65.000/150.000/350.000 €). Sie sind Ausbauten (`tg_klein` … `tg_luxus`) im Werkstatt-Computer.
+  - Die Stellplätze hängen als neue Platzart `garage` hinten an die bestehende Liste an (Plätze 22–122), mit eigenem Ort (`place`).
+  - Werkstatt- und Schrottplatz-Plätze behalten ihre Nummern. Alte Spielstände und Koop-Werkstätten bekommen die neuen Plätze automatisch dazu, denn die Stellplatzliste darf auf dem Server wachsen.
+- **Aufteilung:** Bis 15 Plätze gibt es eine Fahrgasse mit zwei Reihen, darüber zwei Fahrgassen mit vier Reihen. Die Buchten sind 2,7 × 5,4 m groß, alle drei Buchten steht eine Säule. Jede Garage hat ihren eigenen Koordinatenbereich (x ab 200/350/500/650).
+- **3D (`src/three/UnderGarage.tsx`):**
+  - Betonboden, Decke in 2,8 m Höhe, Wände mit gelbem Sockel, Säulen mit Warnanstrich, Radstopper, Buchtlinien und Nummern, Leuchtbänder, Rampe mit Leuchtleisten, Schilder.
+  - Wände, Säulen und Linien sind je ein zusammengefasstes Netz. Je nach Grafikstufe gibt es ein bis zwei Punktlichter. Die Autos sind vereinfacht und werden nur bis 30 m Entfernung gezeichnet.
+  - Im Hof gibt es eine Einfahrt mit abfallender Rampe, Portal und Schild. Die Wiese hat dort eine Aussparung.
+- **Bedienung:**
+  - Die Einfahrt öffnet die Garagenliste mit Belegung, „Hinunterfahren“ oder dem Kaufhinweis. Die Rampe in der Garage führt zurück in den Hof.
+  - „Umparken“ bietet jede Garage als eine Zeile an (nächster freier Platz). Am eingelagerten Auto gibt es Akte, Umparken, Tuning und Probefahrt. Geschraubt wird dort nicht.
+- **Geprüft:**
+  - Logiktests: Platzanzahl, Buchten innerhalb der Wände und frei von Säulen, Nummern der alten Plätze.
+  - Neuer Browser-Durchlauf `tiefgarage`.
+  - Koop-Szenario: Einparken sichtbar beim Partner, gleichzeitiges Umparken ohne doppeltes Auto.
+  - Kein echter iPad-Test.

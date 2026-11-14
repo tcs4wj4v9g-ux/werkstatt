@@ -152,6 +152,16 @@ Alles ist weiterhin prozedural erzeugt – keine fremden 3D-Modelle, keine Bildd
 
 Bewusste Grenzen: Der Kran wird über sein Bedienfenster gesteuert, nicht von Hand geschoben. Den Motor am Schrottplatz baut der Händler aus. Der Weg zum Schrottplatz ist eine Fahrt mit dem Lieferwagen (Ortswechsel), keine Fahrstrecke. Getriebe und Achsen werden nicht getauscht; Motorumbauten ändern den Antrieb nicht.
 
+## Fahrzeug- und Tiefgaragen-Update
+
+- **Neue Fahrzeuge** mit eigener Karosserie, eigenem Motorraum und passendem Motor: Renolt Twingo 1.2, BMV 323i (E30), Porshe 356 Coupé, Porshe 911 Carrera (964 und 992), Audy TT Coupé 1.8T, Audy Sport quattro S1 und Audy A4 1.8T (B5). Dazu kommen Heckmotoren (Motor von hinten), luftgekühlte Boxer und ein Reihenfünfzylinder.
+- **Tiefgaragen:** Es gibt vier kaufbare, begehbare Tiefgaragen (Werkstatt-Computer → Ausbau): Klein mit 6 Plätzen für 25.000 €, Mittel mit 15 Plätzen für 65.000 €, Groß mit 30 Plätzen für 150.000 € und Luxus mit 50 Plätzen für 350.000 €.
+  - Die Einfahrt liegt am linken Hofrand. Über die Rampe geht es hinunter, dort gibt es Lichtbänder, nummerierte Buchten, Säulen und eine Rampe zurück in den Hof.
+  - Autos stellst du über „Umparken“ ab, eine Zeile je Garage mit dem nächsten freien Platz. Genauso holst du sie jederzeit wieder heraus.
+  - Die Tiefgaragen sind im Koop gemeinsam, und der Server verhindert doppelte Autos.
+  - Fürs iPad werden die Autos dort vereinfacht und nur in der Nähe gezeichnet.
+- **Motorschaden mit Folgen:** Ein gerissener Motorblock lässt sich nur durch einen Motortausch beheben, mit einem Austauschmotor (neu) oder einem Motor vom Schrottplatz. Am Schrottplatz gibt es eine Hebebühne, um auch von unten auszubauen.
+
 ## Auf dem iPad veröffentlichen (GitHub Pages)
 
 1. In Safari `github.com` öffnen, anmelden, dieses Repository öffnen.

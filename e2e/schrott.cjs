@@ -277,7 +277,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   });
   await p.reload(); await p.waitForTimeout(1500);
   const old = await G(() => { const s = window.__gk.getState(); return { money: s.money, len: s.cars.length, junk: s.cars.slice(16).filter(Boolean).length, coil: Object.keys(s.cars[0].components).filter((k) => /^coil/.test(k)).length, harness: s.cars[0].components.harness && s.cars[0].components.harness.installed && s.cars[0].components.pads_rr && s.cars[0].components.pads_rr.installed, def: window.__gkLib.defsOf(s.cars[0]).length === Object.keys(s.cars[0].components).length, engines: s.engines.length }; });
-  expect(old.money === 7777 && old.len === 22 && old.junk === 6 && old.harness && old.def && old.engines === 0, `Alter Spielstand übernommen: Geld, Auto mit neuen Teilen ergänzt, Schrottplatz gefüllt (${JSON.stringify(old)})`);
+  expect(old.money === 7777 && old.len === 123 && old.junk === 6 && old.harness && old.def && old.engines === 0, `Alter Spielstand übernommen: Geld, Auto mit neuen Teilen ergänzt, Schrottplatz gefüllt (${JSON.stringify(old)})`);
 
   console.log('errors:', JSON.stringify(errs));
   console.log(fails || errs.length ? `FEHLER: ${fails + errs.length}` : 'ALLES OK');

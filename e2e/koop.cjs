@@ -199,6 +199,22 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await both(A, B);
   expect((await game(A)).money === 8000 && (await game(B)).money === 8000 && !(await game(B)).cars[slot], `Beide verkaufen gleichzeitig dasselbe Auto: Erlös nur einmal gutgeschrieben (${(await game(A)).money} / ${(await game(B)).money}, ${await reject(A)} ${await reject(B)})`);
 
+  // ---------- Gemeinsame Tiefgarage: einparken, beide sehen es, kein Auto doppelt ----------
+  await G(A, () => { const g = window.__gk; g.setState({ upgrades: [...g.getState().upgrades, 'tg_klein'] }); });
+  await both(A, B);
+  const tgUid = (await game(A)).cars[0].uid;
+  await G(A, () => { const g = window.__gk; const cars = [...g.getState().cars]; cars[22] = cars[0]; cars[0] = null; g.setState({ cars }); });
+  await both(A, B);
+  const tgB = (await game(B)).cars;
+  expect(tgB[22] && tgB[22].uid === tgUid && !tgB[0] && (await G(B, () => window.__gk.getState().upgrades.includes('tg_klein'))), 'Spieler 1 parkt in die gemeinsame Tiefgarage – Spieler 2 sieht Garage und Auto auf Platz 1');
+  await Promise.all([[A, 23], [B, 24]].map(([p, to]) => G(p, (to) => { const g = window.__gk; const cars = [...g.getState().cars]; if (!cars[22]) return; cars[to] = cars[22]; cars[22] = null; g.setState({ cars }); }, to)));
+  await both(A, B);
+  const tgA = (await game(A)).cars.map((c) => c && c.uid);
+  expect(tgA.filter((u) => u === tgUid).length === 1 && norm(tgA) === norm((await game(B)).cars.map((c) => c && c.uid)), `Beide parken gleichzeitig dasselbe Auto um: es steht danach genau einmal da (Platz ${tgA.indexOf(tgUid) - 21})`);
+  await G(A, (u) => { const g = window.__gk; const cars = [...g.getState().cars]; const i = cars.findIndex((c) => c && c.uid === u); cars[0] = cars[i]; cars[i] = null; g.setState({ cars }); }, tgUid);
+  await both(A, B);
+  expect((await game(B)).cars[0] && (await game(B)).cars[0].uid === tgUid, 'Auto wieder aus der Tiefgarage auf Bühne 1 geholt');
+
   // ---------- Test 6: Verbindungsabbruch ----------
   ca = await coop(A);
   const block = (on) => fetch(`${COOP}/__test/block`, { method: 'POST', body: JSON.stringify({ user: ca.me, on }) });

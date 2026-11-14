@@ -19,7 +19,7 @@ export function MarketTab() {
     remembered = { ...f, ...patch };
     setF(remembered);
   };
-  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint').length;
+  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage').length;
   const rows = filterListings(s.listings, f, s.money);
   return (
     <>

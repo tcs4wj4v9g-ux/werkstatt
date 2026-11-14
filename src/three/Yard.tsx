@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { SLOTS, slotAvailable } from '../game/data/workshop';
 import { useGame } from '../game/store';
 import { Interactable } from './Interactable';
-import { BAY_Z, DOOR_HALF, ROOM, YARD } from './player';
+import { BAY_Z, DOOR_HALF, RAMP_GATE, ROOM, YARD } from './player';
 import { doorTexture, textTexture, wallTexture, asphaltTexture } from './textures';
 
 type V3 = [number, number, number];
@@ -48,6 +48,16 @@ export function Yard() {
   const yw = YARD.maxX - YARD.minX;
   const yd = YARD.maxZ - YARD.minZ;
   const ycx = (YARD.maxX + YARD.minX) / 2;
+  // Wiese um die Rampengrube herum (vier Stücke statt einer Fläche, sonst läge Gras über der Rampe)
+  const hole = { x0: YARD.minX - 10.4, x1: YARD.minX, z0: RAMP_GATE.z - 1.6, z1: RAMP_GATE.z + 1.6 };
+  const G0 = ycx - 80;
+  const G1 = ycx + 80;
+  const grass: [number, number, number, number][] = [
+    [G0, hole.x0, -80, 80],
+    [hole.x1, G1, -80, 80],
+    [hole.x0, hole.x1, -80, hole.z0],
+    [hole.x0, hole.x1, hole.z1, 80],
+  ];
   // Torwand in Abschnitten, damit die beiden Tore offen bleiben.
   const piers: [number, number][] = [
     [ROOM.minZ, BAY_Z[0] - DOOR_HALF],
@@ -58,16 +68,19 @@ export function Yard() {
   return (
     <group>
       {/* Gelände */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ycx, -0.02, 0]}>
-        <planeGeometry args={[160, 160]} />
-        <meshStandardMaterial color="#5f8a4a" roughness={1} />
-      </mesh>
+      {/* Wiese mit Aussparung für die Rampe zur Tiefgarage */}
+      {grass.map(([x0, x1, z0, z1]) => (
+        <mesh key={`${x0}${z0}`} rotation={[-Math.PI / 2, 0, 0]} position={[(x0 + x1) / 2, -0.02, (z0 + z1) / 2]}>
+          <planeGeometry args={[x1 - x0, z1 - z0]} />
+          <meshStandardMaterial color="#5f8a4a" roughness={1} />
+        </mesh>
+      ))}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ycx, 0, 0]} receiveShadow>
         <planeGeometry args={[yw, yd]} />
         <meshStandardMaterial map={tex.asphalt} color="#6c6f74" roughness={0.92} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[YARD.minX - 6, -0.01, BAY_Z[0]]}>
-        <planeGeometry args={[12, 6]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[YARD.minX - 6, -0.01, BAY_Z[0] + 0.35]}>
+        <planeGeometry args={[12, 5.3]} />
         <meshStandardMaterial color="#4b4e53" roughness={0.95} />
       </mesh>
 
@@ -107,7 +120,8 @@ export function Yard() {
           ))}
         </group>
       ))}
-      {[[YARD.minZ, BAY_Z[0] - 2.2], [BAY_Z[0] + 2.2, YARD.maxZ]].map(([a, b]) => (
+      {/* Lücke für die Tiefgaragen-Einfahrt (RAMP_GATE) */}
+      {[[YARD.minZ, RAMP_GATE.z - 1.45], [BAY_Z[0] + 2.2, YARD.maxZ]].map(([a, b]) => (
         <group key={a}>
           <Box p={[YARD.minX, 0.9, (a + b) / 2]} s={[0.06, 0.06, b - a]} c="#59606a" m={0.6} />
           <Box p={[YARD.minX, 1.7, (a + b) / 2]} s={[0.06, 0.06, b - a]} c="#59606a" m={0.6} />

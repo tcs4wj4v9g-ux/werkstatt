@@ -610,17 +610,41 @@ describe('Werkstattausbau und Scheunenfunde', () => {
     expect(availableSlots([]).map((s) => s.kind)).toEqual(['lift', 'lift', 'park']);
     expect(availableSlots(['parking']).filter((s) => s.kind === 'park').length).toBe(4);
     expect(availableSlots(['parking', 'wash', 'paint', 'expansion']).length).toBe(10);
-    expect(UPGRADES.filter((u) => !u.equipment).map((u) => u.stage)).toEqual([2, 3, 4, 5, 6, 7, 8]);
+    expect(UPGRADES.filter((u) => !u.equipment && !u.garage).map((u) => u.stage)).toEqual([2, 3, 4, 5, 6, 7, 8]);
     // Größere Standorte: dritte und vierte Hebebühne, dann der Showroom
     const lifts = (u: string[]) => availableSlots(u).filter((s) => s.kind === 'lift').length;
     expect(lifts(['loc_pro'])).toBe(3);
     expect(lifts(['loc_pro', 'loc_center'])).toBe(4);
     expect(availableSlots(['loc_pro', 'loc_center', 'loc_hq']).filter((s) => s.kind === 'show').length).toBe(3);
-    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.filter((s) => s.kind !== 'stand' && s.kind !== 'junk').length);
+    expect(availableSlots(['parking', 'wash', 'paint', 'expansion', 'loc_pro', 'loc_center', 'loc_hq']).length).toBe(SLOTS.filter((s) => s.kind !== 'stand' && s.kind !== 'junk' && s.kind !== 'garage').length);
     expect(UPGRADES.find((u) => u.id === 'loc_center')!.grants).toEqual(['wash', 'paint', 'dyno']);
     expect(UPGRADES.filter((u) => u.location).map((u) => u.price)).toEqual([75000, 200000, 500000]);
     // Keine zwei Stellplätze überlappen
     for (const a of SLOTS) for (const b of SLOTS) if (a.id < b.id) expect(Math.hypot(a.x - b.x, a.z - b.z), `${a.label}/${b.label}`).toBeGreaterThan(2.5);
+  });
+
+  it('Tiefgaragen: vier Größen, Plätze erst nach dem Kauf, Buchten frei von Säulen und innerhalb der Wände', async () => {
+    const { GARAGES, garageLayout, slotPlace, isFleet } = await import('./data/workshop');
+    const { GARAGE_BOXES } = await import('../three/player');
+    expect(GARAGES.map((g) => [g.slots, g.price])).toEqual([[6, 25000], [15, 65000], [30, 150000], [50, 350000]]);
+    expect(availableSlots(['parking']).some((s) => s.kind === 'garage')).toBe(false);
+    for (const g of GARAGES) {
+      const slots = availableSlots([g.id]).filter((s) => s.kind === 'garage');
+      expect(slots.length, g.name).toBe(g.slots);
+      const b = garageLayout(g).bounds;
+      for (const s of slots) {
+        expect(slotPlace(s.id)).toBe(g.id);
+        expect(isFleet(s.id)).toBe(true);
+        // Auto (4,8 m × 2 m, quer zur Fahrgasse) liegt in der Garage und trifft keine Säule
+        const car = { minX: s.x - 1.0, maxX: s.x + 1.0, minZ: s.z - 2.4, maxZ: s.z + 2.4 };
+        expect(car.minX > b.minX && car.maxX < b.maxX && car.minZ >= b.minZ && car.maxZ <= b.maxZ, s.label).toBe(true);
+        for (const p of GARAGE_BOXES[g.id]) expect(p.maxX <= car.minX || p.minX >= car.maxX || p.maxZ <= car.minZ || p.minZ >= car.maxZ, `${s.label} trifft Säule`).toBe(true);
+      }
+    }
+    // Werkstatt- und Schrottplatz-Plätze behalten ihre Nummern (Spielstände)
+    expect(SLOTS[21].kind).toBe('junk');
+    expect(SLOTS[22].label).toBe('Tiefgarage Klein · Platz 1');
+    expect(SLOTS.length).toBe(22 + 6 + 15 + 30 + 50);
   });
 
   it('Scheunenfund: selten, verdreckt, rostig, tot – und nur Schritt für Schritt zu retten', () => {
