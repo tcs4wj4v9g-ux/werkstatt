@@ -8,10 +8,10 @@ import { mat, Mesher, type V3 } from './mesher';
 // Anbauteile, Räder und Innenraum – jeweils zu einer Geometrie mit Materialgruppen verschmolzen.
 
 /** Materialgruppen der Anbauteile und des Innenraums. */
-export const SLOT = { dark: 0, gloss: 1, chrome: 2, lens: 3, glow: 4, tail: 5, tailBar: 6, amber: 7, plate: 8, solid: 9, seat: 10, seat2: 11, plastic: 12 } as const;
-const SLOTS = 13;
+export const SLOT = { dark: 0, gloss: 1, chrome: 2, lens: 3, glow: 4, tail: 5, tailBar: 6, amber: 7, plate: 8, solid: 9, seat: 10, seat2: 11, plastic: 12, livery: 13, stripe: 14 } as const;
+const SLOTS = 15;
 
-export type RimStyle = 'steel' | 'double5' | 'multi' | 'turbine' | 'classic' | 'five';
+export type RimStyle = 'steel' | 'double5' | 'multi' | 'turbine' | 'classic' | 'five' | 'rally';
 export interface CarLook {
   rim: RimStyle;
   grille: 'twin' | 'wide' | 'tall' | 'slot' | 'classic';
@@ -51,7 +51,7 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const tt = body === 'tt';
   const quattro = body === 'quattro';
   return {
-    rim: quattro ? 'turbine' : tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'BMV' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    rim: quattro ? 'rally' : tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'BMV' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
     // BMV: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
     grille: sport ? 'slot' : classic ? 'classic' : brand === 'BMV' ? 'twin' : lux ? 'tall' : 'wide',
     lamps: classic ? 'round' : sport ? 'slim' : brand === 'BMV' ? 'twin' : 'block',
@@ -60,8 +60,8 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     chromeTrim: classic || lux || box || tub || tt,
     spoiler: sport || model?.id === 'bavaria_340_ms',
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,
-    seat: quattro ? '#4b4038' : tt ? '#b98a5a' : nine2 ? '#8a5a3c' : nine ? '#2a2b2f' : tub ? '#7a2b22' : box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
-    seat2: quattro ? '#2c2622' : tt ? '#5a3d26' : nine2 ? '#1b1c1f' : nine ? '#1b1c1f' : tub ? '#5c2019' : box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
+    seat: quattro ? '#1d2f6b' : tt ? '#b98a5a' : nine2 ? '#8a5a3c' : nine ? '#2a2b2f' : tub ? '#7a2b22' : box ? '#4a4d55' : mono ? '#33476e' : lux ? '#b9a384' : sport ? '#7a1f1a' : classic ? '#6b4a2f' : cls === 'budget' ? '#4a4d52' : '#2f3033',
+    seat2: quattro ? '#14161a' : tt ? '#5a3d26' : nine2 ? '#1b1c1f' : nine ? '#1b1c1f' : tub ? '#5c2019' : box ? '#2c2e33' : mono ? '#5b6270' : lux ? '#8f7a60' : sport ? '#1b1c1f' : classic ? '#4f3521' : '#2c2e32',
     front: visual?.front ?? 0,
     rear: visual?.rear ?? 0,
     skirts: !!visual?.skirts,
@@ -81,8 +81,8 @@ export const lookKey = (l: CarLook) => [l.rim, l.grille, l.lamps, +l.chromeBumpe
 
 /** Materialgruppen eines Rads: Reifen, Felge (Farbe/Schmutz), dunkel, Felgenbett. */
 export const WHEEL_SLOT = { tire: 0, rim: 1, dark: 2, barrel: 3 } as const;
-export const RIM_R: Record<RimStyle, number> = { steel: 0.215, double5: 0.232, multi: 0.242, turbine: 0.24, classic: 0.215, five: 0.25 };
-export const RIM_COLOR: Record<RimStyle, string> = { steel: '#aab0b7', double5: '#cdd2d8', multi: '#2a2c30', turbine: '#e4e7eb', classic: '#dfe3e8', five: '#3a3d42' };
+export const RIM_R: Record<RimStyle, number> = { rally: 0.235, steel: 0.215, double5: 0.232, multi: 0.242, turbine: 0.24, classic: 0.215, five: 0.25 };
+export const RIM_COLOR: Record<RimStyle, string> = { rally: '#f1f1ec', steel: '#aab0b7', double5: '#cdd2d8', multi: '#2a2c30', turbine: '#e4e7eb', classic: '#dfe3e8', five: '#3a3d42' };
 
 /** Speiche als verjüngter, leicht gewölbter Balken von der Nabe (z = r0) zum Felgenrand (z = r1). */
 function spoke(m: Mesher, slot: number, angle: number, r0: number, r1: number, w0: number, w1: number, y0: number, y1: number, thick: number, splay = 0) {
@@ -125,13 +125,14 @@ export function wheelGeometry(style: RimStyle, detail: number, lugs: boolean, si
     m.add(W.rim, new THREE.LatheGeometry([[0, 0.094], [0.05, 0.094], [0.075, 0.086], [0.15, 0.084], [rOut, 0.07]].map(([r, y]) => new THREE.Vector2(r, y)), seg));
     for (let i = 0; i < 9; i++) m.box(W.dark, [0.018, 0.006, 0.05], [Math.sin((i / 9) * two) * 0.165, 0.083, Math.cos((i / 9) * two) * 0.165], [0, (i / 9) * two, 0]);
   } else {
-    const n = style === 'double5' ? 5 : style === 'multi' ? 10 : style === 'turbine' ? 7 : style === 'five' ? 5 : 18;
+    const n = style === 'double5' ? 5 : style === 'multi' ? 10 : style === 'turbine' ? 7 : style === 'five' ? 5 : style === 'rally' ? 6 : 18;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * two + 0.31;
       if (style === 'double5') for (const k of [-1, 1]) spoke(m, W.rim, a + k * 0.115, 0.05, rOut, 0.02, 0.017, 0.07, 0.088, 0.018, k * -0.05);
       else if (style === 'multi') spoke(m, W.rim, a, 0.05, rOut, 0.022, 0.015, 0.062, 0.09, 0.018);
       else if (style === 'turbine') spoke(m, W.rim, a, 0.05, rOut, 0.05, 0.03, 0.07, 0.088, 0.016, 0.08);
       else if (style === 'five') spoke(m, W.rim, a, 0.05, rOut, 0.07, 0.04, 0.058, 0.09, 0.02);
+      else if (style === 'rally') spoke(m, W.rim, a, 0.05, rOut, 0.075, 0.05, 0.05, 0.09, 0.024);
       else spoke(m, W.rim, a, 0.06, rOut, 0.007, 0.007, 0.075 - (i % 2) * 0.03, 0.085, 0.006, (i % 2 ? 1 : -1) * 0.12);
     }
     // Nabe und Nabendeckel
@@ -571,6 +572,33 @@ function ttEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   for (let i = 0; i < 6; i++) m.cyl(SLOT.dark, 0.006, 0.006, 0.006, [xf + Math.cos((i / 6) * 6.283) * 0.045, yf + Math.sin((i / 6) * 6.283) * 0.045, zf + 0.007], [Math.PI / 2, 0, 0], 6);
 }
 
+/** Band an der Flanke (`side` 1 = +z) zwischen den Höhen lo(x) und hi(x), als ein zusammenhängendes Netz mit glatten Kanten. */
+function sideBand(m: Mesher, S: Shape, slot: number, side: 1 | -1, x0: number, x1: number, lo: (x: number) => number, hi: (x: number) => number, lift: number, nx: number, ny: number) {
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= nx; i++) {
+    const x = x0 + ((x1 - x0) * i) / nx;
+    const a = lo(x);
+    const b = hi(x);
+    for (let j = 0; j <= ny; j++) {
+      const y = a + ((b - a) * j) / ny;
+      pos.push(x, y, side * (S.sideZ(x, y) + lift));
+    }
+  }
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      const k = i * (ny + 1) + j;
+      if (side > 0) idx.push(k, k + ny + 1, k + 1, k + 1, k + ny + 1, k + ny + 2);
+      else idx.push(k, k + 1, k + ny + 1, k + 1, k + ny + 2, k + ny + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  m.add(slot, g);
+}
+
 /** Emblem aus drei verschlungenen Chromringen vorn (`dir` 1) oder hinten (-1) in Höhe y. */
 function ringsEmblem(m: Mesher, S: Shape, N: (n: number) => number, dir: 1 | -1, y: number, r = 0.03) {
   for (const k of [-1, 0, 1]) {
@@ -581,53 +609,85 @@ function ringsEmblem(m: Mesher, S: Shape, N: (n: number) => number, dir: 1 | -1,
 }
 
 /**
- * Front und Heck des kantigen Rallye-Coupés (`quattro`): große rechteckige Scheinwerfer mit Blinker, schmaler Grill mit Querlamellen
- * und Ringen, schwarze Stoßfänger mit Nebelscheinwerfern; hinten durchgehende schwarze Leuchtenblende, Gummi-Abrisskante, ein Endrohr.
+ * Rallye-Coupé (`quattro`) in Rallye-Optik: kleine Rechteckscheinwerfer, schwarzer Grill mit Ringen, sechs runde Zusatzscheinwerfer,
+ * großer Frontsplitter, Lufteinlässe mit Gitter hinter den Türen, großer Heckflügel, weiße Grundfarbe mit gelbem Unterteil und Zierstreifen.
  */
 function quattroEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   const B = S.B;
-  // ---- Front ----
-  const yL = 0.67;
+  // ---- Lackierung: gelbes Unterteil mit zwei Zierstreifen (Säulen über die Länge, an den Radläufen ausgespart) ----
+  const LO = 0.3;
+  const HI = 0.62;
   for (const s of [-1, 1] as const) {
-    const z = s * 0.52;
-    endPatch(m, SLOT.gloss, S, 1, z, yL, 0.38, 0.14, 0.12, 0.004, N(10), N(4));
-    endPatch(m, SLOT.lens, S, 1, z - s * 0.03, yL, 0.3, 0.11, 0.12, 0.008, N(10), N(4));
-    for (const o of [-0.07, 0.07]) endPatch(m, SLOT.chrome, S, 1, z - s * 0.03 + o, yL, 0.05, 0.08, 1, 0.011, 4, 4);
-    endPatch(m, SLOT.amber, S, 1, z + s * 0.15, yL, 0.05, 0.11, 0.1, 0.008, 3, 4);
-    // Nebelscheinwerfer im Stoßfänger
-    endPatch(m, SLOT.lens, S, 1, s * 0.42, 0.44, 0.13, 0.05, 0.2, 0.02, 4, 2);
+    // Unterkante: über den Radläufen am Bogen entlang; dort läuft das Gelb als Bogen um den Radlauf herum
+    const lo = (x: number) => Math.max(LO, S.bottom(x) + 0.03);
+    const hi = (x: number) => Math.max(HI, lo(x) + 0.07);
+    sideBand(m, S, SLOT.livery, s, B.tail + 0.03, B.nose - 0.05, lo, hi, 0.009, N(160), 6);
+    for (const [o, h] of [[0.025, 0.012], [0.05, 0.006]] as const) sideBand(m, S, SLOT.stripe, s, B.tail + 0.03, B.nose - 0.05, (x) => hi(x) + o - h / 2, (x) => hi(x) + o + h / 2, 0.011, N(160), 1);
   }
-  // Grill: schwarz mit vier Chrom-Querlamellen, Ringe in der Mitte
-  endPatch(m, SLOT.gloss, S, 1, 0, yL, 0.56, 0.13, 0.1, 0.006, N(10), N(4));
-  for (const o of [-0.045, -0.015, 0.015, 0.045]) endPatch(m, SLOT.chrome, S, 1, 0, yL + o, 0.54, 0.006, 0, 0.01, N(10), 1);
-  ringsEmblem(m, S, N, 1, yL, 0.028);
-  // Schwarzer Stoßfänger, Kennzeichen, Frontspoiler
-  wrapPatch(m, SLOT.dark, S, 1, 0, 2.0, 0.45, 0.13, 0.15, 0.014, N(24), N(4));
-  endPatch(m, SLOT.plate, S, 1, 0, 0.45, 0.46, 0.09, 0.06, 0.024, N(8), 2);
-  wrapPatch(m, SLOT.dark, S, 1, 0, 1.7, 0.31, 0.1, 0.2, 0.012, N(18), N(3));
+  for (const d of [1, -1] as const) {
+    wrapPatch(m, SLOT.livery, S, d, 0, 2.4, (LO + HI) / 2, HI - LO, 0.1, 0.012, N(26), N(4));
+    wrapPatch(m, SLOT.stripe, S, d, 0, 2.4, HI + 0.025, 0.012, 0.1, 0.006, N(26), 1);
+  }
+  // ---- Front ----
+  const yL = 0.68;
+  for (const s of [-1, 1] as const) {
+    const z = s * 0.56;
+    endPatch(m, SLOT.gloss, S, 1, z, yL, 0.24, 0.12, 0.12, 0.012, N(8), N(4));
+    endPatch(m, SLOT.lens, S, 1, z, yL, 0.2, 0.09, 0.12, 0.016, N(8), N(4));
+    endPatch(m, SLOT.amber, S, 1, z, yL - 0.115, 0.17, 0.065, 0.15, 0.016, N(6), 2);
+  }
+  // Schwarzer Grill mit Querlamellen und Ringen
+  endPatch(m, SLOT.gloss, S, 1, 0, yL, 0.64, 0.15, 0.08, 0.008, N(10), N(4));
+  for (const o of [-0.05, -0.02, 0.01, 0.04]) endPatch(m, SLOT.dark, S, 1, 0, yL + o, 0.6, 0.008, 0, 0.012, N(10), 1);
+  ringsEmblem(m, S, N, 1, yL + 0.03, 0.022);
+  // Sechs Zusatzscheinwerfer: zwei große oben, vier in einer Reihe darunter (vor dem Grill)
+  const lamp = (y: number, z: number, r: number) => {
+    const x = S.endX(1, y, z) + 0.06;
+    const rot: V3 = [0, 0, -Math.PI / 2];
+    m.cyl(SLOT.gloss, r, r * 0.92, 0.07, [x, y, z], rot, N(18));
+    m.add(SLOT.chrome, new THREE.TorusGeometry(r, r * 0.09, 6, N(20)), mat([x + 0.035, y, z], [0, Math.PI / 2, 0]));
+    m.add(SLOT.lens, new THREE.SphereGeometry(r * 0.95, N(16), N(6), 0, Math.PI * 2, 0, 0.5), mat([x + 0.025, y, z], [0, 0, -Math.PI / 2]));
+    m.add(SLOT.glow, new THREE.SphereGeometry(r * 0.22, 8, 6), mat([x + 0.05, y, z]));
+  };
+  for (const s of [-1, 1]) lamp(yL + 0.02, s * 0.3, 0.085);
+  for (const z of [-0.48, -0.16, 0.16, 0.48]) lamp(0.5, z, 0.072);
+  m.box(SLOT.dark, [0.03, 0.02, 1.0], [S.endX(1, 0.5, 0) + 0.04, 0.42, 0]);
+  // Stoßfänger, Kennzeichen, großer Frontsplitter
+  wrapPatch(m, SLOT.gloss, S, 1, 0, 1.9, 0.36, 0.1, 0.15, 0.012, N(22), N(3));
+  endPatch(m, SLOT.plate, S, 1, 0, 0.37, 0.46, 0.09, 0.06, 0.02, N(8), 2);
+  const xs = S.endX(1, B.ground + 0.06, 0);
+  m.rbox(SLOT.gloss, [0.26, 0.022, B.width * 2.05], 0.008, [xs + 0.07, B.ground + 0.04, 0]);
+  for (const s of [-1, 1]) m.rbox(SLOT.gloss, [0.3, 0.12, 0.016], 0.006, [xs - 0.04, B.ground + 0.1, s * B.width * 1.02], [0, s * 0.25, 0]);
   // ---- Heck ----
   const yT = 0.8;
-  wrapPatch(m, SLOT.gloss, S, -1, 0, 1.95, yT, 0.17, 0.08, 0.004, N(24), N(4));
+  wrapPatch(m, SLOT.gloss, S, -1, 0, 1.95, yT, 0.15, 0.08, 0.004, N(24), N(4));
   for (const s of [-1, 1] as const) {
     const a = Math.atan2(s * 0.56, 0.96);
-    wrapPatch(m, SLOT.tail, S, -1, a, 0.62, yT + 0.03, 0.08, 0.08, 0.009, N(10), N(3));
-    for (const o of [-0.02, 0, 0.02]) wrapPatch(m, SLOT.tailBar, S, -1, a, 0.58, yT + 0.03 + o, 0.004, 0, 0.012, N(8), 1);
-    wrapPatch(m, SLOT.amber, S, -1, a + s * 0.14, 0.3, yT - 0.04, 0.05, 0.08, 0.009, N(6), 2);
-    wrapPatch(m, SLOT.lens, S, -1, a - s * 0.16, 0.24, yT - 0.04, 0.05, 0.08, 0.009, N(6), 2);
+    wrapPatch(m, SLOT.tail, S, -1, a, 0.6, yT + 0.02, 0.08, 0.08, 0.009, N(10), N(3));
+    wrapPatch(m, SLOT.amber, S, -1, a + s * 0.14, 0.3, yT - 0.045, 0.045, 0.08, 0.009, N(6), 2);
   }
-  endPatch(m, SLOT.plate, S, -1, 0, yT, 0.46, 0.1, 0.06, 0.009, N(8), 2);
-  ringsEmblem(m, S, N, -1, yT + 0.12, 0.024);
-  // Schwarzer Stoßfänger, Endrohr rechts
-  wrapPatch(m, SLOT.dark, S, -1, 0, 2.0, 0.48, 0.13, 0.15, 0.014, N(24), N(4));
-  const zp = 0.42;
+  endPatch(m, SLOT.plate, S, -1, 0, yT, 0.44, 0.09, 0.06, 0.009, N(8), 2);
+  // Großer Heckflügel auf zwei Stützen mit Seitenplatten
+  const xw = B.tail + 0.2;
+  const yw = S.crown(xw) + 0.17;
+  m.rbox(SLOT.solid, [0.36, 0.025, B.width * 2.0], 0.01, [xw, yw, 0], [0, 0, 0.12]);
+  for (const s of [-1, 1]) {
+    m.rbox(SLOT.gloss, [0.32, 0.2, 0.014], 0.01, [xw + 0.02, yw - 0.02, s * B.width * 1.0], [0, 0, 0.12]);
+    m.rbox(SLOT.solid, [0.12, 0.17, 0.03], 0.01, [xw + 0.06, yw - 0.085, s * 0.42]);
+  }
+  wrapPatch(m, SLOT.gloss, S, -1, 0, 2.0, 0.46, 0.1, 0.15, 0.014, N(24), N(3));
+  const zp = 0.4;
   const xp = S.endX(-1, B.ground + 0.08, zp);
-  m.add(SLOT.chrome, new THREE.CylinderGeometry(0.034, 0.034, 0.14, 16, 1, true), mat([xp + 0.03, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
-  m.add(SLOT.dark, new THREE.CylinderGeometry(0.03, 0.03, 0.01, 12), mat([xp - 0.035, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
-  // Flanken: schwarze Schutzleiste
+  m.add(SLOT.chrome, new THREE.CylinderGeometry(0.045, 0.045, 0.14, 16, 1, true), mat([xp + 0.03, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
+  m.add(SLOT.dark, new THREE.CylinderGeometry(0.04, 0.04, 0.01, 12), mat([xp - 0.035, B.ground + 0.07, zp], [0, 0, Math.PI / 2]));
+  // ---- Flanken: Lufteinlässe mit Gitter hinter den Türen, Schweller ----
   for (const s of [-1, 1] as const) {
-    const xa = B.rearAxle + ARCH_R + 0.08;
-    const xb = WHEEL_X - ARCH_R - 0.08;
-    sidePatch(m, SLOT.dark, S, s, (xa + xb) / 2, 0.52, xb - xa, 0.035, 0, 0.012, N(14), 2);
+    const xi = B.seams[1] - 0.12;
+    sidePatch(m, SLOT.gloss, S, s, xi, 0.6, 0.12, 0.34, 0.15, 0.008, 3, 6);
+    for (let k = 0; k < 6; k++) sidePatch(m, SLOT.dark, S, s, xi, 0.46 + k * 0.055, 0.1, 0.006, 0, 0.012, 2, 1);
+    const xa = B.rearAxle + ARCH_R + 0.06;
+    const xb = WHEEL_X - ARCH_R - 0.06;
+    sidePatch(m, SLOT.gloss, S, s, (xa + xb) / 2, B.ground + 0.05, xb - xa, 0.07, 0, 0.012, N(12), 2);
   }
 }
 

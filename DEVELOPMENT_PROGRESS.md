@@ -164,7 +164,10 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Nachgebildete Autos tragen leicht abgewandelte Originalnamen (privates Spiel): Renolt Twingo, BMV 323i (E30), Porshe 356, Porshe 911 Carrera (964/992), Audy TT (8N); alle bisherigen Bavaria-Modelle heißen BMV. Modellkennungen bleiben gleich – Spielstände sind nicht betroffen.
 - Audy TT: Emblem aus drei verschlungenen Chromringen vorn und hinten.
 
-## Fahrzeug 7: Audy Ur-quattro 2.2 Turbo (an den Audi Ur-quattro angelehnt) – wartet auf Freigabe
+## Fahrzeug 7: Audy Sport quattro S1 (an den Audi Sport quattro S1 in Rallye-Optik angelehnt) – wartet auf Freigabe
+
+- Auf Wunsch umgebaut zur Rallye-Optik nach Vorlagebild: kürzer und kastiger (Radstand 2,22 m), großer Frontsplitter, sechs runde Zusatzscheinwerfer, kleine Rechteckscheinwerfer, großer Heckflügel, Lufteinlässe mit Gitter hinter den Türen, weiße Grundfarbe mit gelbem Unterteil und Zierstreifen (feste Lackierung, ohne Sponsoren), weiße Sechsspeichenfelgen. Modellkennung unverändert.
+
 
 - Neue Motorbauart **Reihenfünfzylinder** (`R5`): 2,2-l-Turbo, 220 PS, Teilefamilie „R5-Turbo“, fünf Spulen und Kerzen, eigener Klang (2,5. Ordnung). Füllmengen für fünf Zylinder ergänzt.
 - Neue Form `quattro`: 4,40 m, Radstand 2,52 m, flache lange Haube, steile Scheibe, schräge Heckscheibe mit kurzem Kofferraum, eckige Draufsicht, ausgestellte Radläufe, scharfe Seitenkante.
