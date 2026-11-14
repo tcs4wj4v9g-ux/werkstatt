@@ -775,7 +775,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <mesh geometry={interior} material={trimMats} />
         {/* Unterboden und Spritzwand */}
         <mesh position={[(B.nose + B.tail) / 2, B.ground + 0.05, 0]} material={mats.dark}>
-          <boxGeometry args={[B.nose - B.tail - 0.4, 0.08, 1.3]} />
+          <boxGeometry args={[B.nose - B.tail - (rearEngine ? 1.0 : 0.4), 0.08, 1.3]} />
         </mesh>
         {/* Spritzwand vor dem Motorraum; beim Heckmotor hinter den Sitzen. Nie höher als die Karosserie an dieser Stelle. */}
         {(() => {

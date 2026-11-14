@@ -332,20 +332,20 @@ function tubEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   const B = S.B;
   const disc = (dir: 1 | -1, slot: number, z: number, y: number, r: number, lift: number, sy = 1) => endPatch(m, slot, S, dir, z, y, r * 2, r * 2 * sy, 1, lift, N(10), N(8));
   // ---- Front ----
-  const yL = 0.66;
+  const yL = 0.6;
   for (const s of [-1, 1] as const) {
-    const z = s * 0.53;
-    // Scheinwerfer als runder Topf im Kotflügel: Chromring, gewölbtes Glas, nach vorn und leicht nach oben gerichtet
-    const x = S.endX(1, yL, z) - 0.05;
-    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + 0.28]);
-    m.add(SLOT.solid, new THREE.CylinderGeometry(0.095, 0.1, 0.1, N(20), 1, true), r.clone().multiply(mat([0, 0, 0])));
-    m.add(SLOT.chrome, new THREE.TorusGeometry(0.09, 0.011, 6, N(22)), r.clone().multiply(mat([0, 0.05, 0], [Math.PI / 2, 0, 0])));
-    m.add(SLOT.lens, new THREE.SphereGeometry(0.088, N(18), N(8), 0, Math.PI * 2, 0, 0.55), r.clone().multiply(mat([0, -0.02, 0], [0, 0, 0], [1, 1.1, 1])));
-    m.add(SLOT.glow, new THREE.SphereGeometry(0.02, 8, 6), r.clone().multiply(mat([0, 0.06, 0])));
+    const z = s * 0.56;
+    // Scheinwerfer im Kotflügel: Topf in Wagenfarbe, der in die Kotflügelspitze übergeht, Chromring, gewölbtes Glas
+    const x = S.endX(1, yL, z) - 0.07;
+    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + 0.2]);
+    m.add(SLOT.solid, new THREE.CylinderGeometry(0.115, 0.15, 0.17, N(22), 1, false), r.clone().multiply(mat([0, -0.02, 0])));
+    m.add(SLOT.chrome, new THREE.TorusGeometry(0.106, 0.012, 6, N(24)), r.clone().multiply(mat([0, 0.066, 0], [Math.PI / 2, 0, 0])));
+    m.add(SLOT.lens, new THREE.SphereGeometry(0.104, N(20), N(8), 0, Math.PI * 2, 0, 0.5), r.clone().multiply(mat([0, 0.02, 0], [0, 0, 0], [1, 0.9, 1])));
+    m.add(SLOT.chrome, new THREE.SphereGeometry(0.03, 10, 8), r.clone().multiply(mat([0, 0.09, 0], [0, 0, 0], [1, 0.4, 1])));
     // Hupengitter und Blinker darunter
     endPatch(m, SLOT.chrome, S, 1, s * 0.36, 0.5, 0.09, 0.05, 0.9, 0.006, 6, 4);
     for (const o of [-0.012, 0, 0.012]) endPatch(m, SLOT.dark, S, 1, s * 0.36, 0.5 + o, 0.075, 0.004, 0, 0.009, 4, 1);
-    disc(1, SLOT.amber, s * 0.6, 0.5, 0.026, 0.008);
+    disc(1, SLOT.amber, s * 0.58, 0.45, 0.026, 0.008);
   }
   // Haubengriff mit Wappen, Zierleiste auf der Fronthaube
   endPatch(m, SLOT.chrome, S, 1, 0, 0.6, 0.11, 0.025, 0.6, 0.008, 5, 2);
@@ -784,7 +784,7 @@ export function interiorGeometry(body: BodyStyle, detail: number, sportSeats = f
   // Seitenverkleidung hinten, Hutablage bzw. Laderaumboden, Dachhimmel
   const d1 = B.seams[1];
   const back = Math.max(B.x0 + 0.1, B.tail + 0.8);
-  if (d1 - back > 0.2) for (const s of [-1, 1]) m.rbox(SLOT.seat2, [d1 - back, 0.18, 0.03], 0.012, [(d1 + back) / 2, S.beltY(d1) - 0.09, s * (S.width(back) - 0.1)]);
+  if (d1 - back > 0.2 && body !== 'tub') for (const s of [-1, 1]) m.rbox(SLOT.seat2, [d1 - back, 0.18, 0.03], 0.012, [(d1 + back) / 2, S.beltY(d1) - 0.09, s * (S.width(back) - 0.1)]);
   if (body === 'wagon' || body === 'hatch') {
     const xa = B.tail + 0.5;
     const xb = rx - 0.4;
