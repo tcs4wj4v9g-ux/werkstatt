@@ -42,7 +42,7 @@ const LOSSES: Record<string, [string, number]> = {
   bearing: ['Lagerschaden', 0.15],
   head_gasket: ['Kompressionsverlust (Kopfdichtung)', 0.28],
 };
-const BODY_AGILITY = { mono: 1.05, box: 1.06, tub: 1.1, nine: 1.22, nine2: 1.3, tt: 1.15, quattro: 1.08, b5: 0.98, e34: 1.04, sedan: 1, wagon: 0.94, hatch: 1.08, coupe: 1.12, sport: 1.3, luxury: 0.88, classic: 0.96 };
+const BODY_AGILITY = { mono: 1.05, box: 1.06, tub: 1.1, nine: 1.22, nine2: 1.3, tt: 1.15, quattro: 1.08, b5: 0.98, e34: 1.04, golf2: 1.1, evo2: 1.12, g87: 1.24, g82: 1.18, sedan: 1, wagon: 0.94, hatch: 1.08, coupe: 1.12, sport: 1.3, luxury: 0.88, classic: 0.96 };
 
 /** Ergebnis des Leistungsmodells für den eingebauten Motor samt Tuning. */
 export interface EngineOutput {
