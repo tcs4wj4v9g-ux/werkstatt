@@ -334,3 +334,43 @@ describe('Schrottplatz: Hebebühne und fehlende Teile', () => {
     expect(car.components.battery.installed).toBe(true);
   });
 });
+
+describe('Kupplung und Kühler im Tuning', () => {
+  it('verstärkte Kupplung und größerer Kühler wirken als eingebaute Tuningteile – ohne Motorumbau', async () => {
+    const { engineOutput } = await import('./performance');
+    const car = mk('bavaria_335_coupe', []);
+    car.ecu = { map: 2, boost: 1.6, limiter: 0 };
+    car.components.charge_pipe.variant = 'intercooler';
+    for (const k of Object.keys(car.components)) if (/^piston\d$/.test(k)) car.components[k].variant = 'piston_forged';
+    car.components.fuel_pump.variant = 'fuelpump_hp';
+    for (const k of Object.keys(car.components)) if (/^inj\d$/.test(k)) car.components[k].variant = 'injector_hp';
+    car.components.turbo.variant = 'turbo_big';
+    const before = engineOutput(car);
+    expect(before.risks.some((r) => r.id === 'clutch')).toBe(true);
+    car.components.clutch.variant = 'clutch_hd';
+    car.components.radiator.variant = 'swap_radiator';
+    const after = engineOutput(car);
+    expect(after.risks.some((r) => r.id === 'clutch')).toBe(false);
+    const heat = (o: typeof before) => o.risks.find((r) => r.id === 'heat')?.level ?? 0;
+    expect(heat(after)).toBeLessThanOrEqual(heat(before));
+    expect(performance(car).ps).toBeGreaterThanOrEqual(performance({ ...car, components: { ...car.components, clutch: { ...car.components.clutch, variant: undefined } } }).ps);
+  });
+  it('Kupplung sitzt hinter dem Getriebe, der Kühler hinter dem Kühlmittelschlauch; luftgekühlte Boxer haben keinen Kühler', () => {
+    const car = mk('bavaria_320', []);
+    expect(defOf(car, 'clutch').blockedBy).toEqual(['gearbox']);
+    expect(defOf(car, 'radiator').blockedBy).toEqual(['hose']);
+    expect(defOf(car, 'clutch').variants).toEqual(['clutch_hd']);
+    expect(mk('zuffen_929', []).components.radiator).toBeUndefined();
+    expect(mk('zuffen_929', []).components.clutch).toBeDefined();
+  });
+  it('alter Motorumbau mit verstärkter Kupplung: beim Laden als sichtbares Tuningteil übernommen', async () => {
+    const { normalizeCar } = await import('./store');
+    const car = mk('bavaria_320', []);
+    delete (car.components as any).clutch;
+    delete (car.components as any).radiator;
+    car.swap = { from: 'r4_20', parts: ['clutch_hd', 'swap_radiator'] };
+    const loaded = normalizeCar(JSON.parse(JSON.stringify(car)))!;
+    expect(loaded.components.clutch.variant).toBe('clutch_hd');
+    expect(loaded.components.radiator.variant).toBe('swap_radiator');
+  });
+});

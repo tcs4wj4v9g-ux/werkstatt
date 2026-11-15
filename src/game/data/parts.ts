@@ -52,6 +52,8 @@ export const PARTS: Record<PartId, PartDef> = {
   engine_mount: { id: 'engine_mount', name: 'Motorlager-Satz', price: 120, units: 1, desc: 'Gummilager links und rechts' },
   downpipe: { id: 'downpipe', name: 'Hosenrohr', price: 160, units: 1, desc: 'mit Flanschdichtung' },
   fuel_pump: { id: 'fuel_pump', name: 'Kraftstoffpumpe', price: 180, units: 1, desc: 'Tankpumpe mit Sieb' },
+  clutch: { id: 'clutch', name: 'Kupplungssatz', price: 240, units: 1, desc: 'Kupplungsscheibe, Druckplatte, Ausrücklager' },
+  radiator: { id: 'radiator', name: 'Kühler', price: 160, units: 1, desc: 'Wasserkühler mit Kunststoff-Wasserkästen' },
   muffler: { id: 'muffler', name: 'Endschalldämpfer', price: 130, units: 1, desc: 'Endtopf mit Schelle und Gummiaufhängung' },
   control_arm: { id: 'control_arm', name: 'Querlenker', price: 95, units: 1, desc: 'mit Gummilagern und Traggelenk – je Seite' },
   tie_rod_end: { id: 'tie_rod_end', name: 'Spurstangenkopf', price: 38, units: 1, desc: 'mit Manschette und Mutter – je Seite' },
@@ -61,10 +63,10 @@ export const PARTS: Record<PartId, PartDef> = {
   swap_adapter: { id: 'swap_adapter', name: 'Getriebeadapterplatte', price: 540, units: 1, desc: 'Verbindet Motor und vorhandenes Getriebe', kind: 'swap' },
   swap_harness: { id: 'swap_harness', name: 'Umbau-Kabelbaum', price: 460, units: 1, desc: 'Motorkabelbaum passend zum Fahrzeug', kind: 'swap' },
   swap_ecu: { id: 'swap_ecu', name: 'Motorsteuergerät für Umbau', price: 690, units: 1, desc: 'Steuergerät mit Wegfahrsperren-Anpassung', kind: 'swap' },
-  swap_radiator: { id: 'swap_radiator', name: 'Größerer Kühler', price: 320, units: 1, desc: 'Mehr Kühlleistung für mehr Leistung', kind: 'swap' },
+  swap_radiator: { id: 'swap_radiator', name: 'Größerer Kühler', price: 320, units: 1, desc: 'Alu-Kühler mit mehr Netzfläche – mehr Kühlleistung für mehr Leistung', kind: 'tuning', replaces: 'radiator' },
   swap_fuel: { id: 'swap_fuel', name: 'Umbau-Kraftstoffanlage', price: 420, units: 1, desc: 'Pumpe, Leitungen und Druckregler für die andere Kraftstoffart', kind: 'swap' },
   swap_exhaust: { id: 'swap_exhaust', name: 'Umbau-Abgasanlage', price: 480, units: 1, desc: 'Krümmeranschluss und Rohrführung für den neuen Motor', kind: 'swap' },
-  clutch_hd: { id: 'clutch_hd', name: 'Verstärkte Kupplung', price: 560, units: 1, desc: 'Hält deutlich mehr Drehmoment', kind: 'swap' },
+  clutch_hd: { id: 'clutch_hd', name: 'Verstärkte Kupplung', price: 560, units: 1, desc: 'Sinter-Belag und stärkere Druckplatte – hält deutlich mehr Drehmoment', kind: 'tuning', replaces: 'clutch' },
   // Leistungstuning – jedes Teil wird anstelle eines Serienteils eingebaut
   turbo_kit: { id: 'turbo_kit', name: 'Turbo-Nachrüstsatz', price: 2400, units: 1, desc: 'Turbolader, Ladeluftrohr, Ölleitungen – für Saugmotoren', kind: 'tuning' },
   turbo_big: { id: 'turbo_big', name: 'Größerer Turbolader', price: 1650, units: 1, desc: 'Mehr Luft – braucht Einspritzung, Kühlung und Abstimmung', kind: 'tuning', replaces: 'turbo' },
@@ -81,5 +83,5 @@ export const PARTS: Record<PartId, PartDef> = {
 export const PART_LIST = Object.values(PARTS);
 
 /** Teile, die zum Fahrwerk gehören und nach Fahrzeugklasse passen; alles andere außer der Batterie gehört zum Motor. */
-export const CHASSIS_PARTS: PartId[] = ['brake_pads', 'brake_disc', 'tire', 'muffler', 'control_arm', 'tie_rod_end'];
+export const CHASSIS_PARTS: PartId[] = ['brake_pads', 'brake_disc', 'tire', 'muffler', 'control_arm', 'tie_rod_end', 'clutch', 'radiator'];
 export const UNIVERSAL_PARTS: PartId[] = ['battery', 'turbo_kit', 'intake_sport', 'swap_harness', 'swap_ecu', 'swap_radiator', 'swap_fuel', 'clutch_hd', 'fuel_pump', 'fuelpump_hp'];

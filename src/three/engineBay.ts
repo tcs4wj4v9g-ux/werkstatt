@@ -88,8 +88,7 @@ export function engineDecor(e: EngineDef, detail: number, mode: 'car' | 'bare' |
   m.cyl(BAY.alu, 0.03, 0.03, 0.13, [0.94, 0.655, -0.46], Z90, 10);
   for (const dz of [-0.015, 0.015]) m.tube(BAY.steel, [[0.99, 0.645, -0.46 + dz], [1.04, 0.56, -0.56 + dz], [1.2, 0.47, -0.62 + dz]], 0.005, 4);
   // Kühlerpaket: Netz, Wasserkästen, Lüfterzarge mit Lüfter, Schlossträger mit Haubenschloss
-  m.box(BAY.core, [0.035, 0.36, 1.0], [1.957, 0.59, 0]);
-  for (const s of [-1, 1]) m.rbox(BAY.plastic, [0.05, 0.37, 0.06], 0.015, [1.957, 0.59, s * 0.53]);
+  // (Kühlernetz und Wasserkästen sind ein ausbaubares Bauteil – siehe CarModel „radiator“.)
   m.rbox(BAY.plastic, [0.025, 0.34, 0.66], 0.01, [1.92, 0.59, 0]);
   m.torus(BAY.plastic, 0.15, 0.012, [1.905, 0.59, 0], [0, Math.PI / 2, 0], detail ? 20 : 12);
   m.cyl(BAY.painted, 0.04, 0.04, 0.03, [1.9, 0.59, 0], Z90, 10);

@@ -91,11 +91,13 @@ export function swapPlan(car: Pick<CarInstance, 'modelId'>, engineId: string): S
     parts.add('swap_fuel');
     reasons.push(`${e.fuel === 'diesel' ? 'Diesel' : 'Benziner'} statt ${orig.fuel === 'diesel' ? 'Diesel' : 'Benziner'}: andere Kraftstoffanlage.`);
   }
-  if (e.ps > orig.ps * 1.25 || (e.turbo && !orig.turbo)) {
+  // Schon nachgerüsteter größerer Kühler bzw. verstärkte Kupplung zählen mit.
+  const tuned = (comp: string, v: string) => (car as CarInstance).components?.[comp]?.variant === v;
+  if ((e.ps > orig.ps * 1.25 || (e.turbo && !orig.turbo)) && !tuned('radiator', 'swap_radiator')) {
     parts.add('swap_radiator');
     reasons.push('Deutlich mehr Leistung bzw. Turbo: größerer Kühler.');
   }
-  if (e.nm > orig.nm * 1.4) {
+  if (e.nm > orig.nm * 1.4 && !tuned('clutch', 'clutch_hd')) {
     parts.add('clutch_hd');
     reasons.push(`${e.nm} Nm statt ${orig.nm} Nm: verstärkte Kupplung.`);
   }
@@ -152,6 +154,9 @@ export function insertEngine(car: CarInstance, unit: EngineUnit, swapParts: Part
   car.fluids.oil.level = unit.oil;
   if (unit.motor.engineId !== orig.id || car.swap) {
     car.swap = { from: car.swap?.from ?? orig.id, parts: [...new Set([...(car.swap?.parts ?? []), ...swapParts])] };
+    // Beim Umbau eingebauter Kühler bzw. Kupplung sind sichtbare Bauteile.
+    if (swapParts.includes('swap_radiator') && car.components.radiator) car.components.radiator = { ...car.components.radiator, variant: 'swap_radiator', condition: 'ok' };
+    if (swapParts.includes('clutch_hd') && car.components.clutch) car.components.clutch = { ...car.components.clutch, variant: 'clutch_hd', condition: 'ok' };
   }
   car.dyno = undefined;
   car.testDriven = false;

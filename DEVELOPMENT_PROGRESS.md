@@ -286,3 +286,29 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Geschmiedete Kolben: angelaufener Kolbenboden und Stahlpleuel.
   - Schon vorher unterschiedlich: Sportluftfilter (rot), Sportabgasanlage (blank), Sportnockenwellen (gelb), Hochleistungs-Kraftstoffpumpe (rot), Ladeluftkühler-Kit.
 - Geprüft: Logiktests; Browser-Durchläufe `motoren` (neuer Schritt: Tuning-Beschriftung), `schrott`, `mechanik`; Bilder des Motorraums mit und ohne Tuning angesehen. Kein echter iPad-Test.
+
+## Kupplung und Kühler als Bauteile (auch fürs Tuning)
+
+- Bisher gab es die verstärkte Kupplung und den größeren Kühler nur automatisch beim Motorumbau. Die Akte warnte bei mehr Ladedruck zwar „Kupplung rutscht – verstärkte Kupplung“, nachrüsten ließ sie sich aber nicht.
+- **Neues Bauteil Kupplung** (`clutch`):
+  - Sitzt im Kupplungsgehäuse und ist erst nach dem Getriebe erreichbar, also von unten und mit dem Getriebeheber. Drei Schrauben mit 13er Nuss.
+  - Ersatzteil „Kupplungssatz“, Tuning-Ausführung „Verstärkte Kupplung“ (goldener Sinterbelag, blaue Druckplatte, „(Tuning)“ in der Beschriftung).
+  - Neuer Schaden „Verschlissene Kupplung“ mit dem Symptom „Kupplung rutscht“ auf der Probefahrt und Leistungsverlust.
+- **Neues Bauteil Kühler** (`radiator`):
+  - Vorn im Motorraum, oberer Wasserkasten hinter dem Schlossträger mit zwei 10er-Schrauben. Erst den Kühlmittelschlauch abnehmen (Kühlmittel ab), danach wieder füllen und entlüften.
+  - Ersatzteil „Kühler“, Tuning-Ausführung „Größerer Kühler“ (blankes Alunetz, Alu-Wasserkästen).
+  - Neuer Schaden „Undichter Kühler“: Kühlmittelverlust, Motor wird zu heiß.
+  - Luftgekühlte Boxer haben keinen Kühler. Beim wassergekühlten Heckmotor-Boxer (992) gibt es den Kühler vorerst nicht als Bauteil.
+- **Wirkung und Shop:**
+  - Die Leistungsberechnung nutzt die eingebauten Tuningteile (Kupplung hält 2,3- statt 1,35-faches Serien-Drehmoment, Kühler +25 % Kühlleistung).
+  - Beide Tuningteile stehen im Teileshop unter „Tuning“.
+- **Alte Spielstände und Umbauten:**
+  - Bisherige Motorumbauten mit diesen Teilen werden beim Laden als eingebaute Tuningteile übernommen (Einzelspieler und Koop).
+  - Ein neuer Umbau setzt sie direkt ein.
+  - Der Umbauplan verlangt sie nicht doppelt, wenn sie schon verbaut sind.
+- **Getriebe-Platzhalter** hängt tiefer unter dem Auto, damit darüber die Kupplung frei antippbar bleibt.
+- **Geprüft:**
+  - Logiktests: Wirkung ohne Umbau, Lage hinter Getriebe bzw. Schlauch, Übernahme alter Umbauten.
+  - Browser-Durchlauf `karriere`: Getriebe raus, Kupplung im Bild abschrauben und herausnehmen, verstärkte Kupplung einsetzen und festziehen, Austauschgetriebe wieder rein.
+  - Bilder des Motorraums angesehen.
+  - Kein echter iPad-Test.

@@ -29,6 +29,7 @@ export interface Performance {
 
 const LOSSES: Record<string, [string, number]> = {
   coil: ['Zündaussetzer (Zündspule)', 0.3],
+  clutch: ['Kupplung rutscht (verschlissen)', 0.15],
   plugs: ['Zündaussetzer (Zündkerzen)', 0.18],
   injector: ['Einspritzdüse defekt', 0.25],
   vacuum: ['Falschluft', 0.1],
@@ -91,7 +92,7 @@ export function engineOutput(car: CarInstance): EngineOutput {
   const pump = has(car, 'fuel_pump', 'fuelpump_hp') ? 1 : 0;
   const fuel = 1.16 * (1 + 0.3 * injHp) * (1 + 0.28 * pump) * (car.swap?.parts.includes('swap_fuel') ? 1.08 : 1);
   // Kühlung: Ladeluftkühler und größerer Kühler
-  const cooling = 1.25 + 0.35 * +has(car, 'charge_pipe', 'intercooler') + 0.25 * +!!car.swap?.parts.includes('swap_radiator');
+  const cooling = 1.25 + 0.35 * +has(car, 'charge_pipe', 'intercooler') + 0.25 * +(has(car, 'radiator', 'swap_radiator') || !!car.swap?.parts.includes('swap_radiator'));
   let factor = Math.min(air, fuel);
   let limit: EngineOutput['limit'] = air <= 1.001 ? 'Serie' : air > fuel ? 'Kraftstoff' : 'Luft';
   if (factor > cooling) {
@@ -109,7 +110,7 @@ export function engineOutput(car: CarInstance): EngineOutput {
   const forged = share(car, 'piston', 'piston_forged');
   const mechLimit = e.nm * (1.45 + 0.75 * forged);
   if (nm > mechLimit * 0.9) risks.push({ id: 'mech', label: `Motorinnereien an der Grenze (${Math.round(nm)} von ${Math.round(mechLimit)} Nm) – geschmiedete Kolben/Pleuel`, level: Math.max(0, (nm / mechLimit - 0.9) * 5) });
-  const clutchLimit = orig.nm * (car.swap?.parts.includes('clutch_hd') ? 2.3 : 1.35);
+  const clutchLimit = orig.nm * (has(car, 'clutch', 'clutch_hd') || car.swap?.parts.includes('clutch_hd') ? 2.3 : 1.35);
   if (nm > clutchLimit) risks.push({ id: 'clutch', label: `Kupplung rutscht (${Math.round(nm)} Nm, hält ${Math.round(clutchLimit)} Nm) – verstärkte Kupplung`, level: Math.min(1.5, (nm / clutchLimit - 1) * 4) });
   return { factor, boost, stockBoost, limit, risks, notes, redlineShift: (camshaftSport ? 400 : 0) + (ecu.limiter ?? 0) };
 }

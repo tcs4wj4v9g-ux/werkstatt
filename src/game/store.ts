@@ -267,6 +267,9 @@ export function normalizeCar(car: CarInstance | null): CarInstance | null {
     if (!old) {
       // Bauteil gab es früher nicht (z. B. Zylinder 5 und 6 am Sechszylinder): heil und eingebaut.
       components[id] = { ...fresh[id], ...(health === undefined ? {} : { health }) };
+      // Beim früheren Motorumbau verbauter Kühler bzw. verstärkte Kupplung werden zum sichtbaren Bauteil.
+      if (id === 'radiator' && car.swap?.parts?.includes('swap_radiator')) components[id].variant = 'swap_radiator';
+      if (id === 'clutch' && car.swap?.parts?.includes('clutch_hd')) components[id].variant = 'clutch_hd';
       added.push(id);
       continue;
     }

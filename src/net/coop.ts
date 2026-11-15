@@ -244,7 +244,7 @@ function loadState(s: any, entering: boolean) {
   }
   // Autos aus einer Version ohne zerlegbare Hinterachse bekommen Räder und Bremsen hinten.
   // …und Unterbodenteile (Endtopf, Querlenker, Spurstangen) kommen bei älteren Autos dazu.
-  const old = (c: any) => c && !c.bare && c.components && (!c.components.wheel_rl || !c.components.muffler);
+  const old = (c: any) => c && !c.bare && c.components && (!c.components.wheel_rl || !c.components.muffler || !c.components.clutch);
   const st = useGame.getState();
   if ([...st.cars, ...st.listings.map((l) => l.car), ...st.waiting, ...st.auctions.map((a) => a.car), ...st.jobs.map((j) => j.car)].some(old)) {
     useGame.setState({

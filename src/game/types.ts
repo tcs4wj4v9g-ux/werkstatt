@@ -68,6 +68,8 @@ export type PartId =
   | 'downpipe'
   | 'fuel_pump'
   | 'harness'
+  | 'clutch'
+  | 'radiator'
   | 'muffler'
   | 'control_arm'
   | 'tie_rod_end'
@@ -128,7 +130,9 @@ export type DefectId =
   | 'timing_chain'
   | 'muffler'
   | 'control_arm'
-  | 'tie_rod';
+  | 'tie_rod'
+  | 'clutch'
+  | 'radiator';
 
 /** hood = Motorraum (Auto unten), lifted = von unten (Auto angehoben), stand = nur am ausgebauten Motor auf dem Motorständer. */
 export type Access = 'hood' | 'lifted' | 'stand';

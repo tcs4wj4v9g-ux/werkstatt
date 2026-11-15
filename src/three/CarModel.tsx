@@ -120,7 +120,7 @@ const ghostTap = (car: CarInstance, id: string, fn: () => void) => (e: ThreeEven
 };
 
 /** Platzhalter schweben etwas neben der Einbauposition, damit das Teil darunter erreichbar bleibt. */
-const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, valve_cover_b: 0.14, cyl_head: 0.1, gearbox: -0.12, caliper_fl: 0.12, caliper_fr: 0.12, caliper_rl: 0.12, caliper_rr: 0.12, oil_pan: -0.14, engine_cover: 0.36, charge_pipe: 0.12 };
+const GHOST_LIFT: Record<string, number> = { valve_cover: 0.14, valve_cover_b: 0.14, cyl_head: 0.1, gearbox: -0.3, caliper_fl: 0.12, caliper_fr: 0.12, caliper_rl: 0.12, caliper_rr: 0.12, oil_pan: -0.14, engine_cover: 0.36, charge_pipe: 0.12 };
 
 type Axis = 'y' | 'y-' | 'z+' | 'z-' | 'x+';
 const AXIS_ROT: Record<Axis, V3> = {
@@ -1161,6 +1161,22 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               </mesh>
             </>,
           )}
+          {/* Kupplung zwischen Motor und Getriebe: erst nach dem Getriebe erreichbar. Verstärkte Kupplung mit goldenem Sinterbelag */}
+          {st('clutch') &&
+            part(
+              'clutch',
+              <>
+                <mesh position={[0.905, 0.228, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.078, 0.078, 0.018, 20]} />
+                  <Mat color={has('clutch', 'clutch_hd') ? '#c9922e' : st('clutch')?.known && st('clutch')?.condition === 'defect' ? '#4a3a30' : '#6f6a62'} metal={0.4} rough={0.7} />
+                </mesh>
+                <mesh position={[0.885, 0.228, 0]} rotation={[0, 0, Math.PI / 2]}>
+                  <cylinderGeometry args={[0.082, 0.082, 0.022, 20]} />
+                  <Mat color={has('clutch', 'clutch_hd') ? '#2f6bd8' : '#9aa0a7'} metal={0.8} rough={0.4} />
+                </mesh>
+              </>,
+            )}
+          {st('clutch') && !installed('gearbox') && bolts('clutch', [[0.885, 0.15, -0.045], [0.885, 0.15, 0.045], [0.885, 0.148, 0]], 'y-')}
           {/* versetzt angeordnet, damit von schräg vorn keine Schraube die andere verdeckt */}
           {bolts('gearbox', [[0.58, 0.122, -0.11], [0.78, 0.122, -0.03], [0.58, 0.122, 0.11], [0.78, 0.122, 0.03]], 'y-')}
           {/* Zylinderkopf: Reihenmotor ein Ventildeckel, V-Motor je Bank einer */}
@@ -1554,6 +1570,27 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             </>,
           )}
           {bolts('hose', [[1.42, 0.72, -0.45]])}
+          {/* Kühler vorn im Motorraum (Netz und Wasserkästen). Größerer Alu-Kühler: blankes Netz, dicker, mit Alu-Kästen */}
+          {st('radiator') &&
+            part(
+              'radiator',
+              <>
+                <mesh position={[1.957, 0.59, 0]}>
+                  <boxGeometry args={has('radiator', 'swap_radiator') ? [0.055, 0.38, 1.02] : [0.035, 0.36, 1.0]} />
+                  <Mat color={has('radiator', 'swap_radiator') ? '#c9cfd6' : st('radiator')?.known && st('radiator')?.condition === 'defect' ? '#5a5048' : '#1c1e21'} metal={0.85} rough={has('radiator', 'swap_radiator') ? 0.25 : 0.42} />
+                </mesh>
+                {/* Oberer Wasserkasten hinter dem Schlossträger: von oben sichtbar, dort sitzen die Halteschrauben */}
+                <RB s={[0.06, 0.05, 0.94]} r={0.015} p={[1.89, 0.8, 0]}>
+                  <Mat color={has('radiator', 'swap_radiator') ? '#d9dde2' : st('radiator')?.known && st('radiator')?.condition === 'defect' ? '#5a5048' : '#17181b'} metal={has('radiator', 'swap_radiator') ? 0.9 : 0} rough={0.45} />
+                </RB>
+                {[-1, 1].map((s) => (
+                  <RB key={s} s={[0.06, 0.39, 0.06]} r={0.015} p={[1.957, 0.59, s * 0.53]}>
+                    <Mat color={has('radiator', 'swap_radiator') ? '#d9dde2' : '#17181b'} metal={has('radiator', 'swap_radiator') ? 0.9 : 0} rough={0.5} />
+                  </RB>
+                ))}
+              </>,
+            )}
+          {st('radiator') && bolts('radiator', [[1.89, 0.83, -0.38], [1.89, 0.83, 0.38]])}
 
           {draining && !bare && (
             <mesh position={[1.4, 0.185 - 0.84, 0.08]} raycast={noRay}>

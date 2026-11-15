@@ -55,6 +55,7 @@ const list: SymptomDef[] = [
   { id: 'black_smoke', channel: 'drive', text: 'Beim Beschleunigen stößt er eine schwarze Rußwolke aus.', argument: 'Schwarzer Rauch' },
   { id: 'limp_mode', channel: 'drive', warm: true, text: 'Nach kurzer Fahrt geht er in den Notlauf und dreht nicht mehr aus.', argument: 'Notlauf' },
   { id: 'dpf_lamp', channel: 'dash', text: 'Die Partikelfilter-Warnleuchte brennt.', argument: 'DPF-Warnleuchte' },
+  { id: 'clutch_slip', channel: 'drive', text: 'Beim Beschleunigen im hohen Gang steigt die Drehzahl, aber das Auto wird kaum schneller – die Kupplung rutscht.', argument: 'Kupplung rutscht' },
   { id: 'exhaust_loud', channel: 'sound', text: 'Der Auspuff dröhnt hinten laut und knattert beim Gaswegnehmen.', argument: 'Auspuff dröhnt' },
   { id: 'exhaust_look', channel: 'under', text: 'Der Endtopf ist braun verrostet, an den Nähten schwarze Rußfahnen.', argument: 'Auspuff durchgerostet' },
   { id: 'clunk_bump', channel: 'drive', text: 'Über Kanten und Schlaglöcher poltert es vorn, beim Bremsen zieht er leicht zur Seite.', argument: 'Fahrwerk poltert' },
