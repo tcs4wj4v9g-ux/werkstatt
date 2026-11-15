@@ -332,7 +332,9 @@ export class Shape {
       pts.push([w * (0.968 - 0.1 * (1 - Math.cos(a))) + this.flare(x, y) * (1 - i / 2), y]);
     }
     // Innen fällt der Boden wieder auf Normalhöhe: das ergibt die Radhaus-Innenwand.
-    const inner = Math.min(0.66, 0.8 * w);
+    // Die Wand liegt innen von der Bremse – auch bei schmaler Spur (Porsche), sonst verdeckt sie Sattel und Beläge.
+    const track = x > (WHEEL_X + B.rearAxle) / 2 ? B.trackF : B.trackR;
+    const inner = Math.min(0.66, 0.8 * w, 0.6 + track);
     pts.push([inner, bot]);
     pts.push([Math.max(0, inner - 0.02), base]);
     pts.push([Math.min(0.3, 0.4 * w), base]);

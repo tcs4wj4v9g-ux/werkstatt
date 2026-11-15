@@ -21,6 +21,7 @@ function TestHook() {
   (window as any).__gkCamera = camera;
   (window as any).__gkGL = gl;
   (window as any).__gkScene = useThree((s) => s.scene);
+  (window as any).__gkRay = useThree((s) => s.raycaster);
   return null;
 }
 

@@ -313,3 +313,12 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Browser-Durchlauf `karriere`: Getriebe raus, Kupplung im Bild abschrauben und herausnehmen, verstärkte Kupplung einsetzen und festziehen, Austauschgetriebe wieder rein.
   - Bilder des Motorraums angesehen.
   - Kein echter iPad-Test.
+
+## Porsche-Bremsen und Hebebühnen-Arme
+
+- **Bremsen beim Porsche nicht erreichbar:** Die Porsche haben eine schmale Spur (bis 15 cm schmaler), dadurch sitzen Scheibe, Sattel und Beläge weiter innen. Die Radhaus-Innenwand der Karosserie lag aber bei allen Autos gleich und verdeckte sie. Die Wand richtet sich jetzt nach der Spur vorn bzw. hinten und liegt immer innen von der Bremse.
+- **Tragarme griffen in die Reifen:** Die Teller der Hebebühne lagen für alle Autos an derselben Stelle, beim kurzen 356 (Radstand 2,1 m) unter dem Hinterrad. Die Arme richten sich jetzt nach Radstand und Breite des Autos: Die Teller greifen hinter dem Vorderrad und vor dem Hinterrad unter dem Schweller.
+- Geprüft:
+  - Logiktests: für jede Karosserie Teller mit Abstand zu beiden Rädern.
+  - Browser-Durchlauf `bremse`: Beläge im Bild angetippt und herausgenommen, beim 964 vorn und hinten, beim 356 vorn und beim 992 hinten.
+  - Kein echter iPad-Test.

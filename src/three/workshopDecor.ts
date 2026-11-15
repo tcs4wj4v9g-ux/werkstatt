@@ -210,25 +210,42 @@ export function liftFrame(inner: number) {
 }
 
 /** Beweglicher Teil der Hebebühne: Schlitten und vier Tragarme mit Gummitellern (Ursprung = Boden). */
-export function liftCarriage() {
-  const key = 'carriage';
+/**
+ * Schlitten mit vier Teleskoparmen. Die Teller greifen an den Aufnahmepunkten am Schweller – zwischen den Rädern,
+ * passend zum Radstand des Autos (`rearAxle`), damit sie nie unter einem Reifen sitzen.
+ */
+/** Aufnahmepunkte der Hebebühnen-Teller (x vorn, x hinten, z) – hinter dem Vorderrad, vor dem Hinterrad, unter dem Schweller. */
+export const liftPads = (rearAxle: number, halfWidth: number) => ({
+  front: Math.min(0.86, 1.38 - 0.56),
+  rear: Math.max(-1.0, rearAxle + 0.52),
+  z: Math.min(0.74, halfWidth - 0.1),
+});
+
+export function liftCarriage(rearAxle = -1.38, halfWidth = 0.86) {
+  const key = `carriage${rearAxle.toFixed(2)}:${halfWidth.toFixed(2)}`;
   let g = cache.get(key);
   if (g) return g;
   const m = new Mesher(10);
+  // Aufnahmepunkte: hinter dem Vorderrad bzw. vor dem Hinterrad, unter dem Schweller
+  const { front, rear, z: zPad } = liftPads(rearAxle, halfWidth);
   for (const o of [-1.5, 1.5]) {
     const s = Math.sign(o);
     m.rbox(DECO.steelDark, [0.3, 0.34, 0.2], 0.02, [0, 0.22, o - s * 0.1]);
     for (const k of [-1, 1]) {
-      const a = k * s * 0.5;
-      const c: V3 = [k * 0.55, 0.14, o - s * 0.42];
-      // Zweiteiliger Teleskoparm
-      m.rbox(DECO.yellow, [1.0, 0.075, 0.13], 0.012, [c[0] - k * 0.12 * Math.cos(a), c[1], c[2] + k * 0.12 * Math.sin(a)], [0, a, 0]);
-      m.rbox(DECO.steelDark, [0.5, 0.055, 0.1], 0.01, [c[0] + k * 0.36 * Math.cos(a), c[1], c[2] - k * 0.36 * Math.sin(a)], [0, a, 0]);
-      const tip: V3 = [c[0] + k * 0.56 * Math.cos(a), 0, c[2] - k * 0.56 * Math.sin(a)];
+      const pivot: V3 = [k * 0.1, 0.14, o - s * 0.2];
+      const tip: V3 = [k > 0 ? front : rear, 0.14, s * zPad];
+      const dx = tip[0] - pivot[0];
+      const dz = tip[2] - pivot[2];
+      const len = Math.hypot(dx, dz);
+      const a = -Math.atan2(dz, dx);
+      const at = (t: number): V3 => [pivot[0] + dx * t, 0.14, pivot[2] + dz * t];
+      // Zweiteiliger Teleskoparm: dicker Außenteil am Schlitten, ausgezogener Innenteil zum Teller
+      m.rbox(DECO.yellow, [len * 0.62, 0.075, 0.13], 0.012, at(0.31), [0, a, 0]);
+      m.rbox(DECO.steelDark, [len * 0.45, 0.055, 0.1], 0.01, at(0.76), [0, a, 0]);
       m.cyl(DECO.galv, 0.03, 0.03, 0.06, [tip[0], 0.19, tip[2]], undefined, 8);
       m.cyl(DECO.black, 0.07, 0.075, 0.035, [tip[0], 0.238, tip[2]], undefined, 14);
       // Gelenkbolzen am Schlitten
-      m.cyl(DECO.galv, 0.03, 0.03, 0.12, [k * 0.1, 0.14, o - s * 0.2], undefined, 8);
+      m.cyl(DECO.galv, 0.03, 0.03, 0.12, pivot, undefined, 8);
     }
   }
   g = m.build();

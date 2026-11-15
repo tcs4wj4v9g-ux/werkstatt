@@ -113,4 +113,14 @@ describe('Grafikstufen', () => {
     expect(GFX.high.shadowMap).toBeGreaterThan(GFX.medium.shadowMap);
     expect(GFX.low.lights).toBeLessThan(GFX.high.lights);
   });
+
+  it.each(bodies)('%s: Hebebühnen-Teller greifen zwischen den Rädern, nie unter einem Reifen', async (body) => {
+    const { liftPads } = await import('./workshopDecor');
+    const B = BODY_SPECS[body];
+    const pads = liftPads(B.rearAxle, B.width);
+    const R = 0.36; // Reifenradius mit Luft
+    for (const x of [pads.front, pads.rear]) for (const axle of [WHEEL_X, B.rearAxle]) expect(Math.abs(x - axle), `${body}: Teller bei x=${x.toFixed(2)}`).toBeGreaterThan(R + 0.07);
+    expect(pads.front).toBeGreaterThan(pads.rear);
+    expect(pads.z).toBeLessThan(B.width);
+  });
 });

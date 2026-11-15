@@ -150,6 +150,22 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const five = await p.evaluate(() => Object.keys(window.__gk.getState().cars[0].components).filter((k) => /^coil\d$/.test(k)).length);
   expect(/Motorabdeckung/.test(t6 || '') && five === 5, `Fünfzylinder-Turbo: ${five} Zündspulen, Motorabdeckung antippbar – ${t6}`);
   await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  // ---------- Porsche (schmale Spur): Beläge vorn und hinten im Bild antippbar, Tragarme nicht unter den Reifen ----------
+  for (const [model, view, side] of [['zuffen_946', 'Rad vorne links', 'fl'], ['zuffen_946', 'Rad hinten links', 'rl'], ['zuffen_365', 'Rad vorne links', 'fl'], ['zuffen_929', 'Rad hinten links', 'rl']]) {
+    await p.evaluate(([model, side]) => { const g = window.__gk; const s = g.getState(); const car = window.__gkLib.createCar(model, [], Math.random, {}); car.lifted = true; for (const id of [`wheel_${side}`, `caliper_${side}`]) Object.assign(car.components[id], { installed: false, bolts: car.components[id].bolts.map(() => 0) }); g.setState({ cars: [car, ...s.cars.slice(1)], liftUp: [true, false], tool: 'hand', panel: null }); }, [model, side]);
+    await p.waitForTimeout(600);
+    await p.evaluate(() => Object.assign(window.__gkPlayer, { x: -0.5, z: -5.2, yaw: 0, work: null }));
+    await p.waitForTimeout(600);
+    await p.locator('.car-actions button', { hasText: view }).click(); await p.waitForTimeout(900);
+    const pad = await p.evaluate((label) => { let r = null; const cam = window.__gkCamera; const v = new cam.position.constructor(); window.__gkScene.traverse((o) => { if (!r && o.userData && o.userData.label === label) o.traverse((m) => { if (!r && m.isMesh) { m.getWorldPosition(v); v.project(cam); r = { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; } }); }); return r && r.x > 0 && r.x < 1180 && r.y > 0 && r.y < 820 ? r : null; }, `Bremsbeläge ${view.includes('hinten') ? 'hinten' : 'vorne'} links`);
+    await p.evaluate(() => window.__gk.setState({ toast: null }));
+    if (pad) { await p.mouse.click(pad.x, pad.y); await p.waitForTimeout(300); }
+    const res = await p.evaluate((side) => ({ pads: window.__gk.getState().cars[0].components[`pads_${side}`].installed, t: window.__gk.getState().toast && window.__gk.getState().toast.text }), side);
+    expect(!!pad && !res.pads, `${model} ${view}: Beläge im Bild angetippt und herausgenommen – ${res.t}`);
+    if (model === 'zuffen_365' && side === 'fl') await p.screenshot({ path: S + '/porsche-belag.png' });
+    await p.locator('[data-testid=leave]').click(); await p.waitForTimeout(300);
+  }
+
   // ---------- Unterboden: Endschalldämpfer, Querlenker, Spurstangenköpfe ----------
   await p.evaluate(() => { const g = window.__gk; const s = g.getState(); const car = window.__gkLib.createCar('renard_twingle', ['muffler', 'control_arm', 'tie_rod'], () => 0.1, {}); car.lifted = true; car.hoodOpen = false; g.setState({ cars: [car, ...s.cars.slice(1)], liftUp: [true, false], tool: 'lamp', carried: ['ratchet', 'socket17', 'socket16', 'socket13'], panel: null, money: 9000 }); Object.assign(window.__gkPlayer, { x: 2.9, z: -2.7, yaw: Math.PI / 2, pitch: 0, work: null }); });
   await p.waitForTimeout(900);
