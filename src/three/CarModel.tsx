@@ -447,6 +447,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const hoodFront = S.B.hoodHinge === 'front';
   /** Heckmotor: der ganze Motorraum liegt gedreht und etwas tiefer hinter der Hinterachse. */
   const rearEngine = REAR_ENGINE.has(body);
+  /** Moderne M-Coupés ab Werk mit dunklen Felgen. */
+  const rimColor = car?.visual?.rimColor ?? (body === 'g87' || body === 'g82' ? '#2b2d31' : undefined);
   const B = shared.shape.B;
   /** Hosenrohr hängt immer sichtbar unter dem Wagenboden (tiefe Autos wie der B5 haben weniger Bodenfreiheit). */
   const dpY = Math.min(0.3, B.ground - 0.01);
@@ -765,7 +767,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     if (!full || (rear && !st(`wheel_${s}`))) {
       return (
         <group key={s} ref={wheelRef} position={[WX, WY, z(WZ)]} onClick={wheelTap}>
-          <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={car?.visual?.rimColor} />
+          <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={rimColor} />
           <mesh position={[0, 0, -sign * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.17, 0.17, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
@@ -868,7 +870,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           </group>
         )}
         <group ref={wheelRef} position={[WX, WY, z(WZ)]}>
-          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} size={look.rimSize} color={car?.visual?.rimColor} />)}
+          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} size={look.rimSize} color={rimColor} />)}
           <group position={[-WX, -WY, -z(WZ)]}>{bolts(`wheel_${s}`, lug, axis)}</group>
         </group>
       </group>

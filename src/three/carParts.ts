@@ -74,7 +74,7 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     wing: visual?.spoiler ?? (sport || model?.id === 'bavaria_340_ms' ? 3 : 0),
     flares: !!visual?.flares,
     tips: visual?.tips ?? 'stock',
-    rimSize: visual?.rimSize ?? (nine2 || e34 ? 1 : 0),
+    rimSize: visual?.rimSize ?? (nine2 || e34 || g87 || g82 ? 1 : 0),
     sportSeats: visual?.seats === 'sport',
     sportWheel: visual?.wheel === 'sport',
     ...(visual?.rim ? { rim: visual.rim as RimStyle } : {}),
@@ -924,27 +924,29 @@ function mEnds(m: Mesher, S: Shape, N: (n: number) => number, tall: boolean) {
   for (const s of [-1, 1] as const) {
     // Schmaler Scheinwerfer: schwarzes Gehäuse, Klarglas, zwei abgewinkelte Leuchtbalken, kleine Linse
     const a = Math.atan2(s * 0.6, 0.94);
-    wrapPatch(m, SLOT.gloss, S, 1, a, 0.42, yL, 0.08, 0.5, 0.005, N(12), N(4));
-    wrapPatch(m, SLOT.lens, S, 1, a, 0.38, yL, 0.06, 0.5, 0.008, N(12), N(4));
+    wrapPatch(m, SLOT.gloss, S, 1, a, 0.44, yL, 0.09, 0.1, 0.005, N(12), N(4));
+    wrapPatch(m, SLOT.lens, S, 1, a, 0.4, yL, 0.07, 0.1, 0.008, N(12), N(4));
+    // nach innen-unten abgeknickte Spitze zur Niere
+    wrapPatch(m, SLOT.gloss, S, 1, a - s * 0.2, 0.08, yL - 0.03, 0.05, 0.1, 0.005, N(4), N(3));
     wrapPatch(m, SLOT.glow, S, 1, a - s * 0.06, 0.18, yL + 0.012, 0.008, 0, 0.011, N(8), 1);
     wrapPatch(m, SLOT.glow, S, 1, a + s * 0.08, 0.1, yL - 0.01, 0.008, 0, 0.011, N(6), 1);
     disc(1, SLOT.chrome, s * 0.5, yL, 0.022, 0.012);
     // Große schwarze Lufteinlässe außen im Stoßfänger (M2 senkrecht und kantig, M4 kleiner)
     const zi = s * (tall ? 0.6 : 0.57);
     const yi = tall ? 0.4 : 0.42;
-    const wi = tall ? 0.2 : 0.24;
-    const hi = tall ? 0.2 : 0.3;
+    const wi = tall ? 0.26 : 0.24;
+    const hi = tall ? 0.26 : 0.3;
     endPatch(m, SLOT.gloss, S, 1, zi, yi, wi, hi, 0.1, 0.008, N(6), N(8));
     for (const o of tall ? [-0.06, -0.02, 0.02, 0.06] : [-0.1, -0.05, 0, 0.05, 0.1]) endPatch(m, SLOT.dark, S, 1, zi, yi + o, wi - 0.02, 0.006, 0, 0.012, N(4), 1);
   }
   // Niere: zwei Hälften mit Rahmen und waagerechten Lamellen
   for (const s of [-1, 1] as const) {
-    const zk = s * (tall ? 0.105 : 0.16);
-    const w = tall ? 0.17 : 0.29;
+    const zk = s * (tall ? 0.105 : 0.17);
+    const w = tall ? 0.17 : 0.31;
     const h = tall ? 0.34 : 0.17;
     const yk = tall ? 0.57 : yL - 0.05;
-    endPatch(m, SLOT.chrome, S, 1, zk, yk, w + 0.02, h + 0.02, 0.35, 0.01, N(8), N(10));
-    endPatch(m, SLOT.gloss, S, 1, zk, yk, w, h, 0.35, 0.014, N(8), N(10));
+    endPatch(m, SLOT.chrome, S, 1, zk, yk, w + 0.02, h + 0.02, tall ? 0.22 : 0.12, 0.01, N(8), N(10));
+    endPatch(m, SLOT.gloss, S, 1, zk, yk, w, h, tall ? 0.22 : 0.12, 0.014, N(8), N(10));
     const n = tall ? 9 : 4;
     for (let i = 0; i < n; i++) endPatch(m, SLOT.dark, S, 1, zk, yk - h / 2 + (h * (i + 0.5)) / n, w - 0.02, 0.006, 0, 0.017, N(6), 1);
   }
@@ -979,6 +981,34 @@ function mEnds(m: Mesher, S: Shape, N: (n: number) => number, tall: boolean) {
     const xp = S.endX(-1, B.ground + 0.09, zp);
     m.add(SLOT.chrome, new THREE.CylinderGeometry(0.034, 0.034, 0.12, 16, 1, true), mat([xp + 0.03, B.ground + 0.09, zp], [0, 0, Math.PI / 2]));
     m.add(SLOT.dark, new THREE.CylinderGeometry(0.03, 0.03, 0.01, 12), mat([xp - 0.025, B.ground + 0.09, zp], [0, 0, Math.PI / 2]));
+  }
+  // Carbondach (dunkel glänzend) zwischen den Dachkanten
+  {
+    // Gewölbte Fläche, die genau dem Kabinenquerschnitt folgt (Dachmitte bis kurz vor die Dachkante)
+    const nx = N(14);
+    const xa = B.x1 + 0.1;
+    const xb = B.x2 - 0.08;
+    const pos: number[] = [];
+    const idx: number[] = [];
+    const cols = 9;
+    for (let i = 0; i <= nx; i++) {
+      const x = xa + ((xb - xa) * i) / nx;
+      const top = S.cabinProfile(x).slice(0, 5);
+      for (let j = 0; j < cols; j++) {
+        const t = (j / (cols - 1)) * 2 - 1;
+        const zAbs = Math.abs(t) * top[4][0];
+        let y = top[0][1];
+        for (let k = 1; k < 5; k++) if (zAbs <= top[k][0]) { const f = (zAbs - top[k - 1][0]) / Math.max(1e-6, top[k][0] - top[k - 1][0]); y = top[k - 1][1] + (top[k][1] - top[k - 1][1]) * f; break; }
+        pos.push(x, y + 0.003, Math.sign(t) * zAbs);
+      }
+      if (i < nx) for (let j = 0; j < cols - 1; j++) { const p0 = i * cols + j; idx.push(p0, p0 + cols, p0 + 1, p0 + 1, p0 + cols, p0 + cols + 1); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    if (g.getAttribute('normal').getY(0) < 0) { for (let k = 0; k < idx.length; k += 3) [idx[k + 1], idx[k + 2]] = [idx[k + 2], idx[k + 1]]; g.setIndex(idx); g.computeVertexNormals(); }
+    m.add(SLOT.dark, g);
   }
   // Abrisskante auf der Heckklappe
   const xl = B.tail + B.tailLen + 0.04;

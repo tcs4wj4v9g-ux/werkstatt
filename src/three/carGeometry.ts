@@ -226,18 +226,18 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
   // Kompaktes modernes Sportcoupé: 4,58 m, Radstand 2,75 m, kurze Überhänge, flache kantige Haube, steile Front, breite
   // ausgestellte Backen, kurzes hohes Heck mit Abrisskante, Dach fällt früh ab.
   g87: {
-    ...BASE, tail: -2.0, nose: 2.25, width: 0.94, rearAxle: -1.37, trackF: 0.05, trackR: 0.08, roof: 1.36, x0: -1.62, x1: -0.78, x2: 0.04,
-    deck: 1.03, noseP: 5.5, tailMid: 0.74, tailP: 6, tailLen: 0.14, planP: 5.5, planPR: 6, ground: 0.2, tumble: 0.26, bowF: 0.16, bowR: 0.12,
-    flare: 0.055, crease: 0.76, creaseDepth: 0.02, blackPillars: true, pillars: [], glassRear: -1.12, rearSeat: true,
-    seams: [0.74, -0.5], handles: [-0.34], hoodSlope: 0.07, hoodCurve: 0.06, dome: 0.008, cabinK: 0.91, roofArc: 0.02, noseMid: 0.6,
+    ...BASE, tail: -2.32, nose: 2.26, width: 0.94, rearAxle: -1.37, trackF: 0.05, trackR: 0.08, roof: 1.4, x0: -1.78, x1: -0.86, x2: 0.06,
+    deck: 1.04, noseMid: 0.62, noseP: 7, tailMid: 0.76, tailP: 7, tailLen: 0.2, planP: 7, planPR: 7.5, ground: 0.2, tumble: 0.17, bowF: 0.12, bowR: 0.1,
+    flare: 0.06, crease: 0.78, creaseDepth: 0.026, blackPillars: true, pillars: [], glassRear: -1.24, rearSeat: true,
+    seams: [0.74, -0.52], handles: [-0.36], hoodSlope: 0.06, hoodCurve: 0.04, dome: 0.006, cabinK: 0.92, roofArc: 0.016,
   },
-  // Großes modernes Sportcoupé: 4,80 m, Radstand 2,86 m, lange Haube, hohe senkrechte Front, fließende Dachlinie bis zum
-  // kurzen Heck mit Abrisskante, kräftige Backen.
+  // Großes modernes Sportcoupé: 4,79 m, Radstand 2,86 m, lange Haube, hohe senkrechte Front, fließende Dachlinie bis zum
+  // Heck mit Abrisskante, kräftige Backen.
   g82: {
-    ...BASE, tail: -2.14, nose: 2.42, width: 0.93, rearAxle: -1.48, trackF: 0.04, trackR: 0.06, roof: 1.35, x0: -1.78, x1: -0.7, x2: 0.06,
-    deck: 1.02, noseMid: 0.62, noseP: 3.6, tailMid: 0.74, tailP: 4.4, tailLen: 0.16, planP: 4, planPR: 4.5, ground: 0.2, tumble: 0.26, bowF: 0.17, bowR: 0.14,
-    flare: 0.045, crease: 0.76, creaseDepth: 0.018, blackPillars: true, pillars: [], glassRear: -1.2, rearSeat: true,
-    seams: [0.74, -0.56], handles: [-0.4], hoodSlope: 0.06, hoodCurve: 0.07, hoodX1: 2.08, dome: 0.014, cabinK: 0.9, roofArc: 0.026,
+    ...BASE, tail: -2.52, nose: 2.27, width: 0.94, rearAxle: -1.48, trackF: 0.04, trackR: 0.06, roof: 1.39, x0: -1.96, x1: -0.84, x2: 0.04,
+    deck: 1.03, noseMid: 0.64, noseP: 6, tailMid: 0.76, tailP: 6.5, tailLen: 0.22, planP: 6, planPR: 6.5, ground: 0.2, tumble: 0.18, bowF: 0.13, bowR: 0.12,
+    flare: 0.05, crease: 0.78, creaseDepth: 0.024, blackPillars: true, pillars: [], glassRear: -1.36, rearSeat: true,
+    seams: [0.74, -0.6], handles: [-0.44], hoodSlope: 0.05, hoodCurve: 0.05, dome: 0.01, cabinK: 0.92, roofArc: 0.018,
   },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };

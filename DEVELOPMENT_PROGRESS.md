@@ -345,3 +345,11 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Front: riesige hohe Niere bis in den Stoßfänger, Kennzeichen darunter, kleinere Seiteneinlässe. Rest wie M2.
   - Motor `r6t_30m4` (510 PS).
 - Geprüft: Logiktests (Proportionen, Haubenfreiraum, Hebebühnen-Teller für jede neue Form), Browser-Durchläufe `markt` und `bremse`, Bilder in voller Grafik. Kein echter iPad-Test.
+
+## M2 und M4 näher am Original (nach Recherche)
+
+- Echte Maße übernommen (Quellen: BMW-Datenblätter über carexpert.com.au, vehiclesizes.com): M2 4,58 m lang, Radstand 2,75 m, 1,40 m hoch. M4 4,79 m lang, Radstand 2,86 m, 1,39 m hoch. Beide 1,89 m breit. Der M2 war vorher mit 4,25 m deutlich zu kurz.
+- Kantigere Karosserie: eckigere Front, Heck und Draufsicht, weniger eingezogene Seitenscheiben (weniger „Blase“), längerer Kofferraum, tiefere Charakterlinie, kräftigere Backen.
+- Carbondach: dunkle gewölbte Fläche, die genau dem Kabinenquerschnitt folgt.
+- Ab Werk dunkle Felgen (+1 Zoll). Eckigere Scheinwerfer mit abgeknickter Spitze zur Niere. Schärfere Nierenecken, größere M2-Niere, größere M4-Seiteneinlässe.
+- Geprüft: Logiktests (Proportionen, Haubenfreiraum, Hebebühnen-Teller), Browser-Durchläufe `markt` und `bremse`, Bilder in voller Grafik. Kein echter iPad-Test.
