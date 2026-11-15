@@ -779,7 +779,7 @@ function starEmblem(m: Mesher, S: Shape, N: (n: number) => number, dir: 1 | -1, 
   m.add(SLOT.chrome, new THREE.TorusGeometry(r, r * 0.1, 6, N(24)), mat([x, y, 0], [0, (dir * Math.PI) / 2, 0]));
   for (let k = 0; k < 3; k++) {
     const a = Math.PI / 2 + (k * 2 * Math.PI) / 3;
-    m.box(SLOT.chrome, [0.006, r * 0.95, r * 0.14], [x, y + Math.sin(a) * r * 0.47, Math.cos(a) * r * 0.47], [a - Math.PI / 2, 0, 0]);
+    m.box(SLOT.chrome, [0.008, r * 0.95, r * 0.16], [x, y + Math.sin(a) * r * 0.47, Math.cos(a) * r * 0.47], [Math.PI / 2 - a, 0, 0]);
   }
 }
 
@@ -930,15 +930,19 @@ function mEnds(m: Mesher, S: Shape, N: (n: number) => number, tall: boolean) {
     wrapPatch(m, SLOT.glow, S, 1, a + s * 0.08, 0.1, yL - 0.01, 0.008, 0, 0.011, N(6), 1);
     disc(1, SLOT.chrome, s * 0.5, yL, 0.022, 0.012);
     // Große schwarze Lufteinlässe außen im Stoßfänger (M2 senkrecht und kantig, M4 kleiner)
-    endPatch(m, SLOT.gloss, S, 1, s * (tall ? 0.58 : 0.55), tall ? 0.4 : 0.42, tall ? 0.16 : 0.22, tall ? 0.16 : 0.22, 0.15, 0.008, N(6), N(6));
-    for (const o of [-0.04, 0, 0.04]) endPatch(m, SLOT.dark, S, 1, s * (tall ? 0.58 : 0.55), (tall ? 0.4 : 0.42) + o, tall ? 0.14 : 0.2, 0.006, 0, 0.012, N(4), 1);
+    const zi = s * (tall ? 0.6 : 0.57);
+    const yi = tall ? 0.4 : 0.42;
+    const wi = tall ? 0.2 : 0.24;
+    const hi = tall ? 0.2 : 0.3;
+    endPatch(m, SLOT.gloss, S, 1, zi, yi, wi, hi, 0.1, 0.008, N(6), N(8));
+    for (const o of tall ? [-0.06, -0.02, 0.02, 0.06] : [-0.1, -0.05, 0, 0.05, 0.1]) endPatch(m, SLOT.dark, S, 1, zi, yi + o, wi - 0.02, 0.006, 0, 0.012, N(4), 1);
   }
   // Niere: zwei Hälften mit Rahmen und waagerechten Lamellen
   for (const s of [-1, 1] as const) {
-    const zk = s * (tall ? 0.105 : 0.15);
-    const w = tall ? 0.17 : 0.27;
-    const h = tall ? 0.34 : 0.14;
-    const yk = tall ? 0.57 : yL - 0.04;
+    const zk = s * (tall ? 0.105 : 0.16);
+    const w = tall ? 0.17 : 0.29;
+    const h = tall ? 0.34 : 0.17;
+    const yk = tall ? 0.57 : yL - 0.05;
     endPatch(m, SLOT.chrome, S, 1, zk, yk, w + 0.02, h + 0.02, 0.35, 0.01, N(8), N(10));
     endPatch(m, SLOT.gloss, S, 1, zk, yk, w, h, 0.35, 0.014, N(8), N(10));
     const n = tall ? 9 : 4;
@@ -947,8 +951,9 @@ function mEnds(m: Mesher, S: Shape, N: (n: number) => number, tall: boolean) {
   roundel(m, S, N, 1, (tall ? 0.57 + 0.19 : yL + 0.06) + 0.02, 0.03);
   // Mittlerer unterer Einlass, Kennzeichen, Splitter
   if (!tall) {
-    endPatch(m, SLOT.gloss, S, 1, 0, 0.42, 0.62, 0.13, 0.3, 0.008, N(12), N(4));
-    endPatch(m, SLOT.plate, S, 1, 0, 0.53, 0.42, 0.09, 0.06, 0.016, N(8), 2);
+    endPatch(m, SLOT.gloss, S, 1, 0, 0.36, 0.72, 0.16, 0.15, 0.008, N(12), N(4));
+    for (const o of [-0.04, 0, 0.04]) endPatch(m, SLOT.dark, S, 1, 0, 0.36 + o, 0.68, 0.006, 0, 0.012, N(10), 1);
+    endPatch(m, SLOT.plate, S, 1, 0, 0.36, 0.42, 0.09, 0.06, 0.016, N(8), 2);
   } else {
     endPatch(m, SLOT.plate, S, 1, 0, 0.43, 0.42, 0.09, 0.06, 0.022, N(8), 2);
   }
@@ -958,7 +963,7 @@ function mEnds(m: Mesher, S: Shape, N: (n: number) => number, tall: boolean) {
   for (const s of [-1, 1] as const) {
     const a = Math.atan2(s * 0.62, 0.96);
     // Schmale L-förmige Leuchte: dunkles Glas, roter Leuchtbalken waagerecht mit Knick nach unten
-    wrapPatch(m, SLOT.dark, S, -1, a, 0.6, yT, 0.11, 0.3, 0.005, N(12), N(4));
+    wrapPatch(m, SLOT.gloss, S, -1, a, 0.64, yT, 0.13, 0.1, 0.005, N(12), N(4));
     wrapPatch(m, SLOT.tailBar, S, -1, a, 0.52, yT + 0.03, 0.012, 0, 0.011, N(10), 1);
     wrapPatch(m, SLOT.tailBar, S, -1, a + s * 0.24, 0.035, yT - 0.005, 0.07, 0, 0.011, 2, N(4));
     wrapPatch(m, SLOT.tail, S, -1, a, 0.5, yT - 0.02, 0.03, 0.3, 0.009, N(10), 2);
