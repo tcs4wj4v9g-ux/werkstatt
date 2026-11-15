@@ -145,9 +145,13 @@ export type Access = 'hood' | 'lifted' | 'stand';
  * `tt` = rundes Designer-Coupé (ein Dachbogen von der Scheibe bis zum Heck, kreisrunde Radhäuser, schmales Glashaus),
  * `quattro` = kantiges Rallye-Coupé der 80er (Kastenkotflügel, flache lange Haube, schräge Heckscheibe),
  * `b5` = weich gerundete Mittelklasse-Limousine der 90er (vier Türen, sanfter Dachbogen, runder Kofferraum).
- * `e34` = sportliche Oberklasse-Limousine um 1990 (lange flache Haube, Doppelscheinwerfer, schmale Säulen, langer Kofferraum).
+ * `e34` = sportliche Oberklasse-Limousine um 1990 (lange flache Haube, Doppelscheinwerfer, schmale Säulen, langer Kofferraum),
+ * `golf2` = kantiger Kompakter der 80er (drei Türen, steile Heckklappe, breite C-Säule),
+ * `evo2` = kompakte Sportlimousine der frühen 90er mit Kastenverbreiterungen und großem Heckflügel,
+ * `g87` = kompaktes modernes Sportcoupé (kantig, breite Backen, große eckige Niere),
+ * `g82` = großes modernes Sportcoupé (lange Haube, riesige hohe Niere, fließendes Dach),
  */
-export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro' | 'b5' | 'e34';
+export type BodyStyle = 'sedan' | 'wagon' | 'coupe' | 'hatch' | 'sport' | 'luxury' | 'classic' | 'mono' | 'box' | 'tub' | 'nine' | 'nine2' | 'tt' | 'quattro' | 'b5' | 'e34' | 'golf2' | 'evo2' | 'g87' | 'g82';
 export type CarClass = 'budget' | 'mid' | 'sport' | 'luxury' | 'collector';
 export type Screen = 'menu' | 'market' | 'garage' | 'track';
 

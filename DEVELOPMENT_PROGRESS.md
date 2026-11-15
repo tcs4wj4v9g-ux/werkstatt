@@ -322,3 +322,34 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Logiktests: für jede Karosserie Teller mit Abstand zu beiden Rädern.
   - Browser-Durchlauf `bremse`: Beläge im Bild angetippt und herausgenommen, beim 964 vorn und hinten, beim 356 vorn und beim 992 hinten.
   - Kein echter iPad-Test.
+
+## Fahrzeuge 10–13 (auf Wunsch ohne Zwischenfreigabe nacheinander gebaut, nach Fotos des Projektinhabers)
+
+- **10: Volksvagen Golf GTI (Mk2)**, Form `golf2`:
+  - Kantiger Dreitürer, 3,95 m, Radstand 2,47 m, kurze Haube mit stumpfer Front, steile Scheibe, hohes Dach, breite C-Säule, fast senkrechte Heckklappe.
+  - Front: schwarzes Grillband mit Lamellen und rotem Zierstreifen, je ein großer und ein kleiner Rundscheinwerfer, rundes Emblem.
+  - Schwarze Stoßfänger und breite Seitenleiste mit roter Linie, breite Rückleuchten, Kreuzspeichenfelgen.
+  - Motor `r4_18g` (1,8 l, 112 PS). Budget, ab ca. 6.800 €.
+- **11: Mercedez 190E 2.5-16 Evolution II**, Form `evo2`:
+  - Kompakte Sportlimousine, 4,43 m, mit Kastenverbreiterungen (stark ausgestellte Radläufe), tief.
+  - Front: breite Klarglasscheinwerfer mit Blinker außen, Chromgrill mit Stäben und Stern, großer schwarzer Frontsplitter.
+  - Heck: großer Heckflügel auf zwei Stützen mit Seitenplatten und Gurney-Kante, Abrisskante, gerippte Rückleuchten, Doppelendrohr. Seitenschweller.
+  - Motor `r4_25e` (2,5-l-16V, 235 PS, Teilefamilie R4-16V). Sammlerstück (blauschwarz, 165.000 €).
+- **12: BMV M2 (G87)**, Form `g87`:
+  - Kompaktes kantiges Sportcoupé, 4,25 m, breite Backen.
+  - Front: große eckige waagerechte Niere mit Lamellen, schmale Scheinwerfer mit zwei Leuchtbalken, große schwarze Einlässe außen und in der Mitte, Kiemen hinter dem Vorderrad.
+  - Heck: dunkle schmale Leuchten mit roten Balken, Diffusor mit vier Endrohren, Abrisskante.
+  - Motor `r6t_30m2` (3,0-l-Biturbo, 460 PS, Teilefamilie R6-M-Turbo).
+- **13: BMV M4 (G82)**, Form `g82`:
+  - Großes Sportcoupé, 4,56 m, lange Haube.
+  - Front: riesige hohe Niere bis in den Stoßfänger, Kennzeichen darunter, kleinere Seiteneinlässe. Rest wie M2.
+  - Motor `r6t_30m4` (510 PS).
+- Geprüft: Logiktests (Proportionen, Haubenfreiraum, Hebebühnen-Teller für jede neue Form), Browser-Durchläufe `markt` und `bremse`, Bilder in voller Grafik. Kein echter iPad-Test.
+
+## M2 und M4 näher am Original (nach Recherche)
+
+- Echte Maße übernommen (Quellen: BMW-Datenblätter über carexpert.com.au, vehiclesizes.com): M2 4,58 m lang, Radstand 2,75 m, 1,40 m hoch. M4 4,79 m lang, Radstand 2,86 m, 1,39 m hoch. Beide 1,89 m breit. Der M2 war vorher mit 4,25 m deutlich zu kurz.
+- Kantigere Karosserie: eckigere Front, Heck und Draufsicht, weniger eingezogene Seitenscheiben (weniger „Blase“), längerer Kofferraum, tiefere Charakterlinie, kräftigere Backen.
+- Carbondach: dunkle gewölbte Fläche, die genau dem Kabinenquerschnitt folgt.
+- Ab Werk dunkle Felgen (+1 Zoll). Eckigere Scheinwerfer mit abgeknickter Spitze zur Niere. Schärfere Nierenecken, größere M2-Niere, größere M4-Seiteneinlässe.
+- Geprüft: Logiktests (Proportionen, Haubenfreiraum, Hebebühnen-Teller), Browser-Durchläufe `markt` und `bremse`, Bilder in voller Grafik. Kein echter iPad-Test.

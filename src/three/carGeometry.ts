@@ -207,6 +207,38 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     flare: 0.012, crease: 0.8, creaseDepth: 0.01, blackPillars: true, pillars: [[-0.47, -0.37]], glassRear: -1.62, rearSeat: true,
     seams: [0.74, -0.41, -1.42], handles: [-0.23, -1.24], hoodSlope: 0.035, hoodCurve: 0.06, dome: 0.006, cabinK: 0.93, roofArc: 0.012, hoodHinge: 'front',
   },
+  // Kantiger Kompakter der 80er (drei Türen): 3,99 m, Radstand 2,47 m, kurze Haube mit stumpfer Front, hohes Dach,
+  // fast senkrechte Heckklappe, breite C-Säule, eckige Draufsicht, glatte Flanken.
+  golf2: {
+    ...BASE, tail: -1.83, nose: 2.12, width: 0.83, rearAxle: -1.09, trackF: -0.08, trackR: -0.09, roof: 1.42, x0: -1.74, x1: -1.32, x2: 0.12,
+    deck: 1.0, noseMid: 0.62, noseP: 6, tailMid: 0.7, tailP: 4.5, tailLen: 0.12, planP: 6.5, planPR: 6, ground: 0.25, tumble: 0.12, bowF: 0.05, bowR: 0.08,
+    flare: 0.008, crease: 0.8, creaseDepth: 0.008, blackPillars: true, pillars: [], glassRear: -1.02, rearSeat: true,
+    seams: [0.88, -0.5], handles: [-0.34], cowlX: 0.92, cowlY: 1.0, hoodX0: 0.94, cabinX1: 0.95, aBase: 0.7, hoodSlope: 0.05, hoodCurve: 0.04, hoodX1: 1.94, dome: 0.004, cabinK: 0.93, roofArc: 0.008,
+  },
+  // Kompakte Sportlimousine der frühen 90er mit Kastenverbreiterungen: 4,43 m, Radstand 2,67 m, flache Haube, kurzer hoher
+  // Kofferraum (Flügel), stark ausgestellte eckige Radläufe, tief.
+  evo2: {
+    ...BASE, tail: -2.15, nose: 2.28, width: 0.85, rearAxle: -1.29, trackF: 0, trackR: 0.01, roof: 1.36, x0: -1.62, x1: -1.0, x2: 0.08,
+    deck: 1.03, noseMid: 0.64, noseP: 6, tailMid: 0.78, tailP: 6, tailLen: 0.08, planP: 6, planPR: 6.5, ground: 0.2, tumble: 0.13, bowF: 0.07, bowR: 0.07,
+    flare: 0.075, crease: 0.76, creaseDepth: 0.01, blackPillars: true, pillars: [[-0.4, -0.3]], glassRear: -1.34, rearSeat: true,
+    seams: [0.74, -0.34, -1.24], handles: [-0.16, -1.08], hoodSlope: 0.06, hoodCurve: 0.06, dome: 0.006, cabinK: 0.93, roofArc: 0.012,
+  },
+  // Kompaktes modernes Sportcoupé: 4,58 m, Radstand 2,75 m, kurze Überhänge, flache kantige Haube, steile Front, breite
+  // ausgestellte Backen, kurzes hohes Heck mit Abrisskante, Dach fällt früh ab.
+  g87: {
+    ...BASE, tail: -2.32, nose: 2.26, width: 0.94, rearAxle: -1.37, trackF: 0.05, trackR: 0.08, roof: 1.4, x0: -1.78, x1: -0.86, x2: 0.06,
+    deck: 1.04, noseMid: 0.62, noseP: 7, tailMid: 0.76, tailP: 7, tailLen: 0.2, planP: 7, planPR: 7.5, ground: 0.2, tumble: 0.17, bowF: 0.12, bowR: 0.1,
+    flare: 0.06, crease: 0.78, creaseDepth: 0.026, blackPillars: true, pillars: [], glassRear: -1.24, rearSeat: true,
+    seams: [0.74, -0.52], handles: [-0.36], hoodSlope: 0.06, hoodCurve: 0.04, dome: 0.006, cabinK: 0.92, roofArc: 0.016,
+  },
+  // Großes modernes Sportcoupé: 4,79 m, Radstand 2,86 m, lange Haube, hohe senkrechte Front, fließende Dachlinie bis zum
+  // Heck mit Abrisskante, kräftige Backen.
+  g82: {
+    ...BASE, tail: -2.52, nose: 2.27, width: 0.94, rearAxle: -1.48, trackF: 0.04, trackR: 0.06, roof: 1.39, x0: -1.96, x1: -0.84, x2: 0.04,
+    deck: 1.03, noseMid: 0.64, noseP: 6, tailMid: 0.76, tailP: 6.5, tailLen: 0.22, planP: 6, planPR: 6.5, ground: 0.2, tumble: 0.18, bowF: 0.13, bowR: 0.12,
+    flare: 0.05, crease: 0.78, creaseDepth: 0.024, blackPillars: true, pillars: [], glassRear: -1.36, rearSeat: true,
+    seams: [0.74, -0.6], handles: [-0.44], hoodSlope: 0.05, hoodCurve: 0.05, dome: 0.01, cabinK: 0.92, roofArc: 0.018,
+  },
   classic: { ...BASE, tail: -2.26, rearAxle: -1.3, roof: 1.33, x0: -1.56, x1: -0.84, x2: 0.06, deck: 0.96, noseMid: 0.6, noseP: 4.2, tailMid: 0.64, tailP: 4, planP: 4.6, tumble: 0.17, bowF: 0.1, bowR: 0.1, flare: 0.012, crease: 0.82, creaseDepth: 0.02, blackPillars: false, pillars: [], glassRear: -1.24, rearSeat: false, ...TWO_DOOR },
 };
 
