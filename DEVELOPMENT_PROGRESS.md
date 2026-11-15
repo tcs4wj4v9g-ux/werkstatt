@@ -295,7 +295,7 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Ersatzteil „Kupplungssatz“, Tuning-Ausführung „Verstärkte Kupplung“ (goldener Sinterbelag, blaue Druckplatte, „(Tuning)“ in der Beschriftung).
   - Neuer Schaden „Verschlissene Kupplung“ mit dem Symptom „Kupplung rutscht“ auf der Probefahrt und Leistungsverlust.
 - **Neues Bauteil Kühler** (`radiator`):
-  - Vorn im Motorraum, oberer Wasserkasten hinter dem Schlossträger mit zwei 10er-Schrauben. Erst den Kühlmittelschlauch abnehmen (Kühlmittel ab), danach wieder füllen und entlüften.
+  - Vorn im Motorraum, oberer Wasserkasten unter dem Schlossträger mit zwei 10er-Schrauben. Er liegt bewusst nicht höher, sonst verdeckt er beim Blick von vorn den Riemen. Erst den Kühlmittelschlauch abnehmen (Kühlmittel ab), danach wieder füllen und entlüften.
   - Ersatzteil „Kühler“, Tuning-Ausführung „Größerer Kühler“ (blankes Alunetz, Alu-Wasserkästen).
   - Neuer Schaden „Undichter Kühler“: Kühlmittelverlust, Motor wird zu heiß.
   - Luftgekühlte Boxer haben keinen Kühler. Beim wassergekühlten Heckmotor-Boxer (992) gibt es den Kühler vorerst nicht als Bauteil.
@@ -309,6 +309,7 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - **Getriebe-Platzhalter** hängt tiefer unter dem Auto, damit darüber die Kupplung frei antippbar bleibt.
 - **Geprüft:**
   - Logiktests: Wirkung ohne Umbau, Lage hinter Getriebe bzw. Schlauch, Übernahme alter Umbauten.
+  - Diagnose-Test: fester Testauftrag auch ohne zufälligen Tuningwunsch.
   - Browser-Durchlauf `karriere`: Getriebe raus, Kupplung im Bild abschrauben und herausnehmen, verstärkte Kupplung einsetzen und festziehen, Austauschgetriebe wieder rein.
   - Bilder des Motorraums angesehen.
   - Kein echter iPad-Test.

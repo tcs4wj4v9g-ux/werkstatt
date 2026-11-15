@@ -1580,7 +1580,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                   <Mat color={has('radiator', 'swap_radiator') ? '#c9cfd6' : st('radiator')?.known && st('radiator')?.condition === 'defect' ? '#5a5048' : '#1c1e21'} metal={0.85} rough={has('radiator', 'swap_radiator') ? 0.25 : 0.42} />
                 </mesh>
                 {/* Oberer Wasserkasten hinter dem Schlossträger: von oben sichtbar, dort sitzen die Halteschrauben */}
-                <RB s={[0.06, 0.05, 0.94]} r={0.015} p={[1.89, 0.8, 0]}>
+                <RB s={[0.06, 0.05, 0.94]} r={0.015} p={[1.93, 0.76, 0]}>
                   <Mat color={has('radiator', 'swap_radiator') ? '#d9dde2' : st('radiator')?.known && st('radiator')?.condition === 'defect' ? '#5a5048' : '#17181b'} metal={has('radiator', 'swap_radiator') ? 0.9 : 0} rough={0.45} />
                 </RB>
                 {[-1, 1].map((s) => (
@@ -1590,7 +1590,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                 ))}
               </>,
             )}
-          {st('radiator') && bolts('radiator', [[1.89, 0.83, -0.38], [1.89, 0.83, 0.38]])}
+          {st('radiator') && bolts('radiator', [[1.915, 0.79, -0.38], [1.915, 0.79, 0.38]])}
 
           {draining && !bare && (
             <mesh position={[1.4, 0.185 - 0.84, 0.08]} raycast={noRay}>
