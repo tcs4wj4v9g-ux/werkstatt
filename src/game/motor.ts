@@ -43,7 +43,7 @@ export function engineWeight(e: EngineDef) {
 /** Baulänge-Klasse: 1 = kurz (R4, V6), 2 = lang (R6), 3 = breit und schwer (V8). */
 const SIZE: Record<EngineDef['layout'], number> = { B6: 1.4, B4: 1, R4: 1, R5: 1.6, V6: 1.5, R6: 2, V8: 3 };
 /** Wie viel Motor passt in den Motorraum dieser Karosserie? */
-const BAY: Record<string, number> = { mono: 1.2, hatch: 1.5, box: 2.2, tub: 1.2, nine: 1.4, nine2: 1.4, tt: 1.5, quattro: 2.2, b5: 2.6, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
+const BAY: Record<string, number> = { mono: 1.2, hatch: 1.5, box: 2.2, tub: 1.2, nine: 1.4, nine2: 1.4, tt: 1.5, quattro: 2.2, b5: 2.6, e34: 3, classic: 2.5, wagon: 2.6, sedan: 3, coupe: 3, luxury: 3, sport: 3 };
 
 export interface SwapPlan {
   possible: boolean;
@@ -91,11 +91,13 @@ export function swapPlan(car: Pick<CarInstance, 'modelId'>, engineId: string): S
     parts.add('swap_fuel');
     reasons.push(`${e.fuel === 'diesel' ? 'Diesel' : 'Benziner'} statt ${orig.fuel === 'diesel' ? 'Diesel' : 'Benziner'}: andere Kraftstoffanlage.`);
   }
-  if (e.ps > orig.ps * 1.25 || (e.turbo && !orig.turbo)) {
+  // Schon nachgerüsteter größerer Kühler bzw. verstärkte Kupplung zählen mit.
+  const tuned = (comp: string, v: string) => (car as CarInstance).components?.[comp]?.variant === v;
+  if ((e.ps > orig.ps * 1.25 || (e.turbo && !orig.turbo)) && !tuned('radiator', 'swap_radiator')) {
     parts.add('swap_radiator');
     reasons.push('Deutlich mehr Leistung bzw. Turbo: größerer Kühler.');
   }
-  if (e.nm > orig.nm * 1.4) {
+  if (e.nm > orig.nm * 1.4 && !tuned('clutch', 'clutch_hd')) {
     parts.add('clutch_hd');
     reasons.push(`${e.nm} Nm statt ${orig.nm} Nm: verstärkte Kupplung.`);
   }
@@ -152,6 +154,9 @@ export function insertEngine(car: CarInstance, unit: EngineUnit, swapParts: Part
   car.fluids.oil.level = unit.oil;
   if (unit.motor.engineId !== orig.id || car.swap) {
     car.swap = { from: car.swap?.from ?? orig.id, parts: [...new Set([...(car.swap?.parts ?? []), ...swapParts])] };
+    // Beim Umbau eingebauter Kühler bzw. Kupplung sind sichtbare Bauteile.
+    if (swapParts.includes('swap_radiator') && car.components.radiator) car.components.radiator = { ...car.components.radiator, variant: 'swap_radiator', condition: 'ok' };
+    if (swapParts.includes('clutch_hd') && car.components.clutch) car.components.clutch = { ...car.components.clutch, variant: 'clutch_hd', condition: 'ok' };
   }
   car.dyno = undefined;
   car.testDriven = false;

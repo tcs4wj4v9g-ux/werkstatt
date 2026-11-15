@@ -253,3 +253,72 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - `bremse`: Hosenrohr bei B5 und Diesel im Unterboden-Bild ausgebaut.
   - `markt`: Tuningauftrag annehmen, Sportabgasanlage einbauen, abrechnen.
   - Kein echter iPad-Test.
+
+## Fahrzeug 9: BMV M5 (E34) (an den BMW E34 M5 angelehnt) – freigegeben
+
+- Neue Form `e34`: Sportliche Oberklasse-Limousine um 1990.
+  - Maße: 4,70 m lang, Radstand 2,76 m.
+  - Lange flache Haube, vorn angeschlagen wie beim E30 („Motor von oben“).
+  - Leicht vorgeneigte Haifischnase, lange Kabine mit schmalen schwarzen Säulen, kurzer gerader Kofferraum.
+- **Front (nach Fotos des Projektinhabers überarbeitet):** schwarzes Band über die ganze Breite. Darin außen die orangen Blinker, je ein großer und ein kleinerer Rundscheinwerfer mit Chromring, waagerechte Lamellen zur Mitte und eine breite flache Doppelniere. Rundes blau-weißes Emblem auf der Haubenspitze.
+- Unten silbergrau abgesetzt: Stoßfängerunterteil vorn und hinten, Schweller. Der Stoßfänger ist in Wagenfarbe, mit schwarzer Leiste, Lufteinlass, Spoilerlippe und Nebelscheinwerfern.
+- **Heck:** breite gerippte Rückleuchten bis in die Flanke, Emblem und Kennzeichen in der Kofferraumklappe, zwei Endrohre links.
+- **Seite und Räder:** schwarze Schutzleiste an der Seite, große Turbinen-Felgen (+1 Zoll).
+- **Neuer Motor `r6_36m`:** 3,6-l-Reihensechser mit Einzeldrosselklappen, 315 PS, 360 Nm. Eigene Teilefamilie „R6-M“ (teure Teile), Motorraum wie die anderen R6.
+- **Im Spiel:**
+  - Sportklasse, selten, Grundwert 36.000 €, Baujahre 1988–1995.
+  - Farben: Dunkelblau, Schwarz, Silber, Dunkelgrün, Dunkelrot.
+  - Motorraum 3 (passt auch ein V8 hinein).
+- Neues Material „blau“ (Emblem).
+- Geprüft:
+  - Logiktests: Haubenfreiraum, Proportionen, Marktlayouts.
+  - Browser-Durchläufe `markt` und `bremse`.
+  - Motorraum über „Motor von oben“ angesehen.
+  - Kein echter iPad-Test.
+
+## Tuningteile im Motorraum erkennbar
+
+- Beim Anvisieren nennt die Beschriftung das Tuningteil, z. B. „Abgaskrümmer – Fächerkrümmer (Tuning)“ oder „Turbolader – Größerer Turbolader (Tuning)“.
+- Eigene Optik je Tuningteil:
+  - Fächerkrümmer: Edelstahl mit blau-goldenen Anlauffarben (neues Material `heat`), dazu ein blanker Sammler mit Flansch statt braunem Guss.
+  - Größerer Turbolader: blau eloxiertes Verdichtergehäuse (und größer).
+  - Hochleistungs-Einspritzdüsen: rot.
+  - Geschmiedete Kolben: angelaufener Kolbenboden und Stahlpleuel.
+  - Schon vorher unterschiedlich: Sportluftfilter (rot), Sportabgasanlage (blank), Sportnockenwellen (gelb), Hochleistungs-Kraftstoffpumpe (rot), Ladeluftkühler-Kit.
+- Geprüft: Logiktests; Browser-Durchläufe `motoren` (neuer Schritt: Tuning-Beschriftung), `schrott`, `mechanik`; Bilder des Motorraums mit und ohne Tuning angesehen. Kein echter iPad-Test.
+
+## Kupplung und Kühler als Bauteile (auch fürs Tuning)
+
+- Bisher gab es die verstärkte Kupplung und den größeren Kühler nur automatisch beim Motorumbau. Die Akte warnte bei mehr Ladedruck zwar „Kupplung rutscht – verstärkte Kupplung“, nachrüsten ließ sie sich aber nicht.
+- **Neues Bauteil Kupplung** (`clutch`):
+  - Sitzt im Kupplungsgehäuse und ist erst nach dem Getriebe erreichbar, also von unten und mit dem Getriebeheber. Drei Schrauben mit 13er Nuss.
+  - Ersatzteil „Kupplungssatz“, Tuning-Ausführung „Verstärkte Kupplung“ (goldener Sinterbelag, blaue Druckplatte, „(Tuning)“ in der Beschriftung).
+  - Neuer Schaden „Verschlissene Kupplung“ mit dem Symptom „Kupplung rutscht“ auf der Probefahrt und Leistungsverlust.
+- **Neues Bauteil Kühler** (`radiator`):
+  - Vorn im Motorraum, oberer Wasserkasten unter dem Schlossträger mit zwei 10er-Schrauben. Er liegt bewusst nicht höher, sonst verdeckt er beim Blick von vorn den Riemen. Erst den Kühlmittelschlauch abnehmen (Kühlmittel ab), danach wieder füllen und entlüften.
+  - Ersatzteil „Kühler“, Tuning-Ausführung „Größerer Kühler“ (blankes Alunetz, Alu-Wasserkästen).
+  - Neuer Schaden „Undichter Kühler“: Kühlmittelverlust, Motor wird zu heiß.
+  - Luftgekühlte Boxer haben keinen Kühler. Beim wassergekühlten Heckmotor-Boxer (992) gibt es den Kühler vorerst nicht als Bauteil.
+- **Wirkung und Shop:**
+  - Die Leistungsberechnung nutzt die eingebauten Tuningteile (Kupplung hält 2,3- statt 1,35-faches Serien-Drehmoment, Kühler +25 % Kühlleistung).
+  - Beide Tuningteile stehen im Teileshop unter „Tuning“.
+- **Alte Spielstände und Umbauten:**
+  - Bisherige Motorumbauten mit diesen Teilen werden beim Laden als eingebaute Tuningteile übernommen (Einzelspieler und Koop).
+  - Ein neuer Umbau setzt sie direkt ein.
+  - Der Umbauplan verlangt sie nicht doppelt, wenn sie schon verbaut sind.
+- **Getriebe-Platzhalter** hängt tiefer unter dem Auto, damit darüber die Kupplung frei antippbar bleibt.
+- **Geprüft:**
+  - Logiktests: Wirkung ohne Umbau, Lage hinter Getriebe bzw. Schlauch, Übernahme alter Umbauten.
+  - Diagnose-Test: fester Testauftrag auch ohne zufälligen Tuningwunsch.
+  - Browser-Durchlauf `karriere`: Getriebe raus, Kupplung im Bild abschrauben und herausnehmen, verstärkte Kupplung einsetzen und festziehen, Austauschgetriebe wieder rein.
+  - Bilder des Motorraums angesehen.
+  - Kein echter iPad-Test.
+
+## Porsche-Bremsen und Hebebühnen-Arme
+
+- **Bremsen beim Porsche nicht erreichbar:** Die Porsche haben eine schmale Spur (bis 15 cm schmaler), dadurch sitzen Scheibe, Sattel und Beläge weiter innen. Die Radhaus-Innenwand der Karosserie lag aber bei allen Autos gleich und verdeckte sie. Die Wand richtet sich jetzt nach der Spur vorn bzw. hinten und liegt immer innen von der Bremse.
+- **Tragarme griffen in die Reifen:** Die Teller der Hebebühne lagen für alle Autos an derselben Stelle, beim kurzen 356 (Radstand 2,1 m) unter dem Hinterrad. Die Arme richten sich jetzt nach Radstand und Breite des Autos: Die Teller greifen hinter dem Vorderrad und vor dem Hinterrad unter dem Schweller.
+- Geprüft:
+  - Logiktests: für jede Karosserie Teller mit Abstand zu beiden Rädern.
+  - Browser-Durchlauf `bremse`: Beläge im Bild angetippt und herausgenommen, beim 964 vorn und hinten, beim 356 vorn und beim 992 hinten.
+  - Kein echter iPad-Test.

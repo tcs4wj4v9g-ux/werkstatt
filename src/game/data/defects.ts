@@ -154,6 +154,14 @@ export const DEFECTS: Record<DefectId, DefectDef> = {
     id: 'discs_rear', name: 'Verschlissene Bremsscheiben hinten', components: ['disc_rl', 'disc_rr'], pick: 'all',
     penalty: 560, symptoms: ['brake_look'], labor: 150, category: 'Bremsen', weight: 0.6,
   },
+  clutch: {
+    id: 'clutch', name: 'Verschlissene Kupplung', components: ['clutch'], pick: 'all',
+    penalty: 900, symptoms: ['clutch_slip'], labor: 380, category: 'Antrieb', weight: 0.6,
+  },
+  radiator: {
+    id: 'radiator', name: 'Undichter Kühler', components: ['radiator'], pick: 'all',
+    penalty: 450, symptoms: ['coolant_wet', 'temp_high'], labor: 160, category: 'Kühlung', weight: 0.7,
+  },
   // Unterboden: Abgasanlage und Vorderachse
   muffler: {
     id: 'muffler', name: 'Durchgerosteter Endschalldämpfer', components: ['muffler'], pick: 'all',

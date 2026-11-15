@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
+import { BODY_SPECS } from './carGeometry';
 import { useGame } from '../game/store';
 import { Annex } from './Annex';
 import type { ZoneId } from '../game/types';
@@ -278,7 +279,7 @@ function Bay({ index }: { index: number }) {
       )}
 
       <group ref={carriage}>
-        <mesh geometry={liftCarriage()} material={decoMaterials()} castShadow />
+        <mesh geometry={liftCarriage(car ? BODY_SPECS[CAR_MODELS[car.modelId].body].rearAxle : -1.38, car ? BODY_SPECS[CAR_MODELS[car.modelId].body].width : 0.86)} material={decoMaterials()} castShadow />
         {car && <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} car={car} handlers={handlers} tool={tool} lod={detailed ? 'full' : 'simple'} hoodTap />}
       </group>
       <Blob />

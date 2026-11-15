@@ -74,7 +74,7 @@ export function addFluid(car: CarInstance, stock: FluidStock, id: FluidId, produ
   if (id === 'oil' && !isComplete(car, 'oil_pan')) return fail('Erst die Ölwanne montieren.');
   if (id === 'oil' && !car.components.oil_filter.installed) return fail('Erst einen Ölfilter einsetzen.');
   if (id === 'coolant' && engineOf(car).air) return fail('Luftgekühlter Motor – er braucht kein Kühlmittel.');
-  if (id === 'coolant' && ['water_pump', 'thermostat', 'hose'].some((c) => !isComplete(car, c))) return fail('Das Kühlsystem ist noch offen – erst Pumpe, Thermostat und Schlauch montieren.');
+  if (id === 'coolant' && ['water_pump', 'thermostat', 'hose', 'radiator'].some((c) => car.components[c] && !isComplete(car, c))) return fail('Das Kühlsystem ist noch offen – erst Kühler, Pumpe, Thermostat und Schlauch montieren.');
   if (stock[product] < 0.05) return fail(`Kein ${FLUID_PRODUCTS[product].name} im Lager – am Computer bestellen.`);
   const f = car.fluids[id];
   const cap = capacity(car, id);
@@ -146,7 +146,7 @@ export function fluidSymptoms(car: CarInstance): string[] {
 export function dailyLeaks(car: CarInstance) {
   const bad = (id: string) => car.components[id]?.condition === 'defect' && car.components[id]?.installed;
   const oilLoss = (bad('gasket') ? 0.2 : 0) + (bad('oil_pan_gasket') ? 0.3 : 0);
-  const coolantLoss = (bad('water_pump') ? 0.5 : 0) + (bad('hose') ? 0.4 : 0);
+  const coolantLoss = (bad('water_pump') ? 0.5 : 0) + (bad('hose') ? 0.4 : 0) + (bad('radiator') ? 0.4 : 0);
   car.fluids.oil.level = r1(Math.max(0, car.fluids.oil.level - oilLoss));
   car.fluids.coolant.level = r1(Math.max(0, car.fluids.coolant.level - coolantLoss));
 }

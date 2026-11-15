@@ -222,6 +222,19 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
     defectText: 'Späne im Öl, Synchronringe verschlissen, Lagerspiel – defekt!',
   },
   {
+    id: 'clutch',
+    name: 'Kupplung',
+    bolts: 3,
+    fastener: S13,
+    blockedBy: ['gearbox'],
+    access: 'lifted',
+    partId: 'clutch',
+    hidden: true,
+    variants: ['clutch_hd'],
+    okText: 'Belag 7 mm, Druckplatte ohne Hitzeflecken – in Ordnung.',
+    defectText: 'Belag bis auf die Nieten runter, Druckplatte blau angelaufen – verschlissen!',
+  },
+  {
     id: 'oil_filter',
     name: 'Ölfilter',
     bolts: 0,
@@ -303,6 +316,18 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
     partId: 'water_pump',
     okText: 'Trocken, Lager spielfrei – in Ordnung.',
     defectText: 'Kühlmittelspuren an der Welle – Pumpe undicht!',
+  },
+  {
+    id: 'radiator',
+    name: 'Kühler',
+    bolts: 2,
+    fastener: S10,
+    blockedBy: ['hose'],
+    access: 'hood',
+    partId: 'radiator',
+    variants: ['swap_radiator'],
+    okText: 'Netz sauber, Wasserkästen dicht – in Ordnung.',
+    defectText: 'Haarriss am Wasserkasten, Kalkspuren am Netz – undicht!',
   },
   {
     id: 'hose',
@@ -494,15 +519,16 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
   // Was gehört zum Motor? Alles außer Rädern, Bremsen, Batterie, Getriebe, Abgasanlage und den Anschlüssen am Fahrzeug.
   for (const d of out) d.engine = !CAR_SIDE.test(d.id);
   // Luftgekühlt: kein Kühlmittelkreislauf
+  if (!engine.air && (engine.layout === 'B4' || engine.layout === 'B6')) return out.filter((d) => d.id !== 'radiator');
   if (engine.air) {
-    const water = new Set(['water_pump', 'hose', 'thermostat']);
+    const water = new Set(['water_pump', 'hose', 'thermostat', 'radiator']);
     return out.filter((d) => !water.has(d.id)).map((d) => ({ ...d, blockedBy: d.blockedBy.filter((b) => !water.has(b)) }));
   }
   return out;
 }
 
 /** Bauteile der Karosserie bzw. des Fahrwerks: bleiben beim Motorausbau im Auto. */
-const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|battery$|gearbox$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
+const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|battery$|gearbox$|clutch$|radiator$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
 
 const cache = new Map<string, { list: ComponentDef[]; map: Record<string, ComponentDef> }>();
 function forEngine(engineId: string, turboKit = false) {

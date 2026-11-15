@@ -180,7 +180,7 @@ describe('Reparatur', () => {
 
   it('alle Defekte zusammen: abzugsfrei erst nach Reparatur und Probefahrt', () => {
     const all = applicableDefects('bavaria_320').filter((d) => !standOnly(d));
-    expect(all.length).toBe(25);
+    expect(all.length).toBe(27);
     expect(applicableDefects('bavaria_320').filter((d) => standOnly(d)).sort()).toEqual(['camshaft', 'main_bearing', 'oil_pump', 'rings', 'timing_chain']);
     const car = mk('bavaria_320', all);
     const i = inv(8);
@@ -246,7 +246,7 @@ describe('Diagnose', () => {
     expect(possibleCauses('rough_idle', mk('bavaria_320', [])).map((d) => d.id).sort()).toEqual(['coil', 'plugs', 'vacuum']);
     expect(possibleCauses('rough_idle', mk('bavaria_320d', [])).map((d) => d.id).sort()).toEqual(['egr', 'glow', 'injector', 'vacuum']);
     expect(possibleCauses('metal_noise').map((d) => d.id).sort()).toEqual(['bearing', 'chain', 'lifters', 'timing_chain']);
-    expect(possibleCauses('coolant_wet').map((d) => d.id).sort()).toEqual(['coolant_hose', 'water_pump']);
+    expect(possibleCauses('coolant_wet').map((d) => d.id).sort()).toEqual(['coolant_hose', 'radiator', 'water_pump']);
     DEFECT_LIST.forEach((d) => d.symptoms.forEach((s) => expect(SYMPTOMS[s], `${d.id}:${s}`).toBeTruthy()));
 
     const car = mk('bavaria_318', ['vacuum']);

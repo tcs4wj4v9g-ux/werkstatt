@@ -93,8 +93,24 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await G(() => window.__gk.setState({ upgrades: [...window.__gk.getState().upgrades, 'hoist'] }));
   await aimTap(under, [0.965, LIFT + 0.16, bz]);
   expect(!(await comp(10, 'gearbox')).installed && (await comp(10, 'gearbox')).known, 'Mit Heber: Getriebe ausgebaut und als defekt erkannt – ' + (await toast()));
+  // Kupplung hinter dem Getriebe: Schrauben im Bild lösen, herausnehmen, verstärkte Kupplung einsetzen
+  const cl = [[0.885, -0.045], [0.885, 0.045], [0.885, 0]].map(([x, z]) => [x, 0.148 + LIFT - 0.02, bz + z]);
+  await kit('ratchet'); for (const q of cl) await aimTap(under, q);
+  await kit('hand'); for (const q of cl) await aimTap(under, q);
+  expect((await comp(10, 'clutch')).bolts.join() === '0,0,0', 'Kupplung: drei Schrauben im Bild gelöst und herausgedreht – ' + (await comp(10, 'clutch')).bolts);
+  await aimTap(under, [0.9, LIFT + 0.228, bz]);
+  expect(!(await comp(10, 'clutch')).installed, 'Kupplung herausgenommen – ' + (await toast()));
+  await G(() => { const g = window.__gk; g.getState().buyPart('clutch_hd', 10); g.setState({ tool: 'hand' }); g.getState().installWith(10, 'clutch', { kind: 'variant', part: 'clutch_hd' }); });
+  await kit('hand'); for (const q of cl) await aimTap(under, q); await kit('ratchet'); for (const q of cl) await aimTap(under, q);
+  const c2 = await comp(10, 'clutch');
+  const clLabel = await G(() => { let l = null; window.__gkScene.traverse((o) => { if (!l && o.userData && /^Kupplung – /.test(o.userData.label || '')) l = o.userData.label; }); return l; });
+  expect(c2.installed && c2.variant === 'clutch_hd' && c2.bolts.join() === '2,2,2' && /Verstärkte Kupplung \(Tuning\)/.test(clLabel || ''), 'Verstärkte Kupplung eingebaut und festgeschraubt: ' + clLabel);
   await G(() => window.__gk.getState().buyPart('gearbox', 10));
-  await aimTap(under, [0.965, LIFT + 0.16 - 0.12, bz]);
+  // Platzhalter hängt tiefer unter dem Auto (darüber liegt die Kupplung frei): im Bild suchen und antippen
+  await aim(under, [0.7, LIFT - 0.1, bz]);
+  const gh = await G(() => { let r = null; const cam = window.__gkCamera; const v = new cam.position.constructor(); window.__gkScene.traverse((o) => { if (!r && o.userData && o.userData.label === 'Getriebe einbauen') o.traverse((m) => { if (!r && m.isMesh && m.geometry.type === 'BoxGeometry') { m.getWorldPosition(v); v.project(cam); r = { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }; } }); }); return r; });
+  await kit('hand'); await G(() => window.__gk.setState({ toast: null }));
+  if (gh) { await p.mouse.click(gh.x, gh.y); await p.waitForTimeout(250); }
   for (const q of gb) await aimTap(under, q); await kit('ratchet'); for (const q of gb) await aimTap(under, q);
   const g2 = await comp(10, 'gearbox');
   expect(g2.installed && g2.condition === 'ok' && g2.bolts.join() === '2,2,2,2', 'Austauschgetriebe eingebaut und verschraubt');
