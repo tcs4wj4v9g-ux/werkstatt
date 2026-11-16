@@ -724,8 +724,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             ))}
           </>,
         )}
-        {/* beide Schrauben von unten erreichbar: am Flansch vorn und an der Gummiaufhängung unter dem Topf */}
-        {bolts('muffler', [[xm + 0.18, yU + 0.02, -0.19], [xm - 0.06, yU - 0.072, zm + 0.16]], 'y-')}
+        {/* beide Schrauben von unten erreichbar: am Flansch vorn und an der Gummiaufhängung unter dem Topf; Köpfe nach vorn zur Ansicht „Unterboden hinten“ (senkrecht nach unten sähe man sie dort nur streifend) */}
+        {bolts('muffler', [[xm + 0.18, yU + 0.02, -0.19], [xm - 0.06, yU - 0.072, zm + 0.16]], rearEngine ? 'y-' : 'x+')}
         {([1, -1] as const).map((sg) => {
           const s = sg > 0 ? 'fr' : 'fl';
           const zo = sg * (0.6 + B.trackF);
