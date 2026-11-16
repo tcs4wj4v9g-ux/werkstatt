@@ -13,6 +13,7 @@ Echte Tipps im laufenden Spiel (Playwright, Chromium mit Software-Grafik). Vorau
 | `markt` | 25 Inserate, Filter, Blättern, Teileshop je Auto, Akte, Karosserie-Bilder | Markt, Shop, Karosserien |
 | `karriere` | Version-4-Spielstand, Standorte, Getriebe mit Heber, Prüfstand, Showroom, Wettbewerb, Treffen | Karriere, Standorte, Spielstand |
 | `tiefgarage` | Autohaus (Plätze, Rundum-Ansicht, Drehteller, Verkauf) und Tiefgaragen: Kauf, Einparken über „Umparken“, Einfahrt im Hof, begehen (Wände), Akte, Herausholen, volle Garage, Ausfahrt, Neuladen, Luxus mit 50 Autos | Tiefgaragen, Stellplätze, Orte |
+| `unterboden` | Alle Modelle: Endtopf, Kraftstoffpumpe, Hosenrohr im Unterboden-Bild ausbaubar (Schrauben, Stecker, Teil) | Unterboden, Karosserieformen, neue Modelle |
 | `koop` | Zwei Spieler in getrennten Browser-Profilen gegen das echte SQL-Schema: die acht Pflichtszenarien (Zugang, Reparatur, Ratschen, Spezialwerkzeug, Geld, Verbindungsabbruch, Wiederbeitritt, Einzelspieler) und die gemeinsame Tiefgarage | Koop (`src/net`, `supabase/schema.sql`), Spielstand, Werkzeuge |
 
 ```
