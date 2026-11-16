@@ -404,3 +404,14 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Fehler behoben: Sport-Nockenwellen brachten keine Leistung.
   - Im Tuningfenster steht zu jedem eingebauten Tuningteil die Mehrleistung oder der Grund, warum es (noch) nichts bringt. Beispiele: Die Pumpe hebt nur die Kraftstoffgrenze, der große Turbo braucht Stufe 2 und mehr Ladedruck.
 - **Halle 2:** Werkzeugwagen (Werkzeugschrank, im Koop die gemeinsame Kiste), Computer und Teileregal. Halle 2 ist damit ohne Rückweg nutzbar.
+
+## Koop: grauer Bildschirm behoben
+
+- **Ursache:** Verkauft oder parkt ein Spieler ein Auto um, während der andere gleichzeitig daran schraubt, landete dessen Schritt im leeren Stellplatz. Dort entstand ein halbes Auto ohne Modell, und beim Zeichnen stürzte die ganze Ansicht ab. Übrig blieb der graue Hintergrund, bis man neu startete.
+- **Behoben:** Schritte an einem Auto, das auf dem Platz nicht (mehr) steht, werden verworfen (`apply` in `src/net/diff.ts`, mit Logiktest). Halbe Autos aus älteren Fehlern werden beim Beitreten und nach jedem Abgleich entfernt.
+- **Sicherheitsnetz:**
+  - Stürzen 3D-Ansicht oder Bedienung doch einmal ab, bauen sie sich selbst neu auf (`src/ui/Recover.tsx`). Im Koop wird dabei der Stand frisch vom Server geholt, die Fehlermeldung erscheint kurz als Hinweis.
+  - Erst bei vier Abstürzen in 15 Sekunden erscheint „Neu laden“.
+  - Verliert das iPad den Grafikkontext, wird die 3D-Ansicht neu erzeugt.
+  - Die Werkzeugschilder der Partnerfigur werden beim Wechsel freigegeben.
+- Geprüft: Logiktests, Durchlauf `koop`, Kurztest mit eingeschleustem halbem Auto (Ansicht erholt sich, Auto entfernt). Kein echter iPad-Test.

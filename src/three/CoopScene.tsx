@@ -167,7 +167,11 @@ function Avatar({ id, index }: { id: string; index: number }) {
     if (toolSprite.current && toolLabel.current !== p.tool) {
       toolLabel.current = p.tool;
       const t = textTexture(`${TOOL_MAP[p.tool]?.icon ?? ''} ${TOOL_MAP[p.tool]?.short ?? ''}`, { bg: '#e3a81c', fg: '#16181d', w: 256, h: 64, font: 38 });
+      // altes Schild freigeben, sonst sammeln sich bei jedem Werkzeugwechsel des Partners Texturen an
+      const old = toolSprite.current.material as THREE.SpriteMaterial;
       toolSprite.current.material = new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true, opacity: 0.92 });
+      old.map?.dispose();
+      old.dispose();
     }
   });
 

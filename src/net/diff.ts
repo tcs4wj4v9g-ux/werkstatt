@@ -102,6 +102,12 @@ export function apply<T extends Record<string, any>>(state: T, patches: Patch[],
   let s: any = state;
   for (const p of patches) {
     if (skip?.has(p.path.join('/'))) continue;
+    // Änderung an einem Auto, das hier nicht (mehr) auf dem Platz steht (gleichzeitig verkauft/umgeparkt):
+    // sonst entstünde aus dem leeren Platz ein halbes Auto ohne Modell, an dem die 3D-Ansicht abstürzt.
+    if (p.path[0] === 'cars' && p.path.length > 2) {
+      const slot = s.cars?.[Number(p.path[1])];
+      if (!slot || typeof slot !== 'object' || !slot.modelId) continue;
+    }
     s = p.path.length === 1 ? { ...s, [p.path[0]]: p.after } : setIn(s, p.path, p.after, 0);
   }
   return s;

@@ -1,7 +1,8 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGame } from './game/store';
-import { isLeader } from './net/coop';
+import { isLeader, recoverAfterCrash } from './net/coop';
+import { Recover } from './ui/Recover';
 import { Perf } from './three/Env';
 import { GFX, TEST_DPR, TEST_MODE, useGfx } from './three/gfx';
 import { GarageScene } from './three/GarageScene';
@@ -32,6 +33,8 @@ export function App() {
   const level = useGfx((s) => s.level);
   const scale = useGfx((s) => s.scale);
   const G = GFX[level];
+  // Verliert das iPad den Grafikkontext (Speicherdruck), wird die 3D-Ansicht neu aufgebaut statt grau zu bleiben.
+  const [glKey, setGlKey] = useState(0);
   const dpr = TEST_MODE ? TEST_DPR : Math.max(0.6, Math.min(window.devicePixelRatio || 1, G.dpr) * scale);
   // Auktionen laufen in Echtzeit – auch die Zeit, in der das Spiel geschlossen war, wird beim Start nachgeholt.
   useEffect(() => {
@@ -48,7 +51,9 @@ export function App() {
   return (
     <div className="app">
       {/* Ein Wechsel der Grafikstufe baut die 3D-Ansicht neu auf (Kantenglättung und Schatten lassen sich nicht im Betrieb umschalten). */}
-      <Canvas key={level} shadows={G.shadows} dpr={dpr} gl={{ antialias: G.antialias, powerPreference: 'high-performance' }} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
+      {/* Absturz in der 3D-Ansicht: neu aufbauen statt grauem Bildschirm (im Koop mit frischem Stand vom Server) */}
+      <Recover onError={(e) => { recoverAfterCrash(); useGame.getState().say(`Ansicht neu aufgebaut (${e?.message ?? 'Fehler'}).`, true); }} fallback={(msg, reload) => <div className="crash"><div>Die Ansicht stürzt wiederholt ab:<br /><small>{msg}</small></div><button className="btn primary" onClick={reload}>Neu laden</button></div>}>
+      <Canvas key={`${level}-${glKey}`} onCreated={({ gl }) => gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setTimeout(() => setGlKey((k) => k + 1), 400); }, { once: true })} shadows={G.shadows} dpr={dpr} gl={{ antialias: G.antialias, powerPreference: 'high-performance' }} camera={{ fov: 45, near: 0.08, far: 400, position: [5, 2.5, 5] }}>
         <TestHook />
         <Perf />
         {screen === 'menu' && <MarketScene showroom />}
@@ -56,6 +61,8 @@ export function App() {
         {screen === 'garage' && <GarageScene />}
         {screen === 'track' && <TrackScene />}
       </Canvas>
+      </Recover>
+      <Recover onError={() => recoverAfterCrash()} fallback={(msg, reload) => <div className="crash"><div>Die Bedienung stürzt wiederholt ab:<br /><small>{msg}</small></div><button className="btn primary" onClick={reload}>Neu laden</button></div>}>
       <div className="ui">
         {screen === 'menu' && <MenuScreen />}
         {screen === 'market' && <MarketUI />}
@@ -65,6 +72,7 @@ export function App() {
         {panel === 'coop' && screen !== 'menu' && <CoopModal />}
         <Toast />
       </div>
+      </Recover>
       <div className="rotate">
         <div>↻</div>
         Bitte das iPad ins Querformat drehen
