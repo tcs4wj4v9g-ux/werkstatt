@@ -176,7 +176,7 @@ function siteBoxes(): Box[] {
     if (s.kind !== 'lift' || s.id < 10 || !(s.needs === 'loc_pro' ? site.pro : site.center)) continue;
     out.push(box(0, s.z - 1.5, 0.3, 0.36), box(0, s.z + 1.5, 0.3, 0.36));
   }
-  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1), box(5.9, 1.3, 0.6, 0.5));
+  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1), box(5.85, -9.6, 0.4, 0.5), box(5.95, -6.6, 0.45, 1.0), box(5.9, 1.3, 0.6, 0.5));
   else out.push(box(-3.4, -5.2, 0.8, 0.6)); // Unterstellböcke vor der geschlossenen Seitenwand
   if (site.center) out.push(box(5.8, -13.6, 0.6, 0.8));
   if (site.hq) out.push(box(5.6, 6.6, 1.0, 1.6));

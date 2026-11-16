@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { SLOTS } from '../game/data/workshop';
 import { useGame } from '../game/store';
+import { coopActive, openBox } from '../net/coop';
+import { Interactable } from './Interactable';
 import { PASSAGE, ROOM, hall2, SHOWROOM } from './player';
 import { concreteTexture, textTexture, wallTexture } from './textures';
 
@@ -61,6 +63,7 @@ export function GapWall({ z, color = '#d9d6cc', thickness = 0.2 }: { z: number; 
 
 export function Annex() {
   const upgrades = useGame((s) => s.upgrades);
+  const setPanel = useGame((s) => s.setPanel);
   const pro = upgrades.includes('loc_pro');
   const center = upgrades.includes('loc_center');
   const hq = upgrades.includes('loc_hq');
@@ -141,9 +144,30 @@ export function Annex() {
           <Box p={[ROOM.maxX - 0.005, 0.6, cz2]} s={[0.01, 1.2, d2]} c="#3f4a57" />
           <Box p={[ROOM.maxX - 0.008, 1.22, cz2]} s={[0.012, 0.06, d2]} c="#ff7a1a" />
           <Sign text={center ? 'PERFORMANCE-CENTER' : 'HALLE 2'} p={[ROOM.maxX - 0.03, 2.8, cz2]} rot={[0, -Math.PI / 2, 0]} size={[3.2, 0.5]} />
-          {/* Einrichtung: Werkzeugwagen und Regal an der Rückwand */}
-          <Box p={[5.7, 0.5, -8.1]} s={[0.7, 1.0, 1.1]} c="#b3261e" m={0.4} r={0.5} />
-          <Box p={[5.7, 1.03, -8.1]} s={[0.74, 0.06, 1.14]} c="#2a2c30" m={0.5} />
+          {/* Einrichtung an der Rückwand: Werkzeugwagen (wie der Werkzeugschrank), Terminal (Teile, Markt, Aufträge), Teileregal */}
+          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('schrank') : setPanel('cabinet'))} position={[5.7, 0, -8.1]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
+            <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 1.1]} c="#b3261e" m={0.4} r={0.5} />
+            <Box p={[0, 1.03, 0]} s={[0.74, 0.06, 1.14]} c="#2a2c30" m={0.5} />
+            {[0.25, 0.5, 0.75].map((y) => (
+              <Box key={y} p={[-0.355, y, 0]} s={[0.01, 0.02, 0.9]} c="#c9ccd1" m={0.9} r={0.3} />
+            ))}
+          </Interactable>
+          <Interactable id="h2_computer" label="Terminal – Teile, Markt, Aufträge" onUse={() => setPanel('computer')} position={[5.85, 0, -9.6]} halo={[0.5, 1.5, 0.7]} haloPos={[0, 0.75, 0]}>
+            <Box p={[0, 0.5, 0]} s={[0.4, 1.0, 0.5]} c="#3f4650" m={0.5} />
+            <mesh position={[-0.21, 1.15, 0]} rotation={[0, -Math.PI / 2, -0.25]}>
+              <planeGeometry args={[0.45, 0.3]} />
+              <meshStandardMaterial color="#0f1a2a" emissive="#4a8fd8" emissiveIntensity={0.6} />
+            </mesh>
+          </Interactable>
+          <Interactable id="h2_shelf" label="Ersatzteilregal Halle 2" onUse={() => setPanel('shop')} position={[5.95, 0, -6.6]} halo={[0.5, 2.0, 1.1]} haloPos={[0, 1.0, 0]}>
+            {[0.3, 0.9, 1.5].map((y) => (
+              <Box key={y} p={[0, y, 0]} s={[0.45, 0.04, 1.0]} c="#b3b8be" m={0.7} r={0.4} />
+            ))}
+            {[-0.48, 0.48].map((z) => (
+              <Box key={z} p={[0, 0.95, z]} s={[0.45, 1.9, 0.04]} c="#3f4650" m={0.6} />
+            ))}
+            {[0.42, 1.02, 1.62].flatMap((y) => [-0.25, 0.1].map((z) => <Box key={`${y}${z}`} p={[0, y, z]} s={[0.32, 0.2, 0.28]} c={z < 0 ? '#a9825a' : '#24406e'} r={0.9} />))}
+          </Interactable>
           {center && (
             <group>
               {/* Rollenprüfstand: im Boden eingelassene Rollen und Bedienpult */}
