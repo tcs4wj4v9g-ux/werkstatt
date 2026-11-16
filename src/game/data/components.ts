@@ -12,7 +12,7 @@ const S16: ToolNeed = { driver: 'ratchet', socket: 'socket16' };
 /** Unterboden: Endschalldämpfer und Vorderachse (Querlenker, Spurstangenköpfe). Gehört zur Karosserie, nicht zum Motor. */
 const chassis = (): ComponentDef[] => [
   {
-    id: 'muffler', name: 'Endschalldämpfer', bolts: 2, fastener: S13, blockedBy: [], access: 'lifted', partId: 'muffler',
+    id: 'muffler', name: 'Endschalldämpfer', bolts: 2, fastener: S13, blockedBy: [], access: 'lifted', partId: 'muffler', variants: ['muffler_sport'],
     okText: 'Endtopf dicht, Schelle und Gummiaufhängung in Ordnung.', defectText: 'Endtopf durchgerostet – Löcher im Mantel, er dröhnt!',
   },
   ...(['fl', 'fr'] as const).flatMap((s): ComponentDef[] => {
@@ -443,7 +443,7 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
       okText: 'Steckverbindung sauber, Verriegelung intakt.', defectText: 'Kontakte korrodiert – Wackelkontakt!',
     },
     {
-      id: 'mounts', name: 'Motorlager und Getriebeglocke', bolts: 4, fastener: S17, blockedBy: [], access: 'hood', partId: 'engine_mount',
+      id: 'mounts', name: 'Motorlager und Getriebeglocke', bolts: 4, fastener: S17, blockedBy: [], access: 'lifted', partId: 'engine_mount',
       okText: 'Gummilager ohne Risse.', defectText: 'Gummilager gerissen – der Motor schlägt beim Lastwechsel!',
     },
     {
@@ -528,7 +528,7 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
 }
 
 /** Bauteile der Karosserie bzw. des Fahrwerks: bleiben beim Motorausbau im Auto. */
-const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|battery$|gearbox$|clutch$|radiator$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
+const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|arm_|tie_|muffler$|battery$|gearbox$|clutch$|radiator$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
 
 const cache = new Map<string, { list: ComponentDef[]; map: Record<string, ComponentDef> }>();
 function forEngine(engineId: string, turboKit = false) {

@@ -26,7 +26,7 @@ const only = process.argv.slice(2);
   for (const model of models) {
     const ids = await G((model) => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar(model, [], Math.random, {}); c.lifted = true; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [true, false], panel: null, tool: 'hand', carried: ['ratchet', 'socket10', 'socket13', 'socket16', 'socket17'] }); Object.assign(window.__gkPlayer, { x: 2.9, z: -2.7, yaw: Math.PI / 2, work: null }); return ['muffler', 'fuel_pump', 'downpipe'].filter((id) => c.components[id]); }, model);
     await p.waitForTimeout(500);
-    await p.locator('.car-actions button', { hasText: 'Unterboden' }).click(); await p.waitForTimeout(600);
+    await p.locator('.car-actions button', { hasText: /Unterboden$/ }).click(); await p.waitForTimeout(600);
     for (const id of ids) {
       const info = await G((id) => { const c = window.__gk.getState().cars[0]; const d = window.__gkLib.defOf(c, id); return { name: d.name, n: d.bolts, conn: !!d.connector, drv: d.fastener && d.fastener.driver }; }, id);
       const boltLabel = await G((name) => { let l = null; window.__gkScene.traverse((o) => { if (!l && o.userData && typeof o.userData.label === 'string' && o.userData.label.startsWith('Schraube – ' + name)) l = o.userData.label; }); return l; }, info.name);

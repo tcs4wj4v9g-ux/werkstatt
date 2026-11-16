@@ -7,10 +7,10 @@ import { VISUAL_MAP, VISUAL_PARTS, dropOf, mountedId } from '../game/data/visual
 import { JUNK_SLOTS, SLOTS, STAND_SLOT, isLift } from '../game/data/workshop';
 import { fitOf } from '../game/fitment';
 import { engineHealth, engineValue, junkEnginePrice, motorLabel, removalSteps, swapPlan, unitComplete, type EngineUnit } from '../game/motor';
-import { engineOutput, performance } from '../game/performance';
+import { engineOutput, performance, tuningEffects } from '../game/performance';
 import { isAssembled } from '../game/repair';
 import { installOptions, useGame } from '../game/store';
-import type { CarInstance, VisualTune } from '../game/types';
+import type { CarInstance, PartId, VisualTune } from '../game/types';
 import { eur, Modal } from './common';
 
 const carName = (c: CarInstance) => `${CAR_MODELS[c.modelId].name} (${c.year})`;
@@ -211,6 +211,16 @@ export function TuningPanel() {
       {out.risks.map((r) => (
         <div key={r.label} className={`meta ${r.level >= 1 ? 'bad' : ''}`}>⚠ {r.label}{r.level >= 1 ? ' – unter Volllast drohen Schäden!' : ''}</div>
       ))}
+      {tuningEffects(car).length > 0 && (
+        <>
+          <h4>Eingebaute Tuningteile</h4>
+          {tuningEffects(car).map((t) => (
+            <div key={t.comp + t.part} className="meta" data-testid="tune-effect">
+              <b>{PARTS[t.part as PartId]?.name ?? t.part}</b>: {t.ps >= 1 ? <span className="good">+{t.ps} PS</span> : <span>{t.note}</span>}
+            </div>
+          ))}
+        </>
+      )}
       <h4>Steuergerät {hasObd ? '' : '(OBD-Diagnosegerät mitnehmen)'}</h4>
       <div className="row wrap">
         {[0, 1, 2].map((m) => (

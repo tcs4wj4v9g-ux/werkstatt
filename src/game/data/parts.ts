@@ -76,6 +76,7 @@ export const PARTS: Record<PartId, PartDef> = {
   intake_sport: { id: 'intake_sport', name: 'Sportluftfilter mit Ansaugrohr', price: 240, units: 1, desc: 'Offener Pilzfilter, größerer Querschnitt', kind: 'tuning', replaces: 'intake_hose' },
   exhaust_sport: { id: 'exhaust_sport', name: 'Sportabgasanlage', price: 890, units: 1, desc: 'Größerer Querschnitt, kräftigerer Klang', kind: 'tuning', replaces: 'downpipe' },
   manifold_sport: { id: 'manifold_sport', name: 'Fächerkrümmer', price: 620, units: 1, desc: 'Gleich lange Einzelrohre', kind: 'tuning', replaces: 'exhaust_manifold' },
+  muffler_sport: { id: 'muffler_sport', name: 'Sport-Endschalldämpfer', price: 560, units: 1, desc: 'Edelstahl-Endtopf mit großen Doppelendrohren – weniger Gegendruck, kräftiger Klang', kind: 'tuning', replaces: 'muffler' },
   intercooler: { id: 'intercooler', name: 'Ladeluftkühler-Kit', price: 540, units: 1, desc: 'Großer Frontkühler mit Rohren – kühlere Ladeluft', kind: 'tuning', replaces: 'charge_pipe' },
   fuelpump_hp: { id: 'fuelpump_hp', name: 'Hochleistungs-Kraftstoffpumpe', price: 340, units: 1, desc: 'Mehr Fördermenge', kind: 'tuning', replaces: 'fuel_pump' },
 };

@@ -59,6 +59,11 @@ export interface EngineOutput {
 }
 
 const has = (car: CarInstance, id: string, variant: string) => car.components[id]?.installed && car.components[id]?.variant === variant;
+/** Anteil der Nockenwellen in Sportausführung (Reihenmotor eine, V/Boxer zwei Bänke). Früher übersehen: die Ids haben keine Nummer. */
+const camShare = (car: CarInstance) => {
+  const ids = ['camshaft', 'camshaft_b'].filter((id) => car.components[id]?.installed);
+  return ids.length ? ids.filter((id) => car.components[id].variant === 'camshaft_sport').length / ids.length : 0;
+};
 const share = (car: CarInstance, prefix: string, variant: string) => {
   const list = Object.entries(car.components).filter(([k]) => k.startsWith(prefix) && /\d$/.test(k));
   return list.length ? list.filter(([, c]) => c.variant === variant).length / list.length : 0;
@@ -84,7 +89,7 @@ export function engineOutput(car: CarInstance): EngineOutput {
   if (charged && target > capacity + 0.01 && capacity > 0) notes.push(`Der Turbolader schafft nur ${capacity.toFixed(2)} bar.`);
   if (charged && target > mapLimit + 0.01) notes.push(`Das Steuergerät (${ecu.map ? `Stufe ${ecu.map}` : 'Serie'}) begrenzt auf ${mapLimit.toFixed(2)} bar.`);
   // Luftdurchsatz
-  const breathe = 1 + 0.035 * +has(car, 'intake_hose', 'intake_sport') + 0.05 * +has(car, 'downpipe', 'exhaust_sport') + 0.04 * +has(car, 'exhaust_manifold', 'manifold_sport') + 0.07 * share(car, 'camshaft', 'camshaft_sport') * (car.components.camshaft_b ? 1 : 1);
+  const breathe = 1 + 0.035 * +has(car, 'intake_hose', 'intake_sport') + 0.05 * +has(car, 'downpipe', 'exhaust_sport') + 0.025 * +has(car, 'muffler', 'muffler_sport') + 0.04 * +has(car, 'exhaust_manifold', 'manifold_sport') + 0.07 * camShare(car);
   const camshaftSport = has(car, 'camshaft', 'camshaft_sport');
   const air = ((1 + boost) / (1 + stockBoost)) * breathe * (1 + 0.04 * ecu.map);
   // Kraftstoff: Einspritzdüsen (Diesel), Pumpe, Steuergerät
@@ -185,4 +190,36 @@ export function powerCurve(car: CarInstance, steps = 24): { rpm: number; ps: num
   const maxNm = Math.max(...raw.map((r) => r.nm));
   const maxPs = Math.max(...raw.map((r) => r.ps));
   return raw.map((r) => ({ rpm: Math.round(r.rpm / 50) * 50, nm: Math.round((r.nm / maxNm) * p.nm), ps: Math.round((r.ps / maxPs) * p.ps) }));
+}
+
+/** Was in der Wirkung eines Tuningteils steckt, wenn es (noch) nichts bringt. */
+const ENABLER: Partial<Record<string, string>> = {
+  fuelpump_hp: 'Hebt die Kraftstoffgrenze – bringt erst etwas, wenn der Motor mehr Luft bekommt (Ladedruck, Kennfeld) und Kraftstoff knapp wird.',
+  injector_hp: 'Hebt die Kraftstoffgrenze – bringt erst etwas, wenn der Motor mehr Luft bekommt (Ladedruck, Kennfeld) und Kraftstoff knapp wird.',
+  intercooler: 'Kühlt die Ladeluft – bringt erst etwas, wenn die Kühlung begrenzt (mehr Ladedruck). Schützt vor Überhitzung.',
+  swap_radiator: 'Mehr Kühlleistung – bringt erst etwas, wenn die Kühlung begrenzt. Schützt vor Überhitzung.',
+  turbo_big: 'Liefert mehr Ladedruck – der kommt aber erst an, wenn das Steuergerät (Stufe 2) und das Ladedruck-Ziel höher gestellt sind.',
+  piston_forged: 'Halten mehr Drehmoment aus – keine Mehrleistung, aber Schutz bei viel Ladedruck.',
+  clutch_hd: 'Überträgt mehr Drehmoment – keine Mehrleistung, verhindert aber, dass die Kupplung bei viel Leistung rutscht.',
+};
+
+/** Wirkung jedes eingebauten Tuningteils: PS-Unterschied gegenüber dem Serienteil an derselben Stelle, sonst die Erklärung. */
+export function tuningEffects(car: CarInstance): { comp: string; part: string; ps: number; note?: string }[] {
+  const base = performance(car).ps;
+  const out: { comp: string; part: string; ps: number; note?: string }[] = [];
+  const seen = new Set<string>();
+  for (const [id, st] of Object.entries(car.components)) {
+    if (!st.installed || !st.variant) continue;
+    // Gleiche Teile an mehreren Zylindern bzw. Bänken zusammen bewerten
+    const group = /^(piston|inj)\d+$/.test(id) ? id.replace(/\d+$/, '') : id === 'camshaft_b' ? 'camshaft' : id;
+    const key = group + ':' + st.variant;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const ids = Object.keys(car.components).filter((k) => (group === id ? k === id : group === 'camshaft' ? k.startsWith('camshaft') : new RegExp(`^${group}\\d+$`).test(k)) && car.components[k].variant === st.variant);
+    const stock = { ...car, components: { ...car.components } };
+    for (const k of ids) stock.components[k] = { ...stock.components[k], variant: undefined };
+    const ps = base - performance(stock).ps;
+    out.push({ comp: id, part: st.variant, ps, ...(ps < 1 ? { note: ENABLER[st.variant] ?? 'Wirkt sich derzeit nicht auf die Leistung aus.' } : {}) });
+  }
+  return out;
 }

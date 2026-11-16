@@ -173,7 +173,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const seen = await p.evaluate(() => window.__gk.getState().cars[0].observed);
   expect(['exhaust_look', 'arm_look', 'tie_look'].every((x) => seen.includes(x)), 'Sichtprüfung von unten: Endtopf, Querlenkerlager und Spurstangenkopf auffällig – ' + seen.join(', '));
   const armSide = await p.evaluate(() => (window.__gk.getState().cars[0].components.arm_fl.condition === 'defect' ? 'fl' : 'fr'));
-  await p.locator('.car-actions button', { hasText: 'Unterboden' }).click(); await p.waitForTimeout(900);
+  await p.locator('.car-actions button', { hasText: /Unterboden$/ }).click(); await p.waitForTimeout(900);
   await p.evaluate(() => window.__gk.setState({ tool: 'ratchet' }));
   const armBolts = (await findBolts(`Schraube – Querlenker vorne ${armSide === 'fl' ? 'links' : 'rechts'}`)).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
   for (const b of armBolts) { await p.mouse.click(b.x, b.y); await p.waitForTimeout(250); }
@@ -200,7 +200,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   for (const model of ['audy_a4_b5', 'bavaria_320d']) {
     await p.evaluate((model) => { const g = window.__gk; const s = g.getState(); const c = window.__gkLib.createCar(model, [], Math.random, {}); c.lifted = true; g.setState({ cars: [c, ...s.cars.slice(1)], liftUp: [true, false], tool: 'ratchet', carried: ['ratchet', 'socket13'], panel: null }); Object.assign(window.__gkPlayer, { x: 2.9, z: -2.7, yaw: Math.PI / 2, work: null }); }, model);
     await p.waitForTimeout(900);
-    await p.locator('.car-actions button', { hasText: 'Unterboden' }).click(); await p.waitForTimeout(900);
+    await p.locator('.car-actions button', { hasText: /Unterboden$/ }).click(); await p.waitForTimeout(900);
     const dpb = (await findBolts('Schraube – Hosenrohr')).filter((b) => b.x > 0 && b.x < 1180 && b.y > 0 && b.y < 820);
     for (const b of dpb) { await p.mouse.click(b.x, b.y); await p.waitForTimeout(200); }
     await p.evaluate(() => window.__gk.setState({ tool: 'hand' }));

@@ -80,7 +80,7 @@ export interface WorkPose {
 
 export const player = { x: 4.3, z: 0, yaw: Math.PI / 2, pitch: -0.12, zoom: false, work: null as WorkPose | null };
 
-export type WorkView = 'engine' | 'engine_left' | 'engine_right' | 'wheel_left' | 'wheel_right' | 'rear_left' | 'rear_right' | 'under';
+export type WorkView = 'engine' | 'engine_left' | 'engine_right' | 'wheel_left' | 'wheel_right' | 'rear_left' | 'rear_right' | 'under' | 'under_rear';
 export const WORK_LABELS: Record<WorkView, string> = {
   engine: 'Motor von vorn',
   engine_left: 'Motor links',
@@ -90,6 +90,7 @@ export const WORK_LABELS: Record<WorkView, string> = {
   rear_left: 'Rad hinten links',
   rear_right: 'Rad hinten rechts',
   under: 'Unterboden',
+  under_rear: 'Unterboden hinten',
 };
 
 /** Feste Arbeitsansicht nah am Bauteil. Der Spieler steht dabei still und kann sich nur umsehen. */
@@ -112,14 +113,24 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     wheel_right: [[1.38, h + 0.42, z0 + 1.85], [1.38, h + 0.36, z0 + 0.8]],
     rear_left: [[rearX, h + 0.42, z0 - 1.85], [rearX, h + 0.36, z0 - 0.8]],
     rear_right: [[rearX, h + 0.42, z0 + 1.85], [rearX, h + 0.36, z0 + 0.8]],
-    under: [[2.25, 1.2, z0], [1.3, h + 0.22, z0]],
+    under: [[1.95, 1.2, z0], [1.3, h + 0.22, z0]],
+    // Unter dem Auto stehend nach hinten: Kraftstoffpumpe, Getriebe, Endtopf
+    under_rear: [[0.95, 1.2, z0 - 0.3], [-1.0, h + 0.2, z0 + 0.1]],
   };
   let [pos, to] = table[view];
+  // Heckmotor: Die Unteransicht zeigt den Motor hinten – die zweite Unteransicht schaut deshalb nach vorn auf Vorderachse und Pumpe
+  // (mittig, damit die vorn seitlich liegende Kraftstoffpumpe nicht vor einen Spurstangenkopf rückt)
+  if (rearBayX !== undefined && view === 'under_rear') [pos, to] = [[-0.5, 1.2, z0], [1.2, h + 0.2, z0]];
   // Heckmotor: Motoransichten gespiegelt nach hinten (Blick von hinten bzw. von den Seiten auf den Motor), Unterboden ebenso
   if (rearBayX !== undefined && (view.startsWith('engine') || view === 'under')) {
     const m = (p: [number, number, number]): [number, number, number] => [rearBayX - p[0], p[1] + (view === 'under' ? 0 : REAR_BAY.y), z0 - (p[2] - z0)];
     [pos, to] = [m(pos), m(to)];
     if (view === 'engine') [pos, to] = [[rearBayX - 2.45, 1.45, z0], [rearBayX - 1.3, 0.62, z0]];
+    // Seitenansichten beim Heckmotor: über den Kotflügel steil von oben durch die Deckelöffnung (sonst sieht man nur Blech)
+    if (view === 'engine_left' || view === 'engine_right') {
+      const s = view === 'engine_left' ? 1 : -1;
+      [pos, to] = [[rearBayX - 1.25, 1.95, z0 + s * 0.72], [rearBayX - 1.3, 0.5, z0 + s * 0.12]];
+    }
   }
   // Plätze, die nicht wie die Hebebühnen bei x = 0 längs stehen (Schrottplatz): Pose in Platz-Koordinaten drehen und verschieben.
   const slot = SLOTS[bay];
@@ -171,7 +182,7 @@ function siteBoxes(): Box[] {
     if (s.kind !== 'lift' || s.id < 10 || !(s.needs === 'loc_pro' ? site.pro : site.center)) continue;
     out.push(box(0, s.z - 1.5, 0.3, 0.36), box(0, s.z + 1.5, 0.3, 0.36));
   }
-  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1), box(5.9, 1.3, 0.6, 0.5));
+  if (site.pro) out.push(box(5.7, -8.1, 0.7, 1.1), box(5.85, -9.6, 0.4, 0.5), box(5.95, -6.6, 0.45, 1.0), box(5.9, 1.3, 0.6, 0.5));
   else out.push(box(-3.4, -5.2, 0.8, 0.6)); // Unterstellböcke vor der geschlossenen Seitenwand
   if (site.center) out.push(box(5.8, -13.6, 0.6, 0.8));
   if (site.hq) out.push(box(5.6, 6.6, 1.0, 1.6));

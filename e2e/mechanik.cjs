@@ -118,7 +118,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.evaluate(() => { const g = window.__gk.getState(); g.setTool('hand'); g.tapHood(0); g.tapLift(0); });
   await p.waitForTimeout(2800);
   const under = [2.5, BZ];
-  const OB = [[1.1, 0.19, -0.12], [1.5, 0.19, -0.12], [1.1, 0.19, 0.12], [1.5, 0.19, 0.12]];
+  const OB = [[1.04, 0.19, -0.12], [1.56, 0.19, -0.12], [1.04, 0.19, 0.12], [1.56, 0.19, 0.12]];
   // Neu seit dem Ölsystem: vor dem Abnehmen der Wanne das Öl ablassen.
   await p.evaluate(() => window.__gk.getState().togglePan(0));
   await kit('ratchet'); await aimTap(under, W(1, 1.4, 0.185, 0.08));

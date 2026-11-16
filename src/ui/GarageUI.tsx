@@ -30,7 +30,7 @@ import { engineOf } from '../game/data/components';
 
 /** Beschriftung der Arbeitsansicht: Heckmotor von hinten, vorn angeschlagene Haube von oben. */
 const viewLabel = (v: WorkView, car: CarInstance) =>
-  v === 'engine' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Motor von hinten' : v === 'engine' && BODY_SPECS[CAR_MODELS[car.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v];
+  v === 'engine' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Motor von hinten' : v === 'under_rear' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Unterboden vorn' : v === 'engine' && BODY_SPECS[CAR_MODELS[car.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v];
 
 const carName = (c: CarInstance) => `${CAR_MODELS[c.modelId].name} (${c.year})`;
 
@@ -63,7 +63,7 @@ export function GarageUI() {
   const near = nearBay >= 0 ? s.cars[nearBay] : null;
   const running = nearBay >= 0 && s.engineBay === nearBay;
   const kind = nearBay >= 0 ? SLOTS[nearBay].kind : null;
-  const views: WorkView[] = !near || (kind !== 'lift' && kind !== 'junk') ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'rear_left', 'rear_right', 'under'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
+  const views: WorkView[] = !near || (kind !== 'lift' && kind !== 'junk') ? [] : near.lifted ? ['wheel_left', 'wheel_right', 'rear_left', 'rear_right', 'under', 'under_rear'] : near.hoodOpen ? ['engine', 'engine_left', 'engine_right'] : [];
   // Am Waschplatz und in der Lackierkabine liegen andere Geräte bereit als am Werkzeuggürtel.
   const station: ToolId[] = kind === 'wash' ? WASH_TOOLS : kind === 'paint' ? PAINT_TOOLS : [];
   useEffect(() => {
