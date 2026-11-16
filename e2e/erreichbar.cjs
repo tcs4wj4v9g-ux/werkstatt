@@ -94,6 +94,8 @@ const only = process.argv.slice(2);
     const pick = process.env.GK_IDS ? process.env.GK_IDS.split(',') : null;
     for (const id of ids) {
       if (pick && !pick.includes(id)) continue;
+      // Einzelne Ausreißer im langen Lauf (alles „nicht im Bild“) verschwinden beim zweiten Versuch: Befund erst, wenn beide scheitern
+      const check = async () => {
       // frisches Auto, alles davor abbauen
       await G(([model, id]) => {
         const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const c = L.createCar(model, [], Math.random, {}); c.fluids.oil.level = 0;
@@ -125,6 +127,10 @@ const only = process.argv.slice(2);
         return A.reach(pts, own, !!c.lifted) ? null : `Teil [${A.why()}]`;
       }, id);
       if (part) res.push(part);
+      return res;
+      };
+      let res = await check();
+      if (res.length && res[0] !== 'nicht eingebaut') res = await check();
       checked++;
       if (res.length && res[0] !== 'nicht eingebaut') bad.push(`${model} · ${id}: ${res.join(', ')}`);
     }

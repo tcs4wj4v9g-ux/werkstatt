@@ -30,7 +30,7 @@ import { engineOf } from '../game/data/components';
 
 /** Beschriftung der Arbeitsansicht: Heckmotor von hinten, vorn angeschlagene Haube von oben. */
 const viewLabel = (v: WorkView, car: CarInstance) =>
-  v === 'engine' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Motor von hinten' : v === 'engine' && BODY_SPECS[CAR_MODELS[car.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v];
+  v === 'engine' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Motor von hinten' : v === 'under_rear' && REAR_ENGINE.has(CAR_MODELS[car.modelId].body) ? 'Unterboden vorn' : v === 'engine' && BODY_SPECS[CAR_MODELS[car.modelId].body].hoodHinge === 'front' ? 'Motor von oben' : WORK_LABELS[v];
 
 const carName = (c: CarInstance) => `${CAR_MODELS[c.modelId].name} (${c.year})`;
 

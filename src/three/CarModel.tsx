@@ -697,7 +697,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     const yU = B.ground - 0.04;
     // Beim Heckmotor weiter außen am Heck, sonst läge der Topf unter der Ölwanne
     const xm = rearEngine ? B.tail + 0.3 : Math.max(B.tail + 0.32, B.rearAxle - 0.42);
-    const zm = rearEngine ? -0.42 : -0.24;
+    const zm = rearEngine ? -0.52 : -0.24;
     return (
       <group key="chassis">
         {/* Rohr vom Hosenrohr nach hinten (fest) */}
@@ -1677,6 +1677,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             </>,
           )}
           {!bare && bolts('downpipe', [[0.86, dpY - 0.045, -0.22], [0.86, dpY - 0.045, -0.16]], 'y-')}
+          {/* Heckmotor: Pumpe in der Wagenmitte statt vorn neben der Vorderachse (dort stünde sie vor dem linken Spurstangenkopf) */}
+          <group position={[rearEngine && !bare ? (B.bayX ?? REAR_BAY.x) - 0.3 + 1.1 : 0, 0, 0]}>
           {part(
             'fuel_pump',
             <>
@@ -1692,6 +1694,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {/* Schrauben an den Flanschecken außen, damit die Pumpe in der Mitte frei antippbar bleibt */}
           {!bare && bolts('fuel_pump', [[-1.2, fpY - 0.045, 0.27], [-1.0, fpY - 0.045, 0.37]], 'y-')}
           {!bare && connector('fuel_pump', [-1.1, fpY - 0.05, 0.4], [0, -0.04, 0.05])}
+          </group>
 
           {/* ---------- Krümmer (im Auto fest, am Motorständer ausbaubar) ---------- */}
           {!noEngine &&

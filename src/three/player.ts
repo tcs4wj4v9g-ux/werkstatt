@@ -118,6 +118,9 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     under_rear: [[0.95, 1.2, z0 - 0.3], [-1.0, h + 0.2, z0 + 0.1]],
   };
   let [pos, to] = table[view];
+  // Heckmotor: Die Unteransicht zeigt den Motor hinten – die zweite Unteransicht schaut deshalb nach vorn auf Vorderachse und Pumpe
+  // (mittig, damit die vorn seitlich liegende Kraftstoffpumpe nicht vor einen Spurstangenkopf rückt)
+  if (rearBayX !== undefined && view === 'under_rear') [pos, to] = [[-0.5, 1.2, z0], [1.2, h + 0.2, z0]];
   // Heckmotor: Motoransichten gespiegelt nach hinten (Blick von hinten bzw. von den Seiten auf den Motor), Unterboden ebenso
   if (rearBayX !== undefined && (view.startsWith('engine') || view === 'under')) {
     const m = (p: [number, number, number]): [number, number, number] => [rearBayX - p[0], p[1] + (view === 'under' ? 0 : REAR_BAY.y), z0 - (p[2] - z0)];
