@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { marketLabel } from '../game/market';
-import { useGame } from '../game/store';
+import { dayClock, dayLeft, useGame } from '../game/store';
 import { GFX_LABEL, useGfx, type GfxLevel } from '../three/gfx';
 import { CoopChip } from './CoopUI';
 
@@ -37,6 +37,19 @@ export function Toast() {
   return <div className={`toast ${toast.bad ? 'bad' : ''}`}>{toast.text}</div>;
 }
 
+/** Restzeit des Spieltags (der Tag wechselt danach automatisch). */
+function DayClock() {
+  const started = useGame((s) => s.dayStartedAt);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (!dayClock.ms) return null;
+  const sec = Math.ceil(dayLeft({ dayStartedAt: started }) / 1000);
+  return <span data-testid="dayclock">🕒 {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span>;
+}
+
 export function TopBar({ title, back }: { title: string; back?: { label: string; onClick(): void } }) {
   const money = useGame((s) => s.money);
   const day = useGame((s) => s.day);
@@ -52,7 +65,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <div className="title">{title}</div>
       <CoopChip />
       <div className="daychip" title={marketLabel(index)}>
-        Tag {day} · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
+        Tag {day} <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
       <button className="btn ghost" data-testid="sound" aria-label="Ton ein/aus" onClick={() => setSound(!sound)}>{sound ? '🔊' : '🔇'}</button>
       <button className="btn ghost" onClick={() => setPanel('help')}>? Hilfe</button>

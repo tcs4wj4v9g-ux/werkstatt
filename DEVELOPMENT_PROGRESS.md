@@ -446,3 +446,18 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Gesamtcheck für Auto und Motorständer (964, 992, 356).
   - Logiktests, Durchläufe `motoren`, `schrott`, `bremse` (allein grün).
   - Kein echter iPad-Test.
+
+## Tage laufen automatisch ab, Porsche-Scheinwerfer aufrecht
+
+- **Tageswechsel:**
+  - Ein Spieltag endet nach drei Minuten von selbst (`App.tsx`); vorher musste man danach „Feierabend“ tippen. Die Restzeit steht in der oberen Leiste neben „Tag …“.
+  - Im Koop schaltet nur ein Gerät um (`isLeader`), sonst sprängen zwei Tage auf einmal. Auf Probefahrt und im Menü wartet der Wechsel.
+  - War das Spiel länger als einen Tag lang zu, beginnt der Tag beim Öffnen neu, statt sofort umzuspringen.
+  - Im Testmodus (Tageslänge 0) bleibt es beim Knopf.
+- **Porsche-Scheinwerfer:** Sie waren entlang der Kotflügellinie bis fast 50° nach hinten gekippt („schief“), beim 992 verdeckte die Fronthaube die untere Hälfte. Jetzt stehen sie fast senkrecht (964/356: 0,12 rad, 992: 0,08 rad) zwischen den Stellen, an denen Ober- und Unterkante des Glases aus dem Kotflügel treten. Der Topf in Wagenfarbe reicht nach hinten in den Kotflügel.
+- Geprüft:
+  - Logiktests.
+  - Tageswechsel im normalen Spielmodus (Uhr, automatischer Wechsel mit Meldung, Warten auf Probefahrt).
+  - Durchläufe `markt`, `karriere`, `werkstatt`.
+  - Bilder der drei Porsches aus der Nähe.
+  - Kein echter iPad-Test.
