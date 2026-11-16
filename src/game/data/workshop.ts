@@ -1,7 +1,7 @@
 // Stellplätze und Ausbaustufen der Werkstatt. Positionen in Weltkoordinaten
 // (Halle: x von -4,8 bis 6,4; der Hof liegt davor in Richtung -x).
 
-export type SlotKind = 'lift' | 'wash' | 'paint' | 'park' | 'show' | 'stand' | 'junk' | 'garage';
+export type SlotKind = 'lift' | 'wash' | 'paint' | 'park' | 'show' | 'stand' | 'junk' | 'garage' | 'expo';
 export interface SlotDef {
   id: number;
   kind: SlotKind;
@@ -17,7 +17,8 @@ export interface SlotDef {
 }
 
 export type GarageId = 'tg_klein' | 'tg_mittel' | 'tg_gross' | 'tg_luxus';
-export type UpgradeId = 'parking' | 'wash' | 'paint' | 'expansion' | 'hoist' | 'dyno' | 'loc_pro' | 'loc_center' | 'loc_hq' | GarageId;
+export type ExpoId = 'expo3' | 'expo4' | 'expo5' | 'expo6' | 'expo7' | 'expo8';
+export type UpgradeId = ExpoId | 'parking' | 'wash' | 'paint' | 'expansion' | 'hoist' | 'dyno' | 'loc_pro' | 'loc_center' | 'loc_hq' | GarageId;
 
 // ---------------------------------------------------------------- Tiefgaragen
 // Vier kaufbare, begehbare Tiefgaragen als Fahrzeuglager und private Sammlung. Jede ist ein eigener Ort
@@ -109,6 +110,28 @@ export const SLOTS: SlotDef[] = [
 for (const s of SLOTS) if (s.kind === 'junk') s.place = 'schrott';
 // Tiefgaragen ab Platz 22: 6 + 15 + 30 + 50 Stellplätze
 SLOTS.push(...garageSlots(SLOTS.length));
+
+// ---------------------------------------------------------------- Autohaus
+// Ausstellungsraum als eigener Ort: zwei Plätze von Anfang an, jeder weitere einzeln kaufbar (bis acht).
+// Je Platz ein Drehteller; ausgestellte Autos verkaufen sich wie im Showroom etwas teurer.
+export const EXPO = { ox: 800, maxPlaces: 8, bounds: { minX: 799.6, maxX: 825, minZ: -7.6, maxZ: 7.6 } };
+const EXPO_POS: [number, number][] = [804, 809.5, 815, 820.5].flatMap((x) => [[x, -3.8], [x, 3.8]] as [number, number][]);
+export const EXPO_PRICES = [8000, 12000, 18000, 26000, 36000, 50000];
+SLOTS.push(
+  ...EXPO_POS.map(([x, z], i): SlotDef => ({
+    id: SLOTS.length + i,
+    kind: 'expo',
+    label: `Autohaus · Platz ${i + 1}`,
+    x,
+    z,
+    rot: 0,
+    place: 'autohaus',
+    ...(i >= 2 ? { needs: `expo${i + 1}` as ExpoId } : {}),
+  })),
+);
+export const isExpo = (slot: number) => SLOTS[slot]?.kind === 'expo';
+/** Ausstellungsfläche mit Verkaufsbonus (Showroom im Headquarters oder Autohaus). */
+export const isShowcase = (slot: number) => SLOTS[slot]?.kind === 'show' || SLOTS[slot]?.kind === 'expo';
 /** Ort eines Stellplatzes: Werkstatt, Schrottplatz oder eine Tiefgarage. */
 export const slotPlace = (slot: number) => SLOTS[slot]?.place ?? 'werkstatt';
 export const isGarage = (slot: number) => SLOTS[slot]?.kind === 'garage';
@@ -139,6 +162,8 @@ export interface UpgradeDef {
   grants?: UpgradeId[];
   /** Tiefgarage (Fahrzeuglager). */
   garage?: boolean;
+  /** Weiterer Ausstellungsplatz im Autohaus. */
+  expo?: boolean;
 }
 
 export const UPGRADES: UpgradeDef[] = [
@@ -158,6 +183,15 @@ export const UPGRADES: UpgradeDef[] = [
     name: g.name,
     price: g.price,
     desc: `Begehbare Tiefgarage mit ${g.slots} Stellplätzen: Rampe am Hofrand, Beleuchtung, nummerierte Buchten. Lager und private Sammlung – jedes Auto lässt sich jederzeit wieder herausholen.`,
+  })),
+  ...EXPO_PRICES.map((price, i): UpgradeDef => ({
+    id: `expo${i + 3}` as ExpoId,
+    stage: 0,
+    expo: true,
+    name: `Autohaus: Ausstellungsplatz ${i + 3}`,
+    price,
+    desc: 'Weiterer Drehteller mit Licht im Autohaus. Ausgestellte Autos verkaufen sich 4 % teurer und bringen der Sammlung mehr Ansehen.',
+    ...(i > 0 ? { requires: `expo${i + 2}` as ExpoId } : {}),
   })),
 ];
 

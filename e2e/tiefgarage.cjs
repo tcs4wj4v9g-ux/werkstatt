@@ -70,7 +70,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   expect(back.at === 'werkstatt' && Math.abs(back.z + 6.65) < 0.1 && back.x > -23, 'Rampe hoch: zurück im Hof an der Einfahrt');
   await p.waitForTimeout(1500); await p.reload(); await p.waitForTimeout(1500);
   const kept = await G(() => { const s = window.__gk.getState(); return { n: s.cars.slice(22, 28).filter(Boolean).length, up: s.upgrades.includes('tg_klein'), len: s.cars.length }; });
-  expect(kept.n === 6 && kept.up && kept.len === 123, `Nach Neuladen: Garage gekauft, 6 Autos eingelagert (${JSON.stringify(kept)})`);
+  expect(kept.n === 6 && kept.up && kept.len === 131, `Nach Neuladen: Garage gekauft, 6 Autos eingelagert (${JSON.stringify(kept)})`);
 
   // ---------- Luxus: 50 Plätze, zwei Fahrgassen ----------
   await G(() => { const g = window.__gk; const L = window.__gkLib; g.setState({ money: 400000 }); g.getState().buyUpgrade('tg_luxus'); const ids = Object.keys(L.models); const cars = [...g.getState().cars]; L.slots.filter((s) => s.place === 'tg_luxus').forEach((s, i) => { cars[s.id] = L.createCar(ids[i % ids.length], [], Math.random, {}); }); g.setState({ cars }); L.travel('tg_luxus'); });
@@ -79,6 +79,40 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   const lux = await G(() => { const s = window.__gk.getState(); return window.__gkLib.slots.filter((x) => x.place === 'tg_luxus' && s.cars[x.id]).length; });
   expect(lux === 50, 'Luxus-Tiefgarage mit 50 Autos belegt und dargestellt');
   await G(() => window.__gkLib.travel('werkstatt'));
+
+  // ---------- Autohaus: zwei Plätze, dritter kaufbar, Rundum-Ansicht, Verkaufsbonus ----------
+  await G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const c = L.createCar('bmv_m5_e34', [], Math.random, {}); c.purchasePrice = 20000; c.testDriven = true; const cars = [...s.cars]; cars[0] = c; cars[1] = null; g.setState({ cars, money: 50000, panel: null }); g.getState().setPanel('move', 0); });
+  await p.waitForTimeout(300);
+  const expoBtns = await p.locator('.modal button', { hasText: 'Autohaus · Platz' }).allTextContents();
+  expect(expoBtns.length === 2 && /ausstellen/.test(expoBtns[0]), 'Umparken bietet zwei Autohaus-Plätze an: ' + expoBtns.join(' | '));
+  await p.locator('.modal button', { hasText: 'Autohaus · Platz 1' }).click(); await p.waitForTimeout(300);
+  expect(!!(await cars())[123] && !(await cars())[0], 'Auto steht im Autohaus auf Platz 1');
+  const mBefore = await G(() => window.__gk.getState().money);
+  await G(() => window.__gk.getState().buyUpgrade('expo3'));
+  const expo3 = await G(() => ({ up: window.__gk.getState().upgrades.includes('expo3'), money: window.__gk.getState().money }));
+  expect(expo3.up && mBefore - expo3.money === 8000, 'Dritter Ausstellungsplatz für 8.000 € gekauft');
+  await G(() => Object.assign(window.__gkPlayer, { x: -15.15, z: 7.3, yaw: Math.PI, pitch: 0, work: null })); await p.waitForTimeout(800);
+  expect(/Autohaus betreten/.test((await G(() => window.__gkLib.focus.getState().label)) || ''), 'Eingang zum Autohaus im Hof anvisiert');
+  await G(() => window.__gkLib.stations.get('expo_gate')()); await p.waitForTimeout(1500);
+  expect(await G(() => window.__gkLib.place.at) === 'autohaus', 'Im Autohaus angekommen');
+  const es = await G(() => window.__gkLib.slots[123]);
+  await G((s) => Object.assign(window.__gkPlayer, { x: s.x, z: s.z + 2.9, yaw: 0, pitch: -0.2 }), es); await p.waitForTimeout(900);
+  expect(await G(() => window.__gkLib.focus.getState().nearBay) === 123, 'Spieler steht am ausgestellten Auto');
+  await p.screenshot({ path: `${S}/autohaus.png` });
+  await p.locator('[data-testid=orbit]').click(); await p.waitForTimeout(1200);
+  const c0 = await G(() => window.__gkCamera.position.toArray());
+  await p.mouse.move(600, 420); await p.mouse.down(); await p.mouse.move(300, 420, { steps: 10 }); await p.mouse.up(); await p.waitForTimeout(700);
+  const c1 = await G(() => window.__gkCamera.position.toArray());
+  const dist = Math.hypot(c1[0] - es.x, c1[2] - es.z);
+  expect(Math.hypot(c1[0] - c0[0], c1[2] - c0[2]) > 0.8 && dist > 2 && dist < 4.3, `Rundum-Ansicht: Wischen dreht die Kamera um das Auto (Abstand ${dist.toFixed(1)} m)`);
+  await p.screenshot({ path: `${S}/autohaus-rundum.png` });
+  await p.locator('[data-testid=turntable]').click(); await p.waitForTimeout(200);
+  expect(/starten/.test(await p.locator('[data-testid=turntable]').textContent()), 'Drehteller lässt sich anhalten');
+  await p.locator('[data-testid=orbit-leave]').click(); await p.waitForTimeout(500);
+  const sale = await G(() => { const g = window.__gk; const before = g.getState().money; g.getState().sell(123); return { got: g.getState().money - before, gone: !g.getState().cars[123] }; });
+  expect(sale.gone && sale.got > 0, `Aus dem Autohaus verkauft (${sale.got} €)`);
+  await G(() => { window.__gk.setState({ lastSale: null }); window.__gkLib.stations.get('expo_exit')(); }); await p.waitForTimeout(800);
+  expect(await G(() => window.__gkLib.place.at) === 'werkstatt', 'Ausgang: zurück im Hof');
 
   console.log('errors:', JSON.stringify(errs));
   console.log(fails || errs.length ? `FEHLER: ${fails + errs.length}` : 'ALLES OK');

@@ -118,7 +118,7 @@ export function collection(cars: (CarInstance | null)[], index = 1): CollectionE
     const base = { budget: 1, mid: 2, sport: 5, luxury: 9, collector: 20 }[m.cls] + car.rarity * 4;
     const flawless = v.deductions.every((d) => !d.defect);
     // Im Showroom ausgestellt zählt ein Auto anderthalbfach.
-    const shown = SLOTS[slot]?.kind === 'show' ? 1.5 : 1;
+    const shown = SLOTS[slot]?.kind === 'show' || SLOTS[slot]?.kind === 'expo' ? 1.5 : 1;
     return [{ slot, car, value: v.value, prestige: Math.round(base * shown * (flawless ? 1 : 0.4) * (0.6 + 0.4 * Math.min(1, v.value / Math.max(1, v.cleanValue)))) }];
   });
 }

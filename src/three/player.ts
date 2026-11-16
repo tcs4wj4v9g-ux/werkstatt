@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BAY, GARAGE_MAP, GARAGES, garageLayout, SLOTS, type GarageId } from '../game/data/workshop';
+import { BAY, EXPO, GARAGE_MAP, GARAGES, garageLayout, SLOTS, type GarageId } from '../game/data/workshop';
 
 // Zustand des Spielers in der begehbaren Werkstatt. Liegt bewusst außerhalb
 // von React: Position und Blick ändern sich jeden Frame.
@@ -15,7 +15,11 @@ export const hall2 = (center: boolean) => ({ minX: ROOM.minX, maxX: ROOM.maxX, m
 export const SHOWROOM = { minX: ROOM.minX, maxX: ROOM.maxX, minZ: ROOM.maxZ, maxZ: 14.6 };
 /** Schrottplatz: eigener Ort, mit dem Lieferwagen erreichbar. */
 export const JUNK = { minX: -78, maxX: -51, minZ: -12, maxZ: 12 };
-export type Place = 'werkstatt' | 'schrott' | GarageId;
+export type Place = 'werkstatt' | 'schrott' | 'autohaus' | GarageId;
+/** Eingang zum Autohaus am Hofrand (hinten rechts, zur Halle hin). */
+export const EXPO_GATE = { x: -15.15, z: 8.7 };
+/** Rundum-Ansicht im Autohaus: Stellplatz, um den die Kamera kreist (null = normale Ansicht). */
+export const useView = create<{ orbit: number | null }>(() => ({ orbit: null }));
 export const isGaragePlace = (p: string): p is GarageId => p in GARAGE_MAP;
 /** Wo sich der Spieler gerade befindet (Werkstatt mit Hof oder Schrottplatz). */
 export const place = { at: 'werkstatt' as Place };
@@ -43,9 +47,12 @@ export const GARAGE_BOXES: Record<string, Box[]> = Object.fromEntries(
 export function travel(to: Place) {
   const from = place.at;
   place.at = to;
+  useView.setState({ orbit: null });
   usePlace.setState({ at: to });
   player.work = null;
   if (to === 'schrott') Object.assign(player, { x: -53.2, z: 0, yaw: Math.PI / 2, pitch: -0.1 });
+  else if (to === 'autohaus') Object.assign(player, { x: EXPO.ox + 0.9, z: 0, yaw: -Math.PI / 2, pitch: -0.05 });
+  else if (from === 'autohaus') Object.assign(player, { x: EXPO_GATE.x, z: EXPO_GATE.z - 0.8, yaw: Math.PI, pitch: -0.1 });
   else if (isGaragePlace(to)) Object.assign(player, { x: GARAGE_MAP[to].ox - 0.6, z: 0, yaw: -Math.PI / 2, pitch: -0.05 });
   else if (from && isGaragePlace(from)) Object.assign(player, { x: RAMP_GATE.x + 0.3, z: RAMP_GATE.z, yaw: -Math.PI / 2, pitch: -0.1 });
   else Object.assign(player, { x: -19.5, z: 2.2, yaw: -Math.PI / 2, pitch: -0.1 });
@@ -176,6 +183,8 @@ function siteBoxes(): Box[] {
 export const carBox = (slot: number): Box => {
   const s = SLOTS[slot];
   if (s.kind === 'stand') return box(s.x, s.z, 1.3, 0.9);
+  // Drehteller: das Auto dreht sich, deshalb ein quadratischer Bereich um die Mitte
+  if (s.kind === 'expo') return box(s.x, s.z, 4.2, 4.2);
   return Math.abs(s.rot) < 0.1 ? box(s.x, s.z, 4.8, 2.0) : box(s.x, s.z, 2.0, 4.8);
 };
 
@@ -199,6 +208,10 @@ const hits = (x: number, z: number, b: Box) => x > b.minX - RADIUS && x < b.maxX
 
 /** Darf man hier stehen? Halle, Hof oder eines der beiden offenen Tore. */
 function inBounds(x: number, z: number) {
+  if (place.at === 'autohaus') {
+    const b = EXPO.bounds;
+    return x > b.minX + RADIUS && x < b.maxX - RADIUS && z > b.minZ + RADIUS && z < b.maxZ - RADIUS;
+  }
   if (isGaragePlace(place.at)) {
     const b = garageLayout(GARAGE_MAP[place.at]).bounds;
     return x > b.minX + RADIUS && x < b.maxX - RADIUS && z > b.minZ + RADIUS && z < b.maxZ - RADIUS;
@@ -224,7 +237,7 @@ function inBounds(x: number, z: number) {
 
 /** Bewegt den Spieler und lässt ihn an Wänden und Hindernissen entlanggleiten. */
 export function movePlayer(dx: number, dz: number, dynamic: Box[]) {
-  const boxes = isGaragePlace(place.at) ? [...GARAGE_BOXES[place.at], ...dynamic] : place.at === 'schrott' ? [...JUNK_BOXES, ...dynamic] : [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
+  const boxes = place.at === 'autohaus' ? [...dynamic] : isGaragePlace(place.at) ? [...GARAGE_BOXES[place.at], ...dynamic] : place.at === 'schrott' ? [...JUNK_BOXES, ...dynamic] : [...STATIC_BOXES, ...siteBoxes(), ...dynamic];
   const free = (x: number, z: number) => inBounds(x, z) && !boxes.some((b) => hits(x, z, b));
   // Steckt der Spieler (z. B. nach dem Ablassen der Bühne) in einem Hindernis, darf er heraus.
   const stuck = inBounds(player.x, player.z) && boxes.some((b) => hits(player.x, player.z, b));

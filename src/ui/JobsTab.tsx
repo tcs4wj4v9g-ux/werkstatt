@@ -7,7 +7,7 @@ import { eur } from './common';
 /** Kundenaufträge am Werkstatt-Computer: Anfragen annehmen, laufende Aufträge abrechnen. */
 export function JobsTab() {
   const s = useGame();
-  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage').length;
+  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage' && x.kind !== 'expo').length;
   const active = s.cars.map((car, bay) => ({ car, bay })).filter((x) => x.car?.job);
   return (
     <>
