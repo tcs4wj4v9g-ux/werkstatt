@@ -292,6 +292,15 @@ export class Shape {
     return B.ground;
   }
 
+  /** 0..1: wie weit der Wagenboden an dieser Stelle für den Motorraum geöffnet ist (Motor vorn bzw. beim Heckmotor hinten). */
+  engineOpening(x: number) {
+    const F = this.F;
+    const rear = this.B.lidX0 !== undefined;
+    const [a, b] = rear ? [F.openX0 - 0.1, F.openX1 + 0.05] : [F.openX0 - 0.15, F.openX1 - 0.05];
+    const e = 0.08;
+    return smooth((x - a) / e) * smooth((b - x) / e);
+  }
+
   /** Unterkante der Außenhaut – im Bereich der Räder zum Radhaus hochgezogen. */
   bottom(x: number) {
     let b = this.base(x);
@@ -605,6 +614,9 @@ function buildBody(S: Shape, detail: number): Built {
     for (let j = 0; j < R; j++) {
       const hs = halfSeg(j, mid);
       if (hs < NT && (inHood || inCabin)) continue; // Öffnung für Motorraum bzw. Innenraum
+      // Unter dem Motor kein Bodenblech (wie beim echten Auto): von unten frei an Ölwanne, Lager und Getriebe –
+      // auch bei tiefen Autos, deren Ölwanne sonst über dem Bodenblech verschwand.
+      if (hs >= half - 3 && S.engineOpening((xa + xb) / 2) > 0.5) continue;
       const a = s * R + j;
       const b = s * R + ((j + 1) % R);
       const c = (s + 1) * R + j;

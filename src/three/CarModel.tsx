@@ -205,8 +205,14 @@ function RB({ s, r = 0.012, p, rot, children }: { s: V3; r?: number; p?: V3; rot
 }
 const noRay = () => null;
 /** Unsichtbarer Körper, der Tipps abfängt (hinter fest verbauten Motorteilen). */
-const Proxy = ({ s, p }: { s: V3; p: V3 }) => (
-  <mesh position={p}>
+/** Strahl trifft nur von oben (Treffer auf der Unterseite werden verworfen) – für Körper, die von unten nicht im Weg sein sollen. */
+function raycastFromAbove(this: THREE.Mesh, rc: THREE.Raycaster, hits: THREE.Intersection[]) {
+  const before = hits.length;
+  THREE.Mesh.prototype.raycast.call(this, rc, hits);
+  for (let i = hits.length - 1; i >= before; i--) if (hits[i].face && hits[i].face!.normal.y < -0.5) hits.splice(i, 1);
+}
+const Proxy = ({ s, p, fromAbove = false }: { s: V3; p: V3; fromAbove?: boolean }) => (
+  <mesh position={p} raycast={fromAbove ? raycastFromAbove : undefined}>
     <boxGeometry args={s} />
     <primitive object={HIT_MAT} attach="material" />
   </mesh>
@@ -916,9 +922,15 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <mesh geometry={trim} material={trimMats} />
         <mesh geometry={interior} material={trimMats} />
         {/* Unterboden und Spritzwand */}
-        <mesh position={[(B.nose + B.tail) / 2, B.ground + 0.05, 0]} material={mats.dark}>
-          <boxGeometry args={[B.nose - B.tail - (rearEngine ? 1.0 : 0.4), 0.08, 1.3]} />
-        </mesh>
+        {/* Unterbodenplatte nur unter Innenraum und Kofferraum – unter dem Motor offen (dort kommt man von unten an Ölwanne und Lager) */}
+        {(() => {
+          const [a, b] = rearEngine ? [S.F.openX1 + 0.05, B.nose - 0.2] : [B.tail + 0.2, S.F.openX0 - 0.2];
+          return (
+            <mesh position={[(a + b) / 2, B.ground + 0.05, 0]} material={mats.dark}>
+              <boxGeometry args={[b - a, 0.08, 1.3]} />
+            </mesh>
+          );
+        })()}
         {/* Spritzwand vor dem Motorraum; beim Heckmotor hinter den Sitzen. Nie höher als die Karosserie an dieser Stelle. */}
         {(() => {
           const x = rearEngine ? -0.75 : 0.79;
@@ -1003,7 +1015,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             <mesh geometry={engineDecor(engine, G.detail, bare ? 'bare' : noEngine ? 'empty' : 'car')} material={bayMaterials()} raycast={noRay} />
             {/* Boxer: nur das schmale Kurbelgehäuse in der Mitte – die Zylinder liegen flach zu beiden Seiten und müssen frei bleiben */}
             {!bare && !noEngine && <Proxy s={boxer ? [0.7, 0.17, 0.2] : [0.7, 0.17, 0.36 + wide * 2]} p={[1.3, 0.535, 0]} />}
-            {!bare && !noEngine && <Proxy s={[0.66, 0.09, boxer ? 0.2 : 0.32]} p={[1.3, 0.405, 0]} />}
+            {/* Unteres Kurbelgehäuse: fängt nur Tipps von oben ab – von unten liegen Ölwanne, Dichtung und Pleuellager darin */}
+            {!bare && !noEngine && <Proxy s={[0.66, 0.09, boxer ? 0.2 : 0.32]} p={[1.3, 0.405, 0]} fromAbove />}
             {/* Motorständer: Block fängt Tipps ab (sonst ginge der Tipp durch ihn zu Teilen darunter); Kolbenböden liegen darüber */}
             {bare && !vee && <Proxy s={[0.7, 0.17, 0.36]} p={[1.3, 0.535, 0]} />}
             {bare && vee && <Proxy s={[0.7, 0.15, 0.46]} p={[1.3, 0.51, 0]} />}
