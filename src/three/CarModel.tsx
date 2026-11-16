@@ -1186,7 +1186,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               </RB>
             </Bank>,
           )}
-          <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => (boxer ? [0, 0.07] : [-0.07, 0.07]).map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
+          <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [0, 0.07] : [-0.07, 0.07]).map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
           {/* Getriebe hinter dem Motor – nur von unten und nur mit dem Getriebeheber */}
           {part(
             'gearbox',
@@ -1744,7 +1744,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                       <Mat color="#8a9097" metal={0.65} rough={0.5} />
                     </RB>,
                   )}
-                  {!installed('camshaft_b') && bolts('cyl_head_b', [1.04, 1.3, 1.56].flatMap((x) => (boxer ? [-0.07, 0] : [-0.07, 0.07]).map((dz) => [x, 0.69, 0.115 + dz] as V3)))}
+                  {!installed('camshaft_b') && bolts('cyl_head_b', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [-0.07, 0] : [-0.07, 0.07]).map((dz) => [x, 0.69, 0.115 + dz] as V3)))}
                 </Bank>
               )}
               {slots.map((c) => {
