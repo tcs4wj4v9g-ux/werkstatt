@@ -424,3 +424,4 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Beim Koop-Beitritt werden solche Autos ergänzt; im Einzelspiel geschah das beim Laden schon.
   - `isComplete` stürzt bei einem fehlenden Eintrag nicht mehr ab.
 - Geprüft: Logiktests (neuer Test: V8 in den 911, Diesel in den 365 und den 330), Nachstellung mit allen 35 Modellen nach Umbau unter „Meine Autos“, Durchläufe `schrott` und `koop`. Kein echter iPad-Test.
+- **Nachtrag (Schrottauto, Koop):** Auch ohne Motorumbau konnten Autos ohne erwartete Bauteile ankommen: aus älteren Spielständen oder über ein Gerät mit älterer App-Version. Dort zählen Endtopf und Fahrwerk noch zum Motor und fehlen bei motorlosen Schrottautos. Fehlende Bauteile werden jetzt nach jedem Koop-Abgleich ergänzt (`fixOldCars`), nicht nur beim Beitreten. Nach einem abgefangenen Absturz geschieht das auch im Einzelspiel.
