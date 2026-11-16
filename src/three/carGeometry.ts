@@ -137,7 +137,7 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     ...BASE, tail: -1.4, nose: 2.07, width: 0.815, rearAxle: -0.97, trackF: -0.11, trackR: -0.13, roof: 1.43, x0: -1.33, x1: -0.98, x2: 0.22,
     deck: 0.95, noseMid: 0.56, noseP: 2.7, tailMid: 0.62, tailP: 5, tailLen: 0.07, planP: 2.6, ground: 0.2, tumble: 0.08, bowF: 0.2, bowR: 0.03,
     flare: 0.01, crease: 0.62, creaseDepth: 0.004, blackPillars: true, pillars: [[-0.42, -0.33]], glassRear: -1.17, rearSeat: true,
-    seams: [0.93, -0.33], handles: [-0.2], cowlX: 1.1, cowlY: 1.0, hoodSlope: 0.16, hoodCurve: 0.2, hoodX0: 1.12, hoodX1: 1.9, cabinX1: 1.13, aBase: 0.92, dome: 0, cabinK: 0.94, roofArc: 0.045, planPR: 5.5,
+    seams: [0.93, -0.33], handles: [-0.2], cowlX: 1.0, cowlY: 1.0, hoodSlope: 0.11, hoodCurve: 0.17, hoodX0: 1.02, hoodX1: 1.9, cabinX1: 1.03, aBase: 0.82, dome: 0, cabinK: 0.94, roofArc: 0.045, planPR: 5.5,
   },
   // Kantige Stufenheck-Limousine der 80er (zweitürig): 4,33 m, Radstand 2,57 m, flache lange Haube, fast senkrechte Front,
   // steile Scheiben, schmale Säulen mit Knick hinten, kurzer flacher Kofferraum, scharfe Seitenkante, eckige Draufsicht.

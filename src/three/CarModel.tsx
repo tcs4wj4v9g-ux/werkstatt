@@ -688,8 +688,9 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const chassis = () => {
     const rustMuffler = st('muffler')?.known && st('muffler')?.condition === 'defect';
     const yU = B.ground - 0.04;
-    const xm = Math.max(B.tail + 0.32, B.rearAxle - 0.42);
-    const zm = -0.24;
+    // Beim Heckmotor weiter außen am Heck, sonst läge der Topf unter der Ölwanne
+    const xm = rearEngine ? B.tail + 0.3 : Math.max(B.tail + 0.32, B.rearAxle - 0.42);
+    const zm = rearEngine ? -0.42 : -0.24;
     return (
       <group key="chassis">
         {/* Rohr vom Hosenrohr nach hinten (fest) */}
@@ -1854,13 +1855,25 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             <meshStandardMaterial color="#0b0c0e" roughness={0.5} />
           </mesh>
         )}
+        {/* Offen fängt die Haube keine Tipps ab (sie stünde sonst in den Motoransichten im Weg) – geschlossen wird sie an der freien Kante */}
         <mesh
           geometry={geo.hood}
           material={hoodMats}
           castShadow
+          raycast={hoodOpen && (interactive || hoodTap) ? noRay : undefined}
           userData={{ label: interactive || (hoodTap && handlers) ? `${rearEngine ? 'Motordeckel' : 'Motorhaube'} ${hoodOpen ? 'schließen' : 'öffnen'}` : undefined }}
           onClick={interactive || (hoodTap && handlers) ? tap(handlers!.onHood) : bodyTap}
         />
+        {hoodOpen && (interactive || (hoodTap && handlers)) && (() => {
+          // Freie Kante der Haube in den Koordinaten dieser Gruppe (x relativ zu openX0)
+          const xe = hoodFront ? 0.04 : S.F.openX1 - S.F.openX0 - 0.04;
+          const ye = S.crown(S.F.openX0 + xe) - S.crown(S.F.openX0);
+          return (
+            <group position={[xe, ye, 0]} userData={{ label: `${rearEngine ? 'Motordeckel' : 'Motorhaube'} schließen` }} onClick={tap(handlers!.onHood)}>
+              <mesh scale={[0.12, 0.05, Math.min(0.6, B.width * 0.6)]} geometry={HIT_GEO} material={HIT_MAT} />
+            </group>
+          );
+        })()}
       </group>
       </group>
 
