@@ -12,7 +12,7 @@ const S16: ToolNeed = { driver: 'ratchet', socket: 'socket16' };
 /** Unterboden: Endschalldämpfer und Vorderachse (Querlenker, Spurstangenköpfe). Gehört zur Karosserie, nicht zum Motor. */
 const chassis = (): ComponentDef[] => [
   {
-    id: 'muffler', name: 'Endschalldämpfer', bolts: 2, fastener: S13, blockedBy: [], access: 'lifted', partId: 'muffler',
+    id: 'muffler', name: 'Endschalldämpfer', bolts: 2, fastener: S13, blockedBy: [], access: 'lifted', partId: 'muffler', variants: ['muffler_sport'],
     okText: 'Endtopf dicht, Schelle und Gummiaufhängung in Ordnung.', defectText: 'Endtopf durchgerostet – Löcher im Mantel, er dröhnt!',
   },
   ...(['fl', 'fr'] as const).flatMap((s): ComponentDef[] => {

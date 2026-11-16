@@ -120,6 +120,11 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     const m = (p: [number, number, number]): [number, number, number] => [rearBayX - p[0], p[1] + (view === 'under' ? 0 : REAR_BAY.y), z0 - (p[2] - z0)];
     [pos, to] = [m(pos), m(to)];
     if (view === 'engine') [pos, to] = [[rearBayX - 2.45, 1.45, z0], [rearBayX - 1.3, 0.62, z0]];
+    // Seitenansichten beim Heckmotor: über den Kotflügel steil von oben durch die Deckelöffnung (sonst sieht man nur Blech)
+    if (view === 'engine_left' || view === 'engine_right') {
+      const s = view === 'engine_left' ? 1 : -1;
+      [pos, to] = [[rearBayX - 1.25, 1.75, z0 + s * 0.95], [rearBayX - 1.3, 0.5, z0 + s * 0.1]];
+    }
   }
   // Plätze, die nicht wie die Hebebühnen bei x = 0 längs stehen (Schrottplatz): Pose in Platz-Koordinaten drehen und verschieben.
   const slot = SLOTS[bay];

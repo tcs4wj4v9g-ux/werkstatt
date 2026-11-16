@@ -1,7 +1,7 @@
 import { defOf, defsOf } from './game/data/components';
 import { performance } from './game/performance';
 import * as motor from './game/motor';
-import { blockersOf } from './game/repair';
+import { beneath, blockersOf } from './game/repair';
 import { SLOTS } from './game/data/workshop';
 import { CAR_MODELS } from './game/data/cars';
 import { StrictMode } from 'react';
@@ -27,10 +27,12 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 // Für automatisierte Tests und Fehlersuche.
 import { dayClock, useGame } from './game/store';
 (window as any).__gk = useGame;
-import { player, place, stationActions, travel, useFocus } from './three/player';
+import { player, place, REAR_BAY, stationActions, travel, useFocus, workPose } from './three/player';
+import { BODY_SPECS } from './three/carGeometry';
+import { REAR_ENGINE } from './game/data/cars';
 (window as any).__gkPlayer = player;
 import { engineAudio } from './game/audio';
 (window as any).__gkAudio = engineAudio;
 import { createCar } from './game/market';
 import { movePlayer } from './three/player';
-(window as any).__gkLib = { createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock };
+(window as any).__gkLib = { createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock, workPose, REAR_BAY, BODY_SPECS, REAR_ENGINE, beneath };

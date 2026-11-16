@@ -70,6 +70,7 @@ export type PartId =
   | 'harness'
   | 'clutch'
   | 'radiator'
+  | 'muffler_sport'
   | 'muffler'
   | 'control_arm'
   | 'tie_rod_end'

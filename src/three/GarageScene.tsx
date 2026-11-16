@@ -22,7 +22,7 @@ import { Junkyard } from './Junkyard';
 import { Mesher } from './mesher';
 import { DECO } from './workshopDecor';
 import { decoMaterials, liftCarriage, liftFrame } from './workshopDecor';
-import { useGfxSettings } from './gfx';
+import { TEST_MODE, useGfxSettings } from './gfx';
 import { Avatars, coopBoxes, ToolBoxes } from './CoopScene';
 import { coopActive } from '../net/coop';
 
@@ -208,7 +208,7 @@ function Bay({ index }: { index: number }) {
   }, [up, car, index]);
 
   useFrame((_, dt) => {
-    if (carriage.current) carriage.current.position.y += (target - carriage.current.position.y) * Math.min(1, dt * 2.6);
+    if (carriage.current) carriage.current.position.y += (target - carriage.current.position.y) * (TEST_MODE ? 1 : Math.min(1, dt * 2.6));
   });
 
   const leak = car && car.components.oil_pan_gasket?.condition === 'defect';

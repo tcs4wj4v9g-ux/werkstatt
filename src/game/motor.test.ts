@@ -374,3 +374,28 @@ describe('Kupplung und Kühler im Tuning', () => {
     expect(loaded.components.radiator.variant).toBe('swap_radiator');
   });
 });
+
+describe('Wirkung der Tuningteile', () => {
+  it('Sportnockenwellen bringen Leistung (früher übersehen), Sport-Endtopf auch; Grenzteile erklären, warum sie (noch) nichts bringen', async () => {
+    const { tuningEffects } = await import('./performance');
+    const car = mk('bavaria_330', []);
+    const stock = performance(car).ps;
+    car.components.camshaft.variant = 'camshaft_sport';
+    expect(performance(car).ps).toBeGreaterThan(stock);
+    car.components.muffler.variant = 'muffler_sport';
+    car.components.fuel_pump.variant = 'fuelpump_hp';
+    const fx = tuningEffects(car);
+    expect(fx.find((t) => t.part === 'camshaft_sport')!.ps).toBeGreaterThan(0);
+    expect(fx.find((t) => t.part === 'muffler_sport')!.ps).toBeGreaterThan(0);
+    const pump = fx.find((t) => t.part === 'fuelpump_hp')!;
+    expect(pump.ps).toBe(0);
+    expect(pump.note).toMatch(/Kraftstoffgrenze/);
+    // V8: beide Bänke zusammen
+    const v8 = mk('bavaria_340_ms', []);
+    const s8 = performance(v8).ps;
+    v8.components.camshaft.variant = 'camshaft_sport';
+    v8.components.camshaft_b.variant = 'camshaft_sport';
+    expect(performance(v8).ps).toBeGreaterThan(s8);
+    expect(tuningEffects(v8).filter((t) => t.part === 'camshaft_sport').length).toBe(1);
+  });
+});
