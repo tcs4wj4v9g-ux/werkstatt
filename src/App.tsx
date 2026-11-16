@@ -1,6 +1,6 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { useEffect, useState } from 'react';
-import { useGame } from './game/store';
+import { dayClock, dayLeft, useGame } from './game/store';
 import { isLeader, recoverAfterCrash } from './net/coop';
 import { Recover } from './ui/Recover';
 import { Perf } from './three/Env';
@@ -42,6 +42,17 @@ export function App() {
     const tick = () => isLeader() && useGame.getState().tickAuctions(Date.now());
     tick();
     const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
+  // Der Spieltag endet nach drei Minuten von selbst. Im Koop schaltet nur ein Gerät um (sonst zwei Tage auf einmal),
+  // auf Probefahrt oder im Menü wird gewartet. Im Testmodus (Tageslänge 0) bleibt es beim Knopf.
+  useEffect(() => {
+    if (!dayClock.ms) return;
+    const t = setInterval(() => {
+      const s = useGame.getState();
+      if (!s.started || (s.screen !== 'garage' && s.screen !== 'market') || !isLeader()) return;
+      if (dayLeft(s) <= 0) s.nextDay();
+    }, 1000);
     return () => clearInterval(t);
   }, []);
   // Ungültige Kombinationen (z. B. nach Update eines alten Spielstands) abfangen.

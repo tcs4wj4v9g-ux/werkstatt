@@ -1573,7 +1573,8 @@ export const useGame = create<GameState>()(
         const p = persisted ?? {};
         const merged = { ...current, ...p } as GameState;
         merged.cars = Array.from({ length: SLOT_COUNT }, (_, i) => normalizeCar(p.cars?.[i] ?? null));
-        merged.dayStartedAt = typeof p.dayStartedAt === 'number' && p.dayStartedAt <= Date.now() ? p.dayStartedAt : Date.now();
+        // Tage laufen nur beim Spielen ab: War das Spiel länger zu, beginnt der Tag beim Öffnen neu (statt sofort umzuspringen).
+        merged.dayStartedAt = typeof p.dayStartedAt === 'number' && p.dayStartedAt <= Date.now() && (!dayClock.ms || Date.now() - p.dayStartedAt < dayClock.ms) ? p.dayStartedAt : Date.now();
         merged.liftUp = SLOTS.map((x) => isLift(x.id) && (merged.cars[x.id] ? merged.cars[x.id]!.lifted : !!p.liftUp?.[x.id]));
         merged.upgrades = (p.upgrades ?? []).filter((u: UpgradeId) => UPGRADES.some((x) => x.id === u));
         merged.fluidStock = { ...emptyStock(), ...(p.fluidStock ?? {}) };

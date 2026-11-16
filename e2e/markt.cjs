@@ -96,7 +96,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const btn = p.locator('[data-testid=nextday]');
   const day0 = await p.evaluate(() => window.__gk.getState().day);
   const dayTxt = (await btn.count()) ? await btn.textContent() : '';
-  expect((await btn.count()) === 1 && (await btn.isDisabled()) && /Feierabend in [23]:\d\d/.test(dayTxt), 'Feierabend-Knopf gesperrt, Countdown läuft: ' + dayTxt);
+  expect((await btn.count()) === 1 && (await btn.isDisabled()) && /Neuer Tag in [23]:\d\d/.test(dayTxt), 'Feierabend-Knopf gesperrt, Countdown läuft: ' + dayTxt);
   await p.evaluate(() => window.__gk.getState().nextDay());
   expect(await p.evaluate(() => window.__gk.getState().day) === day0, 'Vor Ablauf kein Tageswechsel – ' + (await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text)));
   await p.evaluate(() => window.__gk.setState({ dayStartedAt: Date.now() - 181000 })); await p.waitForTimeout(1200);

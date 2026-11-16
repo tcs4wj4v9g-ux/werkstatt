@@ -350,14 +350,13 @@ function fenderLampX(S: Shape, y: number, z: number) {
   return x;
 }
 /**
- * Lage und Neigung eines Kotflügel-Scheinwerfers mit Radius r: Das Glas folgt der nach vorn abfallenden Kotflügelspitze
- * (oben weiter hinten als unten), die Leuchte sitzt also im Kotflügel statt wie ein Stielauge davor.
+ * Lage eines Kotflügel-Scheinwerfers mit Radius r: fast senkrecht (wie beim Original nur leicht zurückgeneigt), zwischen der
+ * Stelle, an der die Oberkante, und der, an der die Unterkante des Glases aus dem Kotflügel tritt. Der Topf in Wagenfarbe reicht nach hinten in den Kotflügel.
  */
-function fenderLamp(S: Shape, y: number, z: number, r: number, maxTilt = 0.85) {
-  const xh = fenderLampX(S, y + 0.75 * r, z);
-  const xl = fenderLampX(S, y - 0.75 * r, z);
-  const tilt = Math.max(0.1, Math.min(maxTilt, Math.atan2(xl - xh, 1.5 * r)));
-  return { x: (xh + xl) / 2 - 0.05, tilt };
+function fenderLamp(S: Shape, y: number, z: number, r: number, tilt = 0.12) {
+  const xh = fenderLampX(S, y + 0.8 * r, z);
+  const xl = fenderLampX(S, y - 0.8 * r, z);
+  return { x: xh + 0.65 * (xl - xh), tilt };
 }
 
 /**
@@ -374,7 +373,7 @@ function tubEnds(m: Mesher, S: Shape, N: (n: number) => number) {
     // Scheinwerfer im Kotflügel: Topf in Wagenfarbe, der in die Kotflügelspitze übergeht, Chromring, gewölbtes Glas
     const { x, tilt } = fenderLamp(S, yL, z, 0.11);
     const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + tilt]);
-    m.add(SLOT.solid, new THREE.CylinderGeometry(0.115, 0.15, 0.17, N(22), 1, false), r.clone().multiply(mat([0, -0.02, 0])));
+    m.add(SLOT.solid, new THREE.CylinderGeometry(0.115, 0.15, 0.3, N(22), 1, false), r.clone().multiply(mat([0, -0.085, 0])));
     m.add(SLOT.chrome, new THREE.TorusGeometry(0.106, 0.012, 6, N(24)), r.clone().multiply(mat([0, 0.066, 0], [Math.PI / 2, 0, 0])));
     m.add(SLOT.lens, new THREE.SphereGeometry(0.104, N(20), N(8), 0, Math.PI * 2, 0, 0.5), r.clone().multiply(mat([0, 0.02, 0], [0, 0, 0], [1, 0.9, 1])));
     m.add(SLOT.chrome, new THREE.SphereGeometry(0.03, 10, 8), r.clone().multiply(mat([0, 0.09, 0], [0, 0, 0], [1, 0.4, 1])));
@@ -435,7 +434,7 @@ function nineEnds(m: Mesher, S: Shape, N: (n: number) => number) {
     const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + tilt]);
     // Kotflügelbuckel: läuft nach hinten flach in den Kotflügel aus und nimmt vorn den Scheinwerfer auf
     m.sphere(SLOT.solid, 1, [x - 0.17, yL - 0.01, z], [0.24, 0.112, 0.118], N(22));
-    m.add(SLOT.solid, new THREE.CylinderGeometry(0.108, 0.112, 0.1, N(22), 1, false), r.clone().multiply(mat([0, 0.005, 0], [0, 0, 0], [1, 1, 0.92])));
+    m.add(SLOT.solid, new THREE.CylinderGeometry(0.108, 0.13, 0.26, N(22), 1, false), r.clone().multiply(mat([0, -0.075, 0], [0, 0, 0], [1, 1, 0.92])));
     m.add(SLOT.gloss, new THREE.TorusGeometry(0.1, 0.012, 6, N(24)), r.clone().multiply(mat([0, 0.06, 0], [Math.PI / 2, 0, 0], [1, 0.92, 1])));
     m.add(SLOT.lens, new THREE.SphereGeometry(0.098, N(20), N(8), 0, Math.PI * 2, 0, 0.45), r.clone().multiply(mat([0, 0.015, 0], [0, 0, 0], [1, 0.8, 0.92])));
     m.add(SLOT.chrome, new THREE.SphereGeometry(0.028, 10, 8), r.clone().multiply(mat([0, 0.08, 0], [0, 0, 0], [1, 0.4, 1])));
@@ -488,10 +487,10 @@ function nine2Ends(m: Mesher, S: Shape, N: (n: number) => number) {
   const yL = 0.62;
   for (const s of [-1, 1] as const) {
     const z = s * 0.62;
-    const { x, tilt } = fenderLamp(S, yL, z, 0.1, 0.5);
+    const { x, tilt } = fenderLamp(S, yL, z, 0.1, 0.08);
     const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + tilt]);
     m.sphere(SLOT.solid, 1, [x - 0.17, yL - 0.01, z], [0.26, 0.112, 0.124], N(22));
-    m.add(SLOT.solid, new THREE.CylinderGeometry(0.11, 0.114, 0.1, N(22), 1, false), r.clone().multiply(mat([0, 0.005, 0], [0, 0, 0], [1, 1, 0.85])));
+    m.add(SLOT.solid, new THREE.CylinderGeometry(0.11, 0.13, 0.26, N(22), 1, false), r.clone().multiply(mat([0, -0.075, 0], [0, 0, 0], [1, 1, 0.85])));
     m.add(SLOT.lens, new THREE.CylinderGeometry(0.104, 0.104, 0.012, N(24)), r.clone().multiply(mat([0, 0.056, 0], [0, 0, 0], [1, 1, 0.85])));
     m.add(SLOT.gloss, new THREE.TorusGeometry(0.104, 0.008, 6, N(24)), r.clone().multiply(mat([0, 0.06, 0], [Math.PI / 2, 0, 0], [1, 0.85, 1])));
     // Vier Tagfahrlicht-Punkte im Quadrat, darunter die Linse

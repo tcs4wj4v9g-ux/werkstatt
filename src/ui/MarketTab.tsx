@@ -100,7 +100,7 @@ export function MarketTab() {
   );
 }
 
-/** Feierabend erst, wenn der Spieltag abgelaufen ist – bis dahin läuft die Uhr sichtbar herunter. */
+/** Der Spieltag endet nach drei Minuten automatisch (App.tsx); hier läuft die Uhr sichtbar herunter. */
 function DayButton() {
   const s = useGame();
   const [, tick] = useState(0);
@@ -112,7 +112,7 @@ function DayButton() {
   const sec = Math.ceil(left / 1000);
   return (
     <button className="btn big" data-testid="nextday" disabled={left > 0} onClick={s.nextDay}>
-      {left > 0 ? `🕒 Feierabend in ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} – der Tag läuft noch` : '🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)'}
+      {left > 0 ? `🕒 Neuer Tag in ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} – läuft automatisch` : '🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)'}
     </button>
   );
 }
