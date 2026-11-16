@@ -360,8 +360,10 @@ function PartAnim({ installed, axis, real, ghost }: { installed: boolean; axis: 
 
 const COVER_BOLTS: V3[] = [1.0, 1.3, 1.6].flatMap((x) => [-0.15, 0.15].map((z) => [x, 0.78, z] as V3));
 /** Ventildeckelschrauben einer Bank beim V-Motor (vier je Deckel). */
-// Beim Boxer liegt die vordere Außenschraube hinter Riemen und Wasserpumpe: dort weiter hinten und näher zur oberen Kante
-const bankBolts = (bank: number, cylinders: number, boxer = false): V3[] => [[0.975, 0.18], boxer ? [1.52, 0.12] : [1.635, 0.18], [0.985, 0.03], [cylinders === 8 ? 1.35 : 1.25, 0.03]].map(([x, z]) => [x, 0.78, bank * z] as V3);
+// Beim Boxer liegen die Enden des Deckels hinter Riemen, Wasserpumpe und Peilstab: dort alle vier Schrauben in der Mitte des Deckels,
+// von den schrägen Seitenansichten mit dem Kopf zur Kamera
+const bankBolts = (bank: number, cylinders: number, boxer = false): V3[] =>
+  (boxer ? [[1.0, 0.17], [1.4, 0.17], [1.08, 0.09], [1.32, 0.09]] : [[0.975, 0.18], [1.635, 0.18], [0.985, 0.03], [cylinders === 8 ? 1.35 : 1.25, 0.03]]).map(([x, z]) => [x, 0.78, bank * z] as V3);
 const WX = 1.38; // Radmitte vorn/hinten (±)
 const WHEEL_FRONT = WX;
 const WZ = 0.8;
@@ -722,8 +724,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             ))}
           </>,
         )}
-        {/* beide Schrauben von unten erreichbar: am Flansch vorn und an der Gummiaufhängung unter dem Topf */}
-        {bolts('muffler', [[xm + 0.18, yU + 0.02, -0.19], [xm - 0.06, yU - 0.072, zm + 0.16]], 'y-')}
+        {/* beide Schrauben von unten erreichbar: am Flansch vorn und an der Gummiaufhängung unter dem Topf; Köpfe nach vorn zur Ansicht „Unterboden hinten“ (senkrecht nach unten sähe man sie dort nur streifend) */}
+        {bolts('muffler', [[xm + 0.18, yU + 0.02, -0.19], [xm - 0.06, yU - 0.072, zm + 0.16]], rearEngine ? 'y-' : 'x+')}
         {([1, -1] as const).map((sg) => {
           const s = sg > 0 ? 'fr' : 'fl';
           const zo = sg * (0.6 + B.trackF);
@@ -1184,7 +1186,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               </RB>
             </Bank>,
           )}
-          <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, 1.56].flatMap((x) => (boxer ? [0, 0.07] : [-0.07, 0.07]).map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
+          <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [0, 0.07] : [-0.07, 0.07]).map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
           {/* Getriebe hinter dem Motor – nur von unten und nur mit dem Getriebeheber */}
           {part(
             'gearbox',
@@ -1405,7 +1407,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                   ),
                 )}
                 {bolts(top, [boltPos])}
-                {connector(top, [x, 0.838, z + out * 0.095], [0, 0.03, out * 0.06])}
+                {/* Boxer: Die Bank liegt fast flach – außen hieße unten. Stecker deshalb neben der Spule auf der oberen Seite. */}
+                {boxer ? connector(top, [x - 0.07, 0.838, z - bank * 0.03], [-0.05, 0.03, 0]) : connector(top, [x, 0.838, z + out * 0.095], [0, 0.03, out * 0.06])}
               </Bank>
             );
           })}
@@ -1523,9 +1526,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                     <meshStandardMaterial color="#8a7f70" roughness={1} />
                   </mesh>
                 ))}
-              {/* Beim Boxer liegen die Köpfe tief hinter dem Riemen: Tippfläche nur oben, sonst verdeckt sie die Kopfschrauben */}
-              <mesh position={[1.7, boxer ? 0.61 : 0.55, 0]}>
-                <boxGeometry args={[0.05, boxer ? 0.06 : 0.2, 0.56]} />
+              {/* Beim Boxer liegen die Köpfe tief hinter dem Riemen: Tippfläche nur oben, sonst verdeckt sie die Kopfschrauben.
+                  Sie reicht etwas nach innen und oben, damit der Riemen auch unter der Heckkante (kurzer 356) antippbar bleibt. */}
+              <mesh position={[boxer ? 1.65 : 1.7, boxer ? 0.63 : 0.55, 0]}>
+                <boxGeometry args={[boxer ? 0.12 : 0.05, boxer ? 0.08 : 0.2, 0.56]} />
                 <primitive object={HIT_MAT} attach="material" />
               </mesh>
             </>,
@@ -1740,7 +1744,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                       <Mat color="#8a9097" metal={0.65} rough={0.5} />
                     </RB>,
                   )}
-                  {!installed('camshaft_b') && bolts('cyl_head_b', [1.04, 1.3, 1.56].flatMap((x) => (boxer ? [-0.07, 0] : [-0.07, 0.07]).map((dz) => [x, 0.69, 0.115 + dz] as V3)))}
+                  {!installed('camshaft_b') && bolts('cyl_head_b', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [-0.07, 0] : [-0.07, 0.07]).map((dz) => [x, 0.69, 0.115 + dz] as V3)))}
                 </Bank>
               )}
               {slots.map((c) => {

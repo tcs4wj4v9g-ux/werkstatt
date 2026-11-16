@@ -55,7 +55,10 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   // Schrauben im Bild suchen (Beschriftung nennt das Werkzeug) und eine echte Schraube antippen
   const findBolts = (prefix) => p.evaluate((prefix) => {
     const out = []; const cam = window.__gkCamera; const v = new cam.position.constructor();
-    window.__gkScene.traverse((o) => { if (o.userData && typeof o.userData.label === 'string' && o.userData.label.startsWith(prefix)) { o.getWorldPosition(v); v.project(cam); out.push({ label: o.userData.label, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }); } });
+    window.__gkScene.traverse((o) => { if (o.userData && typeof o.userData.label === 'string' && o.userData.label.startsWith(prefix)) { o.getWorldPosition(v);
+      // Teile (keine Schrauben): Mitte des ersten sichtbaren Netzes statt des Gruppenursprungs, der neben dem Teil liegen kann
+      if (!prefix.startsWith('Schraube')) { let m = null; o.traverse((x) => { if (!m && x.isMesh && x.material && x.material.visible !== false) m = x; }); if (m) { m.geometry.computeBoundingBox(); m.geometry.boundingBox.getCenter(v); m.localToWorld(v); } }
+      v.project(cam); out.push({ label: o.userData.label, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight }); } });
     return out;
   }, prefix);
   let bolts = await findBolts('Schraube – Rad hinten links');

@@ -1,5 +1,6 @@
 // Gesamtcheck Erreichbarkeit: Für jedes Modell und jedes Bauteil (Motorraum und Unterboden) wird alles davor abgebaut und dann
 // geprüft, ob Schrauben, Stecker und das Teil selbst von einem festen Standpunkt der Arbeitsansichten aus antippbar sind.
+// Schrauben müssen dabei mit dem Kopf zur Kamera zeigen (sonst sieht man nur den Schaft).
 // „Antippbar“ heißt wie im Spiel: Das Ziel liegt in einer Arbeitsansicht (fast) im Bild, und der erste Treffer mit Tipp-Reaktion
 // entlang des Strahls gehört zum Teil, Abstand höchstens 4,2 m.
 // Aufruf: node e2e/erreichbar.cjs [Modell …]   (ohne Angabe: alle Modelle)
@@ -71,19 +72,21 @@ const only = process.argv.slice(2);
     const centers = (o, many = false) => { const out = []; const V = window.__gkCamera.position.constructor; o.traverse((m) => { if (m.isMesh && m.geometry && !(m.material && m.material.visible === false)) { m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox; const c = new V(); bb.getCenter(c); out.push(m.localToWorld(c.clone())); if (many) for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) { const q = new V(sx > 0 ? bb.max.x : bb.min.x, sy > 0 ? bb.max.y : bb.min.y, sz > 0 ? bb.max.z : bb.min.z); q.lerp(c, 0.3); out.push(m.localToWorld(q)); } if (many) { const pa = m.geometry.attributes.position; const step = Math.max(1, Math.floor(pa.count / 16)); for (let i = 0; i < pa.count; i += step) out.push(m.localToWorld(new V(pa.getX(i), pa.getY(i), pa.getZ(i)))); } } }); return out; };
     // nur Objekte am Auto auf Platz 0 (andere Autos in der Szene tragen dieselben Beschriftungen)
     const atBay = (o) => { const V = window.__gkCamera.position.constructor; const w = o.getWorldPosition(new V()); const z0 = L.workPose('under', 0).pos[2]; return Math.abs(w.x) < 3.2 && Math.abs(w.z - z0) < 1.6; };
+    // Schraubenkopf zeigt zur Kamera (lokale +y-Achse der Schraube, höchstens etwa 75° gegen die Blickrichtung) – sonst sieht man nur den Schaft
+    const facing = (o) => { const V = window.__gkCamera.position.constructor; const w = o.getWorldPosition(new V()); const q = new (window.__gkCamera.quaternion.constructor)(); o.getWorldQuaternion(q); const up = new V(0, 1, 0).applyQuaternion(q); return (pos) => { const d = new V(pos[0] - w.x, pos[1] - w.y, pos[2] - w.z).normalize(); return up.dot(d) > 0.25; }; };
     const find = (pred) => { const out = []; window.__gkScene.traverse((o) => { if (!atBay(o)) return; if (o.userData && typeof o.userData.label === 'string' && pred(o.userData.label)) out.push(o); }); return out; };
     // Ist ein Ziel (Liste von Weltpunkten) von irgendeinem Standpunkt aus antippbar?
     // Muss in der Arbeitsansicht ohne langes Umsehen im Bild liegen (etwas Wischen ist erlaubt: bis 25 % über den Rand)
     const onScreen = (cam, t) => { const q = t.clone().project(cam); return q.z < 1 && Math.abs(q.x) <= 1.25 && Math.abs(q.y) <= 1.25; };
     // Bei Misserfolg merkt sich why, was am häufigsten im Weg war (für die Ausgabe)
     let why = '';
-    const reach = (pts, ok, lifted) => {
+    const reach = (pts, ok, lifted, face) => {
       const seen = {};
-      for (const { v, pos, cam } of views(lifted)) for (const t of pts) { const pre = VIEWWHY ? v + ': ' : ''; if (!onScreen(cam, t)) { seen[pre + 'nicht im Bild'] = (seen[pre + 'nicht im Bild'] || 0) + 1; continue; } const w = winner(pos, t); if (w && w.d <= 4.2 && ok(w.label)) return true; const k = pre + (w ? (w.d > 4.2 ? 'zu weit' : w.label || '?') : 'nichts'); seen[k] = (seen[k] || 0) + 1; }
+      for (const { v, pos, cam } of views(lifted)) for (const t of pts) { const pre = VIEWWHY ? v + ': ' : ''; if (face && !face(pos)) { seen[pre + 'Kopf abgewandt'] = (seen[pre + 'Kopf abgewandt'] || 0) + 1; continue; } if (!onScreen(cam, t)) { seen[pre + 'nicht im Bild'] = (seen[pre + 'nicht im Bild'] || 0) + 1; continue; } const w = winner(pos, t); if (w && w.d <= 4.2 && ok(w.label)) return true; const k = pre + (w ? (w.d > 4.2 ? 'zu weit' : w.label || '?') : 'nichts'); seen[k] = (seen[k] || 0) + 1; }
       why = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, VIEWWHY ? 12 : 3).map(([k, n]) => `${k} ×${n}`).join(' | ');
       return false;
     };
-    window.__audit = { why: () => why, strip, loosen, prep, views, reach, find, centers, cc, use, setTarget: (t) => { target = t; roots = null; } };
+    window.__audit = { facing, why: () => why, strip, loosen, prep, views, reach, find, centers, cc, use, setTarget: (t) => { target = t; roots = null; } };
   }, !!process.env.GK_VIEWWHY);
 
   const bad = [];
@@ -110,7 +113,7 @@ const only = process.argv.slice(2);
         if (!st.installed) return ['nicht eingebaut'];
         // Schrauben einzeln
         const bolts = A.find((l) => l.startsWith('Schraube – ' + d.name + ' ('));
-        bolts.forEach((o, i) => { if (!A.reach(A.centers(o, true), (l) => !!l && l.startsWith('Schraube – ' + d.name + ' ('), lifted)) out.push(`Schraube ${i + 1}/${bolts.length} [${A.why()}]`); });
+        bolts.forEach((o, i) => { if (!A.reach(A.centers(o, true), (l) => !!l && l.startsWith('Schraube – ' + d.name + ' ('), lifted, A.facing(o))) out.push(`Schraube ${i + 1}/${bolts.length} [${A.why()}]`); });
         if (d.bolts && bolts.length < d.bolts) out.push(`nur ${bolts.length} von ${d.bolts} Schrauben im Modell`);
         if (d.connector) { const cn = A.find((l) => l.startsWith('Stecker ' + d.name + ' (')); if (!cn.length || !A.reach(A.centers(cn[0], true), (l) => !!l && l.startsWith('Stecker ' + d.name), lifted)) out.push(`Stecker [${A.why()}]`); }
         return out;

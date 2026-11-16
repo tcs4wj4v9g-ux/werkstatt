@@ -425,3 +425,14 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - `isComplete` stürzt bei einem fehlenden Eintrag nicht mehr ab.
 - Geprüft: Logiktests (neuer Test: V8 in den 911, Diesel in den 365 und den 330), Nachstellung mit allen 35 Modellen nach Umbau unter „Meine Autos“, Durchläufe `schrott` und `koop`. Kein echter iPad-Test.
 - **Nachtrag (Schrottauto, Koop):** Auch ohne Motorumbau konnten Autos ohne erwartete Bauteile ankommen: aus älteren Spielständen oder über ein Gerät mit älterer App-Version. Dort zählen Endtopf und Fahrwerk noch zum Motor und fehlen bei motorlosen Schrottautos. Fehlende Bauteile werden jetzt nach jedem Koop-Abgleich ergänzt (`fixOldCars`), nicht nur beim Beitreten. Nach einem abgefangenen Absturz geschieht das auch im Einzelspiel.
+
+## Porsche: Scheinwerfer und Schrauben im Blick
+
+- **Scheinwerfer:** Sie stehen höher als die Nase. Auf Leuchtenhöhe gibt es dort keine Karosseriekante, deshalb landeten die Leuchten auf einem Ersatzwert weit hinten im Kotflügel und waren bei allen drei Modellen (356, 964, 992) unsichtbar. Jetzt sitzen sie an der Kotflügelspitze, wo der Kotflügel unter die Leuchtenhöhe abfällt. Das Glas ist entlang der Kotflügellinie geneigt (`fenderLamp` in `carParts.ts`), beim 992 aufrechter.
+- **Motor-Seitenansichten beim Heckmotor:** schräg von hinten über die Heckecke statt steil von oben. Dort sah man vorher nur die Unterseite des offenen Motordeckels. Getippt wurde zwar hindurch, sehen konnte man aber nichts. Die Ansicht von hinten ist steiler, über die Heckkante.
+- **Boxer:**
+  - Die vier Ventildeckelschrauben sitzen in der Mitte des Deckels, nicht hinter Riemen, Wasserpumpe und Peilstab, mit dem Kopf zu den Seitenansichten.
+  - Zündspulen-Stecker sitzen neben der Spule auf der oberen Seite. Durch die flache Bank lagen sie vorher unten.
+- **356:** Der Motor sitzt 3 cm weiter vorn, die Motoröffnung ist länger. Riemen und Lichtmaschine lagen unter der Heckkante.
+- **Gesamtcheck:** prüft jetzt auch, ob der Schraubenkopf zur Kamera zeigt (höchstens etwa 75° gegen die Blickrichtung). Sonst sieht man nur den Schaft.
+- Geprüft: Gesamtcheck für alle drei Porsches ohne Befund, Bilder in voller Grafik (Front, Heck, Motoransichten). Kein echter iPad-Test.
