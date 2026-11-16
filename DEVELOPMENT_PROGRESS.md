@@ -363,3 +363,11 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Autos kommen über „Umparken“ hinein und heraus. Ausgestellte Autos verkaufen sich wie im Showroom 4 % teurer und zählen bei der Sammlung mehr. Geschraubt wird dort nicht.
 - Technik: neue Platzart `expo` (Plätze 123–130, hinten angehängt; alte Spielstände und Koop-Werkstätten werden automatisch erweitert), Ausbauten `expo3`–`expo8`. Kein neues Speicherformat, keine Schema-Änderung.
 - Geprüft: Logiktests (Platzzahl je Ausbau, Preise, Reihenfolge, Lage im Raum); Browser-Durchlauf `tiefgarage` mit neuen Schritten (Umparken, Platzkauf, Eingang, Rundum-Ansicht per Wischen, Drehteller, Verkauf, Ausgang). Kein echter iPad-Test.
+
+## Unterboden beim Veloce Stradale V8 (und allgemein)
+
+- **Endschalldämpfer:** Die zweite Schraube saß oben auf dem Topf und war von unten verdeckt. Sie sitzt jetzt an der Gummiaufhängung unter dem Topf.
+- **Kraftstoffpumpe:** Sie hing fest in 30 cm Höhe und steckte bei tiefen Autos (Veloce: Bodenfreiheit 23 cm) im Wagenboden. Jetzt hängt sie immer knapp unter dem Boden. Ihre Schrauben sitzen an den Flanschecken außen, damit die Mitte frei antippbar bleibt.
+- **Herausgedrehte Schrauben** haben eine kleinere Trefferzone (2,6 statt 4,6 cm). Vorher deckten die leeren Schraubenlöcher die Pumpe fast ganz ab, und ein Tipp setzte die Schraube wieder an, statt die Pumpe herauszunehmen.
+- Neuer Browser-Durchlauf `unterboden`: Bei allen 35 Modellen werden Endtopf, Kraftstoffpumpe und Hosenrohr im Bild ausgebaut. Die Kamera wird dafür auf das Teil gerichtet, getippt wird auf die sichtbaren Schraubenköpfe, den Stecker und das Teil.
+- Geprüft: Logiktests, Durchläufe `unterboden`, `bremse`, `schrott`. Kein echter iPad-Test.
