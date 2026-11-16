@@ -56,26 +56,35 @@ const only = process.argv.slice(2);
       for (const h of R.intersectObjects(handledRoots(), true)) {
         let x = h.object; let handled = false; let label = null;
         while (x) { if (!label && x.userData && x.userData.label) label = x.userData.label; if (x.__r3f && x.__r3f.handlers && x.__r3f.handlers.onClick) handled = true; x = x.parent; }
+        if (handled && !label) { const w = h.point; label = `? bei ${w.x.toFixed(1)}/${w.y.toFixed(1)}/${w.z.toFixed(1)}`; }
         if (handled) { const gid = ghostOf(label); if (gid && target && L.beneath(cc(), gid).includes(target)) continue; return { label, d: h.distance }; }
       }
       return null;
     };
-    // Zielpunkte: Mitte jedes Netzes und Punkte zwischen Mitte und Ecken des Hüllquaders (man tippt im Spiel auf sichtbare Kanten)
-    const centers = (o, many = false) => { const out = []; const V = window.__gkCamera.position.constructor; o.traverse((m) => { if (m.isMesh && m.geometry && !(m.material && m.material.visible === false)) { m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox; const c = new V(); bb.getCenter(c); out.push(m.localToWorld(c.clone())); if (many) for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) { const q = new V(sx > 0 ? bb.max.x : bb.min.x, sy > 0 ? bb.max.y : bb.min.y, sz > 0 ? bb.max.z : bb.min.z); q.lerp(c, 0.3); out.push(m.localToWorld(q)); } } }); return out; };
+    // Zielpunkte: Mitte jedes Netzes, Punkte zwischen Mitte und Ecken des Hüllquaders (man tippt im Spiel auf sichtbare Kanten)
+    // und Eckpunkte der Oberfläche (zusammengefügte Netze wie die Lagerdeckel haben in der Quadermitte nichts)
+    const centers = (o, many = false) => { const out = []; const V = window.__gkCamera.position.constructor; o.traverse((m) => { if (m.isMesh && m.geometry && !(m.material && m.material.visible === false)) { m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox; const c = new V(); bb.getCenter(c); out.push(m.localToWorld(c.clone())); if (many) for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) { const q = new V(sx > 0 ? bb.max.x : bb.min.x, sy > 0 ? bb.max.y : bb.min.y, sz > 0 ? bb.max.z : bb.min.z); q.lerp(c, 0.3); out.push(m.localToWorld(q)); } if (many) { const pa = m.geometry.attributes.position; const step = Math.max(1, Math.floor(pa.count / 16)); for (let i = 0; i < pa.count; i += step) out.push(m.localToWorld(new V(pa.getX(i), pa.getY(i), pa.getZ(i)))); } } }); return out; };
     const find = (pred) => { const out = []; window.__gkScene.traverse((o) => { if (o.userData && typeof o.userData.label === 'string' && pred(o.userData.label)) out.push(o); }); return out; };
     // Ist ein Ziel (Liste von Weltpunkten) von irgendeinem Standpunkt aus antippbar?
+    // Bei Misserfolg merkt sich why, was am häufigsten im Weg war (für die Ausgabe)
+    let why = '';
     const reach = (pts, ok, lifted) => {
-      for (const { pos } of views(lifted)) for (const t of pts) { const w = winner(pos, t); if (w && w.d <= 4.2 && ok(w.label)) return true; }
+      const seen = {};
+      for (const { pos } of views(lifted)) for (const t of pts) { const w = winner(pos, t); if (w && w.d <= 4.2 && ok(w.label)) return true; const k = w ? (w.d > 4.2 ? 'zu weit' : w.label || '?') : 'nichts'; seen[k] = (seen[k] || 0) + 1; }
+      why = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ×${n}`).join(' | ');
       return false;
     };
-    window.__audit = { strip, loosen, prep, views, reach, find, centers, cc, use, setTarget: (t) => { target = t; roots = null; } };
+    window.__audit = { why: () => why, strip, loosen, prep, views, reach, find, centers, cc, use, setTarget: (t) => { target = t; roots = null; } };
   });
 
   const bad = [];
   let checked = 0;
   for (const model of models) {
     const ids = await G((model) => { const L = window.__gkLib; const st = L.motor.asStand(L.motor.extractEngine(L.createCar(model, [], Math.random, {})), model); return L.defsOf(st).map((d) => d.id); }, model);
+    // GK_IDS=a,b prüft nur diese Bauteile (zur Fehlersuche)
+    const pick = process.env.GK_IDS ? process.env.GK_IDS.split(',') : null;
     for (const id of ids) {
+      if (pick && !pick.includes(id)) continue;
       // frisches Auto, alles davor abbauen
       await G(([model, id]) => {
         const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const st = L.motor.asStand(L.motor.extractEngine(L.createCar(model, [], Math.random, {})), model); st.fluids.oil.level = 0;
@@ -90,9 +99,9 @@ const only = process.argv.slice(2);
         if (!st.installed) return ['nicht eingebaut'];
         // Schrauben einzeln
         const bolts = A.find((l) => l.startsWith('Schraube – ' + d.name + ' ('));
-        bolts.forEach((o, i) => { if (!A.reach(A.centers(o, true), (l) => !!l && l.startsWith('Schraube – ' + d.name + ' ('), lifted)) out.push(`Schraube ${i + 1}/${bolts.length}`); });
+        bolts.forEach((o, i) => { if (!A.reach(A.centers(o, true), (l) => !!l && l.startsWith('Schraube – ' + d.name + ' ('), lifted)) out.push(`Schraube ${i + 1}/${bolts.length} [${A.why()}]`); });
         if (d.bolts && bolts.length < d.bolts) out.push(`nur ${bolts.length} von ${d.bolts} Schrauben im Modell`);
-        if (d.connector) { const cn = A.find((l) => l.startsWith('Stecker ' + d.name + ' (')); if (!cn.length || !A.reach(A.centers(cn[0], true), (l) => !!l && l.startsWith('Stecker ' + d.name), lifted)) out.push('Stecker'); }
+        if (d.connector) { const cn = A.find((l) => l.startsWith('Stecker ' + d.name + ' (')); if (!cn.length || !A.reach(A.centers(cn[0], true), (l) => !!l && l.startsWith('Stecker ' + d.name), lifted)) out.push(`Stecker [${A.why()}]`); }
         return out;
       }, id);
       // Teil selbst: Schrauben und Stecker lösen, dann prüfen
@@ -104,7 +113,7 @@ const only = process.argv.slice(2);
         const objs = A.find(own);
         if (!objs.length) return 'Teil nicht im Modell';
         const pts = objs.flatMap((o) => A.centers(o, true));
-        return A.reach(pts, own, !!c.lifted) ? null : 'Teil';
+        return A.reach(pts, own, !!c.lifted) ? null : `Teil [${A.why()}]`;
       }, id);
       if (part) res.push(part);
       checked++;

@@ -32,6 +32,19 @@ Ergebnisse und Bildschirmfotos landen in `e2e/out/` (nicht im Repository). Die S
 - `e2e/run.sh koop` startet dieselbe Datenbank und `e2e/coop-server.cjs`, einen Nachbau der Supabase-Schnittstelle (Anmeldung und Funktionsaufrufe, kein Realtime). Das Spiel wird mit `?koop=<Adresse>|<Schlüssel>` darauf gerichtet.
 - Gegen das echte Supabase-Projekt: `npm run test:live` (Server direkt) und `node e2e/koop-live.cjs` (zwei Spieler im Spiel, braucht `vite preview` auf Port 4173). Beide legen eine Test-Werkstatt an und schließen danach deren Einladung. Die Cloud-Umgebung braucht dafür die Projektadresse in ihrer Netzwerkliste.
 
+## Gesamtcheck Erreichbarkeit (eigene Skripte, nicht in `run.sh`)
+
+Prüfen für jedes Bauteil, ob Schrauben, Stecker und das Teil selbst aus einer Arbeitsansicht antippbar sind. Bei jedem Befund steht dabei, was am häufigsten im Weg war.
+
+```
+SKIP_BUILD=1 … vite preview läuft auf Port 4173
+node e2e/erreichbar.cjs bmv_m4_g82 zuffen_929        # Auto: Motorraum und Unterboden (je Modell 1–3 Minuten)
+node e2e/staender.cjs zuffen_929                     # Motor am Motorständer
+GK_IDS=fuel_pump,muffler node e2e/erreichbar.cjs bmv_m4_g82   # nur einzelne Bauteile
+```
+
+Ohne Modellnamen laufen alle Modelle (Auto rund 35 Minuten in drei gleichzeitigen Teilen). Nach Änderungen an Karosserieformen, Motorraum oder Arbeitsansichten mindestens die betroffenen Modelle prüfen.
+
 ## Bildergalerie in voller Grafik
 
 `e2e/galerie.cjs` ist kein Test, sondern nimmt Bilder für den Vorher-Nachher-Vergleich auf (ohne Testmodus, deutlich langsamer):

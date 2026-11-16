@@ -80,7 +80,7 @@ export interface WorkPose {
 
 export const player = { x: 4.3, z: 0, yaw: Math.PI / 2, pitch: -0.12, zoom: false, work: null as WorkPose | null };
 
-export type WorkView = 'engine' | 'engine_left' | 'engine_right' | 'wheel_left' | 'wheel_right' | 'rear_left' | 'rear_right' | 'under';
+export type WorkView = 'engine' | 'engine_left' | 'engine_right' | 'wheel_left' | 'wheel_right' | 'rear_left' | 'rear_right' | 'under' | 'under_rear';
 export const WORK_LABELS: Record<WorkView, string> = {
   engine: 'Motor von vorn',
   engine_left: 'Motor links',
@@ -90,6 +90,7 @@ export const WORK_LABELS: Record<WorkView, string> = {
   rear_left: 'Rad hinten links',
   rear_right: 'Rad hinten rechts',
   under: 'Unterboden',
+  under_rear: 'Unterboden hinten',
 };
 
 /** Feste Arbeitsansicht nah am Bauteil. Der Spieler steht dabei still und kann sich nur umsehen. */
@@ -113,6 +114,8 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     rear_left: [[rearX, h + 0.42, z0 - 1.85], [rearX, h + 0.36, z0 - 0.8]],
     rear_right: [[rearX, h + 0.42, z0 + 1.85], [rearX, h + 0.36, z0 + 0.8]],
     under: [[2.25, 1.2, z0], [1.3, h + 0.22, z0]],
+    // Unter dem Auto stehend nach hinten: Kraftstoffpumpe, Getriebe, Endtopf
+    under_rear: [[0.95, 1.2, z0 - 0.3], [-1.0, h + 0.2, z0 + 0.1]],
   };
   let [pos, to] = table[view];
   // Heckmotor: Motoransichten gespiegelt nach hinten (Blick von hinten bzw. von den Seiten auf den Motor), Unterboden ebenso
@@ -123,7 +126,7 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     // Seitenansichten beim Heckmotor: über den Kotflügel steil von oben durch die Deckelöffnung (sonst sieht man nur Blech)
     if (view === 'engine_left' || view === 'engine_right') {
       const s = view === 'engine_left' ? 1 : -1;
-      [pos, to] = [[rearBayX - 1.25, 1.75, z0 + s * 0.95], [rearBayX - 1.3, 0.5, z0 + s * 0.1]];
+      [pos, to] = [[rearBayX - 1.25, 1.95, z0 + s * 0.72], [rearBayX - 1.3, 0.5, z0 + s * 0.12]];
     }
   }
   // Plätze, die nicht wie die Hebebühnen bei x = 0 längs stehen (Schrottplatz): Pose in Platz-Koordinaten drehen und verschieben.

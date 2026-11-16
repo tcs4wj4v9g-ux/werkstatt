@@ -528,7 +528,7 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
 }
 
 /** Bauteile der Karosserie bzw. des Fahrwerks: bleiben beim Motorausbau im Auto. */
-const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|battery$|gearbox$|clutch$|radiator$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
+const CAR_SIDE = /^(wheel_|caliper_|pads_|disc_|arm_|tie_|muffler$|battery$|gearbox$|clutch$|radiator$|dpf$|intake_hose$|hose$|harness$|mounts$|downpipe$|fuel_pump$)/;
 
 const cache = new Map<string, { list: ComponentDef[]; map: Record<string, ComponentDef> }>();
 function forEngine(engineId: string, turboKit = false) {
