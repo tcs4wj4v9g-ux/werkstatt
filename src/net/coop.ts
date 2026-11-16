@@ -2,6 +2,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from '@supaba
 import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
 import { CAR_MODELS } from '../game/data/cars';
+import { defsOf } from '../game/data/components';
 import { saveGate } from '../game/saveGate';
 import { normalizeCar, useGame } from '../game/store';
 import { SLOT_COUNT } from '../game/data/workshop';
@@ -220,6 +221,7 @@ function applyRemote(changes: { rev: number; by: string; commit: string | null; 
     saveGate.remote = false;
   }
   dropBrokenCars();
+  fixOldCars();
 }
 
 function loadState(s: any, entering: boolean) {
@@ -253,20 +255,27 @@ function loadState(s: any, entering: boolean) {
     });
     dirty = true;
   }
-  // Autos aus einer Version ohne zerlegbare Hinterachse bekommen Räder und Bremsen hinten.
-  // …und Unterbodenteile (Endtopf, Querlenker, Spurstangen) kommen bei älteren Autos dazu.
-  const old = (c: any) => c && !c.bare && c.components && (!c.components.wheel_rl || !c.components.muffler || !c.components.clutch);
+  fixOldCars();
+}
+
+/**
+ * Autos, denen Bauteile fehlen, die diese Version erwartet, werden ergänzt: Autos aus älteren Spielständen
+ * (Räder/Bremsen hinten, Endtopf, Querlenker, Spurstangen, Kupplung), Motorumbau (Kühler, Partikelfilter) und
+ * Schritte eines Partners mit älterer App-Version (dort zählen z. B. Endtopf und Fahrwerk noch zum Motor).
+ * Sonst stürzt die Ansicht beim ersten Zugriff auf das fehlende Teil ab. Läuft beim Beitreten und nach jedem Abgleich.
+ */
+function fixOldCars() {
+  const old = (c: any) => !!c && !c.bare && !!c.components && (!c.components.wheel_rl || !c.components.clutch || defsOf(c).some((d) => !c.components[d.id]));
   const st = useGame.getState();
-  if ([...st.cars, ...st.listings.map((l) => l.car), ...st.waiting, ...st.auctions.map((a) => a.car), ...st.jobs.map((j) => j.car)].some(old)) {
-    useGame.setState({
-      cars: st.cars.map((c) => (old(c) ? normalizeCar(c) : c)),
-      listings: st.listings.map((l) => (old(l.car) ? { ...l, car: normalizeCar(l.car)! } : l)),
-      waiting: st.waiting.map((c) => (old(c) ? normalizeCar(c)! : c)),
-      auctions: st.auctions.map((a) => (old(a.car) ? { ...a, car: normalizeCar(a.car)! } : a)),
-      jobs: st.jobs.map((j) => (old(j.car) ? { ...j, car: normalizeCar(j.car)! } : j)),
-    });
-    dirty = true;
-  }
+  if (![...st.cars, ...st.listings.map((l) => l.car), ...st.waiting, ...st.auctions.map((a) => a.car), ...st.jobs.map((j) => j.car)].some(old)) return;
+  useGame.setState({
+    cars: st.cars.map((c) => (old(c) ? normalizeCar(c) : c)),
+    listings: st.listings.map((l) => (old(l.car) ? { ...l, car: normalizeCar(l.car)! } : l)),
+    waiting: st.waiting.map((c) => (old(c) ? normalizeCar(c)! : c)),
+    auctions: st.auctions.map((a) => (old(a.car) ? { ...a, car: normalizeCar(a.car)! } : a)),
+    jobs: st.jobs.map((j) => (old(j.car) ? { ...j, car: normalizeCar(j.car)! } : j)),
+  });
+  dirty = true;
 }
 
 async function resync(reason?: string) {
@@ -549,6 +558,7 @@ export async function setInvite(open: boolean, renew: boolean) {
 /** Nach einem abgefangenen Absturz: kaputte Autos räumen und im Koop den Stand frisch vom Server holen. */
 export function recoverAfterCrash() {
   dropBrokenCars();
+  fixOldCars();
   if (coopActive()) resync().catch(() => undefined);
 }
 

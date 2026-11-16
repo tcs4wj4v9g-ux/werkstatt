@@ -108,6 +108,16 @@ describe('Motor ausbauen, lagern, wieder einbauen', () => {
 });
 
 describe('Motorumbau', () => {
+  it('fremder Motor bringt fehlende Teile am Auto mit (Kühler im luftgekühlten Auto, Partikelfilter beim Diesel)', () => {
+    for (const [target, donorModel] of [['zuffen_929', 'bavaria_550'], ['zuffen_365', 'bavaria_320d'], ['bavaria_330', 'bavaria_320d']]) {
+      const car = createCar(target, [], () => 0.5, {});
+      const unit = extractEngine(createCar(donorModel, [], () => 0.5, {}));
+      extractEngine(car);
+      insertEngine(car, unit, [], 1);
+      expect(defsOf(car).filter((d) => !car.components[d.id]).map((d) => d.id), `${donorModel} in ${target}`).toEqual([]);
+      expect(() => r.isAssembled(car)).not.toThrow();
+    }
+  });
   it('Kompatibilität: gleiche Baureihe einfach, R4→R6 größerer Umbau, V8 passt nicht in den Kompakten', () => {
     expect(swapPlan({ modelId: 'bavaria_318' }, engineOf({ modelId: 'bavaria_318' }).id).level).toBe(0);
     const r6 = swapPlan({ modelId: 'bavaria_318' }, engineOf({ modelId: 'bavaria_330' }).id);

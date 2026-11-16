@@ -15,7 +15,8 @@ const done = (message?: string): ActionResult => ({ ok: true, message });
 /** Eingebaut, alle Schrauben fest, Stecker verbunden. */
 export const isComplete = (car: CarInstance, id: string) => {
   const c = car.components[id];
-  return c.installed && c.bolts.every((b) => b === TIGHT) && (!defOf(car, id).connector || c.connected);
+  // fehlender Eintrag (älterer Spielstand) zählt als nicht fertig statt die Ansicht abstürzen zu lassen
+  return !!c && c.installed && c.bolts.every((b) => b === TIGHT) && (!defOf(car, id).connector || c.connected);
 };
 
 /**
@@ -291,13 +292,13 @@ export function componentAction(
 export const WHEELS = ['wheel_fl', 'wheel_fr', 'wheel_rl', 'wheel_rr'];
 
 export function activeDefects(car: CarInstance): DefectId[] {
-  return DEFECT_LIST.filter((d) => defectComponents(car, d).some((c) => car.components[c].condition === 'defect')).map((d) => d.id);
+  return DEFECT_LIST.filter((d) => defectComponents(car, d).some((c) => car.components[c]?.condition === 'defect')).map((d) => d.id);
 }
 
 /** Defekte, die der Spieler am Bauteil selbst festgestellt hat. */
 export function knownDefects(car: CarInstance): DefectId[] {
   return DEFECT_LIST.filter((d) =>
-    defectComponents(car, d).some((c) => car.components[c].condition === 'defect' && car.components[c].known),
+    defectComponents(car, d).some((c) => car.components[c]?.condition === 'defect' && car.components[c]?.known),
   ).map((d) => d.id);
 }
 
