@@ -194,17 +194,9 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.waitForTimeout(500);
   await p.getByTestId('drive').click(); await p.waitForTimeout(1500);
   expect((await st()).screen === 'track' && await p.evaluate(() => window.__gkAudio.running()), 'Probefahrt gestartet, Motor zu hören');
-  await p.evaluate(() => {
-    const d = window.__gkDrive; const N = d.samples.length;
-    setInterval(() => {
-      let near = 0, best = 1e9;
-      d.samples.forEach((q, i) => { const dd = (q.x - d.sim.x) ** 2 + (q.z - d.sim.z) ** 2; if (dd < best) { best = dd; near = i; } });
-      const t = d.samples[(near + 8) % N];
-      let diff = Math.atan2(-(t.z - d.sim.z), t.x - d.sim.x) - d.sim.heading; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI;
-      d.input.steer = Math.max(-1, Math.min(1, diff * 3)); d.input.throttle = d.sim.v < 16 ? 1 : 0; d.input.brake = 0;
-    }, 30);
-  });
-  for (let i = 0; i < 200 && (await st()).screen === 'track'; i++) await p.waitForTimeout(1000);
+  // Eingebauter Autopilot (lenkt in jedem Physikschritt) und Zeitraffer: die Runde ist knapp 3 km lang
+  await p.evaluate(() => { const d = window.__gkDrive; d.sim.autopilot = 20; d.sim.timeScale = 3; });
+  for (let i = 0; i < 240 && (await st()).screen === 'track'; i++) await p.waitForTimeout(1000);
   s = await st();
   expect(s.screen === 'garage' && s.cars[0].testDriven && s.cars[0].observed.includes('brake_grind'), 'Probefahrt gewertet; Bremsproblem erst dabei bemerkt');
   expect(!(await p.evaluate(() => window.__gkAudio.running())), 'Motorklang nach der Fahrt beendet');

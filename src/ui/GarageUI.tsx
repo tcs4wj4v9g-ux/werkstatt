@@ -304,6 +304,7 @@ export function GarageUI() {
             <p className="bigline good">Bei der Probefahrt ist dir nichts Auffälliges begegnet.</p>
           )}
           <button className="btn primary big" onClick={() => s.setPanel(null)}>Zur Werkstatt</button>
+          <button className="btn big" data-testid="drive-again" onClick={() => s.startDrive(s.panelBay)}>🏁 Noch eine Runde</button>
         </Modal>
       )}
 
