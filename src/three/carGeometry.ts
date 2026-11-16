@@ -154,7 +154,7 @@ export const BODY_SPECS: Record<BodyStyle, BodySpec> = {
     deck: 0.86, noseMid: 0.42, noseP: 2.2, tailMid: 0.55, tailP: 2.4, tailLen: 0.75, planP: 2.2, planPR: 2.4, ground: 0.22, tumble: 0.16, bowF: 0.05, bowR: 0.08,
     flare: 0.012, crease: 0.6, creaseDepth: 0, blackPillars: false, pillars: [], glassRear: -0.62, rearSeat: false,
     seams: [0.78, -0.42], handles: [-0.3], cowlX: 0.84, cowlY: 0.86, hoodSlope: 0.06, hoodCurve: 0.12, hoodX0: 0.86, hoodX1: 2.0, cabinX1: 0.86, aBase: 0.62,
-    dome: 0, cabinK: 0.9, roofArc: 0.03, lidX0: -1.5, lidX1: -0.86, hoodHinge: 'front', haunch: 0.07,
+    dome: 0, cabinK: 0.9, roofArc: 0.03, lidX0: -1.56, lidX1: -0.8, bayX: 0.22, hoodHinge: 'front', haunch: 0.07,
   },
   // Heckmotor-Sportcoupé der späten 80er: 4,25 m, Radstand 2,27 m, abfallende Fronthaube zwischen aufrechten Scheinwerfern,
   // flach geneigte Scheibe, Dachlinie fällt in einem Bogen bis zum Heck, breite Hinterkotflügel, glatte Stoßfänger.

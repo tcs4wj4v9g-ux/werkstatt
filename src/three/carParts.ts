@@ -340,6 +340,27 @@ function boxEnds(m: Mesher, S: Shape, N: (n: number) => number) {
 }
 
 /**
+ * Längslage eines Kotflügel-Scheinwerfers (Heckmotor-Coupés): dort, wo die Kotflügeloberkante nach vorn unter die
+ * Leuchtenhöhe abfällt. Die Kante auf Leuchtenhöhe gibt es dort nicht (die Leuchte sitzt höher als die Nase) – ohne das
+ * landete die Leuchte weit hinten im Kotflügel und war nicht zu sehen.
+ */
+function fenderLampX(S: Shape, y: number, z: number) {
+  let x = S.B.nose;
+  while (x > S.B.nose - 0.9 && S.topSurf(x, z) < y - 0.03) x -= 0.01;
+  return x;
+}
+/**
+ * Lage und Neigung eines Kotflügel-Scheinwerfers mit Radius r: Das Glas folgt der nach vorn abfallenden Kotflügelspitze
+ * (oben weiter hinten als unten), die Leuchte sitzt also im Kotflügel statt wie ein Stielauge davor.
+ */
+function fenderLamp(S: Shape, y: number, z: number, r: number, maxTilt = 0.85) {
+  const xh = fenderLampX(S, y + 0.75 * r, z);
+  const xl = fenderLampX(S, y - 0.75 * r, z);
+  const tilt = Math.max(0.1, Math.min(maxTilt, Math.atan2(xl - xh, 1.5 * r)));
+  return { x: (xh + xl) / 2 - 0.05, tilt };
+}
+
+/**
  * Front und Heck des runden Heckmotor-Coupés (`tub`): runde Scheinwerfer vorn auf den Kotflügeln, kleine Hupengitter,
  * schlanke Stoßstangen mit Chromleiste und Hörnern, Haubengriff mit Wappen, kleine runde Rückleuchten, Doppelauspuff.
  */
@@ -351,8 +372,8 @@ function tubEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   for (const s of [-1, 1] as const) {
     const z = s * 0.56;
     // Scheinwerfer im Kotflügel: Topf in Wagenfarbe, der in die Kotflügelspitze übergeht, Chromring, gewölbtes Glas
-    const x = S.endX(1, yL, z) - 0.07;
-    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + 0.2]);
+    const { x, tilt } = fenderLamp(S, yL, z, 0.11);
+    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + tilt]);
     m.add(SLOT.solid, new THREE.CylinderGeometry(0.115, 0.15, 0.17, N(22), 1, false), r.clone().multiply(mat([0, -0.02, 0])));
     m.add(SLOT.chrome, new THREE.TorusGeometry(0.106, 0.012, 6, N(24)), r.clone().multiply(mat([0, 0.066, 0], [Math.PI / 2, 0, 0])));
     m.add(SLOT.lens, new THREE.SphereGeometry(0.104, N(20), N(8), 0, Math.PI * 2, 0, 0.5), r.clone().multiply(mat([0, 0.02, 0], [0, 0, 0], [1, 0.9, 1])));
@@ -410,8 +431,8 @@ function nineEnds(m: Mesher, S: Shape, N: (n: number) => number) {
   for (const s of [-1, 1] as const) {
     const z = s * 0.57;
     // Aufrechter Scheinwerfer: Topf in Wagenfarbe, schwarzer Ring, Glas mit Reflektor
-    const x = S.endX(1, yL, z) - 0.08;
-    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + 0.08]);
+    const { x, tilt } = fenderLamp(S, yL, z, 0.1);
+    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + tilt]);
     // Kotflügelbuckel: läuft nach hinten flach in den Kotflügel aus und nimmt vorn den Scheinwerfer auf
     m.sphere(SLOT.solid, 1, [x - 0.17, yL - 0.01, z], [0.24, 0.112, 0.118], N(22));
     m.add(SLOT.solid, new THREE.CylinderGeometry(0.108, 0.112, 0.1, N(22), 1, false), r.clone().multiply(mat([0, 0.005, 0], [0, 0, 0], [1, 1, 0.92])));
@@ -467,8 +488,8 @@ function nine2Ends(m: Mesher, S: Shape, N: (n: number) => number) {
   const yL = 0.62;
   for (const s of [-1, 1] as const) {
     const z = s * 0.62;
-    const x = S.endX(1, yL, z) - 0.08;
-    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + 0.1]);
+    const { x, tilt } = fenderLamp(S, yL, z, 0.1, 0.5);
+    const r = mat([x, yL, z], [0, 0, -Math.PI / 2 + tilt]);
     m.sphere(SLOT.solid, 1, [x - 0.17, yL - 0.01, z], [0.26, 0.112, 0.124], N(22));
     m.add(SLOT.solid, new THREE.CylinderGeometry(0.11, 0.114, 0.1, N(22), 1, false), r.clone().multiply(mat([0, 0.005, 0], [0, 0, 0], [1, 1, 0.85])));
     m.add(SLOT.lens, new THREE.CylinderGeometry(0.104, 0.104, 0.012, N(24)), r.clone().multiply(mat([0, 0.056, 0], [0, 0, 0], [1, 1, 0.85])));
