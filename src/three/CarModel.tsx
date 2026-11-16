@@ -270,7 +270,8 @@ function Bolt({ pos, axis = 'y', state, live, label, onTap, kind = 'ratchet', to
           <meshBasicMaterial color="#39e06f" transparent opacity={0.8} />
         </mesh>
       )}
-      {onTap && <Hit />}
+      {/* Herausgedrehte Schraube: kleinere Trefferzone, damit das leere Loch das Bauteil selbst nicht verdeckt */}
+      {onTap && <Hit r={state > 0 ? 0.046 : 0.026} />}
     </group>
   );
 }
@@ -452,6 +453,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const B = shared.shape.B;
   /** Hosenrohr hängt immer sichtbar unter dem Wagenboden (tiefe Autos wie der B5 haben weniger Bodenfreiheit). */
   const dpY = Math.min(0.3, B.ground - 0.01);
+  /** Kraftstoffpumpe ebenso unter dem Boden (sonst steckt sie bei tiefen Autos im Blech). */
+  const fpY = Math.min(0.3, B.ground - 0.02);
   /** Tieferlegung: Karosserie und Motor sinken, die Räder bleiben stehen. */
   const drop = car && !car.bare ? dropOf(car.visual) / 100 : 0;
   const hinge = useMemo(() => doorHinge(S), [S]);
@@ -701,7 +704,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             </mesh>
           </>,
         )}
-        {bolts('muffler', [[xm + 0.18, yU + 0.02, -0.19], [xm, yU + 0.075, zm + 0.16]], 'y-')}
+        {/* beide Schrauben von unten erreichbar: am Flansch vorn und an der Gummiaufhängung unter dem Topf */}
+        {bolts('muffler', [[xm + 0.18, yU + 0.02, -0.19], [xm - 0.06, yU - 0.072, zm + 0.16]], 'y-')}
         {([1, -1] as const).map((sg) => {
           const s = sg > 0 ? 'fr' : 'fl';
           const zo = sg * (0.6 + B.trackF);
@@ -1642,17 +1646,18 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           {part(
             'fuel_pump',
             <>
-              <RB s={[0.16, 0.08, 0.14]} r={0.02} p={[-1.1, 0.3, 0.32]}>
+              <RB s={[0.16, 0.08, 0.14]} r={0.02} p={[-1.1, fpY, 0.32]}>
                 <Mat color={has('fuel_pump', 'fuelpump_hp') ? '#b3261e' : '#3a3d42'} metal={0.5} rough={0.5} />
               </RB>
-              <mesh position={[-0.4, 0.3, 0.32]} rotation={[0, 0, Math.PI / 2]}>
+              <mesh position={[-0.4, fpY, 0.32]} rotation={[0, 0, Math.PI / 2]}>
                 <cylinderGeometry args={[0.008, 0.008, 1.3, 5]} />
                 <Mat color="#cfd3d8" metal={0.9} rough={0.3} />
               </mesh>
             </>,
           )}
-          {!bare && bolts('fuel_pump', [[-1.16, 0.255, 0.32], [-1.04, 0.255, 0.32]], 'y-')}
-          {!bare && connector('fuel_pump', [-1.1, 0.25, 0.4], [0, -0.04, 0.05])}
+          {/* Schrauben an den Flanschecken außen, damit die Pumpe in der Mitte frei antippbar bleibt */}
+          {!bare && bolts('fuel_pump', [[-1.2, fpY - 0.045, 0.27], [-1.0, fpY - 0.045, 0.37]], 'y-')}
+          {!bare && connector('fuel_pump', [-1.1, fpY - 0.05, 0.4], [0, -0.04, 0.05])}
 
           {/* ---------- Krümmer (im Auto fest, am Motorständer ausbaubar) ---------- */}
           {!noEngine &&
