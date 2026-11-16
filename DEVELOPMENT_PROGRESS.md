@@ -387,11 +387,14 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Die Tippfläche des Keilriemens liegt beim Boxer nur oben.
   - Der Endtopf sitzt beim Heckmotor außen, die Ölablassschraube ist frei.
   - Der Wagenboden ist unter dem Motor offen.
+  - Die vorderste Ventildeckelschraube beim Boxer liegt nicht mehr hinter Riemen und Wasserpumpe. Der Block fängt nur in einem schmalen, niedrigen Bereich Tipps ab, die Kopfdichtungen liegen frei.
 - **Weitere Modelle:**
   - Wagenboden und Unterbodenplatte sind unter dem Motor offen: Ölwanne, Dichtung und Lager liegen bei tiefen Autos nicht mehr im Blech.
   - Spurstangenköpfe sitzen hinter und unter dem Querlenker.
   - Twingo: Scheibenfuß weiter vorn, Zylinder 1 steckt nicht mehr im Armaturenbrett.
-  - Die Motorlager-Schrauben sitzen an der Außenkante.
+  - **Motorlager werden jetzt wie in echt von unten gelöst** (Hebebühne, Schrauben an der Unterseite der Lager). Von oben verdeckten je nach Auto Krümmer, Lichtmaschine, Ansaugschlauch oder Kotflügel mindestens eine Schraube. Zum Motorausbau also: Auto anheben, Motorlager und Hosenrohr lösen, ablassen, Rest im Motorraum.
+  - Die Unteransicht steht etwas weiter unter dem Auto. Beim Twingo enden die Kunststoff-Stoßfänger knapp über dem Wagenboden; vorher zog sich ihre Fläche bis unter den Motor und verdeckte Lager und Ölwanne.
+  - Heckmotor: Kabelbaum-Stecker seitlich neben der Motorabdeckung und Batterie weiter in der Öffnung. Das Motorende an der Spritzwand liegt beim Elfer unter dem Blech.
   - Der Block beim V-Motor ist niedriger, die Kopfdichtungen sind frei.
 - **Ölwanne:** so lang wie der Block statt 0,5 m, deckt alle Lagerstellen ab (Urquattro-Fünfzylinder, Sechszylinder). Die Ölwannendichtung ist ein Rahmen, kein Deckel mehr: Hauptlager und Kurbelwelle darin bleiben antippbar.
 - **Motorständer:** Krümmerschrauben sitzen hinter Riemen und Wasserpumpe. Die Kipphebelschraube sitzt hinter der Steuerkette.

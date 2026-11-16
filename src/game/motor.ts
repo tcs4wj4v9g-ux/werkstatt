@@ -121,7 +121,7 @@ export function removalSteps(car: CarInstance): { label: string; done: boolean }
     { label: 'Ansaugschlauch abbauen', done: out('intake_hose') },
     { label: 'Motorkabelbaum abstecken', done: !c.harness || !c.harness.connected || out('harness') },
     { label: 'Hosenrohr vom Krümmer lösen (von unten)', done: out('downpipe') },
-    { label: 'Motorlager und Getriebeglocke lösen', done: out('mounts') },
+    { label: 'Motorlager und Getriebeglocke lösen (von unten)', done: out('mounts') },
     { label: 'Motorhaube offen, Auto unten', done: car.hoodOpen && !car.lifted },
   ];
   if (c.charge_pipe) steps.splice(3, 0, { label: 'Ladeluftrohr abbauen', done: out('charge_pipe') });
