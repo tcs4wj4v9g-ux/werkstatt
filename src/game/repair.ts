@@ -292,13 +292,13 @@ export function componentAction(
 export const WHEELS = ['wheel_fl', 'wheel_fr', 'wheel_rl', 'wheel_rr'];
 
 export function activeDefects(car: CarInstance): DefectId[] {
-  return DEFECT_LIST.filter((d) => defectComponents(car, d).some((c) => car.components[c].condition === 'defect')).map((d) => d.id);
+  return DEFECT_LIST.filter((d) => defectComponents(car, d).some((c) => car.components[c]?.condition === 'defect')).map((d) => d.id);
 }
 
 /** Defekte, die der Spieler am Bauteil selbst festgestellt hat. */
 export function knownDefects(car: CarInstance): DefectId[] {
   return DEFECT_LIST.filter((d) =>
-    defectComponents(car, d).some((c) => car.components[c].condition === 'defect' && car.components[c].known),
+    defectComponents(car, d).some((c) => car.components[c]?.condition === 'defect' && car.components[c]?.known),
   ).map((d) => d.id);
 }
 
