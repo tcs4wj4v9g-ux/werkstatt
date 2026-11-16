@@ -1,6 +1,6 @@
 import type { CarInstance, ComponentDef, MotorMeta, ToolNeed } from '../types';
 import { CAR_MODELS } from './cars';
-import { cylinderSlots, ENGINES, isV, type EngineDef } from './engines';
+import { cylinderSlots, ENGINES, isBoxer, isV, type EngineDef } from './engines';
 
 // Bauteile der Fahrzeugplattform. Neue Reparaturen = neue Einträge hier
 // (+ Defekt in defects.ts + 3D-Darstellung in CarModel.tsx).
@@ -142,6 +142,7 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
   const slots = cylinderSlots(engine);
   const diesel = engine.fuel === 'diesel';
   const v = isV(engine);
+  const boxer = isBoxer(engine);
   const tops = (bank: number) => slots.filter((c) => !v || c.bank === bank).map((c) => topId(engine, c.n));
   const out: ComponentDef[] = [
   {
@@ -482,11 +483,13 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
             okText: 'Nocken glatt, Lagerstellen ohne Riefen.', defectText: 'Nocken eingelaufen – verschlissen!',
           },
           {
-            id: 'cyl_head_b', name: 'Zylinderkopf Bank 2', bolts: 6, fastener: S13, blockedBy: ['camshaft_b', 'intake_manifold', 'exhaust_manifold'], access: 'stand' as const,
+            // Boxer: Beide Köpfe liegen außen frei – Bank 2 wie Bank 1 im Auto (nach dem Ventildeckel). Am Motorständer kommen
+            // Nockenwelle und Krümmer davor (blockersOf). Beim V-Motor liegt Bank 2 unter Krümmern und Ansaugbrücke: nur am Ständer.
+            id: 'cyl_head_b', name: 'Zylinderkopf Bank 2', bolts: 6, fastener: S13, blockedBy: boxer ? ['gasket_b'] : ['camshaft_b', 'intake_manifold', 'exhaust_manifold'], access: boxer ? ('hood' as const) : ('stand' as const),
             okText: 'Kopf plan, keine Risse.', defectText: '',
           },
           {
-            id: 'head_gasket_b', name: 'Zylinderkopfdichtung Bank 2', bolts: 0, blockedBy: ['cyl_head_b'], access: 'stand' as const, partId: 'head_gasket' as const, hidden: true,
+            id: 'head_gasket_b', name: 'Zylinderkopfdichtung Bank 2', bolts: 0, blockedBy: ['cyl_head_b'], access: boxer ? ('hood' as const) : ('stand' as const), partId: 'head_gasket' as const, hidden: true,
             okText: 'Dichtung sauber – in Ordnung.', defectText: 'Durchgebrannt – defekt!',
           },
         ]

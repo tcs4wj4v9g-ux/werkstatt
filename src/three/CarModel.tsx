@@ -1187,6 +1187,25 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             </Bank>,
           )}
           <Bank bank={vee ? -1 : 0}>{!installed('rocker') && bolts('cyl_head', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [0, 0.07] : [-0.07, 0.07]).map((dz) => [x, 0.69, (vee ? -0.115 : 0) + dz] as V3)))}</Bank>
+          {/* Bank 2: am Motorständer, beim Boxer auch im Auto (beide Köpfe liegen außen frei) */}
+          {vee && (bare || boxer) && (
+            <Bank bank={1}>
+              {part(
+                'head_gasket_b',
+                <mesh position={[1.3, 0.624, 0.115]}>
+                  <boxGeometry args={[0.68, 0.008, 0.21]} />
+                  <Mat color={st('head_gasket_b')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
+                </mesh>,
+              )}
+              {part(
+                'cyl_head_b',
+                <RB s={[0.7, 0.06, 0.23]} r={0.012} p={[1.3, 0.65, 0.115]}>
+                  <Mat color="#8a9097" metal={0.65} rough={0.5} />
+                </RB>,
+              )}
+              {(bare ? !installed('camshaft_b') : !installed('gasket_b')) && bolts('cyl_head_b', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [-0.07, 0] : [-0.07, 0.07]).map((dz) => [x, 0.69, 0.115 + dz] as V3)))}
+            </Bank>
+          )}
           {/* Getriebe hinter dem Motor – nur von unten und nur mit dem Getriebeheber */}
           {part(
             'gearbox',
@@ -1728,24 +1747,6 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
                     {bolts(id, slots.filter((c) => c.bank === bank).filter((_, i, a) => i === 0 || i === a.length - 1).flatMap((c) => [-1, 1].map((k) => (boxer ? [c.x + 0.05 + k * 0.035, 0.735, bank * 0.105 - bank * 0.035] : [c.x + 0.05, 0.735, bank * 0.105 + (bank ? 0 : -0.04) + k * 0.06]) as V3)))}
                   </Bank>
                 ) : null,
-              )}
-              {vee && (
-                <Bank bank={1}>
-                  {part(
-                    'head_gasket_b',
-                    <mesh position={[1.3, 0.624, 0.115]}>
-                      <boxGeometry args={[0.68, 0.008, 0.21]} />
-                      <Mat color={st('head_gasket_b')?.condition === 'defect' ? '#5a3a1c' : '#3d4046'} metal={0.4} rough={0.7} />
-                    </mesh>,
-                  )}
-                  {part(
-                    'cyl_head_b',
-                    <RB s={[0.7, 0.06, 0.23]} r={0.012} p={[1.3, 0.65, 0.115]}>
-                      <Mat color="#8a9097" metal={0.65} rough={0.5} />
-                    </RB>,
-                  )}
-                  {!installed('camshaft_b') && bolts('cyl_head_b', [1.04, 1.3, boxer ? 1.5 : 1.56].flatMap((x) => (boxer ? [-0.07, 0] : [-0.07, 0.07]).map((dz) => [x, 0.69, 0.115 + dz] as V3)))}
-                </Bank>
               )}
               {slots.map((c) => {
                 const hg = vee && c.bank > 0 ? 'head_gasket_b' : 'head_gasket';

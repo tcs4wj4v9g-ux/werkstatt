@@ -436,3 +436,13 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - **356:** Der Motor sitzt 3 cm weiter vorn, die Motoröffnung ist länger. Riemen und Lichtmaschine lagen unter der Heckkante.
 - **Gesamtcheck:** prüft jetzt auch, ob der Schraubenkopf zur Kamera zeigt (höchstens etwa 75° gegen die Blickrichtung). Sonst sieht man nur den Schaft.
 - Geprüft: Gesamtcheck für alle drei Porsches ohne Befund, Bilder in voller Grafik (Front, Heck, Motoransichten). Kein echter iPad-Test.
+
+## Boxer: Kopfdichtungen beider Bänke im Auto
+
+- **Problem:** Beim Boxer (964 mit 3,6 l, 992, 356) ließen sich Zylinderkopf und Kopfdichtung von Bank 1 im Auto tauschen, die von Bank 2 nur am Motorständer. Davor saßen dort Nockenwelle sowie Ansaug- und Abgaskrümmer. Für den V-Motor ist das so gewollt (Bank 2 liegt unter Krümmern und Ansaugbrücke). Beim Boxer liegen beide Köpfe außen frei.
+- **Jetzt:** Beim Boxer kommt Bank 2 wie Bank 1 im Auto heraus: Ventildeckel, Ventildeckeldichtung, Kopf, Kopfdichtung. Am Motorständer bleiben Nockenwelle und Krümmer weiterhin vor dem Kopf (`blockersOf`). Der Kopf von Bank 2 wird beim Boxer auch im Auto als eigenes Teil gezeichnet.
+- Geprüft:
+  - Ausbau beider Kopfdichtungen im 964 mit den Spielaktionen.
+  - Gesamtcheck für Auto und Motorständer (964, 992, 356).
+  - Logiktests, Durchläufe `motoren`, `schrott`, `bremse` (allein grün).
+  - Kein echter iPad-Test.

@@ -26,7 +26,10 @@ export const isComplete = (car: CarInstance, id: string) => {
  */
 export const blockersOf = (car: CarInstance, id: string): string[] => {
   const base = defOf(car, id).blockedBy;
-  return car.bare && id === 'cyl_head' && car.components.camshaft ? [...base, 'camshaft'] : base;
+  if (car.bare && id === 'cyl_head' && car.components.camshaft) return [...base, 'camshaft'];
+  // Boxer am Motorständer: Bank 2 wie beim V-Motor erst nach Nockenwelle und Krümmern (im Auto bleiben sie am Kopf)
+  if (car.bare && id === 'cyl_head_b' && defOf(car, id).access === 'hood') return [...base, 'camshaft_b', 'intake_manifold', 'exhaust_manifold'].filter((x) => car.components[x]);
+  return base;
 };
 
 export const blockersRemoved = (car: CarInstance, id: string) =>
