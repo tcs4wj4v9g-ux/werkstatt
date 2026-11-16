@@ -2,6 +2,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from '@supaba
 import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
 import { CAR_MODELS } from '../game/data/cars';
+import { defsOf } from '../game/data/components';
 import { saveGate } from '../game/saveGate';
 import { normalizeCar, useGame } from '../game/store';
 import { SLOT_COUNT } from '../game/data/workshop';
@@ -255,7 +256,8 @@ function loadState(s: any, entering: boolean) {
   }
   // Autos aus einer Version ohne zerlegbare Hinterachse bekommen Räder und Bremsen hinten.
   // …und Unterbodenteile (Endtopf, Querlenker, Spurstangen) kommen bei älteren Autos dazu.
-  const old = (c: any) => c && !c.bare && c.components && (!c.components.wheel_rl || !c.components.muffler || !c.components.clutch);
+  // …und Autos mit Motorumbau, denen ein vom neuen Motor verlangtes Teil fehlt (Kühler, Partikelfilter).
+  const old = (c: any) => c && !c.bare && c.components && (!c.components.wheel_rl || !c.components.muffler || !c.components.clutch || defsOf(c).some((d) => !c.components[d.id]));
   const st = useGame.getState();
   if ([...st.cars, ...st.listings.map((l) => l.car), ...st.waiting, ...st.auctions.map((a) => a.car), ...st.jobs.map((j) => j.car)].some(old)) {
     useGame.setState({

@@ -15,7 +15,8 @@ const done = (message?: string): ActionResult => ({ ok: true, message });
 /** Eingebaut, alle Schrauben fest, Stecker verbunden. */
 export const isComplete = (car: CarInstance, id: string) => {
   const c = car.components[id];
-  return c.installed && c.bolts.every((b) => b === TIGHT) && (!defOf(car, id).connector || c.connected);
+  // fehlender Eintrag (älterer Spielstand) zählt als nicht fertig statt die Ansicht abstürzen zu lassen
+  return !!c && c.installed && c.bolts.every((b) => b === TIGHT) && (!defOf(car, id).connector || c.connected);
 };
 
 /**

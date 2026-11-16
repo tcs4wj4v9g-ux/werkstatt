@@ -415,3 +415,12 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Verliert das iPad den Grafikkontext, wird die 3D-Ansicht neu erzeugt.
   - Die Werkzeugschilder der Partnerfigur werden beim Wechsel freigegeben.
 - Geprüft: Logiktests, Durchlauf `koop`, Kurztest mit eingeschleustem halbem Auto (Ansicht erholt sich, Auto entfernt). Kein echter iPad-Test.
+
+## Absturz bei „Meine Autos“ und am Parkplatz behoben
+
+- **Ursache:** Nach einem Motorumbau verlangt das Auto unter Umständen Teile, die es vorher nicht gab. Beim luftgekühlten Porsche mit wassergekühltem Motor ist das der Kühler, mit Dieselmotor der Partikelfilter. Für diese Teile fehlte der Eintrag. Die Prüfung „Auto komplett?“ (`isComplete`) stürzte dann ab, sobald die Verkaufskarte unter „Meine Autos“ oder das Auto am Parkplatz in der Nähe angezeigt wurde.
+- **Behoben:**
+  - `insertEngine` ergänzt fehlende Teile heil und eingebaut.
+  - Beim Koop-Beitritt werden solche Autos ergänzt; im Einzelspiel geschah das beim Laden schon.
+  - `isComplete` stürzt bei einem fehlenden Eintrag nicht mehr ab.
+- Geprüft: Logiktests (neuer Test: V8 in den 911, Diesel in den 365 und den 330), Nachstellung mit allen 35 Modellen nach Umbau unter „Meine Autos“, Durchläufe `schrott` und `koop`. Kein echter iPad-Test.

@@ -152,6 +152,9 @@ export function insertEngine(car: CarInstance, unit: EngineUnit, swapParts: Part
   car.motor = { ...unit.motor, history: [...unit.motor.history, `Tag ${day}: eingebaut in ${CAR_MODELS[car.modelId].name}`] };
   for (const [id, st] of Object.entries(unit.components)) car.components[id] = st;
   car.fluids.oil.level = unit.oil;
+  // Der neue Motor kann Teile am Auto verlangen, die es bisher nicht gab (Kühler für einen wassergekühlten Motor
+  // im luftgekühlten Auto, Partikelfilter beim Diesel): heil und eingebaut ergänzen, sonst fehlt der Eintrag ganz.
+  for (const d of defsOf(car)) if (!car.components[d.id]) car.components[d.id] = { installed: true, bolts: Array(d.bolts).fill(2) as BoltState[], connected: true, condition: 'ok', known: false };
   if (unit.motor.engineId !== orig.id || car.swap) {
     car.swap = { from: car.swap?.from ?? orig.id, parts: [...new Set([...(car.swap?.parts ?? []), ...swapParts])] };
     // Beim Umbau eingebauter Kühler bzw. Kupplung sind sichtbare Bauteile.
