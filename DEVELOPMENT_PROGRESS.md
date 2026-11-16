@@ -461,3 +461,70 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
   - Durchläufe `markt`, `karriere`, `werkstatt`.
   - Bilder der drei Porsches aus der Nähe.
   - Kein echter iPad-Test.
+
+## Fahrphysik und Probefahrtwelt
+
+Vorher: flacher Rundkurs (~300 m) mit Kegelbäumen. Die „Physik“ kannte nur eine Geschwindigkeit, die mit Gas stieg und beim Bremsen fiel. Lenkung nur voll oder gar nicht, die Drehzahl war geschätzt. Leistungsdaten, Defekterkennung und die Wertung über Pylonentore blieben erhalten, alles andere ist neu aufgebaut.
+
+**Fahrphysik** (`src/game/vehicle.ts`, reine Rechnung, getestet in `vehicle.test.ts`):
+- Einspurmodell mit Längs-/Quergeschwindigkeit und Gierrate, gerechnet in Teilschritten von 1/120 s (stabil auch bei ruckelnder Bildrate).
+- Gewichtsverlagerung längs: Beschleunigen entlastet die Vorderachse, Bremsen belastet sie. Reifen mit Schräglaufwinkel und Haftgrenze, Längs- und Seitenkraft teilen sich die Haftung (Reibungskreis).
+- **Antriebsart je Modell** (`drivetrainOf`):
+  - Frontantrieb: Twingo, Piccolo, Golf, TT, A4, S6.
+  - Allrad: Sport quattro.
+  - Heckantrieb: alle anderen.
+  - Allrad zieht beim Anfahren am besten. Heckantrieb mit Vollgas in der Kurve drängt mit dem Heck, Frontantrieb schiebt über die Vorderräder.
+- **Motor und Getriebe:**
+  - Drehmoment aus der Prüfstandskurve, also mit Tuning und Leistungsverlust durch Defekte.
+  - Fünf oder sechs Gänge je nach Baujahr und Klasse, Diesel länger übersetzt.
+  - Achsübersetzung so, dass die Höchstgeschwindigkeit (aus Leistung und Luftwiderstand) im letzten Gang erreicht wird.
+  - Automatik: bei Vollgas spät, bei Teillast früh hochschalten, Zurückschalten mit Schaltpause.
+  - Anfahren mit schleifender Kupplung, Begrenzer, Motorbremse im Schub.
+  - Rückwärtsgang: im Stand Bremse halten.
+- **Widerstände und Gelände:** Luft- und Rollwiderstand, Steigung, Wiese (weniger Haftung, mehr Widerstand).
+- **Federung:** Nicken und Wanken als Feder-Dämpfer-System. Das Sportfahrwerk ist straffer und haftet besser.
+- **Tuning:** Fahrwerk, Felgengröße (Reifenbreite), Kotflügelverbreiterung und Spoiler wirken. Starke Autos fahren ab Werk breitere Reifen.
+- **Defekte spürbar:**
+  - Zündaussetzer: Ruckeln.
+  - Verschlissene Beläge: Bremsweg deutlich länger.
+  - Scheiben: Rubbeln beim Bremsen.
+  - Alte Reifen: weniger Haftung.
+  - Spurstange/Querlenker: Lenkung zieht, hat Spiel, klackt bei Lastwechseln.
+  - Kupplung: rutscht, die Drehzahl läuft davon.
+  - Getriebeschaden: langsames Schalten mit Krachen.
+  - Qualm bei Undichtigkeiten.
+- **Gemessene Werte** (Logiktest):
+  - Twingo: 0–100 km/h in 11 s, 164 km/h.
+  - 330: 6,8 s, 248 km/h.
+  - M4: 4,5 s.
+  - Bremswege aus 100 km/h: 37–45 m.
+  - Querbeschleunigung: 1,0–1,15 g.
+
+**Landschaft** (`src/three/driveWorld.ts`, `DriveScenery.tsx`):
+- **Strecke:** Landstraßen-Rundkurs „Acht“, 2,9 km. Die beiden Hälften kreuzen sich im Ort Grünbach (Kreuzung mit Warnschild). Dazu Anstieg auf einen Hügelkamm, kurvige Talfahrt, langes Waldstück und gerade Abschnitte durch Wiesen und Felder.
+- **Straße:** 7 m breit mit Bankett, Randlinien und unterbrochener Mittellinie (an der Kreuzung ausgespart). Leitplanken in engen Kurven und an Böschungen. Ortsschilder, Tempo 50/100, Kurven- und Kreuzungsschilder. Häuser und Straßenlaternen im Ort.
+- **Gelände:** Hügel aus überlagerten Wellen, zur Straße hin als Böschung angeglichen. Wiesen, reife Felder, Äcker und Waldboden als Vertexfarben.
+- **iPad-Leistung:**
+  - Gelände in 64 Kacheln mit drei Detailstufen; die Höhen werden einmal fein berechnet und für die gröberen Stufen wiederverwendet.
+  - Gut 3 000 Bäume als Instanzen in Blöcken von 410 m, unsichtbare Blöcke werden gar nicht gezeichnet.
+  - Häuser, Laternen und Leitplankenpfosten ebenfalls als Instanzen, keine Schatten in der Landschaft, Dunst ab 220 m, Sichtweite 800 m.
+  - Gemessen: etwa 105 000 Dreiecke und 100–140 Zeichenaufrufe pro Bild (vorher über 500 000 Dreiecke bei 12 500 Bäumen).
+  - Die Welt wird einmal erzeugt (Daten etwa 60 ms) und für weitere Probefahrten zwischengespeichert.
+- **Kollision:** Bodenhöhe aus Straße oder Gelände, der Wagen neigt sich mit dem Gelände. Leitplanken halten den Wagen auf der Straße (er gleitet entlang und verliert Tempo). Bäume, Häuser und Laternen sind Hindernisse (Raster-Suche). Die Straßensuche ist lokal, so bleibt man an der Kreuzung auf seinem Ast.
+
+**Probefahrt:**
+- **Instrumente:** Drehzahlmesser mit rotem Bereich ab der Abregeldrehzahl, darin Tempo und Gang (rot bei durchdrehenden Rädern), gefahrene Strecke, Warnleuchten.
+- **Kameras:** Außen (mit Tempo etwas weiter), Motorhaube, Cockpit. Umschalten per Knopf oder Taste C.
+- **iPad-Bedienung:**
+  - Lenkfläche: Finger aufsetzen und ziehen, stufenlos und fein um die Mitte, zurück beim Loslassen.
+  - Pedale dosierbar: oben voll, unten etwa 35 %.
+  - Pfeiltasten am Rechner funktionieren weiter.
+- **Klang:** echte Drehzahl und Last aus der Physik, Reifenquietschen, Fahrtwind, Schaltkrachen, Klacken, Anprall.
+- **Direkt testen:** Knopf „Probefahrt mit diesem Stand“ im Tuningfenster und „Noch eine Runde“ im Fahrtbericht.
+- **Tests:** Ein eingebauter Autopilot (`__gkDrive.sim.autopilot = m/s`) und ein Zeitraffer (`timeScale`) machen die Runde im Browser-Test von der Bildrate unabhängig.
+- Keine Rennen. Werkstatt, Koop und Spielstände unverändert (Probefahrt-Wertung wie bisher).
+- Geprüft:
+  - Logiktests (neu: Fahrphysik).
+  - Durchläufe `diagnose` (komplette Runde mit Autopilot) und `markt`.
+  - Bilder aller drei Kameras und mehrerer Streckenabschnitte.
+  - Kein echter iPad-Test: Die Bildrate auf dem iPad kann ich hier nicht messen.

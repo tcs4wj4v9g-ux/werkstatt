@@ -433,3 +433,50 @@ export const engineAudio = {
     }, 600);
   },
 };
+
+/**
+ * Fahrgeräusche der Probefahrt: Reifenquietschen beim Rutschen, Fahrtwind mit dem Tempo, Krachen beim Schalten
+ * (Getriebeschaden), Klacken ausgeschlagener Fahrwerksteile bei Lastwechseln und ein dumpfer Schlag bei Berührung der Leitplanke.
+ */
+let road: { src: AudioBufferSourceNode; tire: GainNode; wind: GainNode } | null = null;
+export const roadAudio = {
+  start() {
+    this.stop();
+    const c = audio();
+    if (!c || !master) return;
+    const src = noise(c);
+    const tire = band(c, src, 'bandpass', 1150, 3.5, master);
+    const wind = band(c, src, 'lowpass', 520, 0.6, master);
+    src.start();
+    road = { src, tire, wind };
+  },
+  /** slide 0..1, Tempo in m/s */
+  set(slide: number, speed: number) {
+    const c = audio();
+    if (!road || !c) return;
+    const t = c.currentTime;
+    road.tire.gain.setTargetAtTime(Math.min(1, slide) * 0.09, t, 0.05);
+    road.wind.gain.setTargetAtTime(Math.min(1, speed / 55) ** 2 * 0.07, t, 0.2);
+  },
+  /** kurzer Geräuschstoß: Schaltkrachen oder Anprall */
+  hit(kind: 'crunch' | 'bump' | 'clunk') {
+    const c = audio();
+    if (!c || !master) return;
+    const t = c.currentTime;
+    const src = noise(c);
+    const g = band(c, src, 'bandpass', kind === 'crunch' ? 2400 : kind === 'clunk' ? 420 : 160, kind === 'crunch' ? 2 : kind === 'clunk' ? 5 : 0.8, master);
+    g.gain.setValueAtTime(kind === 'crunch' ? 0.12 : kind === 'clunk' ? 0.18 : 0.35, t);
+    g.gain.setTargetAtTime(0.0001, t + 0.05, kind === 'crunch' ? 0.06 : 0.12);
+    src.start(t);
+    src.stop(t + 0.6);
+  },
+  stop() {
+    if (!road) return;
+    try {
+      road.src.stop();
+    } catch {
+      /* bereits gestoppt */
+    }
+    road = null;
+  },
+};

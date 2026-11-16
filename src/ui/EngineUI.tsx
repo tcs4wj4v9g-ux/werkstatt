@@ -283,6 +283,8 @@ export function TuningPanel() {
           ))}
         </details>
       ))}
+      {/* Nach dem Tuning direkt ausprobieren */}
+      <button className="btn primary big" data-testid="tuning-drive" onClick={() => s.startDrive(slot)}>🏁 Probefahrt mit diesem Stand</button>
     </Modal>
   );
 }

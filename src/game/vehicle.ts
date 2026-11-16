@@ -391,7 +391,8 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
 
   // --- Aufbau: Feder-Dämpfer-System für Nicken und Wanken (Sportfahrwerk straffer, Bremsen taucht ein)
   const w = 2 * Math.PI * spec.suspFreq;
-  const pitchTarget = -s.ax * 0.0065 * (1.25 / spec.suspFreq) ** 2;
+  // Beschleunigen: Front hebt sich (Nicken positiv = Nase hoch), Bremsen: Front taucht ein
+  const pitchTarget = s.ax * 0.0065 * (1.25 / spec.suspFreq) ** 2;
   const rollTarget = s.ay * 0.0085 * (1.25 / spec.suspFreq) ** 2 * (f.play ? 1.3 : 1);
   s.pitchV += (w * w * (pitchTarget - s.pitch) - 2 * spec.suspDamping * w * s.pitchV) * dt;
   s.rollV += (w * w * (rollTarget - s.roll) - 2 * spec.suspDamping * w * s.rollV) * dt;
