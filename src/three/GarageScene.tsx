@@ -11,7 +11,9 @@ import { Env } from './Env';
 import { Interactable } from './Interactable';
 import { availableSlots, SLOTS, slotAvailable, slotPlace } from '../game/data/workshop';
 import { GarageEntrance, UnderGarage } from './UnderGarage';
-import { BAY_Z, setSite, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box, place, travel, usePlace, isGaragePlace } from './player';
+import { Autohaus, ExpoEntrance } from './Autohaus';
+import { OrbitRig } from './OrbitRig';
+import { BAY_Z, setSite, carBox, EYE, LIFT_HEIGHT, moveInput, movePlayer, nearestSlot, player, pushOutOf, REACH, useFocus, type Box, place, travel, usePlace, isGaragePlace, useView } from './player';
 import { Yard } from './Yard';
 import { textTexture } from './textures';
 import { Workshop } from './Workshop';
@@ -361,6 +363,18 @@ function Bays() {
 export function GarageScene() {
   const G = useGfxSettings();
   const at = usePlace((p) => p.at);
+  const orbit = useView((v) => v.orbit);
+  if (at === 'autohaus') {
+    const d = orbit !== null ? SLOTS[orbit] : null;
+    return (
+      <>
+        <Env intensity={0.9} />
+        {d ? <OrbitRig target={[d.x, 0.7, d.z]} position={[d.x + 1.5, 1.45, d.z - Math.sign(d.z) * 3.1]} minDist={2.7} maxDist={4.1} /> : <FirstPerson />}
+        <Autohaus />
+        <Avatars />
+      </>
+    );
+  }
   if (isGaragePlace(at)) {
     return (
       <>
@@ -417,10 +431,11 @@ export function GarageScene() {
       <EngineShop />
       <EnginePallets />
       <GarageEntrance />
+      <ExpoEntrance />
       <Interactable id="van" label="Lieferwagen – zum Schrottplatz fahren" onUse={() => travel('schrott')} position={[-19.5, 0, 2.25]} halo={[3.6, 2.2, 2.1]} haloPos={[0, 1.1, 0]}>
         <Van />
       </Interactable>
-      {SLOTS.filter((x) => x.kind !== 'lift' && x.kind !== 'stand' && x.kind !== 'junk' && x.kind !== 'garage').map((x) => (
+      {SLOTS.filter((x) => x.kind !== 'lift' && x.kind !== 'stand' && x.kind !== 'junk' && x.kind !== 'garage' && x.kind !== 'expo').map((x) => (
         <Parked key={x.id} slot={x.id} />
       ))}
     </>

@@ -353,3 +353,13 @@ Weitere Modelle über die fünf Startmodelle hinaus (Wunsch: auch Audis). Geplan
 - Carbondach: dunkle gewölbte Fläche, die genau dem Kabinenquerschnitt folgt.
 - Ab Werk dunkle Felgen (+1 Zoll). Eckigere Scheinwerfer mit abgeknickter Spitze zur Niere. Schärfere Nierenecken, größere M2-Niere, größere M4-Seiteneinlässe.
 - Geprüft: Logiktests (Proportionen, Haubenfreiraum, Hebebühnen-Teller), Browser-Durchläufe `markt` und `bremse`, Bilder in voller Grafik. Kein echter iPad-Test.
+
+## Autohaus (Ausstellungsraum)
+
+- Eigener begehbarer Ort, Eingang „AUTOHAUS“ am Hofrand (Zaunseite gegenüber dem Stellplatz). Heller Raum mit poliertem Boden, Lichtbändern, Glasfront und Empfangstresen.
+- **Plätze:** zwei Ausstellungsplätze von Anfang an, jeder weitere einzeln kaufbar (Werkstatt-Computer → Ausbau, „Ausstellung“), bis acht. Preise: 8.000, 12.000, 18.000, 26.000, 36.000, 50.000 €. Im Raum zeigt eine Bodenmarkierung den nächsten kaufbaren Platz.
+- **Drehteller** je Platz mit Leuchtring und Deckenspot. Das Auto dreht sich langsam und lässt sich anhalten.
+- **Rundum-Ansicht:** Knopf am Auto. Die Kamera kreist per Wischen um das Auto, zwei Finger zoomen (Abstand 2,7 bis 4,1 m, bleibt im Raum).
+- Autos kommen über „Umparken“ hinein und heraus. Ausgestellte Autos verkaufen sich wie im Showroom 4 % teurer und zählen bei der Sammlung mehr. Geschraubt wird dort nicht.
+- Technik: neue Platzart `expo` (Plätze 123–130, hinten angehängt; alte Spielstände und Koop-Werkstätten werden automatisch erweitert), Ausbauten `expo3`–`expo8`. Kein neues Speicherformat, keine Schema-Änderung.
+- Geprüft: Logiktests (Platzzahl je Ausbau, Preise, Reihenfolge, Lage im Raum); Browser-Durchlauf `tiefgarage` mit neuen Schritten (Umparken, Platzkauf, Eingang, Rundum-Ansicht per Wischen, Drehteller, Verkauf, Ausgang). Kein echter iPad-Test.

@@ -82,13 +82,13 @@ export function UpgradesTab() {
       <p className="meta">
         Stufe 1 (vorhanden): zwei Hebebühnen, Werkzeugschrank, Werkbank, Ersatzteillager, kleiner Hof mit einem Stellplatz. Stellplätze gesamt: {slots.length} · belegt: {slots.filter((x) => s.cars[x.id]).length}
       </p>
-      {UPGRADES.map((u) => {
+      {UPGRADES.filter((u) => !u.expo || (!s.upgrades.includes(u.id) && (!u.requires || s.upgrades.includes(u.requires)))).map((u) => {
         const owned = s.upgrades.includes(u.id);
         const locked = !!u.requires && !s.upgrades.includes(u.requires);
         return (
           <div key={u.id} className="shop-row">
             <div>
-              <b>{u.equipment ? 'Spezialgerät' : u.location ? 'Standort' : u.garage ? 'Fahrzeuglager' : `Stufe ${u.stage}`}: {u.name}</b>
+              <b>{u.equipment ? 'Spezialgerät' : u.location ? 'Standort' : u.garage ? 'Fahrzeuglager' : u.expo ? 'Ausstellung' : `Stufe ${u.stage}`}: {u.name}</b>
               <div className="meta">{u.desc}</div>
               {locked && <div className="meta bad">Voraussetzung: {UPGRADES.find((x) => x.id === u.requires)!.name}</div>}
             </div>
@@ -276,7 +276,7 @@ export function MoveList({ from }: { from: number }) {
       ))}
       {free.map((x) => (
         <button key={x.id} className="btn big" onClick={() => s.moveCar(from, x.id)}>
-          → {x.label}{x.kind === 'wash' ? ' (waschen, polieren, Innenraum)' : x.kind === 'paint' ? ' (Rost, Lack)' : x.kind === 'lift' ? ' (reparieren, warten)' : x.kind === 'show' ? ' (ausstellen: +4 % beim Verkauf, mehr Ansehen)' : ''}
+          → {x.label}{x.kind === 'wash' ? ' (waschen, polieren, Innenraum)' : x.kind === 'paint' ? ' (Rost, Lack)' : x.kind === 'lift' ? ' (reparieren, warten)' : x.kind === 'show' || x.kind === 'expo' ? ' (ausstellen: +4 % beim Verkauf, mehr Ansehen)' : ''}
         </button>
       ))}
     </>

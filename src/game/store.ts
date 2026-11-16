@@ -12,7 +12,7 @@ import { CAR_MODELS } from './data/cars';
 import { DEFECTS } from './data/defects';
 import { FLUID_PRODUCTS } from './data/fluids';
 import { PARTS } from './data/parts';
-import { availableSlots, isJunk, isLift, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, UPGRADES, type UpgradeId } from './data/workshop';
+import { availableSlots, isJunk, isLift, isShowcase, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, UPGRADES, type UpgradeId } from './data/workshop';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
 import * as fluids from './fluids';
@@ -1024,7 +1024,7 @@ export const useGame = create<GameState>()(
           if (s.engineBay === bay) stopEngine();
           const v = valuate(car, s.marketIndex);
           // Aus dem Showroom heraus verkauft sich ein Auto teurer.
-          const price = Math.round(((car.haggled ? v.haggleOffer : v.offer) * (SLOTS[bay].kind === 'show' ? 1 + SHOWROOM_BONUS : 1)) / 50) * 50;
+          const price = Math.round(((car.haggled ? v.haggleOffer : v.offer) * (isShowcase(bay) ? 1 + SHOWROOM_BONUS : 1)) / 50) * 50;
           const profit = price - car.purchasePrice - car.partsSpent;
           const cars = [...s.cars];
           cars[bay] = null;

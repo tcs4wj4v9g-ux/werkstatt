@@ -14,7 +14,8 @@ import { marketLabel, RARITY_NAMES, valuate } from '../game/market';
 import { driveBlocker, isAssembled, knownDefects } from '../game/repair';
 import { useGame } from '../game/store';
 import type { CarInstance, PartId, ToolId } from '../game/types';
-import { player, REAR_BAY, stationActions, useFocus, WORK_LABELS, workPose, type WorkView } from '../three/player';
+import { player, REAR_BAY, stationActions, useFocus, useView, WORK_LABELS, workPose, type WorkView } from '../three/player';
+import { useTurntables } from '../three/Autohaus';
 import { AuctionsTab, EventsTab, GarageList, MoveList, ShopList, UpgradesTab } from './ComputerTabs';
 import { FileModal } from './FileModal';
 import { FluidModal } from './FluidModal';
@@ -37,6 +38,8 @@ export function GarageUI() {
   const s = useGame();
   const coop = useCoop((c) => c.status !== 'off');
   const focus = useFocus();
+  const orbit = useView((v) => v.orbit);
+  const turn = useTurntables();
   const [zoom, setZoom] = useState(player.zoom);
   const [work, setWork] = useState<string | null>(player.work?.id ?? null);
   const leave = () => {
@@ -74,9 +77,26 @@ export function GarageUI() {
   const belt: ToolId[] = ['hand', 'lamp', ...s.carried];
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
 
+  // Rundum-Ansicht im Autohaus: Kamera kreist per Wischen um das Auto, Zoomen mit zwei Fingern.
+  if (orbit !== null && s.cars[orbit]) {
+    return (
+      <>
+        <TopBar title="Autohaus" />
+        <div className="car-actions">
+          <button className="btn primary leave" data-testid="orbit-leave" onClick={() => useView.setState({ orbit: null })}>✕ Rundum-Ansicht verlassen</button>
+          <button className="btn" data-testid="turntable" onClick={() => turn.toggle(orbit)}>{turn.stopped[orbit] ? '▶ Drehteller starten' : '⏸ Drehteller anhalten'}</button>
+        </div>
+        <div className="panel left">
+          <h3 className="small">{SLOTS[orbit].label}: {CAR_MODELS[s.cars[orbit]!.modelId].name}</h3>
+          <div className="meta">Wischen: um das Auto drehen · zwei Finger: näher heran oder weiter weg</div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <TopBar title="Werkstatt" />
+      <TopBar title={kind === 'expo' ? 'Autohaus' : 'Werkstatt'} />
 
       {!open && (
         <>
@@ -113,6 +133,8 @@ export function GarageUI() {
                 <button className="btn" data-testid="cranepanel" onClick={() => s.setPanel('crane')}>🏗 {near.motor === null ? 'Motor einsetzen' : 'Motor ausbauen'}</button>
               )}
               {kind === 'lift' && <button className="btn" data-testid="fluids" onClick={() => s.setPanel('fluids', nearBay)}>🛢 Flüssigkeiten</button>}
+              {kind === 'expo' && <button className="btn primary" data-testid="orbit" onClick={() => useView.setState({ orbit: nearBay })}>🔄 Rundum-Ansicht</button>}
+              {kind === 'expo' && <button className="btn" data-testid="turntable" onClick={() => turn.toggle(nearBay)}>{turn.stopped[nearBay] ? '▶ Drehteller starten' : '⏸ Drehteller anhalten'}</button>}
               <button className="btn" data-testid="move" onClick={() => s.setPanel('move', nearBay)}>🅿 Umparken</button>
               {!near.lifted && kind !== 'wash' && kind !== 'paint' && (
                 <button className="btn" data-testid="drive" onClick={() => s.startDrive(nearBay)}>🏁 Probefahrt</button>
@@ -415,7 +437,7 @@ function ObdModal() {
 function ComputerModal() {
   const s = useGame();
   const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'contests' | 'news'>('market');
-  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage').length;
+  const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage' && x.kind !== 'expo').length;
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
     <Modal title="Werkstatt-Computer" onClose={() => s.setPanel(null)} wide>

@@ -12,7 +12,7 @@ Echte Tipps im laufenden Spiel (Playwright, Chromium mit Software-Grafik). Vorau
 | `motoren` | R6, V8, Diesel, Turbo: Zylinderteile, Passform, Klangbild | Motoren, Teile, 3D-Motorraum |
 | `markt` | 25 Inserate, Filter, Blättern, Teileshop je Auto, Akte, Karosserie-Bilder | Markt, Shop, Karosserien |
 | `karriere` | Version-4-Spielstand, Standorte, Getriebe mit Heber, Prüfstand, Showroom, Wettbewerb, Treffen | Karriere, Standorte, Spielstand |
-| `tiefgarage` | Tiefgaragen: Kauf, Einparken über „Umparken“, Einfahrt im Hof, begehen (Wände), Akte, Herausholen, volle Garage, Ausfahrt, Neuladen, Luxus mit 50 Autos | Tiefgaragen, Stellplätze, Orte |
+| `tiefgarage` | Autohaus (Plätze, Rundum-Ansicht, Drehteller, Verkauf) und Tiefgaragen: Kauf, Einparken über „Umparken“, Einfahrt im Hof, begehen (Wände), Akte, Herausholen, volle Garage, Ausfahrt, Neuladen, Luxus mit 50 Autos | Tiefgaragen, Stellplätze, Orte |
 | `koop` | Zwei Spieler in getrennten Browser-Profilen gegen das echte SQL-Schema: die acht Pflichtszenarien (Zugang, Reparatur, Ratschen, Spezialwerkzeug, Geld, Verbindungsabbruch, Wiederbeitritt, Einzelspieler) und die gemeinsame Tiefgarage | Koop (`src/net`, `supabase/schema.sql`), Spielstand, Werkzeuge |
 
 ```
