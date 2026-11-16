@@ -1,6 +1,7 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
+import { CAR_MODELS } from '../game/data/cars';
 import { saveGate } from '../game/saveGate';
 import { normalizeCar, useGame } from '../game/store';
 import { SLOT_COUNT } from '../game/data/workshop';
@@ -194,6 +195,14 @@ function setTools(tools: ToolItem[] | null | undefined, r?: number) {
   }
 }
 
+/** Halbe Autos ohne Modell (aus einem früheren Abgleichfehler) räumen: Daran stürzt die 3D-Ansicht ab. */
+function dropBrokenCars() {
+  const cars = useGame.getState().cars;
+  if (!cars.some((c: any) => c && !CAR_MODELS[c.modelId])) return;
+  useGame.setState({ cars: cars.map((c: any) => (c && !CAR_MODELS[c.modelId] ? null : c)) });
+  dirty = true;
+}
+
 /** Übernimmt Schritte des Partners. Felder mit eigener, noch nicht bestätigter Änderung bleiben unberührt. */
 function applyRemote(changes: { rev: number; by: string; commit: string | null; patches: Patch[] }[]) {
   const foreign = changes.filter((c) => !(c.commit && mine.has(c.commit))).flatMap((c) => c.patches);
@@ -210,6 +219,7 @@ function applyRemote(changes: { rev: number; by: string; commit: string | null; 
   } finally {
     saveGate.remote = false;
   }
+  dropBrokenCars();
 }
 
 function loadState(s: any, entering: boolean) {
@@ -227,6 +237,7 @@ function loadState(s: any, entering: boolean) {
   }
   setMembers(s.members ?? []);
   setTools(s.tools, s.toolsRev);
+  dropBrokenCars();
   // Werkstatt aus einer älteren Spielversion: neue Stellplätze (Motorständer, Schrottplatz) und Lager ergänzen.
   // Das ist eine normale Änderung und wird beim nächsten Abgleich übertragen.
   const g = useGame.getState();
@@ -535,6 +546,12 @@ export async function setInvite(open: boolean, renew: boolean) {
 }
 
 /** Zeitgesteuerte Abläufe (Auktionsuhr) rechnet im Koop nur ein Gerät: das online-Mitglied mit der kleinsten Kennung. */
+/** Nach einem abgefangenen Absturz: kaputte Autos räumen und im Koop den Stand frisch vom Server holen. */
+export function recoverAfterCrash() {
+  dropBrokenCars();
+  if (coopActive()) resync().catch(() => undefined);
+}
+
 export function isLeader() {
   const c = useCoop.getState();
   if (c.status === 'off') return true;

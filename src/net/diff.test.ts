@@ -24,6 +24,18 @@ describe('Koop-Abgleich: Schritte bilden', () => {
     expect(same([1], [1, 2])).toBe(false);
   });
 
+  it('Schritt an einem Auto, das hier schon weg ist, erzeugt kein halbes Auto (Absturz im Koop)', () => {
+    const a = base();
+    const partner = copy(a);
+    partner.cars[0].components.coil3.installed = false;
+    const p = diff(a, partner);
+    const here = copy(a);
+    here.cars[0] = null;
+    expect(apply(here, p).cars[0]).toBeNull();
+    // steht das Auto noch da, kommt der Schritt an
+    expect(apply(copy(a), p).cars[0].components.coil3.installed).toBe(false);
+  });
+
   it('ein ausgebautes Bauteil ist genau ein kleiner Schritt', () => {
     const a = base();
     const b = copy(a);
