@@ -113,7 +113,7 @@ export function workPose(view: WorkView, bay: number, rearX = -1.38, hoodFront =
     wheel_right: [[1.38, h + 0.42, z0 + 1.85], [1.38, h + 0.36, z0 + 0.8]],
     rear_left: [[rearX, h + 0.42, z0 - 1.85], [rearX, h + 0.36, z0 - 0.8]],
     rear_right: [[rearX, h + 0.42, z0 + 1.85], [rearX, h + 0.36, z0 + 0.8]],
-    under: [[2.25, 1.2, z0], [1.3, h + 0.22, z0]],
+    under: [[1.95, 1.2, z0], [1.3, h + 0.22, z0]],
     // Unter dem Auto stehend nach hinten: Kraftstoffpumpe, Getriebe, Endtopf
     under_rear: [[0.95, 1.2, z0 - 0.3], [-1.0, h + 0.2, z0 + 0.1]],
   };

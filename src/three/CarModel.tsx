@@ -604,7 +604,11 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   /** Nur der Motor (Motorständer) bzw. Auto ohne Motor. */
   const bare = !!car?.bare;
   // Kabelbaum-Stecker an der Spritzwand, aber immer innerhalb der Haubenöffnung (kurzer Motorraum wie beim Twingo, Heckmotor)
-  const harnessX = bare ? 0.86 : Math.max(0.86, rearEngine ? (B.bayX ?? REAR_BAY.x) - S.F.openX1 + 0.1 : S.F.openX0 + 0.1);
+  // Beim Heckmotor liegt die Spritzwandseite unter der Karosserie: dort sitzt der Stecker seitlich neben der Motorabdeckung
+  const harnessX = bare ? 0.86 : rearEngine ? 1.3 : Math.max(0.86, S.F.openX0 + 0.1);
+  const harnessZ = rearEngine && !bare ? -0.33 - wide : 0.14;
+  // Batterie beim Heckmotor weiter in die Öffnung gerückt (sonst unter dem Blech an der Spritzwand)
+  const battDX = rearEngine && !bare ? 0.27 : 0;
   const noEngine = car?.motor === null;
   const installed = (id: string) => (car ? !!st(id)?.installed && !st(id)?.missing : true);
   const interactive = !!car && !!handlers && full;
@@ -1019,7 +1023,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             <mesh geometry={engineDecor(engine, G.detail, bare ? 'bare' : noEngine ? 'empty' : 'car')} material={bayMaterials()} raycast={noRay} />
             {/* Boxer: nur das schmale Kurbelgehäuse in der Mitte – die Zylinder liegen flach zu beiden Seiten und müssen frei bleiben */}
             {/* V-Motor: niedriger, damit die schräg liegenden Kopfdichtungen darüber frei bleiben */}
-            {!bare && !noEngine && <Proxy s={boxer ? [0.7, 0.17, 0.2] : vee ? [0.7, 0.14, 0.46] : [0.7, 0.17, 0.36]} p={[1.3, vee && !boxer ? 0.495 : 0.535, 0]} />}
+            {!bare && !noEngine && <Proxy s={boxer ? [0.7, 0.13, 0.16] : vee ? [0.7, 0.14, 0.46] : [0.7, 0.17, 0.36]} p={[1.3, boxer ? 0.515 : vee ? 0.495 : 0.535, 0]} />}
             {/* Unteres Kurbelgehäuse: fängt nur Tipps von oben ab – von unten liegen Ölwanne, Dichtung und Pleuellager darin */}
             {!bare && !noEngine && <Proxy s={[0.66, 0.09, boxer ? 0.2 : 0.32]} p={[1.3, 0.405, 0]} fromAbove />}
             {/* Motorständer: Block fängt Tipps ab (sonst ginge der Tipp durch ihn zu Teilen darunter); Kolbenböden liegen darüber */}
@@ -1120,6 +1124,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             </>,
           )}
 
+          <group position={[battDX, 0, 0]}>
           {part(
             'battery',
             <>
@@ -1148,6 +1153,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
             </>,
           )}
           {bolts('battery', [[1.06, 0.68, 0.5]])}
+          </group>
           {part(
             'oil_filter',
             <group position={[0, 0, -wide]}>
@@ -1642,21 +1648,21 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
               ))}
             </>,
           )}
-          {/* Schrauben an der Außenkante der Lager: von den Seitenansichten am Krümmer vorbei sichtbar */}
-          {!bare && bolts('mounts', [[1.24, 0.495, 0.335 + wide], [1.36, 0.495, 0.335 + wide], [1.24, 0.495, -0.335 - wide], [1.36, 0.495, -0.335 - wide]])}
+          {/* Wie in echt von unten gelöst (Hebebühne): Schrauben an der Unterseite der Lager – von oben verdecken Krümmer, Lichtmaschine und Kotflügel */}
+          {!bare && bolts('mounts', [[1.24, 0.455, 0.3 + wide], [1.33, 0.455, 0.3 + wide], [1.24, 0.455, -0.3 - wide], [1.33, 0.455, -0.3 - wide]], 'y-')}
           {!bare && (
-            <mesh position={[harnessX - 0.03, 0.78, 0.12]} rotation={[0, 0, 0.4]} raycast={noRay}>
+            <mesh position={[harnessX - 0.03, 0.78, harnessZ - 0.02]} rotation={[0, 0, 0.4]} raycast={noRay}>
               <cylinderGeometry args={[0.012, 0.012, 0.12, 6]} />
               <meshStandardMaterial color="#111214" roughness={0.9} />
             </mesh>
           )}
           {part(
             'harness',
-            <RB s={[0.06, 0.04, 0.05]} r={0.008} p={[harnessX, 0.8, 0.14]}>
+            <RB s={[0.06, 0.04, 0.05]} r={0.008} p={[harnessX, 0.8, harnessZ]}>
               <Mat color="#23262b" rough={0.6} />
             </RB>,
           )}
-          {connector('harness', [harnessX, 0.83, 0.14], [0.04, 0.05, 0.05])}
+          {connector('harness', [harnessX, 0.83, harnessZ], [0.04, 0.05, 0.05])}
           {part(
             'downpipe',
             <>

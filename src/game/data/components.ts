@@ -443,7 +443,7 @@ function build(engine: EngineDef, turboKit = false): ComponentDef[] {
       okText: 'Steckverbindung sauber, Verriegelung intakt.', defectText: 'Kontakte korrodiert – Wackelkontakt!',
     },
     {
-      id: 'mounts', name: 'Motorlager und Getriebeglocke', bolts: 4, fastener: S17, blockedBy: [], access: 'hood', partId: 'engine_mount',
+      id: 'mounts', name: 'Motorlager und Getriebeglocke', bolts: 4, fastener: S17, blockedBy: [], access: 'lifted', partId: 'engine_mount',
       okText: 'Gummilager ohne Risse.', defectText: 'Gummilager gerissen – der Motor schlägt beim Lastwechsel!',
     },
     {

@@ -16,8 +16,8 @@ const only = process.argv.slice(2);
   await p.getByText('Neues Spiel').click(); await p.getByText("Los geht's").click(); await p.waitForTimeout(600);
   const G = (fn, a) => p.evaluate(fn, a);
   const models = only.length ? only : await G(() => Object.keys(window.__gkLib.models));
-  // Hilfsfunktionen im Spiel
-  await G(() => {
+  // Hilfsfunktionen im Spiel (GK_VIEWWHY=1: Ursachen je Ansicht ausgeben)
+  await G((VIEWWHY) => {
     const g = window.__gk; const L = window.__gkLib;
     const kit = ['ratchet', 'socket10', 'socket13', 'socket16', 'socket17', 'wrench', 'screwdriver'];
     const use = (t) => g.setState({ tool: t, carried: kit });
@@ -61,7 +61,7 @@ const only = process.argv.slice(2);
       for (const h of R.intersectObjects(handledRoots(), true)) {
         let x = h.object; let handled = false; let label = null;
         while (x) { if (!label && x.userData && x.userData.label) label = x.userData.label; if (x.__r3f && x.__r3f.handlers && x.__r3f.handlers.onClick) handled = true; x = x.parent; }
-        if (handled && !label) { const w = h.point; label = `? bei ${w.x.toFixed(1)}/${w.y.toFixed(1)}/${w.z.toFixed(1)}`; }
+        if (handled && !label) { const w = h.point; label = `? bei ${w.x.toFixed(1)}/${w.y.toFixed(1)}/${w.z.toFixed(1)}${VIEWWHY ? " " + h.object.geometry.type + (h.object.geometry.parameters ? JSON.stringify(h.object.geometry.parameters) : "") + " @" + h.object.position.toArray().map((n) => n.toFixed(2)) + " Mat " + [].concat(h.object.material).map((m) => m.color ? m.color.getHexString() : m.type).join(",") + " Index " + h.object.parent.children.indexOf(h.object) + " Grp " + (h.face ? h.face.materialIndex : "") : ""}`; }
         if (handled) { const gid = ghostOf(label); if (gid && target && L.beneath(cc(), gid).includes(target)) continue; return { label, d: h.distance }; }
       }
       return null;
@@ -79,12 +79,12 @@ const only = process.argv.slice(2);
     let why = '';
     const reach = (pts, ok, lifted) => {
       const seen = {};
-      for (const { pos, cam } of views(lifted)) for (const t of pts) { if (!onScreen(cam, t)) { seen['nicht im Bild'] = (seen['nicht im Bild'] || 0) + 1; continue; } const w = winner(pos, t); if (w && w.d <= 4.2 && ok(w.label)) return true; const k = w ? (w.d > 4.2 ? 'zu weit' : w.label || '?') : 'nichts'; seen[k] = (seen[k] || 0) + 1; }
-      why = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${k} ×${n}`).join(' | ');
+      for (const { v, pos, cam } of views(lifted)) for (const t of pts) { const pre = VIEWWHY ? v + ': ' : ''; if (!onScreen(cam, t)) { seen[pre + 'nicht im Bild'] = (seen[pre + 'nicht im Bild'] || 0) + 1; continue; } const w = winner(pos, t); if (w && w.d <= 4.2 && ok(w.label)) return true; const k = pre + (w ? (w.d > 4.2 ? 'zu weit' : w.label || '?') : 'nichts'); seen[k] = (seen[k] || 0) + 1; }
+      why = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, VIEWWHY ? 12 : 3).map(([k, n]) => `${k} ×${n}`).join(' | ');
       return false;
     };
     window.__audit = { why: () => why, strip, loosen, prep, views, reach, find, centers, cc, use, setTarget: (t) => { target = t; roots = null; } };
-  });
+  }, !!process.env.GK_VIEWWHY);
 
   const bad = [];
   let checked = 0;

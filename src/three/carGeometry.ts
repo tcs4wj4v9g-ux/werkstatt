@@ -616,7 +616,7 @@ function buildBody(S: Shape, detail: number): Built {
       if (hs < NT && (inHood || inCabin)) continue; // Öffnung für Motorraum bzw. Innenraum
       // Unter dem Motor kein Bodenblech (wie beim echten Auto): von unten frei an Ölwanne, Lager und Getriebe –
       // auch bei tiefen Autos, deren Ölwanne sonst über dem Bodenblech verschwand.
-      if (hs >= half - 3 && S.engineOpening((xa + xb) / 2) > 0.5) continue;
+      if (hs >= half - 5 && S.engineOpening((xa + xb) / 2) > 0.5) continue;
       const a = s * R + j;
       const b = s * R + ((j + 1) % R);
       const c = (s + 1) * R + j;

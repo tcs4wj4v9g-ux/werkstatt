@@ -48,8 +48,10 @@ describe('Motor ausbauen, lagern, wieder einbauen', () => {
     const car = mk('bavaria_318', ['bearing']);
     car.hoodOpen = true;
     expect(removalSteps(car).filter((s) => !s.done).length).toBeGreaterThan(4);
-    for (const id of ['battery', 'hose', 'intake_hose', 'harness', 'mounts']) strip(car, id);
+    for (const id of ['battery', 'hose', 'intake_hose', 'harness']) strip(car, id);
+    // Motorlager und Hosenrohr von unten (Hebebühne)
     car.lifted = true;
+    strip(car, 'mounts');
     strip(car, 'downpipe');
     car.lifted = false;
     expect(removalSteps(car).every((s) => s.done)).toBe(true);

@@ -214,7 +214,8 @@ function monoEnds(m: Mesher, S: Shape, look: CarLook, N: (n: number) => number) 
   }
   // Stoßfänger aus grauem Kunststoff, der um die Ecken läuft
   const yB = 0.4;
-  wrapPatch(m, SLOT.plastic, S, 1, 0, 2.4, yB - 0.025, 0.36, 0.2, 0.014, N(28), N(6));
+  // Unterkante knapp über dem Wagenboden: reicht die Fläche bis auf Bodenhöhe, läuft sie unter dem Auto bis unter den Motor
+  wrapPatch(m, SLOT.plastic, S, 1, 0, 2.4, yB - 0.005, 0.32, 0.2, 0.014, N(28), N(6));
   wrapPatch(m, SLOT.dark, S, 1, 0, 2.2, yB + 0.128, 0.014, 0.2, 0.016, N(24), 1);
   // „Lächeln“: breiter Lufteinlass als durchgehendes Band, zur Mitte am höchsten, an den Enden nach oben gezogen und spitz zulaufend
   {
@@ -265,7 +266,7 @@ function monoEnds(m: Mesher, S: Shape, look: CarLook, N: (n: number) => number) 
   endPatch(m, SLOT.dark, S, -1, 0, 0.68, 0.5, 0.14, 0.3, 0.005, N(8), 3);
   endPatch(m, SLOT.plate, S, -1, 0, 0.68, 0.44, 0.1, 0.1, 0.01, N(8), 3);
   // Grauer Kunststoff-Stoßfänger hinten mit Rückstrahlern, Auspuff links unten
-  wrapPatch(m, SLOT.plastic, S, -1, 0, 2.4, 0.37, 0.34, 0.2, 0.014, N(28), N(6));
+  wrapPatch(m, SLOT.plastic, S, -1, 0, 2.4, 0.385, 0.31, 0.2, 0.014, N(28), N(6));
   wrapPatch(m, SLOT.dark, S, -1, 0, 2.2, 0.5, 0.014, 0.2, 0.016, N(24), 1);
   for (const s of [-1, 1]) endPatch(m, SLOT.tail, S, -1, s * 0.5, 0.42, 0.12, 0.028, 0.4, 0.018, 3, 2);
   const zp = -0.42;
