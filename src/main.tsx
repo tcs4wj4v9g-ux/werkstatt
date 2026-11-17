@@ -26,6 +26,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 // Für automatisierte Tests und Fehlersuche.
 import { dayClock, useGame } from './game/store';
+import { soundProfile } from './game/diagnosis';
 (window as any).__gk = useGame;
 import { player, place, REAR_BAY, stationActions, travel, useFocus, workPose } from './three/player';
 import { BODY_SPECS } from './three/carGeometry';
@@ -35,4 +36,4 @@ import { engineAudio } from './game/audio';
 (window as any).__gkAudio = engineAudio;
 import { createCar } from './game/market';
 import { movePlayer } from './three/player';
-(window as any).__gkLib = { createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock, workPose, REAR_BAY, BODY_SPECS, REAR_ENGINE, beneath };
+(window as any).__gkLib = { soundProfile, createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock, workPose, REAR_BAY, BODY_SPECS, REAR_ENGINE, beneath };

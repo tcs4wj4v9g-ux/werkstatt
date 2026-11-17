@@ -1,3 +1,4 @@
+import { ENGINE_WORKLET, engineVoice } from './engineWorklet';
 // Audiosystem: alle Klänge werden synthetisch erzeugt (WebAudio) – keine Audiodateien,
 // keine Aufnahmen echter Fahrzeuge. Der Motorklang ist eine Annäherung, kein Original.
 //
@@ -127,6 +128,13 @@ export interface EngineSound {
   diesel?: boolean;
   turbo?: boolean;
   sport?: number;
+  liters?: number;
+  exhaust?: 'stock' | 'sport' | 'rusty';
+  headers?: boolean;
+  bov?: 'recirc' | 'atmo';
+  flatPlane?: boolean;
+  air?: boolean;
+  pops?: boolean;
 }
 
 /**
@@ -151,6 +159,15 @@ export const VOICES: Record<string, { ratios: number[]; gains: number[]; tone: n
 export const firingHz = (rpm: number, cylinders = 4) => (rpm / 60) * (cylinders / 2);
 
 interface Running {
+  /** Puls-Synthese (AudioWorklet), sobald geladen; dann sind die Oszillatoren stumm. */
+  pulse: AudioWorkletNode | null;
+  oscGains: GainNode[];
+  whoosh: GainNode;
+  rasp: GainNode;
+  fan: GainNode;
+  lastLoad: number;
+  crackleUntil: number;
+  nextPop: number;
   clatter: GainNode;
   boost: GainNode;
   whistle: OscillatorNode;
@@ -207,6 +224,43 @@ function band(c: AudioContext, src: AudioNode, type: BiquadFilterType, freq: num
   return g;
 }
 
+// --- Puls-Synthese laden (einmal pro Audiokontext) ---
+let workletReady: Promise<boolean> | null = null;
+function ensureWorklet(c: AudioContext): Promise<boolean> {
+  if (workletReady) return workletReady;
+  if (!c.audioWorklet || typeof AudioWorkletNode === 'undefined') return (workletReady = Promise.resolve(false));
+  const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: 'application/javascript' }));
+  workletReady = c.audioWorklet.addModule(url).then(
+    () => true,
+    () => false,
+  );
+  return workletReady;
+}
+
+/** Kurzer Geräuschstoß (Knall, Abblasen) über ein Filter mit eigener Hüllkurve. */
+function burst(c: AudioContext, type: BiquadFilterType, freq: number, q: number, peak: number, decay: number, at: number, len = 0.6) {
+  if (!master) return null;
+  const src = noise(c);
+  const f = c.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = freq;
+  f.Q.value = q;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.linearRampToValueAtTime(peak, at + 0.004);
+  g.gain.setTargetAtTime(0.0001, at + 0.006, decay);
+  src.connect(f).connect(g).connect(master);
+  src.start(at, Math.random() * 1.5);
+  src.stop(at + len);
+  return g;
+}
+
+/** Endtopf: Grenzfrequenz des Tiefpasses je Anlage – Serie dumpf, Sport offen, durchgerostet scharf. */
+function mufflerHz(p: EngineSound, rpm: number, load: number) {
+  const x = p.exhaust === 'rusty' ? 2600 + rpm * 0.25 : p.exhaust === 'sport' ? 1250 + rpm * 0.28 : 520 + rpm * 0.14;
+  return x * (p.diesel ? 0.8 : 1) * (0.8 + load * 0.3);
+}
+
 function frame() {
   const r = run;
   const c = ctx;
@@ -222,7 +276,40 @@ function frame() {
   const firing = Math.max(8, firingHz(r.rpm + wobble, p.cylinders));
   voice.ratios.forEach((ratio, i) => r.oscs[i].frequency.setTargetAtTime(firing * ratio, t, 0.03));
   // Diesel klingen dumpfer, dafür härter (siehe Nageln unten).
-  r.tone.frequency.setTargetAtTime((voice.tone + r.rpm * 0.22) * (p.diesel ? 0.72 : 1), t, 0.05);
+  r.tone.frequency.setTargetAtTime(r.pulse ? mufflerHz(p, r.rpm, r.load) : (voice.tone + r.rpm * 0.22) * (p.diesel ? 0.72 : 1), t, 0.05);
+  if (r.pulse) {
+    const pr = r.pulse.parameters;
+    pr.get('rpm')!.setTargetAtTime(since < 0.5 ? 0 : r.rpm + wobble, t, 0.02);
+    pr.get('load')!.setTargetAtTime(r.load, t, 0.03);
+    pr.get('misfire')!.setValueAtTime(p.misfire ?? 0, t);
+  }
+  // Durchgerosteter Topf: Kratzen und Schnarren, mit Last lauter
+  r.rasp.gain.setTargetAtTime(p.exhaust === 'rusty' && since > 0.6 ? 0.012 + r.load * 0.05 : 0.0001, t, 0.05);
+  // Luftgekühlt: Kühlgebläse rauscht mit der Drehzahl
+  r.fan.gain.setTargetAtTime(p.air && since > 0.6 ? 0.006 + Math.min(1, r.rpm / 7000) * 0.022 : 0.0001, t, 0.1);
+  // Gas weg aus hoher Drehzahl: Abblasen (Turbo) und Nachverbrennung im Auspuff (Sportanlage, Kennfeld)
+  const lift = r.lastLoad > 0.55 && r.load < 0.12;
+  if (lift && since > 1) {
+    if (p.turbo && r.spool > 0.4) {
+      if (p.bov === 'atmo') {
+        // nach außen abblasendes Ventil: lautes „Pschh“, dazu kurzes Flattern des Verdichters
+        burst(c, 'highpass', 1900, 0.6, 0.2 * r.spool, 0.16, t, 0.9);
+        for (let k = 0; k < 7; k++) burst(c, 'bandpass', 700, 1.4, 0.07 * r.spool * (1 - k / 8), 0.012, t + 0.05 + k * 0.055, 0.2);
+      } else burst(c, 'bandpass', 1100, 0.8, 0.045 * r.spool, 0.12, t, 0.6); // Schubumluft: leises Zurückblasen
+      r.spool *= 0.3;
+    }
+    if (r.rpm > 2800 && (p.pops || p.exhaust === 'sport' || p.exhaust === 'rusty')) r.crackleUntil = t + (p.pops ? 1.8 : 0.9);
+  }
+  r.lastLoad = r.load;
+  // Knallen und Knistern im Schub: Nachverbrennung von unverbranntem Kraftstoff im heißen Auspuff
+  if (t < r.crackleUntil && r.load < 0.2 && r.rpm > 1800) {
+    while (r.nextPop < t + 0.12) {
+      const at = Math.max(t, r.nextPop);
+      const big = p.pops && Math.random() < 0.25;
+      burst(c, 'bandpass', big ? 380 : 650 + Math.random() * 500, big ? 0.9 : 1.6, (big ? 0.32 : 0.12) * (p.pops ? 1 : 0.6), big ? 0.03 : 0.012, at, 0.25);
+      r.nextPop = at + (p.pops ? 0.04 : 0.09) + Math.random() * (p.pops ? 0.16 : 0.28);
+    }
+  } else r.nextPop = t;
   r.out.gain.setTargetAtTime(since < 0.55 ? 0.0001 : 0.16 + r.load * 0.12, t, 0.08);
   r.exhaust.gain.setTargetAtTime((0.1 + r.load * 0.3) * voice.exhaust * (1 + 0.35 * (p.sport ?? 0)), t, 0.08);
 
@@ -240,8 +327,10 @@ function frame() {
   // Turbolader: läuft mit Verzögerung hoch, pfeift unter Last; ein defekter Lader heult wie eine Sirene.
   if (p.turbo || p.whine) {
     r.spool += ((r.load * Math.min(1, r.rpm / 3000)) - r.spool) * 0.04;
-    r.whistle.frequency.setTargetAtTime(p.whine ? 900 + r.spool * 2600 : 2600 + r.spool * 5200, t, 0.05);
-    r.whistleGain.gain.setTargetAtTime(since < 0.6 ? 0.0001 : p.whine ? 0.012 + r.spool * 0.05 : r.spool * 0.014, t, 0.06);
+    // Pfeifen: Laderwelle dreht mit dem Ladedruck hoch (Tonhöhe folgt), dazu Rauschen der angesaugten Luft
+    r.whistle.frequency.setTargetAtTime(p.whine ? 900 + r.spool * 2600 : 1500 + r.spool * 3600, t, 0.05);
+    r.whistleGain.gain.setTargetAtTime(since < 0.6 ? 0.0001 : p.whine ? 0.012 + r.spool * 0.05 : r.spool * (0.0018 + r.load * 0.0035) * (p.bov === 'atmo' ? 1.5 : 1), t, 0.06);
+    r.whoosh.gain.setTargetAtTime(since < 0.6 ? 0.0001 : r.spool * r.load * (p.bov === 'atmo' ? 0.012 : 0.007), t, 0.08);
   }
   // Leck in der Ladeluft: zischt, sobald Ladedruck aufgebaut werden soll.
   if (p.boostHiss) r.boost.gain.setTargetAtTime(r.load * 0.07, t, 0.05);
@@ -282,6 +371,16 @@ function frame() {
 
 export const engineAudio = {
   running: () => !!run,
+  /** Nur für Tests/Hörproben: Gesamtklang als Aufnahmestrom. */
+  tap() {
+    const c = audio();
+    if (!c || !master) return null;
+    const d = c.createMediaStreamDestination();
+    master.connect(d);
+    return d.stream;
+  },
+  /** Läuft die Puls-Synthese (AudioWorklet) oder der Oszillator-Rückfall? */
+  synth: () => (run ? (run.pulse ? 'pulse' : 'osc') : null),
   /** Aktuelles Klangbild (für Tests und Anzeige). */
   profile: () => (run ? { ...run.profile, warm: run.warm } : null),
 
@@ -300,6 +399,7 @@ export const engineAudio = {
       tone.type = 'lowpass';
       tone.frequency.value = 400;
       tone.connect(miss).connect(out);
+      const oscGains: GainNode[] = [];
       const oscs = (['sawtooth', 'square', 'triangle'] as OscillatorType[]).map((type, i) => {
         const o = c.createOscillator();
         o.type = type;
@@ -307,6 +407,7 @@ export const engineAudio = {
         g.gain.value = VOICES[profile.layout ?? 'R4'].gains[i];
         o.connect(g).connect(tone);
         o.start(t);
+        oscGains.push(g);
         return o;
       });
       const src = noise(c);
@@ -318,6 +419,10 @@ export const engineAudio = {
       const rattle = band(c, src, 'bandpass', 2300, 1.4, master);
       const clatter = band(c, src, 'bandpass', 1750, 2.2, master);
       const boost = band(c, src, 'highpass', 3400, 0.7, master);
+      // Turbo-Ansaugrauschen, kratziger Auspuff (durchgerostet), Kühlgebläse der luftgekühlten Boxer
+      const whoosh = band(c, src, 'bandpass', 1700, 0.7, master);
+      const rasp = band(c, src, 'bandpass', 1500, 1.2, master);
+      const fan = band(c, src, 'bandpass', 3100, 2.2, master);
       const whistle = c.createOscillator();
       whistle.type = 'sine';
       whistle.frequency.value = 2600;
@@ -363,6 +468,7 @@ export const engineAudio = {
       starter.stop(t + 0.8);
 
       run = {
+        pulse: null, oscGains, whoosh, rasp, fan, lastLoad: 0, crackleUntil: 0, nextPop: 0,
         oscs: [...oscs, whistle], noise: src, tone, out, miss, exhaust, knock, tick, rattle, squeal, profile,
         clatter, boost, whistle, whistleGain, spool: 0, nextClatter: t + 0.6,
         started: t, rpm: 250, target: IDLE, load: 0, warm: false,
@@ -370,6 +476,23 @@ export const engineAudio = {
       };
       run.rpm = 1250; // kurzer Drehzahlsprung nach dem Anspringen
       run.raf = requestAnimationFrame(frame);
+      // Puls-Synthese nachladen; sobald sie läuft, übernimmt sie den Grundklang
+      const mine = run;
+      void ensureWorklet(c).then((ok) => {
+        if (!ok || run !== mine) return;
+        try {
+          const node = new AudioWorkletNode(c, 'engine-pulses', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+          node.port.postMessage(engineVoice(mine.profile));
+          const level = c.createGain();
+          level.gain.value = 0.55;
+          node.connect(level).connect(mine.tone);
+          const now = c.currentTime;
+          for (const g of mine.oscGains) g.gain.setTargetAtTime(0.0001, now, 0.08);
+          mine.pulse = node;
+        } catch {
+          /* Rückfall: Oszillatoren bleiben */
+        }
+      });
     } catch {
       run = null;
     }
@@ -393,6 +516,7 @@ export const engineAudio = {
   /** Klangbild des laufenden Motors ändern (z. B. wenn er gerade Schaden nimmt). */
   setProfile(profile: EngineSound) {
     if (run) run.profile = { ...run.profile, ...profile };
+    if (run?.pulse) run.pulse.port.postMessage(engineVoice(run.profile));
   },
 
   /** Kurze Hörprobe beim Verkäufer; mit `driving` inklusive Gasstoß und warmem Motor. */
@@ -416,17 +540,21 @@ export const engineAudio = {
     clearTimeout(r.demoTimer);
     const t = ctx.currentTime;
     // Auslaufen statt abruptem Ende – so gibt es kein Knacken.
-    for (const g of [r.out, r.exhaust, r.knock, r.tick, r.rattle, r.squeal, r.clatter, r.boost, r.whistleGain]) {
+    for (const g of [r.out, r.exhaust, r.knock, r.tick, r.rattle, r.squeal, r.clatter, r.boost, r.whistleGain, r.whoosh, r.rasp, r.fan]) {
       g.gain.cancelScheduledValues(t);
       g.gain.setTargetAtTime(0.0001, t, 0.07);
     }
     r.oscs[0].frequency.setTargetAtTime(6, t, 0.12);
     r.oscs[1].frequency.setTargetAtTime(3, t, 0.12);
+    // Puls-Synthese: Drehzahl fällt auf null (Motor läuft aus)
+    r.pulse?.parameters.get('rpm')!.setTargetAtTime(0, t, 0.15);
     setTimeout(() => {
       try {
         r.oscs.forEach((o) => o.stop());
         r.noise.stop();
         r.out.disconnect();
+        r.pulse?.disconnect();
+        r.pulse?.port.close();
       } catch {
         /* schon beendet */
       }
