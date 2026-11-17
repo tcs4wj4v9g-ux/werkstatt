@@ -126,3 +126,12 @@ describe('Koop-Abgleich: Schritte bilden', () => {
     expect(out.cars[0].hoodOpen).toBe(true);
   });
 });
+
+describe('Chat', () => {
+  it('Sprechblase bleibt mindestens fünf Sekunden, lange Nachrichten länger', async () => {
+    const { bubbleMs } = await import('./coop');
+    expect(bubbleMs('Hi')).toBe(5000);
+    expect(bubbleMs('x'.repeat(40))).toBe(5600);
+    expect(bubbleMs('x'.repeat(160))).toBeGreaterThan(15000);
+  });
+});

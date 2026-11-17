@@ -10,6 +10,7 @@ import { MarketScene } from './three/MarketScene';
 import { TrackScene } from './three/TrackScene';
 import { HelpModal, Toast } from './ui/common';
 import { CoopModal } from './ui/CoopUI';
+import { ChatFeed, ChatPanel } from './ui/Chat';
 import { GarageUI } from './ui/GarageUI';
 import { MarketUI } from './ui/MarketUI';
 import { MenuScreen } from './ui/MenuScreen';
@@ -82,6 +83,8 @@ export function App() {
         {panel === 'help' && screen !== 'menu' && <HelpModal />}
         {panel === 'coop' && screen !== 'menu' && <CoopModal />}
         <Toast />
+        <ChatFeed />
+        <ChatPanel />
       </div>
       </Recover>
       <div className="rotate">

@@ -3,6 +3,7 @@ import { marketLabel } from '../game/market';
 import { dayClock, dayLeft, useGame } from '../game/store';
 import { GFX_LABEL, useGfx, type GfxLevel } from '../three/gfx';
 import { CoopChip } from './CoopUI';
+import { ChatButton } from './Chat';
 
 export const eur = (n: number) => `${Math.round(n).toLocaleString('de-DE')} €`;
 
@@ -64,6 +65,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       {back && <button className="btn" onClick={back.onClick}>{back.label}</button>}
       <div className="title">{title}</div>
       <CoopChip />
+      <ChatButton />
       <div className="daychip" title={marketLabel(index)}>
         Tag {day} <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>

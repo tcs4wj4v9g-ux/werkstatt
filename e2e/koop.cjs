@@ -89,6 +89,20 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await G(B, () => Object.assign(window.__gkPlayer, { x: 5.2, z: 3.4, yaw: 1.9, pitch: -0.1, zoom: false, work: null })); await B.waitForTimeout(1800);
   await B.screenshot({ path: `${S}/koop-figur.png` });
 
+  // ---------- Chat: Nachricht als Einblendung, Zähler und Sprechblase über der Figur (mind. 5 s) ----------
+  await A.getByTestId('chat').click();
+  await A.getByTestId('chat-input').fill('Hallo Ben, schau dir mal den Motor an!');
+  await A.getByTestId('chat-send').click();
+  expect(await until(A, () => window.__gkCoop.useChat.getState().log.some((m) => m.mine && m.text.startsWith('Hallo Ben'))), 'Chat: eigene Nachricht im Verlauf');
+  expect(await until(B, () => { const f = document.querySelector('[data-testid=chat-feed]'); return !!f && f.textContent.includes('Hallo Ben'); }), 'Chat: Spieler 2 sieht die Nachricht eingeblendet');
+  const bub = await G(B, (id) => { const c = window.__gkCoop.useChat.getState(); const b = c.bubbles[id]; return { text: b && b.text, left: b ? b.until - performance.now() : 0, unread: c.unread, badge: (document.querySelector('[data-testid=chat] .badge') || {}).textContent }; }, ca.me);
+  expect(bub.text && bub.text.startsWith('Hallo Ben') && bub.left > 3500 && bub.unread === 1 && bub.badge === '1', 'Chat: Sprechblase über Spieler 1 (mindestens 5 s) und ein ungelesener Hinweis am Knopf: ' + JSON.stringify(bub));
+  await G(B, () => Object.assign(window.__gkPlayer, { x: 6.2, z: 2.6, yaw: Math.atan2(6.2 - 3.2, 2.6 - 1.1), pitch: -0.05, zoom: false, work: null })); await B.waitForTimeout(1500);
+  await B.screenshot({ path: `${S}/koop-chat.png` });
+  await B.getByTestId('chat').click();
+  expect(await until(B, () => window.__gkCoop.useChat.getState().unread === 0 && !!document.querySelector('[data-testid=chat-panel]')), 'Chat: Öffnen setzt den Zähler zurück, Verlauf sichtbar');
+  await B.getByTestId('chat-close').click(); await A.getByTestId('chat-close').click();
+
   // ---------- Test 2: Gemeinsame Reparatur ----------
   const EYE = 1.62, BZ = -2.7;
   await G(A, ([EYE, BZ]) => { const pl = window.__gkPlayer; const from = [2.95, BZ], to = [1.2, 0.875, 0.1 + BZ]; pl.work = null; pl.x = from[0]; pl.z = from[1]; const dx = to[0] - from[0], dz = to[2] - from[1]; pl.yaw = Math.atan2(-dx, -dz); pl.pitch = Math.atan2(to[1] - EYE, Math.hypot(dx, dz)); pl.zoom = true; window.__gk.setState({ tool: 'hand' }); }, [EYE, BZ]);

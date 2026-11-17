@@ -528,3 +528,18 @@ Vorher: flacher Rundkurs (~300 m) mit Kegelbäumen. Die „Physik“ kannte nur 
   - Durchläufe `diagnose` (komplette Runde mit Autopilot) und `markt`.
   - Bilder aller drei Kameras und mehrerer Streckenabschnitte.
   - Kein echter iPad-Test: Die Bildrate auf dem iPad kann ich hier nicht messen.
+
+## Chat im Koop
+
+- **Knopf „💬 Chat“** in der oberen Leiste (nur im Koop), mit Zahl ungelesener Nachrichten. Er öffnet ein Fenster mit Verlauf, Eingabefeld (Enter sendet, höchstens 160 Zeichen) und Schnellantworten zum Antippen, damit man auf dem iPad nicht immer tippen muss.
+- **Sprechblase** über der Figur des Sprechers: weiße Blase mit Spitze, Text umbrochen (bis 5 Zeilen). Sie bleibt mindestens 5 Sekunden stehen, lange Nachrichten länger (2 s + 90 ms je Zeichen), und blendet zum Ende aus.
+- Neue Nachrichten erscheinen außerdem oben links gleich lange, auch die eigene, denn die eigene Figur sieht man in der Ich-Perspektive nicht.
+- **Übertragung:**
+  - Sofort per Realtime-Broadcast (Ereignis `chat`). Zusätzlich bleibt die letzte Nachricht etwa 30 s in der Lage (`presence.chat`), damit sie auch ohne Realtime über den Abgleich ankommt.
+  - Doppelte werden über die Kennung erkannt.
+  - Keine Schema-Änderung: Die Lage ist schon freies JSON.
+- Tippen im Eingabefeld bewegt die Figur nicht (W/A/S/D werden dort ignoriert).
+- Geprüft:
+  - Logiktest (Anzeigedauer).
+  - Durchlauf `koop`: Spieler 1 schreibt, Spieler 2 sieht Einblendung, Zähler und Sprechblase (mindestens 5 s); Öffnen setzt den Zähler zurück; Bild der Sprechblase.
+  - Kein echter iPad-Test.
