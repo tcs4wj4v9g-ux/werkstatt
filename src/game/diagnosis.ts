@@ -98,11 +98,24 @@ export interface SoundProfile {
   liters: number;
   /** Sportteile an Ansaugung und Abgas (0–3): lauter, kerniger. */
   sport?: number;
+  /** Auspuffanlage: Serie, Sportendtopf oder durchgerostet (laut, kratzig). */
+  exhaust?: 'stock' | 'sport' | 'rusty';
+  /** Fächerkrümmer: hellere, kernigere Pulse. */
+  headers?: boolean;
+  /** Turbo nachgerüstet bzw. großer Lader: Abblasventil nach außen („Pschh“) und Flattern. */
+  bov?: 'recirc' | 'atmo';
+  /** V8 mit flacher Kurbelwelle (kreischt) statt Crossplane (blubbert). */
+  flatPlane?: boolean;
+  /** Luftgekühlt: Gebläserauschen. */
+  air?: boolean;
+  /** Steuergerät mit Kennfeld-Tuning: Nachverbrennung im Schub (Knallen). */
+  pops?: boolean;
 }
 
 /** Welche Geräusche der Motor im aktuellen technischen Zustand macht (0 = keins). */
 export function soundProfile(car: CarInstance): SoundProfile {
   const d = activeDefects(car);
+  const variant = (id: string, v: string) => !!car.components[id]?.installed && car.components[id]?.variant === v;
   const has = (id: string) => d.includes(id as never);
   const e = engineOf(car);
   return {
@@ -121,6 +134,12 @@ export function soundProfile(car: CarInstance): SoundProfile {
     liters: e.liters,
     // Ein durchgerosteter Endtopf macht den Auspuff lauter als jede Sportanlage.
     sport: ['exhaust_sport', 'manifold_sport', 'intake_sport', 'muffler_sport'].filter((v) => Object.values(car.components).some((c) => c.installed && c.variant === v)).length + (has('muffler') ? 2 : 0),
+    exhaust: has('muffler') || car.components.muffler?.installed === false ? 'rusty' : variant('muffler', 'muffler_sport') ? 'sport' : 'stock',
+    headers: variant('exhaust_manifold', 'manifold_sport'),
+    bov: car.motor?.turboKit || variant('turbo', 'turbo_big') ? 'atmo' : 'recirc',
+    flatPlane: e.id === 'v8_45s' || e.id === 'v8_30k',
+    air: !!e.air,
+    pops: (car.ecu?.map ?? 0) >= 2 || (variant('muffler', 'muffler_sport') && (car.ecu?.map ?? 0) >= 1),
   };
 }
 

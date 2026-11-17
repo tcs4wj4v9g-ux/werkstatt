@@ -543,3 +543,35 @@ Vorher: flacher Rundkurs (~300 m) mit Kegelbäumen. Die „Physik“ kannte nur 
   - Logiktest (Anzeigedauer).
   - Durchlauf `koop`: Spieler 1 schreibt, Spieler 2 sieht Einblendung, Zähler und Sprechblase (mindestens 5 s); Öffnen setzt den Zähler zurück; Bild der Sprechblase.
   - Kein echter iPad-Test.
+
+## Motorklang realistischer (Zündpulse, Auspuffanlage, Turbo)
+
+Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer-Krümmern, Car Throttle/GFB zu Abblasventil und Verdichterpumpen, Fast Car zu „Pop & Bang“, Pulse-Train-Modelle der Motorklang-Synthese) – umgesetzt:
+
+- **Puls-Synthese** (`src/game/engineWorklet.ts`, AudioWorklet):
+  - Jeder Zylinder stößt bei seinem Zündwinkel einen kurzen Druckpuls ins Abgasrohr: schneller Anstieg, Abklingen, Rohrresonanz und Strömungsrauschen; unter Last kräftiger und heller.
+  - Die Abgasstränge haben je eine Rohrresonanz (Kammfilter) und gehen auf links/rechts.
+  - Die alten Oszillatoren bleiben als Rückfall, falls ein Browser kein AudioWorklet kann.
+- **Charakter je Bauart:**
+  - Reihenvierer kernig.
+  - Reihenfünfer mit leichtem Trällern.
+  - Reihensechser glatt und hell (zwei Krümmerstränge 1–3/4–6).
+  - V6.
+  - Crossplane-V8 (`v8_40`, `v8t_44`): Zündfolge 1-8-4-3-6-5-7-2, je Bank ungleichmäßige Abstände (L R L L R L R R). Dicht folgende Pulse im selben Strang verstärken sich – das Blubbern (gemessen: Nebenlinien im Abstand der halben Zündordnung).
+  - Flatplane-V8 (`v8_45s`, `v8_30k`): Bänke abwechselnd, helle harte Pulse – kreischend, sauberes Spektrum.
+  - Boxer-Vierer: ungleich lange Krümmer, versetzte Pulse – Grummeln. Boxer-Sechser: gleich lange Krümmer, heiser.
+  - Luftgekühlte Boxer zusätzlich mit Gebläserauschen.
+  - Diesel tiefer, mit Nageln (wie bisher).
+- **Auspuffanlage:**
+  - Endtopf als Tiefpass: Serie dumpf (gemessener Klangschwerpunkt ~830 Hz), Sportendtopf offener (~1 280 Hz), durchgerostet scharf mit Kratzen (~3 400 Hz).
+  - Fächerkrümmer machen die Pulse härter und heller.
+- **Turbo:**
+  - Pfeifen steigt mit dem Ladedruck (1,5–5 kHz), dazu Ansaugrauschen; beides deutlich unter dem Motorklang.
+  - Gas weg unter Ladedruck: Serienturbo bläst leise zurück (Schubumluft), nachgerüsteter oder großer Turbo bläst laut nach außen („Pschh“) mit kurzem Flattern.
+- **Nachverbrennung im Schub:** Gas weg aus über 2 800/min. Mit Kennfeld-Tuning (Stufe 2, oder Stufe 1 mit Sportendtopf) knallt es kräftig, mit Sportendtopf oder durchgerostetem Topf knistert es leiser.
+- Klangprofil (`soundProfile`) um Auspuffanlage, Fächerkrümmer, Turbo-Art, Kurbelwelle, Luftkühlung und Knallen erweitert. Gilt in der Werkstatt (Gas geben), beim Händler und auf der Probefahrt.
+- Geprüft:
+  - Logiktests (neu: Klangzuordnung).
+  - Durchläufe `motoren`, `diagnose`, `werkstatt`.
+  - Hörproben im Testbrowser aufgenommen (elf Autos bzw. Ausbaustufen) und ausgewertet: Pegel, Spitze, Ordnungen, Klangschwerpunkt.
+  - Kein echter iPad-Test.
