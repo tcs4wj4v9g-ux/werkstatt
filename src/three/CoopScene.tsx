@@ -1,8 +1,8 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { TOOL_MAP } from '../game/data/tools';
-import { openBox, remotePlayers, useCoop } from '../net/coop';
+import { openBox, remotePlayers, useChat, useCoop } from '../net/coop';
 import { Interactable } from './Interactable';
 import { mat, Mesher } from './mesher';
 import { place, type Box } from './player';
@@ -115,6 +115,84 @@ function figure() {
 }
 const COLORS = ['#c8501e', '#1f6fb2', '#2f6b3a', '#7a3fa0'];
 
+/** Sprechblase als Bild: weiße abgerundete Blase mit Spitze nach unten, Text umbrochen (höchstens 5 Zeilen). */
+function bubbleTexture(text: string) {
+  const W = 512;
+  const font = 34;
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d')!;
+  ctx.font = `600 ${font}px system-ui, -apple-system, sans-serif`;
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > W - 60 && line) {
+      lines.push(line);
+      line = w;
+    } else line = test;
+  }
+  if (line) lines.push(line);
+  if (lines.length > 5) {
+    lines.length = 5;
+    lines[4] = lines[4].replace(/.{0,2}$/, '…');
+  }
+  const width = Math.min(W, Math.max(160, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 60));
+  const H = lines.length * (font + 8) + 40 + 26;
+  c.width = W;
+  c.height = H;
+  const x0 = (W - width) / 2;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgba(255,255,255,0.96)';
+  g.strokeStyle = 'rgba(20,22,26,0.35)';
+  g.lineWidth = 3;
+  const r = 26;
+  const bh = H - 26;
+  g.beginPath();
+  g.moveTo(x0 + r, 2);
+  g.arcTo(x0 + width - 2, 2, x0 + width - 2, bh, r);
+  g.arcTo(x0 + width - 2, bh, x0 + 2, bh, r);
+  g.lineTo(W / 2 + 18, bh);
+  g.lineTo(W / 2, H - 2);
+  g.lineTo(W / 2 - 18, bh);
+  g.arcTo(x0 + 2, bh, x0 + 2, 2, r);
+  g.arcTo(x0 + 2, 2, x0 + width - 2, 2, r);
+  g.closePath();
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#16181d';
+  g.font = `600 ${font}px system-ui, -apple-system, sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'top';
+  lines.forEach((l, i) => g.fillText(l, W / 2, 20 + i * (font + 8)));
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return { tex, aspect: H / W };
+}
+
+/** Sprechblase über dem Kopf eines Mitglieds; verschwindet nach der Lesezeit (mindestens fünf Sekunden). */
+function Bubble({ id }: { id: string }) {
+  const bubble = useChat((c) => c.bubbles[id]);
+  const ref = useRef<THREE.Sprite>(null);
+  const made = useMemo(() => (bubble ? bubbleTexture(bubble.text) : null), [bubble?.text, bubble?.until]);
+  const mat = useMemo(() => (made ? new THREE.SpriteMaterial({ map: made.tex, depthTest: false, transparent: true, fog: false, toneMapped: false }) : null), [made]);
+  useEffect(() => () => {
+    made?.tex.dispose();
+    mat?.dispose();
+  }, [made, mat]);
+  useFrame(() => {
+    const sp = ref.current;
+    if (!sp || !bubble) return;
+    const left = bubble.until - performance.now();
+    sp.visible = left > 0;
+    // in der letzten halben Sekunde ausblenden
+    (sp.material as THREE.SpriteMaterial).opacity = Math.min(1, left / 500);
+  });
+  if (!made || !mat) return null;
+  const w = 1.5;
+  return <sprite ref={ref} position={[0, 2.12 + (w * made.aspect) / 2, 0]} scale={[w, w * made.aspect, 1]} material={mat} renderOrder={10} raycast={() => null} />;
+}
+
 function Avatar({ id, index }: { id: string; index: number }) {
   const root = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
@@ -186,6 +264,7 @@ function Avatar({ id, index }: { id: string; index: number }) {
       </mesh>
       <sprite position={[0, 1.95, 0]} scale={[0.4, 0.1, 1]} material={label} raycast={() => null} />
       <sprite ref={toolSprite} position={[0, 1.84, 0]} scale={[0.32, 0.08, 1]} raycast={() => null} />
+      <Bubble id={id} />
     </group>
   );
 }

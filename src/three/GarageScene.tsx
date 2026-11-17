@@ -72,7 +72,9 @@ function FirstPerson() {
       moveInput.x = (keys.d || keys.ArrowRight ? 1 : 0) - (keys.a || keys.ArrowLeft ? 1 : 0);
       moveInput.y = (keys.w || keys.ArrowUp ? 1 : 0) - (keys.s || keys.ArrowDown ? 1 : 0);
     };
-    const kd = (e: KeyboardEvent) => ((keys[e.key] = true), apply());
+    // Tippen im Chat (Eingabefeld) bewegt die Figur nicht
+    const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const kd = (e: KeyboardEvent) => !typing(e) && ((keys[e.key] = true), apply());
     const ku = (e: KeyboardEvent) => ((keys[e.key] = false), apply());
     window.addEventListener('keydown', kd);
     window.addEventListener('keyup', ku);

@@ -56,6 +56,7 @@ export function TrackScene() {
       driveInput.brake = keys.ArrowDown || keys.s ? 1 : 0;
     };
     const down = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
       if (e.key === 'c') useDriveHud.getState().set({ camera: (['chase', 'hood', 'cockpit'] as const)[(['chase', 'hood', 'cockpit'].indexOf(useDriveHud.getState().camera) + 1) % 3] });
       keys[e.key] = true;
       apply();

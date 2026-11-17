@@ -37,6 +37,14 @@ export interface Presence {
   /** Werkstatt oder Schrottplatz. */
   place?: string;
   car: string | null;
+  /** Letzte Chatnachricht (bleibt ~30 s in der Lage, damit sie auch ohne Realtime über den Abgleich ankommt). */
+  chat?: ChatLine | null;
+}
+export interface ChatLine {
+  id: string;
+  text: string;
+  /** Zeitpunkt beim Absender (ms). */
+  at: number;
 }
 export interface Member {
   id: string;
@@ -165,8 +173,66 @@ function presence(): Presence {
   const near = useFocus.getState().nearBay;
   const car = g.screen === 'track' ? g.cars[g.driveBay]?.uid : g.screen === 'garage' && near >= 0 ? g.cars[near]?.uid : null;
   const r = (v: number) => Math.round(v * 100) / 100;
-  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null };
+  const chat = myChat && Date.now() - myChat.at < 30_000 ? myChat : null;
+  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, ...(chat ? { chat } : {}) };
 }
+
+// ---------------------------------------------------------------- Chat
+
+/** Wie lange eine Sprechblase stehen bleibt: mindestens fünf Sekunden, lange Nachrichten länger (Lesezeit). */
+export const bubbleMs = (text: string) => Math.max(5000, 2000 + text.length * 90);
+export const CHAT_MAX = 160;
+
+export interface ChatEntry {
+  id: string;
+  from: string;
+  name: string;
+  text: string;
+  at: number;
+  mine: boolean;
+}
+interface ChatState {
+  log: ChatEntry[];
+  /** Sprechblasen je Mitglied: Text und bis wann sichtbar (performance.now). */
+  bubbles: Record<string, { text: string; until: number }>;
+  unread: number;
+  open: boolean;
+}
+export const useChat = create<ChatState>(() => ({ log: [], bubbles: {}, unread: 0, open: false }));
+let myChat: ChatLine | null = null;
+const seenChat = new Set<string>();
+
+/** Nachricht eines Mitglieds übernehmen (aus Realtime oder Abgleich); doppelte werden über die Kennung erkannt. */
+function receiveChat(from: string, line: ChatLine | null | undefined) {
+  if (!line || typeof line.text !== 'string' || !line.id || seenChat.has(line.id)) return;
+  seenChat.add(line.id);
+  const c = useCoop.getState();
+  const mine = from === c.me;
+  const name = mine ? c.members.find((m) => m.id === from)?.name ?? 'Du' : c.members.find((m) => m.id === from)?.name ?? 'Partner';
+  const text = line.text.slice(0, CHAT_MAX);
+  useChat.setState((s) => ({
+    log: [...s.log, { id: line.id, from, name, text, at: Date.now(), mine }].slice(-40),
+    bubbles: { ...s.bubbles, [from]: { text, until: performance.now() + bubbleMs(text) } },
+    unread: s.open || mine ? s.unread : s.unread + 1,
+  }));
+}
+
+/** Chatnachricht senden: sofort per Realtime, zusätzlich in der Lage (Abgleich) für Geräte ohne Realtime. */
+export function sendChat(raw: string) {
+  const text = raw.replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+  const c = useCoop.getState();
+  if (!text || c.status === 'off' || !c.me) return false;
+  myChat = { id: uuid(), text, at: Date.now() };
+  receiveChat(c.me, myChat);
+  try {
+    channel?.send({ type: 'broadcast', event: 'chat', payload: { id: c.me, chat: myChat } });
+  } catch {
+    /* ohne Realtime geht sie mit dem nächsten Abgleich raus */
+  }
+  lastSync = 0;
+  return true;
+}
+export const setChatOpen = (open: boolean) => useChat.setState({ open, ...(open ? { unread: 0 } : {}) });
 
 function setMembers(members: Member[]) {
   const me = useCoop.getState().me;
@@ -175,6 +241,7 @@ function setMembers(members: Member[]) {
     if (m.id === me) continue;
     const known = remotePlayers.get(m.id);
     // Lagedaten aus Realtime sind frischer als die des Abgleichs: der Abgleich füllt nur aus, wenn Realtime länger schweigt.
+    if (m.online) receiveChat(m.id, (m.presence as Partial<Presence>).chat);
     if (!m.online) remotePlayers.delete(m.id);
     else if (typeof m.presence.x === 'number' && (!known || (known.rt ? now - known.at > 6000 : now - known.at > 900))) remotePlayers.set(m.id, { ...(m.presence as Presence), name: m.name, at: now });
     else if (known && known.name !== m.name) known.name = m.name;
@@ -395,7 +462,9 @@ function openChannel(ws: string) {
       .on('broadcast', { event: 'pos' }, ({ payload }) => {
         const m = useCoop.getState().members.find((x) => x.id === payload.id);
         if (m) remotePlayers.set(payload.id, { ...(payload as Presence), name: m.name, at: performance.now(), rt: true });
+        if (m) receiveChat(payload.id, payload.chat);
       })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => receiveChat(payload.id, payload.chat))
       .on('broadcast', { event: 'poke' }, () => {
         lastSync = 0;
       })
@@ -504,6 +573,8 @@ export async function leave(error?: string) {
   }
   channel = null;
   remotePlayers.clear();
+  myChat = null;
+  useChat.setState({ log: [], bubbles: {}, unread: 0, open: false });
   shadow = null;
   inflight = null;
   useCoop.setState({ status: 'off', ws: null, members: [], tools: [], ledger: [], error: error ? text(error) : null });
@@ -574,4 +645,4 @@ export const openBox = (box: string) => {
   useGame.getState().setPanel('cabinet');
 };
 
-if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, remotePlayers, takeTool, returnTool, buyTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
+if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, sendChat, remotePlayers, takeTool, returnTool, buyTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
