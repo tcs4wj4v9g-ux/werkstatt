@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CAMERA_LABEL, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
 import { DEFECTS } from '../game/data/defects';
 import { activeDefects } from '../game/repair';
@@ -16,69 +16,24 @@ function restart() {
   }
 }
 
-/**
- * Pedal mit Dosierung: oben angetippt voll, weiter unten weniger (35 %). Mit dem Finger verschieben ändert den Druck.
- * So lässt sich auf dem iPad feinfühlig Gas geben und bremsen.
- */
-function Pedal({ set, className, children }: { set(v: number): void; className: string; children: ReactNode }) {
-  const amount = (e: RPointerEvent<HTMLButtonElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const rel = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    return Math.round((1 - rel * 0.65) * 100) / 100;
-  };
+/** Knopf, der gedrückt gehalten wird (Finger darf beim Drücken verrutschen). */
+function Hold({ on, off, className, children, testid }: { on(): void; off(): void; className: string; children: ReactNode; testid?: string }) {
   return (
     <button
       className={`pedal ${className}`}
+      data-testid={testid}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         restart();
-        set(amount(e));
+        on();
       }}
-      onPointerMove={(e) => e.buttons && set(amount(e))}
-      onPointerUp={() => set(0)}
-      onPointerCancel={() => set(0)}
-      onLostPointerCapture={() => set(0)}
+      onPointerUp={off}
+      onPointerCancel={off}
+      onLostPointerCapture={off}
       onContextMenu={(e) => e.preventDefault()}
     >
       {children}
     </button>
-  );
-}
-
-/** Lenkfläche: Finger aufsetzen und nach links/rechts ziehen – stufenlos, beim Loslassen zurück in die Mitte. */
-function SteerPad() {
-  const origin = useRef<number | null>(null);
-  const [angle, setAngle] = useState(0);
-  const apply = (v: number) => {
-    driveInput.steer = v;
-    setAngle(-v * 120);
-  };
-  return (
-    <div
-      className="steerpad"
-      data-testid="steerpad"
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        restart();
-        origin.current = e.clientX;
-      }}
-      onPointerMove={(e) => {
-        if (origin.current === null) return;
-        // 120 px Weg = voller Einschlag; kleine Bewegungen fein (quadratisch), große schnell
-        const d = Math.max(-1, Math.min(1, (e.clientX - origin.current) / 120));
-        apply(-Math.sign(d) * (0.35 * Math.abs(d) + 0.65 * d * d));
-      }}
-      onPointerUp={() => ((origin.current = null), apply(0))}
-      onPointerCancel={() => ((origin.current = null), apply(0))}
-      onLostPointerCapture={() => ((origin.current = null), apply(0))}
-    >
-      <svg viewBox="-50 -50 100 100" width="96" height="96" style={{ transform: `rotate(${angle}deg)` }} aria-hidden>
-        <circle r="40" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" />
-        <path d="M-38 4 L-10 8 L0 20 L10 8 L38 4" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" strokeLinejoin="round" />
-        <circle r="7" fill="rgba(255,255,255,0.85)" />
-      </svg>
-      <span>Lenken: ziehen ◀ ▶</span>
-    </div>
   );
 }
 
@@ -128,12 +83,19 @@ export function TrackUI() {
   const finishDrive = useGame((s) => s.finishDrive);
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
+  const [esp, setEspState] = useState(driveInput.assist);
+  // ESP aus: Stabilitäts- und Antriebsschlupfregelung abgeschaltet – das Heck darf kommen (ABS bleibt)
+  const setEsp = (on: boolean) => {
+    driveInput.assist = on;
+    setEspState(on);
+  };
   const next = (c: DriveCamera): DriveCamera => (c === 'chase' ? 'hood' : c === 'hood' ? 'cockpit' : 'chase');
   return (
     <>
       <div className="topbar">
         <button className="btn ghost" onClick={() => finishDrive(false)}>✕ Abbrechen</button>
         <div className="title">Probefahrt – eine Runde durch alle Pylonen-Tore</div>
+        <button className={`btn ${esp ? '' : 'active'}`} data-testid="esp" onClick={() => setEsp(!esp)}>{esp ? '🛡 ESP an' : '⚠ ESP aus'}</button>
         <button className="btn" data-testid="camera" onClick={() => hud.set({ camera: next(hud.camera) })}>🎥 {CAMERA_LABEL[hud.camera]}</button>
         <div className="money">Tor {Math.min(hud.checkpoint, hud.total)}/{hud.total}</div>
       </div>
@@ -145,11 +107,12 @@ export function TrackUI() {
         {hud.checkpoint >= hud.total && <div className="good">Runde geschafft!</div>}
       </div>
       <div className="drive left">
-        <SteerPad />
+        <Hold className="steer" testid="steer-left" on={() => (driveInput.steer = 1)} off={() => driveInput.steer === 1 && (driveInput.steer = 0)}>◀</Hold>
+        <Hold className="steer" testid="steer-right" on={() => (driveInput.steer = -1)} off={() => driveInput.steer === -1 && (driveInput.steer = 0)}>▶</Hold>
       </div>
       <div className="drive right">
-        <Pedal className="brake" set={(v) => (driveInput.brake = v)}>BREMSE</Pedal>
-        <Pedal className="gas" set={(v) => (driveInput.throttle = v)}>GAS</Pedal>
+        <Hold className="brake" testid="brake" on={() => (driveInput.brake = 1)} off={() => (driveInput.brake = 0)}>BREMSE</Hold>
+        <Hold className="gas" testid="gas" on={() => (driveInput.throttle = 1)} off={() => (driveInput.throttle = 0)}>GAS</Hold>
       </div>
     </>
   );

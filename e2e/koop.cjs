@@ -309,6 +309,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await B.reload(); await B.waitForTimeout(1500);
   await B.getByText('Bestehende Koop-Werkstatt öffnen').click();
   expect(await until(B, () => window.__gkCoop.useCoop.getState().status === 'online' && window.__gk.getState().screen === 'garage'), 'Spieler 2 öffnet die Werkstatt später allein (nach Neuladen der Seite, ohne Code)');
+  expect(await until(B, () => { const m = document.querySelector('[data-testid="member-Anna"]'); return !!m && /zuletzt (gerade eben|vor \d+ min)/.test(m.textContent); }, null, 20000), 'Spieler 2 sieht in der Leiste, wann Spieler 1 zuletzt online war: ' + (await G(B, () => (document.querySelector('[data-testid="coop-chip"]') || {}).textContent)));
   const after = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools) };
   expect(after.car === before.car && after.money === before.money, 'Reparaturfortschritt und Geld sind erhalten');
   expect(norm(await G(B, () => window.__gk.getState().cars[15])) === before.stand, 'Der halb zerlegte Motor auf dem Ständer ist erhalten');

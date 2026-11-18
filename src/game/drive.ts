@@ -2,8 +2,8 @@ import { create } from 'zustand';
 
 // Eingaben und Telemetrie der Probefahrt. Bewusst getrennt vom Spielstand:
 // Eingaben ändern sich pro Frame und werden nie gespeichert.
-/** steer: +1 = voll links, −1 = voll rechts (stufenlos); throttle/brake 0..1 (stufenlos). */
-export const driveInput = { steer: 0, throttle: 0, brake: 0 };
+/** steer: +1 = voll links, −1 = voll rechts; throttle/brake 0..1; assist: ESP an (Standard) oder aus (Driften). */
+export const driveInput = { steer: 0, throttle: 0, brake: 0, assist: true };
 
 export type DriveCamera = 'chase' | 'hood' | 'cockpit';
 export const CAMERA_LABEL: Record<DriveCamera, string> = { chase: 'Außen', hood: 'Motorhaube', cockpit: 'Cockpit' };

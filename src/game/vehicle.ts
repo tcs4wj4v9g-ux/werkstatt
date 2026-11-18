@@ -107,6 +107,8 @@ export interface VehicleState {
 }
 
 export interface DriveInput {
+  /** ESP und Antriebsschlupfregelung (Standard an). Aus: Heck kann ausbrechen – Driften für Könner. */
+  assist?: boolean;
   throttle: number;
   brake: number;
   /** +1 = links, −1 = rechts. */
@@ -152,7 +154,9 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
   // Gewichtsverteilung: Frontmotor ~55 % vorn, Heckmotor ~40 % vorn, Frontantrieb etwas kopflastiger.
   const rear = REAR_ENGINE.has(model.body);
   const drive = drivetrainOf(car.modelId);
-  const frontShare = rear ? 0.4 : drive === 'FWD' ? 0.61 : model.cls === 'sport' || model.cls === 'luxury' ? 0.52 : 0.54;
+  // Mittelmotor-Sportwagen (Veloce): Motor vor der Hinterachse, ~42 % vorn
+  const mid = car.modelId === 'veloce_stradale' || car.modelId === 'veloce_gt';
+  const frontShare = rear ? 0.4 : mid ? 0.42 : drive === 'FWD' ? 0.61 : model.cls === 'sport' || model.cls === 'luxury' ? 0.52 : 0.54;
   const a = wheelbase * (1 - frontShare);
   const b = wheelbase * frontShare;
   const diesel = e.fuel === 'diesel';
@@ -170,8 +174,11 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
   const tireF = defects.includes('tires') ? 0.78 : 1;
   const tireR = defects.includes('tires_rear') ? 0.78 : 1;
   // Starke Autos fahren ab Werk breitere Reifen
-  const wide = 1 + Math.min(0.16, Math.max(0, (p.powerToWeight - 120) / 1600));
-  const mu = wide * (1 + 0.025 * (car.visual?.rimSize ?? 0)) * (car.visual?.flares ? 1.03 : 1) * susp.grip * (model.cls === 'sport' ? 1.06 : 1);
+  const wide = 1 + Math.min(0.2, Math.max(0, (p.powerToWeight - 120) / 1400));
+  // Reifentechnik nach Baujahr: ältere Autos haften weniger (Grundhaftung guter Straßenreifen ~0,93)
+  const year = car.year ?? 2005;
+  const era = year < 1975 ? 0.86 : year < 1990 ? 0.91 : year < 2005 ? 0.96 : 1;
+  const mu = 0.93 * era * wide * (1 + 0.025 * (car.visual?.rimSize ?? 0)) * (car.visual?.flares ? 1.03 : 1) * susp.grip * (model.cls === 'sport' || model.cls === 'luxury' ? 1.06 : 1);
   const has = (id: string) => defects.includes(id);
   const out = p.output;
   const clutchRisk = out.risks.find((r) => r.id === 'clutch');
@@ -202,11 +209,13 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
     shiftTime: faults.gearbox ? 0.55 : model.cls === 'sport' ? 0.18 : 0.28,
     engineBrake: Math.max(25, p.nm * (diesel ? 0.28 : 0.22)),
     muFront: mu * tireF,
-    muRear: mu * tireR * (rear ? 1.03 : 1),
-    cornerFront: mass * G * (b / wheelbase) * 16 * susp.grip,
-    cornerRear: mass * G * (a / wheelbase) * 18 * susp.grip,
+    // Hinterachse mit Reserve (breitere Reifen, Spur, Geometrie): im Grenzbereich schiebt das Auto über die Vorderräder,
+    // statt sich zu drehen – wie ein echtes, gutmütig abgestimmtes Serienauto
+    muRear: mu * tireR * 1.12 * (rear ? 1.03 : 1),
+    cornerFront: mass * G * (b / wheelbase) * 14 * susp.grip,
+    cornerRear: mass * G * (a / wheelbase) * 21 * susp.grip,
     brakeForce: mass * G * 1.05 * (faults.weakBrakes ? 0.45 : 1) * (model.cls === 'budget' ? 0.95 : 1.05),
-    brakeBiasFront: 0.66,
+    brakeBiasFront: 0.7,
     steerMax: 0.5,
     dragArea,
     rollRes: 0.013,
@@ -261,7 +270,11 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const rate = 3.2;
   s.steer += Math.max(-rate * dt, Math.min(rate * dt, input.steer - s.steer));
   const speedFactor = 1 / (1 + Math.max(0, s.vx) / 22);
-  let wheel = s.steer * spec.steerMax * speedFactor;
+  // Bei Tempo höchstens so viel Einschlag, wie die Vorderreifen umsetzen können (Kurvenradius aus der Haftgrenze plus
+  // bestem Schräglaufwinkel) – voller Einschlag überfordert sonst die Reifen und das Auto schiebt bzw. dreht sich
+  const vxa = Math.max(1, Math.abs(s.vx));
+  const usable = Math.atan((L * spec.muFront * G * surface.grip) / (vxa * vxa)) + 0.09;
+  let wheel = s.steer * Math.min(spec.steerMax * speedFactor, usable);
   if (f.play && Math.abs(s.steer) < 0.15) wheel += Math.sin(s.t * 1.7) * f.play * 0.15 * Math.min(1, speed / 15);
   wheel += f.pull * 0.1 * Math.min(1, speed / 10);
   s.wheelAngle = wheel;
@@ -333,6 +346,7 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
     fxR -= dir * Math.min(total * (1 - spec.brakeBiasFront), muR * loadR * 0.98);
   }
 
+  const assist = input.assist !== false;
   // --- Seitenkräfte über Schräglaufwinkel; bei kleinem Tempo gedämpft (sonst springt der Winkel)
   const vxs = Math.max(Math.abs(s.vx), 2.5);
   const alphaF = Math.atan2(s.vy + spec.a * s.yawRate, vxs) - wheel * Math.sign(s.vx || 1);
@@ -340,6 +354,17 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   // Reibungskreis: Längskraft nimmt Seitenführung weg (Gas im Heckantrieb → Heck kommt)
   const capF = muF * loadF;
   const capR = muR * loadR;
+  // ABS (immer aktiv) mit Seitenreserve: die Bremse lässt der Hinterachse Seitenführung (kein Ausbrechen beim Bremsen in der Kurve)
+  // Seitenkraft, die die Kurve gerade braucht (aus der letzten Querbeschleunigung), bleibt jeder Achse vorbehalten
+  const needF = spec.mass * Math.abs(s.ay) * (spec.b / L);
+  const needR = spec.mass * Math.abs(s.ay) * (spec.a / L);
+  if (fxR < 0 && input.brake > 0) fxR = Math.max(fxR, -Math.sqrt(Math.max(0, capR * capR - needR * needR * 1.3)) * 0.97);
+  if (fxF < 0 && input.brake > 0) fxF = Math.max(fxF, -Math.sqrt(Math.max(0, capF * capF - needF * needF)) * 0.98);
+  if (assist) {
+    // Antriebsschlupfregelung (Teil des ESP): Antriebskraft höchstens bis zur Haftgrenze (keine durchdrehenden Räder)
+    if (fxF > 0) fxF = Math.min(fxF, capF * 0.97);
+    if (fxR > 0) fxR = Math.min(fxR, Math.sqrt(Math.max(0, capR * capR - needR * needR)) * 0.97);
+  }
   const spinF = Math.max(0, Math.abs(fxF) - capF) / Math.max(1, capF);
   const spinR = Math.max(0, Math.abs(fxR) - capR) / Math.max(1, capR);
   fxF = Math.sign(fxF) * Math.min(Math.abs(fxF), capF);
@@ -364,11 +389,28 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const sin = Math.sin(wheel);
   const fx = fxF * cos - fyF * sin + fxR - drag - rolling - slope;
   const fy = fxF * sin + fyF * cos + fyR;
-  const ax = fx / spec.mass;
+  // Drehende Teile (Räder, Antriebswelle, Getriebe, Schwungrad) müssen mitbeschleunigt werden – in den kurzen Gängen
+  // deutlich spürbar (Faustformel: effektive Masse 1,03 + 0,0011 × Gesamtübersetzung²)
+  const massEff = spec.mass * (1.03 + (s.shiftTimer > 0 || s.gear === 0 ? 0 : 0.0011 * r * r));
+  const ax = (fxF * cos - fyF * sin + fxR) / massEff - (drag + rolling + slope) / spec.mass;
   const ay = fy / spec.mass;
   s.vx += (ax + s.vy * s.yawRate) * dt;
   s.vy += (ay - s.vx * s.yawRate) * dt;
-  s.yawRate += ((spec.a * (fyF * cos + fxF * sin) - spec.b * fyR) / spec.yawInertia) * dt;
+  let yawMoment = spec.a * (fyF * cos + fxF * sin) - spec.b * fyR;
+  // ESP: dreht das Auto schneller, als es der Lenkeinschlag bei dieser Haftung erlaubt (Heck kommt), bremst es gezielt
+  // gegen und nimmt Gas weg – wie im echten Auto. Ohne ESP bleibt das Heck frei (Driften).
+  if (assist && Math.abs(s.vx) > 3) {
+    const ref = Math.max(-1, Math.min(1, (s.vx * Math.tan(wheel)) / L));
+    const limit = (spec.muRear * G * surface.grip) / Math.abs(s.vx);
+    const target = Math.max(-limit, Math.min(limit, ref));
+    const excess = s.yawRate - target;
+    const slip = Math.atan2(s.vy, Math.abs(s.vx));
+    if (Math.abs(excess) > 0.04 && Math.sign(excess) === Math.sign(s.yawRate)) yawMoment -= excess * spec.yawInertia * 5;
+    // Schwimmwinkel zu groß (Heck drängt nach außen): gegendrehen. In einer Linkskurve mit ausbrechendem Heck ist
+    // die Quergeschwindigkeit negativ – das Moment muss dann die Drehung verringern.
+    if (Math.abs(slip) > 0.07) yawMoment += (slip - Math.sign(slip) * 0.07) * spec.mass * 14 * Math.sign(s.vx);
+  }
+  s.yawRate += (yawMoment / spec.yawInertia) * dt;
   // Bei kleinem Tempo nur rollen, nicht driften; Stillstand ohne Gas bleibt stehen
   if (speed < 1.5) {
     s.vy *= 1 - Math.min(1, dt * 8);

@@ -1,3 +1,4 @@
+import { CarStatsCard } from './CarStatsCard';
 import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
 import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
@@ -117,6 +118,8 @@ export function DynoModal() {
         <p className="meta good">Volle Leistung. Das Messprotokoll liegt dem Auto bei und überzeugt Käufer.</p>
       )}
       <button className="btn primary big" onClick={() => s.setPanel('file', s.panelBay)}>Zur Fahrzeugakte</button>
+      <h4>Fahrleistungen</h4>
+      <CarStatsCard car={car} />
     </Modal>
   );
 }

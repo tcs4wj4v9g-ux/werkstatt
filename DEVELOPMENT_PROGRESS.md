@@ -575,3 +575,38 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Durchläufe `motoren`, `diagnose`, `werkstatt`.
   - Hörproben im Testbrowser aufgenommen (elf Autos bzw. Ausbaustufen) und ausgewertet: Pegel, Spitze, Ordnungen, Klangschwerpunkt.
   - Kein echter iPad-Test.
+
+## Fahrphysik überarbeitet, Fahrzeugstatistik, Knopfsteuerung, Anlasser, „zuletzt online“
+
+- **Problem gemessen:** Mit vollem Lenkeinschlag drehte sich bei 80 km/h selbst der frontgetriebene Twingo, und beim Bremsen in der Kurve brachen alle Autos aus. Ein Fahrer mit reinen An/Aus-Knöpfen schaffte die Runde nur mit dem Twingo, mit 34 Drehern.
+- **Ursachen und Abhilfe** (`vehicle.ts`):
+  - Vorder- und Hinterachse erreichten die Haftgrenze gleichzeitig (neutral im Grenzbereich, kippelig). Jetzt hat die Hinterachse Reserve (Haftung ×1,12, höhere Seitensteifigkeit): Im Grenzbereich schiebt das Auto über die Vorderräder, wie ein gutmütiges Serienauto.
+  - Voller Einschlag bei Tempo überforderte die Vorderreifen. Jetzt wird der Einschlag je nach Tempo begrenzt (Kurvenradius aus der Haftgrenze plus bestem Schräglaufwinkel).
+  - ABS (immer aktiv) lässt jeder Achse die Seitenkraft, die die Kurve gerade braucht. Mehr Bremskraft vorn (70 %).
+  - ESP (Standard an, in der Probefahrt abschaltbar):
+    - Giermomentregelung, wenn das Auto stärker dreht, als Einschlag und Haftung erlauben.
+    - Gegenmoment bei zu großem Schwimmwinkel.
+    - Antriebsschlupfregelung.
+    - Ohne ESP lassen starke Hecktriebler mit Vollgas in der Kurve das Heck kommen – Driften für Könner.
+  - Drehende Teile (Räder, Getriebe, Schwungrad) werden mitbeschleunigt. Kleine Autos sind dadurch in den kurzen Gängen nicht mehr unrealistisch flott (Twingo 0–100 in 14 s).
+  - Reifenhaftung nach Baujahr (ältere Autos weniger) und Klasse (Sportreifen). Mittelmotor-Sportwagen mit 42 % Gewicht vorn.
+- **Logiktests:**
+  - Mit ESP kein Ausbrechen bei vollem Einschlag (50–110 km/h) und beim Bremsen in der Kurve.
+  - Ein Knopf-Fahrer schafft die Runde ohne Abkommen (Twingo, M4, 964).
+  - Ohne ESP driftet der M4, der Golf nicht.
+- **Fahrzeugstatistik** (`carStats.ts`, Karte in Akte und Prüfstand):
+  - PS, Nm, Gewicht, PS/t, Antrieb und Gänge.
+  - Gemessen mit derselben Fahrphysik: 0–100 km/h, Höchstgeschwindigkeit, Bremsweg aus 100 km/h, Querbeschleunigung (Handling), dazu Noten als Balken.
+  - Tuning, Fahrwerk, Reifen und Defekte zählen mit. Ergebnisse werden zwischengespeichert (alle 35 Modelle zusammen etwa 140 ms).
+- **Steuerung:** Knöpfe ◀ ▶ zum Lenken, Gas und Bremse (voll an/aus). Die Lenkung baut sich weich auf und wird je nach Tempo begrenzt. Dazu der Schalter „ESP an/aus“.
+- **Anlasser:**
+  - Der Elektromotor surrt und bricht bei jeder Verdichtung kurz ein. Dazu das dumpfe „Tschuck“ der Verdichtungstakte bei etwa 220/min.
+  - Danach zündet der Motor, die Drehzahl schießt kurz hoch und fällt auf Leerlauf.
+  - Kalt, Diesel oder Zündaussetzer: länger orgeln.
+- **Koop:** In der oberen Leiste steht bei Mitspielern, die nicht online sind, „zuletzt gerade eben / vor 12 min / vor 3 Std. / vor 2 Tagen“, ebenso im Chat-Fenster.
+- Geprüft:
+  - Logiktests.
+  - Durchläufe `koop` (neu: „zuletzt online“), `diagnose`, `markt`.
+  - Browser: Knöpfe (Gas, Lenken, Bremse, ESP) und die Statistik in der Akte.
+  - Hörproben des Anlassers.
+  - Kein echter iPad-Test.

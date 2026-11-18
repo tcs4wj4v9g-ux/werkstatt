@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCar } from './market';
 import { initialState, stepVehicle, vehicleSpec, type DriveInput, type VehicleSpec } from './vehicle';
+import { driveWorld } from '../three/driveWorld';
 import type { CarInstance } from './types';
 
 const flat = { grade: 0, grip: 1, drag: 0 };
@@ -134,5 +135,113 @@ describe('Fahrphysik', () => {
     expect(climb(0.12)).toBeLessThan(climb(0) * 0.9);
     const grass = { ...spec, muFront: spec.muFront * 0.55, muRear: spec.muRear * 0.55 };
     expect(cornerG(grass).g).toBeLessThan(cornerG(spec).g * 0.75);
+  });
+});
+
+const beta = (s: { vx: number; vy: number }) => Math.abs(Math.atan2(s.vy, Math.max(0.5, Math.abs(s.vx)))) * 57.3;
+
+describe('Fahrbarkeit: nicht dauernd ausbrechen, Driften nur mit Absicht', () => {
+  const cars = ['renard_twingle', 'bavaria_330', 'bmv_m4_g82', 'zuffen_946', 'veloce_stradale'];
+  it('mit ESP: voller Einschlag bei 50–110 km/h und Bremsen in der Kurve ohne Ausbrechen', () => {
+    for (const id of cars) {
+      const sp = mk(id);
+      for (const kmh of [50, 80, 110]) {
+        const s = initialState(0, 0, 0);
+        s.vx = kmh / 3.6;
+        s.gear = kmh < 60 ? 2 : kmh < 95 ? 3 : 4;
+        let b = 0;
+        for (let i = 0; i < 180; i++) {
+          stepVehicle(sp, s, { steer: 1, throttle: 0.3, brake: 0 }, flat, 1 / 60);
+          b = Math.max(b, beta(s));
+        }
+        expect(b, `${id} ${kmh} km/h voller Einschlag`).toBeLessThan(12);
+      }
+      const s = initialState(0, 0, 0);
+      s.vx = 80 / 3.6;
+      s.gear = 3;
+      let b = 0;
+      for (let i = 0; i < 60; i++) stepVehicle(sp, s, { steer: 0.6, throttle: 0.3, brake: 0 }, flat, 1 / 60);
+      for (let i = 0; i < 120; i++) {
+        stepVehicle(sp, s, { steer: 0.6, throttle: 0, brake: 1 }, flat, 1 / 60);
+        b = Math.max(b, beta(s));
+      }
+      expect(b, `${id} Bremsen in der Kurve`).toBeLessThan(15);
+    }
+  });
+
+  it('mit Knöpfen (Lenken voll/aus, Gas/Bremse voll/aus) schafft man die Runde ohne Abkommen', () => {
+    const w = driveWorld();
+    const n = w.samples.length;
+    for (const id of ['renard_twingle', 'bmv_m4_g82', 'zuffen_946']) {
+      const sp = mk(id);
+      const st = initialState(w.start.x, w.start.z, w.start.heading);
+      let near = 0;
+      let prog = 0;
+      let off = 0;
+      for (let t = 0; t < 300 && prog < n; t += 1 / 60) {
+        const q = w.nearest(st.x, st.z, near);
+        let d = q.i - near;
+        if (d > n / 2) d -= n;
+        if (d < -n / 2) d += n;
+        prog += d;
+        near = q.i;
+        if (Math.abs(q.lateral) > 4.4) off += 1 / 60;
+        const tg = w.samples[(near + 10) % n];
+        let diff = Math.atan2(-(tg.z - st.z), tg.x - st.x) - st.heading;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        let curv = 0;
+        for (let k = 5; k < 60; k++) curv = Math.max(curv, Math.abs(w.samples[(near + k) % n].curv));
+        const vt = Math.min(28, Math.sqrt((0.75 * 9.81) / Math.max(1e-4, curv)));
+        stepVehicle(sp, st, { steer: diff > 0.04 ? 1 : diff < -0.04 ? -1 : 0, throttle: st.vx < vt ? 1 : 0, brake: st.vx > vt + 3 ? 1 : 0 }, flat, 1 / 60);
+      }
+      expect(prog, `${id} Runde geschafft`).toBeGreaterThanOrEqual(n);
+      expect(off, `${id} Sekunden neben der Straße`).toBeLessThan(1);
+    }
+  });
+
+  it('ohne ESP: starker Hecktriebler driftet mit Vollgas in der Kurve, Frontantrieb nicht', () => {
+    const drift = (id: string, assist: boolean) => {
+      const sp = mk(id);
+      const s = initialState(0, 0, 0);
+      s.vx = 50 / 3.6;
+      s.gear = 2;
+      let b = 0;
+      for (let i = 0; i < 90; i++) {
+        stepVehicle(sp, s, { steer: 0.6, throttle: 1, brake: 0, assist }, flat, 1 / 60);
+        b = Math.max(b, beta(s));
+      }
+      return b;
+    };
+    expect(drift('bmv_m4_g82', false)).toBeGreaterThan(25);
+    expect(drift('bmv_m4_g82', true)).toBeLessThan(10);
+    expect(drift('vw_golf2_gti', false)).toBeLessThan(10);
+  });
+});
+
+describe('Fahrzeugstatistik', () => {
+  it('liefert für alle Modelle plausible Werte; Tuning und Defekte ändern sie in die richtige Richtung', async () => {
+    const { carStats } = await import('./carStats');
+    const { CAR_MODELS } = await import('./data/cars');
+    const t0 = Date.now();
+    const rows: string[] = [];
+    for (const id of Object.keys(CAR_MODELS)) {
+      const c = createCar(id, [], () => 0.5, { year: 2012 });
+      for (const k of Object.keys(c.components)) c.components[k].condition = 'ok';
+      const st = carStats(c);
+      rows.push(`${id.padEnd(22)} ${String(st.ps).padStart(3)} PS ${String(st.weight).padStart(4)} kg ${st.drive} 0-100 ${st.t100.toFixed(1).padStart(4)} s  ${Math.round(st.vmax)} km/h  Bremse ${st.brake100.toFixed(0)} m  ${st.lateralG.toFixed(2)} g  Noten ${Object.values(st.rating).join('/')}`);
+      expect(st.t100).toBeGreaterThan(2.5);
+      expect(st.t100).toBeLessThan(25);
+      expect(st.vmax).toBeGreaterThan(120);
+      for (const v of Object.values(st.rating)) expect(v).toBeGreaterThanOrEqual(0);
+    }
+    console.log(rows.join('\n'));
+    console.log('Rechenzeit für alle Modelle', Date.now() - t0, 'ms');
+    const base = createCar('bavaria_330', [], () => 0.5, { year: 2012 });
+    for (const k of Object.keys(base.components)) base.components[k].condition = 'ok';
+    const tuned = structuredClone(base);
+    tuned.visual = { ...(tuned.visual ?? {}), suspension: 'coilover', rimSize: 2 } as never;
+    expect(carStats(tuned).lateralG).toBeGreaterThan(carStats(base).lateralG);
+    const worn = createCar('bavaria_330', ['brakes'] as never, () => 0.5, { year: 2012 });
+    expect(carStats(worn).brake100).toBeGreaterThan(carStats(base).brake100 * 1.2);
   });
 });

@@ -1,3 +1,4 @@
+import { CarStatsCard } from './CarStatsCard';
 import { CAR_MODELS } from '../game/data/cars';
 import { SLOTS } from '../game/data/workshop';
 import { dirtLevel, interiorDirt, rustLevel, shineLevel } from '../game/detail';
@@ -52,6 +53,8 @@ export function FileModal() {
           {car.motor ? 'Der Motor ist ausgebaut (am Kran, auf dem Ständer oder im Lager) – seine Teile zählen hier weiter mit.' : 'In diesem Auto ist kein Motor. Motorursachen lassen sich erst wieder mit Motor prüfen.'}
         </p>
       )}
+      <h4>Fahrleistungen</h4>
+      <CarStatsCard car={car} />
       <h4>Beobachtete Symptome und mögliche Ursachen</h4>
       {symptoms.length === 0 && (
         <p className="meta">

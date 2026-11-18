@@ -114,23 +114,33 @@ export function CoopMenu() {
 }
 
 /** Anzeige in der Kopfzeile: Verbindungsstatus und wer online ist. */
+/** Wann ein Mitglied zuletzt online war (Sekunden seit 1970 vom Server). */
+export const ago = (seen: number) => {
+  const min = Math.max(0, Math.round((Date.now() / 1000 - seen) / 60));
+  return min < 2 ? 'gerade eben' : min < 90 ? `vor ${min} min` : min < 2880 ? `vor ${Math.round(min / 60)} Std.` : `vor ${Math.round(min / 1440)} Tagen`;
+};
+
 export function CoopChip() {
   const c = useCoop();
   const setPanel = useGame((s) => s.setPanel);
   if (c.status === 'off') return null;
   const others = c.members.filter((m) => m.id !== c.me);
-  const online = others.filter((m) => m.online);
   return (
     <button className={`btn coop-chip ${c.status}`} data-testid="coop-chip" onClick={() => (setPanel('coop'), void loadLedger())}>
-      {c.status === 'offline' ? '🔴 Offline' : '🟢 Koop'} · {others.length === 0 ? 'allein' : online.length ? online.map((m) => m.name).join(', ') : `${others[0].name} offline`}
+      {c.status === 'offline' ? '🔴 Offline' : '🟢 Koop'} ·{' '}
+      {others.length === 0
+        ? 'allein'
+        : others.map((m, i) => (
+            <span key={m.id} className={m.online ? 'mem-on' : 'mem-off'} data-testid={`member-${m.name}`}>
+              {i > 0 ? ', ' : ''}
+              {m.online ? m.name : `${m.name} (zuletzt ${ago(m.seen)})`}
+            </span>
+          ))}
     </button>
   );
 }
 
-const ago = (seen: number) => {
-  const min = Math.max(0, Math.round((Date.now() / 1000 - seen) / 60));
-  return min < 2 ? 'gerade eben' : min < 90 ? `vor ${min} min` : min < 2880 ? `vor ${Math.round(min / 60)} Std.` : `vor ${Math.round(min / 1440)} Tagen`;
-};
+
 
 /** Übersicht der gemeinsamen Werkstatt: Mitglieder, Einladung, Kontobuch. */
 export function CoopModal() {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { bubbleMs, CHAT_MAX, sendChat, setChatOpen, useChat, useCoop } from '../net/coop';
+import { ago } from './CoopUI';
 
 /** Häufige Sätze zum schnellen Antippen (auf dem iPad ohne Tastatur). */
 const QUICK = ['Hilf mir mal kurz!', 'Komm her, schau dir das an', 'Bin gleich da', 'Brauchst du die Ratsche?', 'Gute Arbeit 👍', 'Ich fahre Probe'];
@@ -21,6 +22,8 @@ export function ChatPanel() {
   const open = useChat((c) => c.open);
   const log = useChat((c) => c.log);
   const coop = useCoop((c) => c.status !== 'off');
+  const members = useCoop((c) => c.members);
+  const me = useCoop((c) => c.me);
   const [text, setText] = useState('');
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -34,6 +37,9 @@ export function ChatPanel() {
     <div className="chat-panel" data-testid="chat-panel">
       <div className="chat-head">
         <b>💬 Werkstatt-Chat</b>
+        <span className="meta" data-testid="chat-members">
+          {members.filter((m) => m.id !== me).map((m) => `${m.online ? '🟢' : '⚪'} ${m.name}${m.online ? '' : ` · ${ago(m.seen)}`}`).join('  ') || 'noch niemand eingeladen'}
+        </span>
         <button className="btn ghost" data-testid="chat-close" onClick={() => setChatOpen(false)}>✕</button>
       </div>
       <div className="chat-log" ref={list}>
