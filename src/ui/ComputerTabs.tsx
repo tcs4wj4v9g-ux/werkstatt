@@ -5,7 +5,7 @@ import { FLUID_LIST } from '../game/data/fluids';
 import { defsOf, engineOf, modelEngine } from '../game/data/components';
 import { PART_LIST, PARTS } from '../game/data/parts';
 import { fitOf, stockOf } from '../game/fitment';
-import { availableSlots, GARAGES, SLOTS, STAND_SLOT, UPGRADES, isJunk } from '../game/data/workshop';
+import { availableSlots, GARAGES, SLOTS, STAND_SLOTS, UPGRADES, isJunk } from '../game/data/workshop';
 import { travel } from '../three/player';
 import { fromStand, newEnginePrice, swapPlan, withRemovedEngine, type EngineUnit } from '../game/motor';
 import { ENGINES } from '../game/data/engines';
@@ -141,7 +141,7 @@ export function ShopList() {
   const fitted = partsCar ? new Set(defsOf(partsCar).flatMap((d) => [d.partId, ...(d.variants ?? [])]).filter(Boolean)) : new Set();
   if (car && car.motor !== null && !engineOf(car).turbo && !car.motor?.turboKit) fitted.add('turbo_kit');
   const [dept, setDept] = useState<'parts' | 'revision' | 'tuning' | 'swap'>('parts');
-  const motors = [s.crane, ...s.engines, ...(s.cars[STAND_SLOT] ? [fromStand(s.cars[STAND_SLOT]!)] : [])].filter((u): u is EngineUnit => !!u);
+  const motors = [s.crane, ...s.engines, ...STAND_SLOTS.filter((i) => s.cars[i]).map((i) => fromStand(s.cars[i]!))].filter((u): u is EngineUnit => !!u);
   return (
     <>
       <h4>Betriebsflüssigkeiten</h4>

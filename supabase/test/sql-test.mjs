@@ -221,6 +221,36 @@ test('Werkzeugkiste voll; weiteres Exemplar kaufen; Spezialwerkzeug nicht käufl
   assert.equal((await b.rpc('gk_sync', ws, 0, 0, null)).changes.length, 2);
 });
 
+test('Werkzeug verkaufen: halber Preis zurück, nie das letzte Exemplar, kein Spezialwerkzeug, nicht aus fremder Hand', async () => {
+  const { a, b, ws } = await workshop();
+  // Kiste A voll machen und dann ein Exemplar verkaufen – danach ist wieder Platz
+  for (let i = 0; i < 2; i++) assert.equal((await a.rpc('gk_buy_tool', ws, 'ratchet', 'kiste_a')).ok, true);
+  let tools = (await a.rpc('gk_get_state', ws)).tools;
+  const inA = tools.filter((t) => t.box === 'kiste_a' && t.type === 'ratchet');
+  const sold = await a.rpc('gk_sell_tool', ws, inA[0].id);
+  assert.equal(sold.ok, true);
+  let st = await b.rpc('gk_get_state', ws);
+  assert.equal(st.state.money, 10000 - 120 + 30, 'Ratsche 60 € gekauft, für 30 € verkauft');
+  assert.equal(st.tools.length, tools.length - 1);
+  assert.equal((await a.rpc('gk_buy_tool', ws, 'ratchet', 'kiste_a')).ok, true, 'wieder Platz in der Kiste');
+  // Spezialwerkzeug und letztes Exemplar sind nicht verkäuflich
+  tools = (await a.rpc('gk_get_state', ws)).tools;
+  assert.equal((await a.rpc('gk_sell_tool', ws, tools.find((t) => t.type === 'obd').id)).reason, 'nicht_verkaeuflich');
+  const screwdrivers = tools.filter((t) => t.type === 'screwdriver');
+  for (const t of screwdrivers.slice(1)) assert.equal((await a.rpc('gk_sell_tool', ws, t.id)).ok, true);
+  assert.equal((await a.rpc('gk_sell_tool', ws, screwdrivers[0].id)).reason, 'letztes_exemplar');
+  // Was ein anderer trägt, kann man nicht verkaufen; der Träger selbst schon
+  const wrench = tools.find((t) => t.type === 'wrench' && t.box === 'kiste_b').id;
+  await b.rpc('gk_take_tool', ws, wrench);
+  assert.equal((await a.rpc('gk_sell_tool', ws, wrench)).reason, 'traegt_anderer');
+  assert.equal((await b.rpc('gk_sell_tool', ws, wrench)).ok, true);
+  // Neue Kisten in Halle 2
+  assert.equal((await a.rpc('gk_buy_tool', ws, 'ratchet', 'halle2')).ok, true);
+  assert.equal((await a.rpc('gk_buy_tool', ws, 'ratchet', 'spezial2')).ok, true);
+  st = await a.rpc('gk_get_state', ws);
+  assert.equal(new Set(st.tools.map((t) => t.id)).size, st.tools.length, 'kein Exemplar doppelt');
+});
+
 test('Lange Abwesenheit: Werkzeug kehrt als dasselbe Exemplar zurück', async () => {
   const { a, b, ws } = await workshop();
   const tools = (await a.rpc('gk_get_state', ws)).tools;

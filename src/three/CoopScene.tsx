@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { TOOL_MAP } from '../game/data/tools';
 import { openBox, remotePlayers, useChat, useCoop } from '../net/coop';
+import { useGame } from '../game/store';
 import { Interactable } from './Interactable';
 import { mat, Mesher } from './mesher';
 import { place, type Box } from './player';
@@ -13,13 +14,15 @@ import { DECO, decoMaterials } from './workshopDecor';
 
 type V3 = [number, number, number];
 /** Standorte der Werkzeugkisten (der bestehende Werkzeugschrank ist die vierte Kiste). */
-export const BOX_SITES: { id: string; label: string; p: V3; rot: number; size: [number, number] }[] = [
+export const BOX_SITES: { id: string; label: string; p: V3; rot: number; size: [number, number]; pro?: boolean }[] = [
   { id: 'kiste_a', label: 'Werkzeugkiste A', p: [-1.3, 0, -0.76], rot: 0, size: [0.8, 0.46] },
   { id: 'kiste_b', label: 'Werkzeugkiste B', p: [-1.3, 0, 0.76], rot: 0, size: [0.8, 0.46] },
   { id: 'spezial', label: 'Spezialwerkzeugschrank', p: [2.45, 0, 5.3], rot: 0, size: [0.9, 0.5] },
+  // Halle 2: zweiter Schrank an der Rückwand, Tür zur Halle (steht auch im Einzelspiel, Hindernis in siteBoxes)
+  { id: 'spezial2', label: 'Spezialwerkzeugschrank Halle 2', p: [6.15, 0, -10.45], rot: Math.PI / 2, size: [0.5, 0.9], pro: true },
 ];
 /** Hindernisse der Koop-Kisten für die Laufsteuerung. */
-export const coopBoxes = (): Box[] => BOX_SITES.map((b) => ({ minX: b.p[0] - b.size[0] / 2, maxX: b.p[0] + b.size[0] / 2, minZ: b.p[2] - b.size[1] / 2, maxZ: b.p[2] + b.size[1] / 2 }));
+export const coopBoxes = (): Box[] => BOX_SITES.filter((b) => !b.pro).map((b) => ({ minX: b.p[0] - b.size[0] / 2, maxX: b.p[0] + b.size[0] / 2, minZ: b.p[2] - b.size[1] / 2, maxZ: b.p[2] + b.size[1] / 2 }));
 
 let cartGeo: THREE.BufferGeometry | null = null;
 let lockerGeo: THREE.BufferGeometry | null = null;
@@ -61,14 +64,17 @@ function locker() {
 export function ToolBoxes() {
   const active = useCoop((c) => c.status !== 'off');
   const tools = useCoop((c) => c.tools);
-  if (!active) return null;
+  const pro = useGame((s) => s.upgrades.includes('loc_pro'));
+  // Im Einzelspiel steht nur der Schrank in Halle 2 (öffnet den Werkzeugschrank wie der Werkzeugwagen dort).
+  const sites = BOX_SITES.filter((b) => (b.pro ? pro : active));
+  if (!sites.length) return null;
   return (
     <>
-      {BOX_SITES.map((b) => {
+      {sites.map((b) => {
         const n = tools.filter((t) => t.box === b.id).length;
-        const special = b.id === 'spezial';
+        const special = b.id.startsWith('spezial');
         return (
-          <Interactable key={b.id} id={`box_${b.id}`} label={`${b.label} (${n} Werkzeuge)`} onUse={() => openBox(b.id)} position={b.p} rotation={[0, b.rot, 0]} halo={special ? [0.92, 1.56, 0.52] : [0.86, 0.9, 0.5]} haloPos={[0, special ? 0.78 : 0.45, 0]}>
+          <Interactable key={b.id} id={`box_${b.id}`} label={active ? `${b.label} (${n} Werkzeuge)` : b.label} onUse={() => (active ? openBox(b.id) : useGame.getState().setPanel('cabinet'))} position={b.p} rotation={[0, b.rot, 0]} halo={special ? [0.92, 1.56, 0.52] : [0.86, 0.9, 0.5]} haloPos={[0, special ? 0.78 : 0.45, 0]}>
             <mesh geometry={special ? locker() : cart()} material={decoMaterials()} castShadow />
             <mesh position={[0, special ? 1.36 : 0.5, special ? -0.243 : 0.214]} rotation={[0, special ? Math.PI : 0, 0]}>
               <planeGeometry args={[special ? 0.48 : 0.34, 0.075]} />

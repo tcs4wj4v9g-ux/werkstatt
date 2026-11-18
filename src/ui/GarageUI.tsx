@@ -105,9 +105,9 @@ export function GarageUI() {
           {!work && <Joystick />}
           {near && kind === 'stand' && (
             <div className="car-actions">
-              <button className="btn primary" data-testid="standpanel" onClick={() => s.setPanel('crane')}>🛠 Motorständer</button>
-              <button className="btn" onClick={() => s.flipEngine()}>↻ Drehen</button>
-              <button className="btn" onClick={() => s.testEngine()}>📊 Prüfen</button>
+              <button className="btn primary" data-testid="standpanel" onClick={() => s.setPanel('crane', nearBay)}>🛠 Motorständer</button>
+              <button className="btn" onClick={() => s.flipEngine(nearBay)}>↻ Drehen</button>
+              <button className="btn" onClick={() => s.testEngine(nearBay)}>📊 Prüfen</button>
             </div>
           )}
           {near && kind === 'junk' && (
@@ -130,7 +130,7 @@ export function GarageUI() {
               <button className="btn" data-testid="file" onClick={() => s.setPanel('file', nearBay)}>📋 Akte</button>
               <button className="btn" data-testid="tuning" onClick={() => s.setPanel('tuning', nearBay)}>🛠 Tuning</button>
               {kind === 'lift' && !near.lifted && near.hoodOpen && s.upgrades.includes('hoist') && (
-                <button className="btn" data-testid="cranepanel" onClick={() => s.setPanel('crane')}>🏗 {near.motor === null ? 'Motor einsetzen' : 'Motor ausbauen'}</button>
+                <button className="btn" data-testid="cranepanel" onClick={() => s.setPanel('crane', nearBay)}>🏗 {near.motor === null ? 'Motor einsetzen' : 'Motor ausbauen'}</button>
               )}
               {kind === 'lift' && <button className="btn" data-testid="fluids" onClick={() => s.setPanel('fluids', nearBay)}>🛢 Flüssigkeiten</button>}
               {kind === 'expo' && <button className="btn primary" data-testid="orbit" onClick={() => useView.setState({ orbit: nearBay })}>🔄 Rundum-Ansicht</button>}

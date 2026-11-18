@@ -129,6 +129,9 @@ SLOTS.push(
     ...(i >= 2 ? { needs: `expo${i + 1}` as ExpoId } : {}),
   })),
 );
+// Zweiter Motorständer in Halle 2 (mit der Profi-Werkstatt): hinten angehängt, damit alte Spielstände gültig bleiben
+SLOTS.push({ id: SLOTS.length, kind: 'stand', label: 'Motorständer Halle 2', x: 3.1, z: -10.0, rot: 0, needs: 'loc_pro' });
+export const STAND2_SLOT = SLOTS.length - 1;
 export const isExpo = (slot: number) => SLOTS[slot]?.kind === 'expo';
 /** Ausstellungsfläche mit Verkaufsbonus (Showroom im Headquarters oder Autohaus). */
 export const isShowcase = (slot: number) => SLOTS[slot]?.kind === 'show' || SLOTS[slot]?.kind === 'expo';
@@ -142,6 +145,12 @@ export const isLift = (slot: number) => SLOTS[slot]?.kind === 'lift';
 /** Platz für eigene Fahrzeuge (nicht Motorständer, nicht Schrottplatz). */
 export const isFleet = (slot: number) => !!SLOTS[slot] && SLOTS[slot].kind !== 'stand' && SLOTS[slot].kind !== 'junk';
 export const STAND_SLOT = 15;
+/** Alle Motorständer (Stammhalle, Halle 2). */
+export const STAND_SLOTS = SLOTS.filter((s) => s.kind === 'stand').map((s) => s.id);
+export const isStand = (slot: number) => SLOTS[slot]?.kind === 'stand';
+/** Zu welchem Motorständer (und Kran) ein Platz gehört: der Ständer selbst, sonst der in derselben Halle. */
+export const standFor = (slot: number, upgrades: string[]) =>
+  isStand(slot) ? slot : SLOTS[slot] && SLOTS[slot].z < -5.6 && upgrades.includes('loc_pro') && slotPlace(slot) === 'werkstatt' ? STAND2_SLOT : STAND_SLOT;
 export const JUNK_SLOTS = SLOTS.filter((s) => s.kind === 'junk').map((s) => s.id);
 export const isJunk = (slot: number) => SLOTS[slot]?.kind === 'junk';
 /** Aufschlag beim Verkauf aus dem Showroom heraus. */
@@ -173,7 +182,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: 'hoist', stage: 0, equipment: true, name: 'Motor- und Getriebeheber', price: 6500, desc: 'Hydraulischer Heber für schwere Aggregate. Ohne ihn lässt sich kein Getriebe aus- oder einbauen – damit werden kapitale Schäden reparierbar.' },
   { id: 'dyno', stage: 0, equipment: true, name: 'Leistungsprüfstand', price: 28000, desc: 'Rollenprüfstand: misst Leistung und Drehmoment im aktuellen Zustand, zeigt die Kurve und Abweichungen vom Werkswert. Ein Messprotokoll steigert den Verkaufswert.', requires: 'expansion' },
   { id: 'expansion', stage: 5, name: 'Größere Werkstatt', price: 15000, desc: 'Lageranbau mit Großhandelskonditionen (Teile und Flüssigkeiten 10 % günstiger) und zwei weitere Stellplätze.', requires: 'parking' },
-  { id: 'loc_pro', stage: 6, location: true, name: 'Profi-Werkstatt (Halle 2)', price: 75000, desc: 'Anbau mit dritter Hebebühne – drei Autos gleichzeitig in Arbeit. Durchgang von der Stammhalle.', requires: 'expansion' },
+  { id: 'loc_pro', stage: 6, location: true, name: 'Profi-Werkstatt (Halle 2)', price: 75000, desc: 'Anbau mit dritter Hebebühne – drei Autos gleichzeitig in Arbeit. Eigene Ausstattung: Werkzeugwagen, Spezialwerkzeugschrank, Motorständer und (mit Motorheber) ein zweiter Kran. Durchgang von der Stammhalle.', requires: 'expansion' },
   { id: 'loc_center', stage: 7, location: true, name: 'Performance-Center', price: 200000, desc: 'Halle 2 wird verlängert: vierte Hebebühne. Leistungsprüfstand, Waschplatz und Lackierkabine sind im Preis enthalten.', requires: 'loc_pro', grants: ['wash', 'paint', 'dyno'] },
   { id: 'loc_hq', stage: 8, location: true, name: 'Headquarters mit Showroom', price: 500000, desc: 'Verglaster Showroom mit drei Ausstellungsplätzen. Ausgestellte Autos verkaufen sich 4 % teurer und bringen der Sammlung mehr Ansehen.', requires: 'loc_center' },
   ...GARAGES.map((g): UpgradeDef => ({

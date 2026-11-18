@@ -610,3 +610,13 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Browser: Knöpfe (Gas, Lenken, Bremse, ESP) und die Statistik in der Akte.
   - Hörproben des Anlassers.
   - Kein echter iPad-Test.
+
+## Halle 2 mit eigener Ausstattung, Werkzeug verkaufen
+
+- **Motorständer Halle 2:** neuer Stellplatz (`STAND2_SLOT`, hinten an die Liste angehängt → 132 Plätze). Alte Spielstände und Koop-Stände werden beim Laden wie bisher verlängert. Den Ständer gibt es nur mit `loc_pro`.
+- **Zweiter Motorkran** in Halle 2 bei (3,1 / −8,0), sobald auch der Motorheber gekauft ist. Es gibt weiterhin nur einen hängenden Motor (`crane`). Er wird an dem Kran gezeigt, dessen Fenster zuletzt offen war (`useCraneSite`, nur Anzeige).
+- **Kranfenster:** `standFor(bay, upgrades)` wählt den Ständer der Halle. Hebebühnen 3 und 4 sowie Ständer 2 gehören zu Halle 2, alles andere zur Stammhalle. `craneToStand`, `standToCrane`, `flipEngine`, `testEngine` und `fitTurboKit` nehmen den Ständerplatz entgegen. Die Motorübersicht am Computer zeigt beide Ständer.
+- **Spezialwerkzeugschrank Halle 2** an der Rückwand. Im Koop ist es die eigene Kiste `spezial2` (4 Plätze). Der Werkzeugwagen dort ist jetzt die Kiste `halle2` (8 Plätze) statt eines zweiten Zugangs zum Werkzeugschrank. Im Einzelspiel öffnen beide den Werkzeugschrank.
+- **Werkzeug verkaufen (Koop):** Knopf „Verkaufen“ in der Kiste und für Werkzeug in der eigenen Leiste. Erstattet wird der halbe Kaufpreis. Das letzte Exemplar einer Art und Werkzeug in fremder Hand lassen sich nicht verkaufen. Serverseitig über `gk_sell_tool`, mit Buchung im Kassenbuch.
+- **Schema:** `gk_box_cap` kennt `halle2` und `spezial2`, neu ist `gk_sell_tool`, und `gk_reclaim` nutzt die neuen Kisten als Ausweichplatz. **`supabase/schema.sql` muss einmal im Supabase-SQL-Editor ausgeführt werden.**
+- Tests: Logiktest Slotzahl; `schrott.cjs` prüft Ständer 2 (gesperrt ohne Halle 2, Kranfenster „Halle 2“, auf/ab, drehen, Ständer 1 unberührt); `koop.cjs` prüft das Verkaufen; SQL-Test für `gk_sell_tool`.

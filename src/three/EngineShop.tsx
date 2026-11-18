@@ -2,7 +2,8 @@ import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { ENGINES } from '../game/data/engines';
-import { STAND_SLOT, SLOTS } from '../game/data/workshop';
+import { create } from 'zustand';
+import { STAND2_SLOT, STAND_SLOT, SLOTS } from '../game/data/workshop';
 import { asStand } from '../game/motor';
 import { useGame } from '../game/store';
 import type { ZoneId } from '../game/types';
@@ -11,16 +12,23 @@ import { bayMaterials, engineDecor } from './engineBay';
 import { Interactable } from './Interactable';
 import { Mesher, type V3 } from './mesher';
 import type { Box } from './player';
-import { useFocus } from './player';
 import { DECO, decoMaterials } from './workshopDecor';
 
 // Motorwerkstatt: Motorständer (drehbar), Motorkran mit hängendem Motor, Motorlager auf Paletten im Hof.
 
 export const CRANE_POS: V3 = [3.1, 0, 1.45];
+/** Zweiter Kran in Halle 2 (sobald der Motorheber gekauft ist), wie in der Stammhalle 2 m vor dem Ständer. */
+export const CRANE2_POS: V3 = [3.1, 0, -8.0];
+/** An welchem Kran der Motor hängt (nur Anzeige): an dem, dessen Fenster zuletzt offen war. */
+export const useCraneSite = create<{ hall2: boolean }>(() => ({ hall2: false }));
+const craneBox = (p: V3): Box => ({ minX: p[0] - 0.5, maxX: p[0] + 0.5, minZ: p[2] - 0.38, maxZ: p[2] + 0.38 });
 /** Paletten des Motorlagers im Hof (vier je Reihe). */
 export const PALLETS: V3[] = [0, 1, 2, 3].flatMap((i) => [0.2, 1.5].map((z) => [-9 - i * 1.3, 0, z] as V3));
-export const engineShopBoxes = (hoist: boolean): Box[] => [
-  ...(hoist ? [{ minX: CRANE_POS[0] - 0.5, maxX: CRANE_POS[0] + 0.5, minZ: CRANE_POS[2] - 0.38, maxZ: CRANE_POS[2] + 0.38 }] : []),
+export const engineShopBoxes = (hoist: boolean, pro = false): Box[] => [
+  ...(hoist ? [craneBox(CRANE_POS)] : []),
+  // Halle 2: Ständer und Kran gehören zur Ausstattung des Anbaus
+  ...(pro && hoist ? [craneBox(CRANE2_POS)] : []),
+  ...(pro ? [{ minX: SLOTS[STAND2_SLOT].x - 0.65, maxX: SLOTS[STAND2_SLOT].x + 0.65, minZ: SLOTS[STAND2_SLOT].z - 0.45, maxZ: SLOTS[STAND2_SLOT].z + 0.45 }] : []),
   { minX: -14.2, maxX: -8.4, minZ: -0.35, maxZ: 2.05 },
 ];
 
@@ -86,58 +94,77 @@ function craneGeometry() {
   return craneGeo;
 }
 
-/** Motorständer mit dem Motor darauf (interaktiv wie ein Auto) und der Kran daneben. */
-export function EngineShop() {
-  const car = useGame((s) => s.cars[STAND_SLOT]);
-  const crane = useGame((s) => s.crane);
-  const hoist = useGame((s) => s.upgrades.includes('hoist'));
+/** Motorständer mit dem Motor darauf (interaktiv wie ein Auto). */
+function Stand({ id }: { id: number }) {
+  const car = useGame((s) => s.cars[id]);
   const tool = useGame((s) => s.tool);
-  const near = useFocus((f) => f.nearBay === STAND_SLOT);
   const flip = useRef<THREE.Group>(null);
   const handlers = useMemo(() => {
     const g = useGame.getState;
     return {
       onHood: () => g().say('Der Motor hat keine Haube – drehen kannst du ihn am Ständer.'),
-      onComponent: (id: string) => g().tapComponent(STAND_SLOT, id),
-      onBolt: (id: string, i: number) => g().tapBolt(STAND_SLOT, id, i),
-      onConnector: (id: string) => g().tapConnector(STAND_SLOT, id),
-      onBody: (zone?: ZoneId) => g().tapBody(STAND_SLOT, zone),
-      onFluid: () => g().setPanel('fluids', STAND_SLOT),
+      onComponent: (c: string) => g().tapComponent(id, c),
+      onBolt: (c: string, i: number) => g().tapBolt(id, c, i),
+      onConnector: (c: string) => g().tapConnector(id, c),
+      onBody: (zone?: ZoneId) => g().tapBody(id, zone),
+      onFluid: () => g().setPanel('fluids', id),
       onBleed: () => undefined,
     };
-  }, []);
-  const hanging = useMemo(() => (crane ? asStand(crane, 'bavaria_320') : null), [crane]);
-  const slot = SLOTS[STAND_SLOT];
+  }, [id]);
+  const slot = SLOTS[id];
   // Drehung sichtbar nachführen (das Modell selbst springt beim Drehen auf die neue Lage).
   useFrame(() => {
     if (flip.current) flip.current.rotation.x = car?.lifted ? Math.PI : 0;
   });
   return (
-    <>
-      <group position={[slot.x, 0, slot.z]}>
-        <mesh geometry={standGeometry()} material={decoMaterials()} castShadow />
-        <group ref={flip} position={[0, 0.95, 0]}>
-          <mesh geometry={armsGeometry()} material={decoMaterials()} />
-        </group>
-        <Interactable id="stand" label={car ? 'Motorständer – drehen, prüfen, an den Kran' : 'Motorständer (leer)'} onUse={() => useGame.getState().setPanel('crane')} position={[-0.62, 0.95, 0.24]} halo={[0.16, 0.16, 0.16]}>
-          <mesh>
-            <sphereGeometry args={[0.07, 8, 6]} />
-            <meshBasicMaterial visible={false} />
-          </mesh>
-        </Interactable>
-        {car && <CarModel body="sedan" color="#6f757c" car={car} handlers={handlers} tool={tool} lod={near ? 'full' : 'full'} modelId={car.modelId} />}
+    <group position={[slot.x, 0, slot.z]}>
+      <mesh geometry={standGeometry()} material={decoMaterials()} castShadow />
+      <group ref={flip} position={[0, 0.95, 0]}>
+        <mesh geometry={armsGeometry()} material={decoMaterials()} />
       </group>
-      {hoist && (
-        <group position={CRANE_POS}>
-          <Interactable id="crane" label={crane ? `Motorkran – ${ENGINES[crane.motor.engineId]?.name ?? 'Motor'} hängt dran` : 'Motorkran'} onUse={() => useGame.getState().setPanel('crane')} halo={[1.2, 1.7, 0.8]} haloPos={[0.05, 0.85, 0]}>
-            <mesh geometry={craneGeometry()} material={decoMaterials()} castShadow />
-          </Interactable>
-          {hanging && (
-            <group position={[0.63, 0.12, 0]} rotation={[0, Math.PI / 2, 0]}>
-              <CarModel body="sedan" color="#6f757c" car={hanging} lod="full" modelId={hanging.modelId} />
-            </group>
-          )}
+      <Interactable id={id === STAND_SLOT ? 'stand' : `stand${id}`} label={car ? 'Motorständer – drehen, prüfen, an den Kran' : 'Motorständer (leer)'} onUse={() => useGame.getState().setPanel('crane', id)} position={[-0.62, 0.95, 0.24]} halo={[0.16, 0.16, 0.16]}>
+        <mesh>
+          <sphereGeometry args={[0.07, 8, 6]} />
+          <meshBasicMaterial visible={false} />
+        </mesh>
+      </Interactable>
+      {car && <CarModel body="sedan" color="#6f757c" car={car} handlers={handlers} tool={tool} lod="full" modelId={car.modelId} />}
+    </group>
+  );
+}
+
+/** Motorkran; der hängende Motor erscheint an dem Kran, der zuletzt benutzt wurde. */
+function Crane({ pos, stand, hall2 }: { pos: V3; stand: number; hall2: boolean }) {
+  const crane = useGame((s) => s.crane);
+  const here = useCraneSite((c) => c.hall2 === hall2);
+  const hanging = useMemo(() => (crane && here ? asStand(crane, 'bavaria_320') : null), [crane, here]);
+  return (
+    <group position={pos}>
+      <Interactable id={hall2 ? 'crane2' : 'crane'} label={crane && here ? `Motorkran – ${ENGINES[crane.motor.engineId]?.name ?? 'Motor'} hängt dran` : hall2 ? 'Motorkran Halle 2' : 'Motorkran'} onUse={() => useGame.getState().setPanel('crane', stand)} halo={[1.2, 1.7, 0.8]} haloPos={[0.05, 0.85, 0]}>
+        <mesh geometry={craneGeometry()} material={decoMaterials()} castShadow />
+      </Interactable>
+      {hanging && (
+        <group position={[0.63, 0.12, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <CarModel body="sedan" color="#6f757c" car={hanging} lod="full" modelId={hanging.modelId} />
         </group>
+      )}
+    </group>
+  );
+}
+
+/** Motorständer und Kran der Stammhalle, mit Halle 2 ein zweites Paar dort. */
+export function EngineShop() {
+  const hoist = useGame((s) => s.upgrades.includes('hoist'));
+  const pro = useGame((s) => s.upgrades.includes('loc_pro'));
+  return (
+    <>
+      <Stand id={STAND_SLOT} />
+      {hoist && <Crane pos={CRANE_POS} stand={STAND_SLOT} hall2={false} />}
+      {pro && (
+        <>
+          <Stand id={STAND2_SLOT} />
+          {hoist && <Crane pos={CRANE2_POS} stand={STAND2_SLOT} hall2 />}
+        </>
       )}
     </>
   );

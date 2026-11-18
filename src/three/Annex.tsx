@@ -145,7 +145,7 @@ export function Annex() {
           <Box p={[ROOM.maxX - 0.008, 1.22, cz2]} s={[0.012, 0.06, d2]} c="#ff7a1a" />
           <Sign text={center ? 'PERFORMANCE-CENTER' : 'HALLE 2'} p={[ROOM.maxX - 0.03, 2.8, cz2]} rot={[0, -Math.PI / 2, 0]} size={[3.2, 0.5]} />
           {/* Einrichtung an der Rückwand: Werkzeugwagen (wie der Werkzeugschrank), Terminal (Teile, Markt, Aufträge), Teileregal */}
-          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('schrank') : setPanel('cabinet'))} position={[5.7, 0, -8.1]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
+          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('halle2') : setPanel('cabinet'))} position={[5.7, 0, -8.1]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
             <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 1.1]} c="#b3261e" m={0.4} r={0.5} />
             <Box p={[0, 1.03, 0]} s={[0.74, 0.06, 1.14]} c="#2a2c30" m={0.5} />
             {[0.25, 0.5, 0.75].map((y) => (

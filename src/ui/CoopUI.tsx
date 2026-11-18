@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CABINET_TOOLS, MAX_CARRIED, TOOL_MAP } from '../game/data/tools';
 import { useGame } from '../game/store';
 import { COOP_CONFIGURED } from '../net/config';
-import { BOXES, buyTool, createWorkshop, joinWorkshop, lastWorkshop, leave, listWorkshops, loadLedger, openWorkshop, returnTool, setInvite, takeTool, TOOL_PRICE, useCoop } from '../net/coop';
+import { BOXES, buyTool, createWorkshop, joinWorkshop, lastWorkshop, leave, listWorkshops, loadLedger, openWorkshop, returnTool, sellPrice, sellTool, setInvite, takeTool, TOOL_PRICE, useCoop, type ToolItem } from '../net/coop';
 import { eur, Modal } from './common';
 
 const NAME_KEY = 'garage-kings-koop-name';
@@ -193,6 +193,8 @@ export function CoopCabinet() {
   const mine = c.tools.filter((t) => t.holder === c.me);
   const others = c.tools.filter((t) => t.holder && t.holder !== c.me && t.home === box);
   const nameOf = (id: string | null) => c.members.find((m) => m.id === id)?.name ?? 'Partner';
+  // Verkaufen: nur käufliches Werkzeug und nicht das letzte Exemplar einer Art (wie auf dem Server)
+  const canSell = (t: ToolItem) => sellPrice(t.type) !== null && c.tools.filter((x) => x.type === t.type).length > 1;
   return (
     <Modal title={`${BOXES[box].name} – ${here.length}/${BOXES[box].cap} Plätze belegt`} onClose={() => g.setPanel(null)} wide>
       <h4>In dieser Kiste</h4>
@@ -206,6 +208,7 @@ export function CoopCabinet() {
               <div className="meta">{TOOL_MAP[t.type].hint}</div>
             </div>
             <button className="btn primary" disabled={mine.length >= MAX_CARRIED} onClick={() => void takeTool(t)}>Nehmen</button>
+            {canSell(t) && <button className="btn" data-testid={`sell-${t.type}`} onClick={() => void sellTool(t)}>Verkaufen · {eur(sellPrice(t.type)!)}</button>}
           </div>
         ))}
       </div>
@@ -221,10 +224,11 @@ export function CoopCabinet() {
               <div className="meta">gehört in: {BOXES[t.home]?.name ?? t.home}</div>
             </div>
             <button className="btn" onClick={() => void returnTool(t, box)}>Hier ablegen</button>
+            {canSell(t) && <button className="btn" data-testid={`sell-mine-${t.type}`} onClick={() => void sellTool(t)}>Verkaufen · {eur(sellPrice(t.type)!)}</button>}
           </div>
         ))}
       </div>
-      {box !== 'spezial' && (
+      {!box.startsWith('spezial') && (
         <>
           <h4>Weiteres Exemplar für diese Kiste kaufen</h4>
           <div className="row wrap">
@@ -237,7 +241,7 @@ export function CoopCabinet() {
         </>
       )}
       <p className="meta">
-        Jedes Werkzeug ist ein einzelnes Exemplar: Was du nimmst, fehlt in der Kiste, bis du es zurücklegst. Drehmomentschlüssel und OBD-Diagnosegerät gibt es nur einmal – im Spezialwerkzeugschrank am Schreibtisch.
+        Jedes Werkzeug ist ein einzelnes Exemplar: Was du nimmst, fehlt in der Kiste, bis du es zurücklegst. Überzähliges Werkzeug lässt sich für den halben Preis verkaufen (nicht das letzte Exemplar einer Art, kein Spezialwerkzeug). Drehmomentschlüssel und OBD-Diagnosegerät gibt es nur einmal – im Spezialwerkzeugschrank am Schreibtisch.
         Hand und Prüflampe hat jeder immer dabei.
       </p>
     </Modal>

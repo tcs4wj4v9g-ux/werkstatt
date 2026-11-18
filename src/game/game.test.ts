@@ -681,7 +681,7 @@ describe('Werkstattausbau und Scheunenfunde', () => {
     // Werkstatt- und Schrottplatz-Plätze behalten ihre Nummern (Spielstände)
     expect(SLOTS[21].kind).toBe('junk');
     expect(SLOTS[22].label).toBe('Tiefgarage Klein · Platz 1');
-    expect(SLOTS.length).toBe(22 + 6 + 15 + 30 + 50 + 8);
+    expect(SLOTS.length).toBe(22 + 6 + 15 + 30 + 50 + 8 + 1); // + Motorständer Halle 2
   });
 
   it('Autohaus: zwei Plätze von Anfang an, jeder weitere einzeln kaufbar, Verkaufsbonus wie im Showroom', async () => {
