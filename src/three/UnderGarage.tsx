@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
 import { BAY, GARAGE_MAP, garageLayout, SLOTS, type GarageId } from '../game/data/workshop';
+import { useAway } from '../net/coop';
 import { useGame } from '../game/store';
 import type { ZoneId } from '../game/types';
 import { CarModel } from './CarModel';
@@ -126,7 +127,9 @@ function ramp(id: GarageId) {
 
 /** Ein geparktes Auto: vereinfachtes Modell, Türen und Karosserie antippbar; weit entfernt nicht gezeichnet. */
 function GarageCar({ slot }: { slot: number }) {
-  const car = useGame((s) => s.cars[slot]);
+  const stored = useGame((s) => s.cars[slot]);
+  const away = useAway((a) => !!stored && a.uids.includes(stored.uid));
+  const car = away ? null : stored;
   const group = useRef<THREE.Group>(null);
   const def = SLOTS[slot];
   const handlers = useMemo(() => {

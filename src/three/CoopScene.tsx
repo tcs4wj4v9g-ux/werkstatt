@@ -18,8 +18,8 @@ export const BOX_SITES: { id: string; label: string; p: V3; rot: number; size: [
   { id: 'kiste_a', label: 'Werkzeugkiste A', p: [-1.3, 0, -0.76], rot: 0, size: [0.8, 0.46] },
   { id: 'kiste_b', label: 'Werkzeugkiste B', p: [-1.3, 0, 0.76], rot: 0, size: [0.8, 0.46] },
   { id: 'spezial', label: 'Spezialwerkzeugschrank', p: [2.45, 0, 5.3], rot: 0, size: [0.9, 0.5] },
-  // Halle 2: zweiter Schrank an der Rückwand, Tür zur Halle (steht auch im Einzelspiel, Hindernis in siteBoxes)
-  { id: 'spezial2', label: 'Spezialwerkzeugschrank Halle 2', p: [6.15, 0, -10.45], rot: Math.PI / 2, size: [0.5, 0.9], pro: true },
+  // Halle 2: zweiter Schrank in der Motorenbau-Nische, Tür zur Halle (steht auch im Einzelspiel, Hindernis in siteBoxes)
+  { id: 'spezial2', label: 'Spezialwerkzeugschrank Halle 2', p: [10.35, 0, -9.8], rot: Math.PI / 2, size: [0.5, 0.9], pro: true },
 ];
 /** Hindernisse der Koop-Kisten für die Laufsteuerung. */
 export const coopBoxes = (): Box[] => BOX_SITES.filter((b) => !b.pro).map((b) => ({ minX: b.p[0] - b.size[0] / 2, maxX: b.p[0] + b.size[0] / 2, minZ: b.p[2] - b.size[1] / 2, maxZ: b.p[2] + b.size[1] / 2 }));

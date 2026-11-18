@@ -4,7 +4,7 @@ import { SLOTS } from '../game/data/workshop';
 import { useGame } from '../game/store';
 import { coopActive, openBox } from '../net/coop';
 import { Interactable } from './Interactable';
-import { PASSAGE, ROOM, hall2, SHOWROOM } from './player';
+import { NICHE, PASSAGE, ROOM, hall2, SHOWROOM } from './player';
 import { concreteTexture, textTexture, wallTexture } from './textures';
 
 // Größere Standorte: Halle 2 (dritte und vierte Hebebühne) schließt an die
@@ -57,6 +57,44 @@ export function GapWall({ z, color = '#d9d6cc', thickness = 0.2 }: { z: number; 
         <Box key={x} p={[x, PASSAGE.height / 2, z]} s={[0.12, PASSAGE.height, thickness + 0.08]} c="#3f4650" m={0.5} />
       ))}
       <Box p={[(PASSAGE.minX + PASSAGE.maxX) / 2, PASSAGE.height, z]} s={[PASSAGE.maxX - PASSAGE.minX + 0.12, 0.12, thickness + 0.08]} c="#3f4650" m={0.5} />
+    </group>
+  );
+}
+
+/** Offene Nische hinter Halle 2 für den Motorenbau: Boden, Decke, drei Wände, Licht und Schild. */
+function Niche({ floor }: { floor: THREE.Texture }) {
+  const w = NICHE.maxX - NICHE.minX;
+  const d = NICHE.maxZ - NICHE.minZ;
+  const cx = (NICHE.maxX + NICHE.minX) / 2;
+  const cz = (NICHE.maxZ + NICHE.minZ) / 2;
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.001, cz]} receiveShadow>
+        <planeGeometry args={[w, d]} />
+        <meshStandardMaterial map={floor} color="#b9bec4" roughness={0.5} metalness={0.1} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[cx, H, cz]}>
+        <planeGeometry args={[w, d]} />
+        <meshStandardMaterial color="#c9c7c0" roughness={1} />
+      </mesh>
+      {/* Rückwand und Seitenwände (außen bündig mit der Hallenwand) */}
+      <Box p={[NICHE.maxX + 0.1, H / 2, cz]} s={[0.2, H, d + 0.4]} c="#e4e1d8" r={0.95} />
+      {[NICHE.minZ - 0.1, NICHE.maxZ + 0.1].map((z) => (
+        <group key={z}>
+          <Box p={[cx + 0.1, H / 2, z]} s={[w + 0.2, H, 0.2]} c="#e4e1d8" r={0.95} />
+          <Box p={[cx, 0.6, z + (z < cz ? 0.105 : -0.105)]} s={[w, 1.2, 0.01]} c="#3f4a57" />
+        </group>
+      ))}
+      <Box p={[NICHE.maxX - 0.005, 0.6, cz]} s={[0.01, 1.2, d]} c="#3f4a57" />
+      <Box p={[NICHE.maxX - 0.008, 1.22, cz]} s={[0.012, 0.06, d]} c="#ff7a1a" />
+      {/* Gelbe Bodenlinie an der Kante zur Halle */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[NICHE.minX + 0.05, 0.004, cz]}>
+        <planeGeometry args={[0.08, d]} />
+        <meshStandardMaterial color="#e3a81c" roughness={0.8} />
+      </mesh>
+      <Sign text="MOTORENBAU" p={[NICHE.maxX - 0.03, 2.9, cz]} rot={[0, -Math.PI / 2, 0]} size={[2.4, 0.4]} />
+      <Tube p={[cx, H - 0.34, cz]} />
+      <pointLight position={[cx, 3.6, cz]} intensity={12} distance={8} decay={1.7} color="#f4f8ff" />
     </group>
   );
 }
@@ -119,7 +157,15 @@ export function Annex() {
             <meshStandardMaterial color="#c9c7c0" roughness={1} />
           </mesh>
           {/* Außenwände: Rückwand, Stirnwand, Front mit geschlossenem Rolltor */}
-          <Box p={[ROOM.maxX + 0.1, H / 2, cz2]} s={[0.2, H, d2]} c="#e4e1d8" r={0.95} />
+          {/* Rückwand mit offener Seite zur Motorenbau-Nische */}
+          {[[h2.minZ, NICHE.minZ], [NICHE.maxZ, h2.maxZ]].map(([a, b]) => (
+            <group key={a}>
+              <Box p={[ROOM.maxX + 0.1, H / 2, (a + b) / 2]} s={[0.2, H, b - a]} c="#e4e1d8" r={0.95} />
+              <Box p={[ROOM.maxX - 0.005, 0.6, (a + b) / 2]} s={[0.01, 1.2, b - a]} c="#3f4a57" />
+              <Box p={[ROOM.maxX - 0.008, 1.22, (a + b) / 2]} s={[0.012, 0.06, b - a]} c="#ff7a1a" />
+            </group>
+          ))}
+          <Niche floor={tex.floor} />
           <Box p={[CX, H / 2, h2.minZ - 0.1]} s={[W + 0.4, H, 0.2]} c="#e4e1d8" r={0.95} />
           <Box p={[ROOM.minX - 0.1, H / 2, cz2]} s={[0.2, H, d2]} c="#e4e1d8" r={0.95} />
           {lifts.map((s) => (
@@ -140,26 +186,23 @@ export function Annex() {
               <pointLight position={[2.6, 3.6, s.z]} intensity={14} distance={9} decay={1.7} color="#f4f8ff" />
             </group>
           ))}
-          {/* Sockelband wie in der Stammhalle */}
-          <Box p={[ROOM.maxX - 0.005, 0.6, cz2]} s={[0.01, 1.2, d2]} c="#3f4a57" />
-          <Box p={[ROOM.maxX - 0.008, 1.22, cz2]} s={[0.012, 0.06, d2]} c="#ff7a1a" />
-          <Sign text={center ? 'PERFORMANCE-CENTER' : 'HALLE 2'} p={[ROOM.maxX - 0.03, 2.8, cz2]} rot={[0, -Math.PI / 2, 0]} size={[3.2, 0.5]} />
-          {/* Einrichtung an der Rückwand: Werkzeugwagen (wie der Werkzeugschrank), Terminal (Teile, Markt, Aufträge), Teileregal */}
-          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('halle2') : setPanel('cabinet'))} position={[5.7, 0, -8.1]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
+          <Sign text={center ? 'PERFORMANCE-CENTER' : 'HALLE 2'} p={[ROOM.minX + 0.03, 2.8, cz2]} rot={[0, Math.PI / 2, 0]} size={[3.2, 0.5]} />
+          {/* Einrichtung der Nische an deren Rückwand: Werkzeugwagen (wie der Werkzeugschrank), Terminal (Teile, Markt, Aufträge); Teileregal in der Halle */}
+          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('halle2') : setPanel('cabinet'))} position={[10.25, 0, -8.0]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
             <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 1.1]} c="#b3261e" m={0.4} r={0.5} />
             <Box p={[0, 1.03, 0]} s={[0.74, 0.06, 1.14]} c="#2a2c30" m={0.5} />
             {[0.25, 0.5, 0.75].map((y) => (
               <Box key={y} p={[-0.355, y, 0]} s={[0.01, 0.02, 0.9]} c="#c9ccd1" m={0.9} r={0.3} />
             ))}
           </Interactable>
-          <Interactable id="h2_computer" label="Terminal – Teile, Markt, Aufträge" onUse={() => setPanel('computer')} position={[5.85, 0, -9.6]} halo={[0.5, 1.5, 0.7]} haloPos={[0, 0.75, 0]}>
+          <Interactable id="h2_computer" label="Terminal – Teile, Markt, Aufträge" onUse={() => setPanel('computer')} position={[10.4, 0, -8.95]} halo={[0.5, 1.5, 0.7]} haloPos={[0, 0.75, 0]}>
             <Box p={[0, 0.5, 0]} s={[0.4, 1.0, 0.5]} c="#3f4650" m={0.5} />
             <mesh position={[-0.21, 1.15, 0]} rotation={[0, -Math.PI / 2, -0.25]}>
               <planeGeometry args={[0.45, 0.3]} />
               <meshStandardMaterial color="#0f1a2a" emissive="#4a8fd8" emissiveIntensity={0.6} />
             </mesh>
           </Interactable>
-          <Interactable id="h2_shelf" label="Ersatzteilregal Halle 2" onUse={() => setPanel('shop')} position={[5.95, 0, -6.6]} halo={[0.5, 2.0, 1.1]} haloPos={[0, 1.0, 0]}>
+          <Interactable id="h2_shelf" label="Ersatzteilregal Halle 2" onUse={() => setPanel('shop')} position={[5.95, 0, -6.3]} halo={[0.5, 2.0, 1.1]} haloPos={[0, 1.0, 0]}>
             {[0.3, 0.9, 1.5].map((y) => (
               <Box key={y} p={[0, y, 0]} s={[0.45, 0.04, 1.0]} c="#b3b8be" m={0.7} r={0.4} />
             ))}
