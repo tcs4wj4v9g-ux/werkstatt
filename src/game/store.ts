@@ -12,7 +12,7 @@ import { CAR_MODELS } from './data/cars';
 import { DEFECTS } from './data/defects';
 import { FLUID_PRODUCTS } from './data/fluids';
 import { PARTS } from './data/parts';
-import { availableSlots, isJunk, isLift, isShowcase, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, UPGRADES, type UpgradeId } from './data/workshop';
+import { availableSlots, isJunk, isLift, isShowcase, isStand, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, STAND_SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
 import * as fluids from './fluids';
@@ -175,14 +175,15 @@ export interface GameState {
   installWith(bay: number, compId: string, choice: InstallChoice): void;
   /** Motor mit dem Kran aus dem Auto heben (Werkstatt) bzw. am Schrottplatz kaufen und ausbauen. */
   liftEngine(slot: number): void;
-  craneToStand(): void;
-  standToCrane(): void;
+  /** Ständer: Stammhalle (Standard) oder Halle 2. */
+  craneToStand(slot?: number): void;
+  standToCrane(slot?: number): void;
   craneToStorage(): void;
   storageToCrane(uid: string): void;
   /** Motor vom Kran in das Auto auf dieser Hebebühne einsetzen (Motorumbau). */
   installEngine(slot: number): void;
-  flipEngine(): void;
-  testEngine(): void;
+  flipEngine(slot?: number): void;
+  testEngine(slot?: number): void;
   sellEngine(uid: string): void;
   /** Fabrikneuen Austauschmotor bestellen – wird ins Motorlager geliefert. */
   buyNewEngine(engineId: string, modelId: string): void;
@@ -222,8 +223,8 @@ export function installOptions(s: Pick<GameState, 'inventory' | 'used'>, car: Ca
 
 /** Alle ausgebauten Motoren der Werkstatt: am Kran, auf dem Ständer, im Lager. */
 export function removedEngines(s: Pick<GameState, 'crane' | 'engines' | 'cars'>): EngineUnit[] {
-  const stand = s.cars[STAND_SLOT];
-  return [s.crane, ...s.engines, ...(stand ? [fromStand(stand)] : [])].filter((u): u is EngineUnit => !!u);
+  const stands = STAND_SLOTS.map((i) => s.cars[i]).filter((c): c is CarInstance => !!c).map(fromStand);
+  return [s.crane, ...s.engines, ...stands].filter((u): u is EngineUnit => !!u);
 }
 
 export function partPrice(s: Pick<GameState, 'events' | 'upgrades' | 'day'>, id: PartId, car?: CarInstance | null): number {
@@ -855,7 +856,7 @@ export const useGame = create<GameState>()(
             }
           }
           const before = get().cars[bay];
-          if (compId === 'drain_plug' && bay !== STAND_SLOT && before?.components.drain_plug?.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
+          if (compId === 'drain_plug' && !isStand(bay) && before?.components.drain_plug?.installed && !get().drainPan[bay] && get().tool !== 'lamp') {
             sfx.error();
             return get().say('Erst die Auffangwanne unter den Motor stellen – sonst läuft das Altöl auf den Boden.', true);
           }
@@ -1196,23 +1197,26 @@ export const useGame = create<GameState>()(
           s.say(`Motor hängt am Kran: ${motorLabel(unit.motor)}. Jetzt auf den Motorständer setzen oder ins Lager stellen.`);
         },
 
-        craneToStand: () => {
+        craneToStand: (slot = STAND_SLOT) => {
           const s = get();
+          if (!isStand(slot)) return;
+          const needs = SLOTS[slot].needs;
+          if (needs && !s.upgrades.includes(needs)) return s.say('Dieser Motorständer gehört zu Halle 2 – die musst du erst anbauen.', true);
           if (!s.crane) return s.say('Am Kran hängt kein Motor.', true);
-          if (s.cars[STAND_SLOT]) return s.say('Auf dem Motorständer sitzt schon ein Motor.', true);
+          if (s.cars[slot]) return s.say('Auf dem Motorständer sitzt schon ein Motor.', true);
           const cars = [...s.cars];
-          cars[STAND_SLOT] = asStand(s.crane, 'bavaria_320');
+          cars[slot] = asStand(s.crane, 'bavaria_320');
           sfx.clunk();
           set({ cars, crane: null });
           s.say('Motor sitzt auf dem Motorständer. Mit „Motor drehen“ kommst du an die Unterseite.');
         },
-        standToCrane: () => {
+        standToCrane: (slot = STAND_SLOT) => {
           const s = get();
-          const car = s.cars[STAND_SLOT];
+          const car = isStand(slot) ? s.cars[slot] : null;
           if (!car) return s.say('Auf dem Motorständer sitzt kein Motor.', true);
           if (s.crane) return s.say('Am Kran hängt schon ein Motor.', true);
           const cars = [...s.cars];
-          cars[STAND_SLOT] = null;
+          cars[slot] = null;
           sfx.clunk();
           set({ cars, crane: fromStand(clone(car)) });
           s.say('Motor hängt am Kran.');
@@ -1258,19 +1262,19 @@ export const useGame = create<GameState>()(
           set({ cars, inventory, crane: null });
           s.say(`${motorLabel(unit.motor)} eingesetzt (${plan.label}). Jetzt Motorlager, Kabelbaum, Hosenrohr, Schläuche und Batterie wieder anschließen, Öl und Kühlmittel auffüllen.`);
         },
-        flipEngine: () => {
+        flipEngine: (slot = STAND_SLOT) => {
           const s = get();
-          const car = s.cars[STAND_SLOT];
+          const car = isStand(slot) ? s.cars[slot] : null;
           if (!car) return;
           const cars = [...s.cars];
-          cars[STAND_SLOT] = { ...car, lifted: !car.lifted };
+          cars[slot] = { ...car, lifted: !car.lifted };
           sfx.clunk();
           set({ cars });
           s.say(car.lifted ? 'Motor zurückgedreht – Oberseite oben.' : 'Motor gedreht – die Unterseite (Ölwanne, Lager, Kurbelwelle) liegt jetzt oben.');
         },
-        testEngine: () => {
+        testEngine: (slot = STAND_SLOT) => {
           const s = get();
-          const car = s.cars[STAND_SLOT];
+          const car = isStand(slot) ? s.cars[slot] : null;
           if (!car) return;
           if (!repair.isAssembled(car)) return s.say('Für Kompressions- und Öldruckprüfung muss der Motor komplett montiert sein.', true);
           const t = engineTest(fromStand(car));
@@ -1283,7 +1287,7 @@ export const useGame = create<GameState>()(
           };
           t.compression.forEach((v, i) => v >= t.nominal * 0.85 && known(`piston${i + 1}`));
           if (t.oilPressure >= 3.5) ['bearing', 'mainbrg', 'oil_pump', 'crank'].forEach(known);
-          cars[STAND_SLOT] = { ...car, components: comps, motor: { ...car.motor!, history: [...car.motor!.history, `Tag ${s.day}: Prüfstand – Kompression ${t.compression.join('/')} bar, Öldruck ${t.oilPressure} bar`] } };
+          cars[slot] = { ...car, components: comps, motor: { ...car.motor!, history: [...car.motor!.history, `Tag ${s.day}: Prüfstand – Kompression ${t.compression.join('/')} bar, Öldruck ${t.oilPressure} bar`] } };
           const notes = [
             ...(t.compression.every((v) => v >= t.nominal * 0.85) ? ['Kompression an allen Zylindern im Soll – Kolbenringe in Ordnung (in der Akte vermerkt).'] : []),
             ...(t.oilPressure >= 3.5 ? ['Öldruck im Soll – Lager und Ölpumpe in Ordnung (in der Akte vermerkt).'] : []),

@@ -1,10 +1,12 @@
+import { useEffect } from 'react';
 import { CAR_MODELS } from '../game/data/cars';
 import { defOf, engineOf } from '../game/data/components';
 import { DEFECTS } from '../game/data/defects';
 import { ENGINES } from '../game/data/engines';
 import { PARTS } from '../game/data/parts';
 import { VISUAL_MAP, VISUAL_PARTS, dropOf, mountedId } from '../game/data/visual';
-import { JUNK_SLOTS, SLOTS, STAND_SLOT, isLift } from '../game/data/workshop';
+import { JUNK_SLOTS, SLOTS, STAND2_SLOT, isLift, standFor } from '../game/data/workshop';
+import { useCraneSite } from '../three/EngineShop';
 import { fitOf } from '../game/fitment';
 import { engineHealth, engineValue, junkEnginePrice, motorLabel, removalSteps, swapPlan, unitComplete, type EngineUnit } from '../game/motor';
 import { engineOutput, performance, tuningEffects } from '../game/performance';
@@ -44,17 +46,20 @@ function Checklist({ car }: { car: CarInstance }) {
 /** Motorkran, Motorständer und Einbau in ein Auto. */
 export function CranePanel() {
   const s = useGame();
-  const stand = s.cars[STAND_SLOT];
+  // Ständer und Kran der Halle, aus der das Fenster geöffnet wurde (Stammhalle oder Halle 2)
+  const standSlot = standFor(s.panelBay, s.upgrades);
+  const stand = s.cars[standSlot];
   const lifts = SLOTS.filter((x) => isLift(x.id) && s.cars[x.id]);
   const hoist = s.upgrades.includes('hoist');
+  useEffect(() => useCraneSite.setState({ hall2: standSlot === STAND2_SLOT }), [standSlot]);
   return (
-    <Modal title="Motorkran und Motorständer" onClose={() => s.setPanel(null)} wide>
+    <Modal title={standSlot === STAND2_SLOT ? 'Motorkran und Motorständer – Halle 2' : 'Motorkran und Motorständer'} onClose={() => s.setPanel(null)} wide>
       {!hoist && <p className="meta">Für Motorausbau und -einbau brauchst du den Motorkran: Werkstatt-Computer → Ausbau → „Motor- und Getriebeheber“. Der Motorständer ist schon da.</p>}
       <h4>Am Kran</h4>
       {s.crane ? <UnitLine u={s.crane} /> : <p className="meta">Am Kran hängt kein Motor.</p>}
       {s.crane && (
         <div className="row wrap">
-          <button className="btn primary" disabled={!!stand} onClick={() => s.craneToStand()}>Auf den Motorständer</button>
+          <button className="btn primary" disabled={!!stand} onClick={() => s.craneToStand(standSlot)}>Auf den Motorständer</button>
           <button className="btn" onClick={() => s.craneToStorage()}>Ins Motorlager (Palette)</button>
         </div>
       )}
@@ -100,8 +105,8 @@ export function CranePanel() {
           <div className="row wrap">
             <button className="btn primary" data-testid="flip" onClick={() => s.flipEngine()}>↻ Motor drehen</button>
             <button className="btn" data-testid="enginetest" onClick={() => s.testEngine()}>📊 Kompression und Öldruck prüfen</button>
-            <button className="btn" disabled={!!s.crane || !hoist} onClick={() => s.standToCrane()}>An den Kran hängen</button>
-            {!engineOf(stand).turbo && !stand.motor?.turboKit && <button className="btn" onClick={() => s.fitTurboKit(STAND_SLOT)}>Turbo-Nachrüstsatz vorbereiten</button>}
+            <button className="btn" disabled={!!s.crane || !hoist} onClick={() => s.standToCrane(standSlot)}>An den Kran hängen</button>
+            {!engineOf(stand).turbo && !stand.motor?.turboKit && <button className="btn" onClick={() => s.fitTurboKit(standSlot)}>Turbo-Nachrüstsatz vorbereiten</button>}
           </div>
           <details>
             <summary className="meta">Historie</summary>

@@ -65,6 +65,8 @@ export const BOXES: Record<string, { name: string; cap: number }> = {
   kiste_b: { name: 'Werkzeugkiste B – Hebebühne 2', cap: 6 },
   schrank: { name: 'Werkzeugschrank', cap: 14 },
   spezial: { name: 'Spezialwerkzeugschrank', cap: 4 },
+  halle2: { name: 'Werkzeugwagen Halle 2', cap: 8 },
+  spezial2: { name: 'Spezialwerkzeugschrank Halle 2', cap: 4 },
   schrott: { name: 'Werkzeugregal Schrottplatz', cap: 8 },
 };
 /** Preise für ein weiteres Exemplar (muss zu gk_tool_price im SQL passen); Spezialwerkzeug ist nicht käuflich. */
@@ -107,6 +109,9 @@ const TEXT: Record<string, string> = {
   kiste_voll: 'Diese Kiste ist voll – leg das Werkzeug in eine andere.',
   nicht_dabei: 'Dieses Werkzeug trägst du nicht.',
   nicht_kaeuflich: 'Dieses Spezialwerkzeug gibt es nur einmal je Werkstatt.',
+  nicht_verkaeuflich: 'Spezialwerkzeug lässt sich nicht verkaufen – es gibt nur ein Exemplar je Werkstatt.',
+  letztes_exemplar: 'Das ist das letzte Exemplar dieser Art in der Werkstatt – das behältst du lieber.',
+  traegt_anderer: 'Dieses Werkzeug trägt gerade ein Mitspieler.',
   code_unbekannt: 'Diesen Einladungscode gibt es nicht (oder die Einladung ist geschlossen).',
   voll: 'Diese Werkstatt hat schon vier Mitglieder.',
   zu_viele_werkstaetten: 'Du bist schon in fünf Werkstätten.',
@@ -595,7 +600,10 @@ async function toolCall(fn: string, args: Record<string, unknown>, done?: (r: an
     lastSync = 0;
     await step();
   } catch (e) {
-    useGame.getState().say(e instanceof NetError ? 'Keine Verbindung – Werkzeuge lassen sich gerade nicht holen oder zurücklegen.' : text(String((e as Error).message)), true);
+    const msg = String((e as Error).message);
+    // Server ohne die neue Funktion (schema.sql noch nicht neu ausgeführt)
+    if (!(e instanceof NetError) && /gk_sell_tool|function|404/i.test(msg) && fn === 'gk_sell_tool') return useGame.getState().say('Verkaufen geht erst, wenn das neue supabase/schema.sql einmal im Supabase-SQL-Editor ausgeführt wurde.', true);
+    useGame.getState().say(e instanceof NetError ? 'Keine Verbindung – Werkzeuge lassen sich gerade nicht holen oder zurücklegen.' : text(msg), true);
   }
 }
 export const takeTool = (tool: ToolItem) =>
@@ -603,6 +611,10 @@ export const takeTool = (tool: ToolItem) =>
     if (TOOL_MAP[tool.type].kind !== 'socket') useGame.setState({ tool: tool.type });
   });
 export const returnTool = (tool: ToolItem, box: string) => toolCall('gk_return_tool', { p_tool: tool.id, p_box: box });
+/** Werkzeug verkaufen (halber Kaufpreis). Braucht `gk_sell_tool` im Schema; ältere Server melden einen verständlichen Hinweis. */
+export const sellTool = (tool: ToolItem) =>
+  toolCall('gk_sell_tool', { p_tool: tool.id }, () => useGame.getState().say(`${TOOL_MAP[tool.type].name} verkauft – ${Math.round((TOOL_PRICE[tool.type] ?? 0) / 2)} € gutgeschrieben.`));
+export const sellPrice = (type: ToolId) => (TOOL_PRICE[type] ? Math.round(TOOL_PRICE[type]! / 2) : null);
 export const buyTool = (type: ToolId, box: string) => toolCall('gk_buy_tool', { p_type: type, p_box: box }, () => useGame.getState().say(`${TOOL_MAP[type].name} gekauft – liegt in ${BOXES[box].name}.`));
 
 export async function loadLedger() {
@@ -645,4 +657,4 @@ export const openBox = (box: string) => {
   useGame.getState().setPanel('cabinet');
 };
 
-if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, sendChat, remotePlayers, takeTool, returnTool, buyTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
+if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };

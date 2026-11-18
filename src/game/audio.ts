@@ -159,6 +159,8 @@ export const VOICES: Record<string, { ratios: number[]; gains: number[]; tone: n
 export const firingHz = (rpm: number, cylinders = 4) => (rpm / 60) * (cylinders / 2);
 
 interface Running {
+  /** Sekunden nach dem Start, ab denen der Motor läuft (vorher orgelt der Anlasser). */
+  fire: number;
   /** Puls-Synthese (AudioWorklet), sobald geladen; dann sind die Oszillatoren stumm. */
   pulse: AudioWorkletNode | null;
   oscGains: GainNode[];
@@ -267,7 +269,9 @@ function frame() {
   if (!r || !c) return;
   const t = c.currentTime;
   const since = t - r.started;
-  r.rpm += (r.target - r.rpm) * 0.12;
+  // Bis zum Zünden: Anlasser orgelt; beim Anspringen kurz hoch, dann fällt die Drehzahl auf den Leerlauf
+  if (since < r.fire) r.rpm = 1350;
+  else r.rpm += (r.target - r.rpm) * 0.12;
   const p = r.profile;
 
   // Unrunder Lauf: Drehzahl schwankt, einzelne Zündungen fallen aus.
@@ -279,14 +283,14 @@ function frame() {
   r.tone.frequency.setTargetAtTime(r.pulse ? mufflerHz(p, r.rpm, r.load) : (voice.tone + r.rpm * 0.22) * (p.diesel ? 0.72 : 1), t, 0.05);
   if (r.pulse) {
     const pr = r.pulse.parameters;
-    pr.get('rpm')!.setTargetAtTime(since < 0.5 ? 0 : r.rpm + wobble, t, 0.02);
+    pr.get('rpm')!.setTargetAtTime(since < r.fire ? 0 : r.rpm + wobble, t, 0.02);
     pr.get('load')!.setTargetAtTime(r.load, t, 0.03);
     pr.get('misfire')!.setValueAtTime(p.misfire ?? 0, t);
   }
   // Durchgerosteter Topf: Kratzen und Schnarren, mit Last lauter
-  r.rasp.gain.setTargetAtTime(p.exhaust === 'rusty' && since > 0.6 ? 0.012 + r.load * 0.05 : 0.0001, t, 0.05);
+  r.rasp.gain.setTargetAtTime(p.exhaust === 'rusty' && since > r.fire ? 0.012 + r.load * 0.05 : 0.0001, t, 0.05);
   // Luftgekühlt: Kühlgebläse rauscht mit der Drehzahl
-  r.fan.gain.setTargetAtTime(p.air && since > 0.6 ? 0.006 + Math.min(1, r.rpm / 7000) * 0.022 : 0.0001, t, 0.1);
+  r.fan.gain.setTargetAtTime(p.air && since > r.fire ? 0.006 + Math.min(1, r.rpm / 7000) * 0.022 : 0.0001, t, 0.1);
   // Gas weg aus hoher Drehzahl: Abblasen (Turbo) und Nachverbrennung im Auspuff (Sportanlage, Kennfeld)
   const lift = r.lastLoad > 0.55 && r.load < 0.12;
   if (lift && since > 1) {
@@ -310,11 +314,11 @@ function frame() {
       r.nextPop = at + (p.pops ? 0.04 : 0.09) + Math.random() * (p.pops ? 0.16 : 0.28);
     }
   } else r.nextPop = t;
-  r.out.gain.setTargetAtTime(since < 0.55 ? 0.0001 : 0.16 + r.load * 0.12, t, 0.08);
+  r.out.gain.setTargetAtTime(since < r.fire ? 0.0001 : 0.16 + r.load * 0.12, t, 0.08);
   r.exhaust.gain.setTargetAtTime((0.1 + r.load * 0.3) * voice.exhaust * (1 + 0.35 * (p.sport ?? 0)), t, 0.08);
 
   // Diesel-Nageln: ein harter Schlag je Zündung, kalt und im Leerlauf am deutlichsten.
-  if (p.diesel && since > 0.55) {
+  if (p.diesel && since > r.fire) {
     const period = 1 / firing;
     const amp = (r.warm ? 0.035 : 0.06) * (1 - r.load * 0.4) * (p.misfire ? 1.6 : 1);
     while (r.nextClatter < t + 0.12) {
@@ -329,8 +333,8 @@ function frame() {
     r.spool += ((r.load * Math.min(1, r.rpm / 3000)) - r.spool) * 0.04;
     // Pfeifen: Laderwelle dreht mit dem Ladedruck hoch (Tonhöhe folgt), dazu Rauschen der angesaugten Luft
     r.whistle.frequency.setTargetAtTime(p.whine ? 900 + r.spool * 2600 : 1500 + r.spool * 3600, t, 0.05);
-    r.whistleGain.gain.setTargetAtTime(since < 0.6 ? 0.0001 : p.whine ? 0.012 + r.spool * 0.05 : r.spool * (0.0018 + r.load * 0.0035) * (p.bov === 'atmo' ? 1.5 : 1), t, 0.06);
-    r.whoosh.gain.setTargetAtTime(since < 0.6 ? 0.0001 : r.spool * r.load * (p.bov === 'atmo' ? 0.012 : 0.007), t, 0.08);
+    r.whistleGain.gain.setTargetAtTime(since < r.fire + 0.1 ? 0.0001 : p.whine ? 0.012 + r.spool * 0.05 : r.spool * (0.0018 + r.load * 0.0035) * (p.bov === 'atmo' ? 1.5 : 1), t, 0.06);
+    r.whoosh.gain.setTargetAtTime(since < r.fire + 0.1 ? 0.0001 : r.spool * r.load * (p.bov === 'atmo' ? 0.012 : 0.007), t, 0.08);
   }
   // Leck in der Ladeluft: zischt, sobald Ladedruck aufgebaut werden soll.
   if (p.boostHiss) r.boost.gain.setTargetAtTime(r.load * 0.07, t, 0.05);
@@ -453,25 +457,50 @@ export const engineAudio = {
         lfo.start(t);
         oscs.push(sq, lfo);
       }
-      // Anlasser: kurzes Orgeln, dann springt der Motor an.
+      // Anlasser: Elektromotor surrt (bricht bei jeder Verdichtung kurz ein), der Motor wird mit ~220/min durchgedreht –
+      // dumpfes „Tschuck“ je Verdichtungstakt. Kalt, Diesel oder Zündaussetzer: länger orgeln.
+      const crank = (profile.diesel ? 1.0 : 0.7) + (profile.misfire ? 0.5 : 0);
+      const cyl = profile.cylinders ?? 4;
+      const strokes = Math.max(3, Math.round(crank * (220 / 60) * (cyl / 2)));
       const starter = c.createOscillator();
-      const sg = c.createGain();
       starter.type = 'sawtooth';
-      starter.frequency.setValueAtTime(95, t);
-      starter.frequency.linearRampToValueAtTime(150, t + 0.55);
+      const whineF = c.createBiquadFilter();
+      whineF.type = 'bandpass';
+      whineF.frequency.value = 1100;
+      whineF.Q.value = 2.5;
+      const sg = c.createGain();
       sg.gain.setValueAtTime(0.0001, t);
-      sg.gain.linearRampToValueAtTime(0.12, t + 0.05);
-      for (let k = 0; k < 6; k++) sg.gain.setTargetAtTime(k % 2 ? 0.12 : 0.05, t + 0.06 + k * 0.08, 0.02);
-      sg.gain.setTargetAtTime(0.0001, t + 0.56, 0.03);
-      starter.connect(sg).connect(master);
+      sg.gain.linearRampToValueAtTime(0.028, t + 0.06);
+      starter.frequency.setValueAtTime(620, t);
+      starter.frequency.linearRampToValueAtTime(820, t + 0.12);
+      const chugF = c.createBiquadFilter();
+      chugF.type = 'lowpass';
+      chugF.frequency.value = 260;
+      const chugG = c.createGain();
+      chugG.gain.value = 0.0001;
+      const chugSrc = noise(c);
+      chugSrc.connect(chugF).connect(chugG).connect(master);
+      for (let k = 0; k < strokes; k++) {
+        const at = t + 0.08 + (k * crank) / strokes;
+        // Verdichtung: Elektromotor wird gebremst (Ton sinkt), danach Schwung; dumpfer Stoß
+        starter.frequency.setTargetAtTime(700, at, 0.02);
+        starter.frequency.setTargetAtTime(840, at + 0.05, 0.03);
+        chugG.gain.setValueAtTime(0.0001, at);
+        chugG.gain.linearRampToValueAtTime(0.16 * (0.75 + Math.random() * 0.4), at + 0.012);
+        chugG.gain.setTargetAtTime(0.0001, at + 0.02, 0.03);
+      }
+      sg.gain.setTargetAtTime(0.0001, t + 0.08 + crank, 0.04);
+      starter.connect(whineF).connect(sg).connect(master);
       starter.start(t);
-      starter.stop(t + 0.8);
+      starter.stop(t + crank + 0.5);
+      chugSrc.start(t);
+      chugSrc.stop(t + crank + 0.4);
 
       run = {
         pulse: null, oscGains, whoosh, rasp, fan, lastLoad: 0, crackleUntil: 0, nextPop: 0,
         oscs: [...oscs, whistle], noise: src, tone, out, miss, exhaust, knock, tick, rattle, squeal, profile,
         clatter, boost, whistle, whistleGain, spool: 0, nextClatter: t + 0.6,
-        started: t, rpm: 250, target: IDLE, load: 0, warm: false,
+        started: t, fire: 0.08 + crank, rpm: 250, target: IDLE, load: 0, warm: false,
         nextKnock: t + 0.7, nextTick: t + 0.7, nextMiss: t + 1, raf: 0, demoTimer: 0,
       };
       run.rpm = 1250; // kurzer Drehzahlsprung nach dem Anspringen

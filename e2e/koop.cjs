@@ -112,7 +112,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   // Spieler 2 holt Ratsche und 10er Nuss aus Kiste B bzw. dem Schrank und baut Zündspule 1 aus
   cb = await coop(B);
   await G(B, () => window.__gkCoop.openBox('kiste_b')); await B.waitForTimeout(300);
-  await B.getByTestId('coop-box').locator('[data-tool="ratchet"] button').click();
+  await B.getByTestId('coop-box').locator('[data-tool="ratchet"] button.primary').click();
   expect(await until(B, () => window.__gk.getState().carried.includes('ratchet')), 'Spieler 2 nimmt die Ratsche aus Kiste B (über das Kistenfenster)');
   await B.screenshot({ path: `${S}/koop-kiste.png` });
   await G(B, () => window.__gk.getState().setPanel(null));
@@ -147,7 +147,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   ca = await coop(A);
   const ratA = toolOf(ca, 'ratchet', 'kiste_a');
   await G(A, () => window.__gkCoop.openBox('kiste_a')); await A.waitForTimeout(300);
-  await A.getByTestId('coop-box').locator('[data-tool="ratchet"] button').click();
+  await A.getByTestId('coop-box').locator('[data-tool="ratchet"] button.primary').click();
   expect(await until(A, () => window.__gk.getState().carried.join() === 'ratchet'), 'Spieler 1 nimmt Ratsche A – sie erscheint nur in seiner Leiste');
   await G(A, () => window.__gk.getState().setPanel(null));
   await G(B, () => window.__gkCoop.openBox('kiste_a'));
@@ -178,8 +178,15 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await G(A, () => window.__gkCoop.buyTool('ratchet', 'kiste_a'));
   expect(await until(B, ([m, r]) => window.__gk.getState().money === m - 60 && window.__gkCoop.useCoop.getState().tools.filter((t) => t.type === 'ratchet').length === r + 1, [m0, r0]), 'Vierte Ratsche gekauft: eigenes Exemplar, 60 € vom gemeinsamen Konto, bei beiden sichtbar');
 
-  // ---------- Gemeinsames Lager ----------
+  // Überzähliges Werkzeug verkaufen (Knopf in der Kiste): halber Preis zurück, bei beiden weg
   await until(A, (m) => window.__gk.getState().money === m - 60, m0); await settled(A);
+  await G(A, () => window.__gkCoop.openBox('kiste_a')); await A.waitForTimeout(300);
+  await A.locator('[data-testid="sell-ratchet"]').first().click();
+  expect(await until(B, ([m, r]) => window.__gk.getState().money === m - 30 && window.__gkCoop.useCoop.getState().tools.filter((t) => t.type === 'ratchet').length === r, [m0, r0]), 'Überzählige Ratsche verkauft: 30 € zurück, bei beiden aus der Kiste verschwunden');
+  await G(A, () => window.__gk.getState().setPanel(null));
+
+  // ---------- Gemeinsames Lager ----------
+  await until(A, (m) => window.__gk.getState().money === m - 30, m0); await settled(A);
   await G(A, () => window.__gk.getState().buyPart('spark_plug', 0)); await both(A, B);
   const inv = (await game(B)).inventory; const key = Object.keys(inv).find((k) => k.startsWith('spark_plug'));
   expect(inv[key] > 0 && (await game(A)).money === (await game(B)).money, `Teilekauf von Spieler 1 liegt im gemeinsamen Lager: ${inv[key]}× ${key}`);
@@ -309,6 +316,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await B.reload(); await B.waitForTimeout(1500);
   await B.getByText('Bestehende Koop-Werkstatt öffnen').click();
   expect(await until(B, () => window.__gkCoop.useCoop.getState().status === 'online' && window.__gk.getState().screen === 'garage'), 'Spieler 2 öffnet die Werkstatt später allein (nach Neuladen der Seite, ohne Code)');
+  expect(await until(B, () => { const m = document.querySelector('[data-testid="member-Anna"]'); return !!m && /zuletzt (gerade eben|vor \d+ min)/.test(m.textContent); }, null, 20000), 'Spieler 2 sieht in der Leiste, wann Spieler 1 zuletzt online war: ' + (await G(B, () => (document.querySelector('[data-testid="coop-chip"]') || {}).textContent)));
   const after = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools) };
   expect(after.car === before.car && after.money === before.money, 'Reparaturfortschritt und Geld sind erhalten');
   expect(norm(await G(B, () => window.__gk.getState().cars[15])) === before.stand, 'Der halb zerlegte Motor auf dem Ständer ist erhalten');

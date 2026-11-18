@@ -109,7 +109,7 @@ function FirstPerson() {
         const dz = (-cos * moveInput.y - sin * moveInput.x) * k;
         // Autos am Boden sind Hindernisse; unter angehobenen kann man durchlaufen.
         const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted && SLOTS[i].kind !== 'stand' && slotPlace(i) === place.at ? [carBox(i)] : []));
-        dynamic.push(...engineShopBoxes(s.upgrades.includes('hoist')), { minX: -21.3, maxX: -17.7, minZ: 1.2, maxZ: 3.3 });
+        dynamic.push(...engineShopBoxes(s.upgrades.includes('hoist'), s.upgrades.includes('loc_pro')), { minX: -21.3, maxX: -17.7, minZ: 1.2, maxZ: 3.3 });
         if (s.upgrades.includes('expansion')) dynamic.push({ minX: -22.9, maxX: -21.3, minZ: 0.1, maxZ: 3.9 });
         if (s.upgrades.includes('paint')) dynamic.push({ minX: -22.9, maxX: -16, minZ: 8.6, maxZ: 9 });
         if (coopActive()) dynamic.push(...coopBoxes());

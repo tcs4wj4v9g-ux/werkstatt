@@ -220,6 +220,26 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   const back = await G(() => window.__gk.getState().cars[15].components.drain_plug.installed);
   expect(back, 'Ablassschraube wieder eingedreht');
 
+  // ---------- Halle 2: eigener Motorständer und Kran ----------
+  const S2 = await G(() => window.__gkLib.slots.findIndex((x) => x.label === 'Motorständer Halle 2'));
+  await G((i) => { const g = window.__gk; const L = window.__gkLib; const u = L.motor.extractEngine(L.createCar('bavaria_320', [], Math.random, {})); g.setState({ crane: u, panel: null, upgrades: g.getState().upgrades.filter((x) => x !== 'loc_pro') }); g.getState().craneToStand(i); }, S2);
+  expect(await G((i) => !window.__gk.getState().cars[i] && !!window.__gk.getState().crane, S2), 'Ohne Halle 2 lässt sich der zweite Ständer nicht benutzen');
+  await G(() => { const g = window.__gk; g.setState({ upgrades: [...new Set([...g.getState().upgrades, 'expansion', 'hoist', 'loc_pro'])] }); g.getState().setPanel('crane', 10); });
+  await p.waitForTimeout(400);
+  const h2title = await p.evaluate(() => document.querySelector('.modal') && document.querySelector('.modal').textContent);
+  expect(/Halle 2/.test(h2title), 'Kranfenster an Hebebühne 3 gehört zu Halle 2');
+  const stand1 = await G(() => JSON.stringify(window.__gk.getState().cars[15]));
+  await p.locator('.modal button', { hasText: 'Auf den Motorständer' }).click();
+  const h2 = await G((i) => ({ on: !!window.__gk.getState().cars[i], crane: !!window.__gk.getState().crane, s1: JSON.stringify(window.__gk.getState().cars[15]) }), S2);
+  expect(h2.on && !h2.crane && h2.s1 === stand1, 'Motor sitzt auf dem Ständer in Halle 2, der Ständer der Stammhalle bleibt unberührt');
+  await G((i) => { window.__gk.getState().flipEngine(i); window.__gk.getState().setPanel(null); }, S2);
+  expect(await G((i) => window.__gk.getState().cars[i].lifted, S2), 'Motor am Ständer in Halle 2 drehbar');
+  await G((i) => window.__gk.getState().setPanel('crane', i), S2);
+  await p.waitForTimeout(300);
+  await p.locator('.modal button', { hasText: 'An den Kran hängen' }).click();
+  expect(await G((i) => !window.__gk.getState().cars[i] && !!window.__gk.getState().crane, S2), 'Zurück an den Kran in Halle 2');
+  await G(() => { window.__gk.setState({ crane: null }); window.__gk.getState().setPanel(null); });
+
   // ---------- Akte bei ausgebautem Motor: Motorursachen bleiben sichtbar ----------
   await G(() => { const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars]; const c = L.createCar('bavaria_330', [], Math.random, {}); c.observed = ['blue_smoke']; const u = L.motor.extractEngine(c); c.motorOut = u.motor.uid; cars[1] = c; g.setState({ cars, crane: u, panel: null }); g.getState().setPanel('file', 1); });
   await p.waitForTimeout(400);
@@ -293,7 +313,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   });
   await p.reload(); await p.waitForTimeout(1500);
   const old = await G(() => { const s = window.__gk.getState(); return { money: s.money, len: s.cars.length, junk: s.cars.slice(16).filter(Boolean).length, coil: Object.keys(s.cars[0].components).filter((k) => /^coil/.test(k)).length, harness: s.cars[0].components.harness && s.cars[0].components.harness.installed && s.cars[0].components.pads_rr && s.cars[0].components.pads_rr.installed, def: window.__gkLib.defsOf(s.cars[0]).length === Object.keys(s.cars[0].components).length, engines: s.engines.length }; });
-  expect(old.money === 7777 && old.len === 131 && old.junk === 6 && old.harness && old.def && old.engines === 0, `Alter Spielstand übernommen: Geld, Auto mit neuen Teilen ergänzt, Schrottplatz gefüllt (${JSON.stringify(old)})`);
+  expect(old.money === 7777 && old.len === 132 && old.junk === 6 && old.harness && old.def && old.engines === 0, `Alter Spielstand übernommen: Geld, Auto mit neuen Teilen ergänzt, Schrottplatz gefüllt (${JSON.stringify(old)})`);
 
   console.log('errors:', JSON.stringify(errs));
   console.log(fails || errs.length ? `FEHLER: ${fails + errs.length}` : 'ALLES OK');

@@ -91,7 +91,7 @@ alter table gk_tools enable row level security;
 -- ---------------------------------------------------------------- Stammdaten
 
 create or replace function gk_box_cap(p_box text) returns int language sql immutable as $$
-  select case p_box when 'kiste_a' then 6 when 'kiste_b' then 6 when 'schrank' then 14 when 'spezial' then 4 when 'schrott' then 8 else null end;
+  select case p_box when 'kiste_a' then 6 when 'kiste_b' then 6 when 'schrank' then 14 when 'spezial' then 4 when 'schrott' then 8 when 'halle2' then 8 when 'spezial2' then 4 else null end;
 $$;
 
 -- Kaufpreis eines weiteren Exemplars; null = Spezialwerkzeug, das es nur einmal je Werkstatt gibt.
@@ -162,7 +162,7 @@ begin
     select tl.id, tl.home_box from gk_tools tl join gk_members m on m.workshop_id = tl.workshop_id and m.user_id = tl.holder
     where tl.workshop_id = p_ws and m.last_seen < now() - interval '30 minutes' for update of tl
   loop
-    select b into target from unnest(array[t.home_box, 'schrank', 'kiste_a', 'kiste_b', 'spezial', 'schrott']) with ordinality as x(b, ord)
+    select b into target from unnest(array[t.home_box, 'schrank', 'kiste_a', 'kiste_b', 'spezial', 'halle2', 'spezial2', 'schrott']) with ordinality as x(b, ord)
       where (select count(*) from gk_tools where workshop_id = p_ws and box = b) < gk_box_cap(b) order by ord limit 1;
     update gk_tools set holder = null, box = coalesce(target, t.home_box), taken_at = null where id = t.id;
     update gk_workshops set tools_rev = tools_rev + 1 where id = p_ws;
@@ -451,13 +451,36 @@ begin
   return jsonb_build_object('ok', true, 'tools', gk_tools_json(p_ws), 'toolsRev', w.tools_rev + 1);
 end $$;
 
+-- Werkzeug verkaufen: die Hälfte des Kaufpreises zurück. Nur käufliches Werkzeug (kein Spezialwerkzeug) und nie das letzte
+-- Exemplar einer Art – damit bleibt die Werkstatt arbeitsfähig. Verkaufen darf, wer das Werkzeug trägt, oder aus einer Kiste.
+create or replace function gk_sell_tool(p_ws uuid, p_tool uuid) returns jsonb language plpgsql security definer set search_path = public as $$
+declare v uuid := gk_require_member(p_ws); w gk_workshops%rowtype; t gk_tools%rowtype; price numeric; refund numeric; m numeric; vs jsonb; who text;
+begin
+  select * into w from gk_workshops where id = p_ws for update;
+  select * into t from gk_tools where id = p_tool and workshop_id = p_ws for update;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'weg'); end if;
+  if t.holder is not null and t.holder <> v then return jsonb_build_object('ok', false, 'reason', 'traegt_anderer'); end if;
+  price := gk_tool_price(t.type);
+  if price is null then return jsonb_build_object('ok', false, 'reason', 'nicht_verkaeuflich'); end if;
+  if (select count(*) from gk_tools where workshop_id = p_ws and type = t.type) <= 1 then return jsonb_build_object('ok', false, 'reason', 'letztes_exemplar'); end if;
+  refund := round(price / 2);
+  m := (w.state->>'money')::numeric;
+  delete from gk_tools where id = p_tool;
+  vs := jsonb_set(w.vers, '{money}', to_jsonb(coalesce((w.vers->>'money')::bigint, 0) + 1), true);
+  update gk_workshops set state = jsonb_set(state, '{money}', to_jsonb(m + refund)), vers = vs, rev = rev + 1, tools_rev = tools_rev + 1 where id = p_ws;
+  insert into gk_changes(workshop_id, rev, by_user, patches) values (p_ws, w.rev + 1, v, jsonb_build_array(jsonb_build_object('path', jsonb_build_array('money'), 'before', to_jsonb(m), 'after', to_jsonb(m + refund))));
+  select name into who from gk_members where workshop_id = p_ws and user_id = v;
+  insert into gk_ledger(workshop_id, by_user, by_name, amount, balance, note) values (p_ws, v, who, refund, m + refund, 'Werkzeug verkauft: ' || t.type);
+  return jsonb_build_object('ok', true, 'tools', gk_tools_json(p_ws), 'toolsRev', w.tools_rev + 1);
+end $$;
+
 -- ---------------------------------------------------------------- Rechte
 
 revoke all on all tables in schema public from anon, authenticated;
 revoke all on function gk_touch(uuid, uuid, jsonb), gk_reclaim(uuid), gk_tools_json(uuid), gk_members_json(uuid), gk_changes_json(uuid, bigint, bigint), gk_require_member(uuid), gk_new_code() from public, anon, authenticated;
 revoke all on function gk_create_workshop(text, text, jsonb), gk_join_workshop(text, text), gk_my_workshops(), gk_set_invite(uuid, boolean, boolean), gk_rename_player(uuid, text),
   gk_get_state(uuid), gk_sync(uuid, bigint, bigint, jsonb), gk_commit(uuid, uuid, bigint, jsonb, text, jsonb), gk_ledger_list(uuid, int),
-  gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text) from public, anon;
+  gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text), gk_sell_tool(uuid, uuid) from public, anon;
 grant execute on function gk_create_workshop(text, text, jsonb), gk_join_workshop(text, text), gk_my_workshops(), gk_set_invite(uuid, boolean, boolean), gk_rename_player(uuid, text),
   gk_get_state(uuid), gk_sync(uuid, bigint, bigint, jsonb), gk_commit(uuid, uuid, bigint, jsonb, text, jsonb), gk_ledger_list(uuid, int),
-  gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text) to authenticated;
+  gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text), gk_sell_tool(uuid, uuid) to authenticated;

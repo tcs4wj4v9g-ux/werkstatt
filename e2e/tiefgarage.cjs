@@ -70,7 +70,7 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
   expect(back.at === 'werkstatt' && Math.abs(back.z + 6.65) < 0.1 && back.x > -23, 'Rampe hoch: zurück im Hof an der Einfahrt');
   await p.waitForTimeout(1500); await p.reload(); await p.waitForTimeout(1500);
   const kept = await G(() => { const s = window.__gk.getState(); return { n: s.cars.slice(22, 28).filter(Boolean).length, up: s.upgrades.includes('tg_klein'), len: s.cars.length }; });
-  expect(kept.n === 6 && kept.up && kept.len === 131, `Nach Neuladen: Garage gekauft, 6 Autos eingelagert (${JSON.stringify(kept)})`);
+  expect(kept.n === 6 && kept.up && kept.len === 132, `Nach Neuladen: Garage gekauft, 6 Autos eingelagert (${JSON.stringify(kept)})`);
 
   // ---------- Luxus: 50 Plätze, zwei Fahrgassen ----------
   await G(() => { const g = window.__gk; const L = window.__gkLib; g.setState({ money: 400000 }); g.getState().buyUpgrade('tg_luxus'); const ids = Object.keys(L.models); const cars = [...g.getState().cars]; L.slots.filter((s) => s.place === 'tg_luxus').forEach((s, i) => { cars[s.id] = L.createCar(ids[i % ids.length], [], Math.random, {}); }); g.setState({ cars }); L.travel('tg_luxus'); });

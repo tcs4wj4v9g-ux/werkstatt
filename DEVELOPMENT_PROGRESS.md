@@ -575,3 +575,48 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Durchläufe `motoren`, `diagnose`, `werkstatt`.
   - Hörproben im Testbrowser aufgenommen (elf Autos bzw. Ausbaustufen) und ausgewertet: Pegel, Spitze, Ordnungen, Klangschwerpunkt.
   - Kein echter iPad-Test.
+
+## Fahrphysik überarbeitet, Fahrzeugstatistik, Knopfsteuerung, Anlasser, „zuletzt online“
+
+- **Problem gemessen:** Mit vollem Lenkeinschlag drehte sich bei 80 km/h selbst der frontgetriebene Twingo, und beim Bremsen in der Kurve brachen alle Autos aus. Ein Fahrer mit reinen An/Aus-Knöpfen schaffte die Runde nur mit dem Twingo, mit 34 Drehern.
+- **Ursachen und Abhilfe** (`vehicle.ts`):
+  - Vorder- und Hinterachse erreichten die Haftgrenze gleichzeitig (neutral im Grenzbereich, kippelig). Jetzt hat die Hinterachse Reserve (Haftung ×1,12, höhere Seitensteifigkeit): Im Grenzbereich schiebt das Auto über die Vorderräder, wie ein gutmütiges Serienauto.
+  - Voller Einschlag bei Tempo überforderte die Vorderreifen. Jetzt wird der Einschlag je nach Tempo begrenzt (Kurvenradius aus der Haftgrenze plus bestem Schräglaufwinkel).
+  - ABS (immer aktiv) lässt jeder Achse die Seitenkraft, die die Kurve gerade braucht. Mehr Bremskraft vorn (70 %).
+  - ESP (Standard an, in der Probefahrt abschaltbar):
+    - Giermomentregelung, wenn das Auto stärker dreht, als Einschlag und Haftung erlauben.
+    - Gegenmoment bei zu großem Schwimmwinkel.
+    - Antriebsschlupfregelung.
+    - Ohne ESP lassen starke Hecktriebler mit Vollgas in der Kurve das Heck kommen – Driften für Könner.
+  - Drehende Teile (Räder, Getriebe, Schwungrad) werden mitbeschleunigt. Kleine Autos sind dadurch in den kurzen Gängen nicht mehr unrealistisch flott (Twingo 0–100 in 14 s).
+  - Reifenhaftung nach Baujahr (ältere Autos weniger) und Klasse (Sportreifen). Mittelmotor-Sportwagen mit 42 % Gewicht vorn.
+- **Logiktests:**
+  - Mit ESP kein Ausbrechen bei vollem Einschlag (50–110 km/h) und beim Bremsen in der Kurve.
+  - Ein Knopf-Fahrer schafft die Runde ohne Abkommen (Twingo, M4, 964).
+  - Ohne ESP driftet der M4, der Golf nicht.
+- **Fahrzeugstatistik** (`carStats.ts`, Karte in Akte und Prüfstand):
+  - PS, Nm, Gewicht, PS/t, Antrieb und Gänge.
+  - Gemessen mit derselben Fahrphysik: 0–100 km/h, Höchstgeschwindigkeit, Bremsweg aus 100 km/h, Querbeschleunigung (Handling), dazu Noten als Balken.
+  - Tuning, Fahrwerk, Reifen und Defekte zählen mit. Ergebnisse werden zwischengespeichert (alle 35 Modelle zusammen etwa 140 ms).
+- **Steuerung:** Knöpfe ◀ ▶ zum Lenken, Gas und Bremse (voll an/aus). Die Lenkung baut sich weich auf und wird je nach Tempo begrenzt. Dazu der Schalter „ESP an/aus“.
+- **Anlasser:**
+  - Der Elektromotor surrt und bricht bei jeder Verdichtung kurz ein. Dazu das dumpfe „Tschuck“ der Verdichtungstakte bei etwa 220/min.
+  - Danach zündet der Motor, die Drehzahl schießt kurz hoch und fällt auf Leerlauf.
+  - Kalt, Diesel oder Zündaussetzer: länger orgeln.
+- **Koop:** In der oberen Leiste steht bei Mitspielern, die nicht online sind, „zuletzt gerade eben / vor 12 min / vor 3 Std. / vor 2 Tagen“, ebenso im Chat-Fenster.
+- Geprüft:
+  - Logiktests.
+  - Durchläufe `koop` (neu: „zuletzt online“), `diagnose`, `markt`.
+  - Browser: Knöpfe (Gas, Lenken, Bremse, ESP) und die Statistik in der Akte.
+  - Hörproben des Anlassers.
+  - Kein echter iPad-Test.
+
+## Halle 2 mit eigener Ausstattung, Werkzeug verkaufen
+
+- **Motorständer Halle 2:** neuer Stellplatz (`STAND2_SLOT`, hinten an die Liste angehängt → 132 Plätze). Alte Spielstände und Koop-Stände werden beim Laden wie bisher verlängert. Den Ständer gibt es nur mit `loc_pro`.
+- **Zweiter Motorkran** in Halle 2 bei (3,1 / −8,0), sobald auch der Motorheber gekauft ist. Es gibt weiterhin nur einen hängenden Motor (`crane`). Er wird an dem Kran gezeigt, dessen Fenster zuletzt offen war (`useCraneSite`, nur Anzeige).
+- **Kranfenster:** `standFor(bay, upgrades)` wählt den Ständer der Halle. Hebebühnen 3 und 4 sowie Ständer 2 gehören zu Halle 2, alles andere zur Stammhalle. `craneToStand`, `standToCrane`, `flipEngine`, `testEngine` und `fitTurboKit` nehmen den Ständerplatz entgegen. Die Motorübersicht am Computer zeigt beide Ständer.
+- **Spezialwerkzeugschrank Halle 2** an der Rückwand. Im Koop ist es die eigene Kiste `spezial2` (4 Plätze). Der Werkzeugwagen dort ist jetzt die Kiste `halle2` (8 Plätze) statt eines zweiten Zugangs zum Werkzeugschrank. Im Einzelspiel öffnen beide den Werkzeugschrank.
+- **Werkzeug verkaufen (Koop):** Knopf „Verkaufen“ in der Kiste und für Werkzeug in der eigenen Leiste. Erstattet wird der halbe Kaufpreis. Das letzte Exemplar einer Art und Werkzeug in fremder Hand lassen sich nicht verkaufen. Serverseitig über `gk_sell_tool`, mit Buchung im Kassenbuch.
+- **Schema:** `gk_box_cap` kennt `halle2` und `spezial2`, neu ist `gk_sell_tool`, und `gk_reclaim` nutzt die neuen Kisten als Ausweichplatz. **`supabase/schema.sql` muss einmal im Supabase-SQL-Editor ausgeführt werden.**
+- Tests: Logiktest Slotzahl; `schrott.cjs` prüft Ständer 2 (gesperrt ohne Halle 2, Kranfenster „Halle 2“, auf/ab, drehen, Ständer 1 unberührt); `koop.cjs` prüft das Verkaufen; SQL-Test für `gk_sell_tool`.
