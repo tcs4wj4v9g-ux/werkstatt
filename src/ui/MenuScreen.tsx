@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '../game/store';
+import { duration, todayOf } from '../game/playtime';
 import { eur, GfxPicker } from './common';
 import { CoopMenu } from './CoopUI';
 
@@ -29,6 +30,8 @@ export function MenuScreen() {
         {s.started && (
           <p className="stats">
             Kontostand {eur(s.money)} · Verkaufte Autos {s.carsSold} · Gesamtgewinn {eur(s.totalProfit)}
+            <br />
+            <span data-testid="playtime">⏱ Arbeitszeit {duration(s.playTime.total)} · heute {duration(todayOf(s.playTime))}</span>
           </p>
         )}
         <CoopMenu />

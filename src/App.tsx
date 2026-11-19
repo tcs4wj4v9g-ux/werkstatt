@@ -1,7 +1,8 @@
 import { Canvas, useThree } from '@react-three/fiber';
+import { addPlay, isActive } from './game/playtime';
 import { useEffect, useState } from 'react';
 import { dayClock, dayLeft, useGame } from './game/store';
-import { isLeader, recoverAfterCrash } from './net/coop';
+import { coopActive, isLeader, recoverAfterCrash } from './net/coop';
 import { Recover } from './ui/Recover';
 import { Perf } from './three/Env';
 import { GFX, TEST_DPR, TEST_MODE, useGfx } from './three/gfx';
@@ -44,6 +45,29 @@ export function App() {
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
+  }, []);
+  // Arbeitszeit im Einzelspiel: jede aktive Sekunde zählen, alle 30 s (und beim Verlassen) in den Spielstand übernehmen
+  useEffect(() => {
+    let pending = 0;
+    const flush = () => {
+      if (pending <= 0) return;
+      const s = useGame.getState();
+      useGame.setState({ playTime: addPlay(s.playTime, pending) });
+      pending = 0;
+    };
+    const t = setInterval(() => {
+      const s = useGame.getState();
+      if (s.started && s.screen !== 'menu' && !coopActive() && isActive()) pending++;
+      if (pending >= 30 || (pending > 0 && s.screen === 'menu')) flush();
+    }, 1000);
+    const hide = () => document.hidden && flush();
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', hide);
+      window.removeEventListener('pagehide', flush);
+    };
   }, []);
   // Der Spieltag endet nach drei Minuten von selbst. Im Koop schaltet nur ein Gerät um (sonst zwei Tage auf einmal),
   // auf Probefahrt oder im Menü wird gewartet. Im Testmodus (Tageslänge 0) bleibt es beim Knopf.

@@ -1,4 +1,5 @@
 import { CarStatsCard } from './CarStatsCard';
+import { duration, todayOf } from '../game/playtime';
 import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
 import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
@@ -17,7 +18,7 @@ export function AchievementsTab() {
   return (
     <>
       <p className="meta">
-        {done} von {ACHIEVEMENTS.length} Erfolgen erreicht · bisher {eur(ACHIEVEMENTS.filter((a) => s.achieved.includes(a.id)).reduce((sum, a) => sum + a.reward, 0))} Belohnung
+        ⏱ Arbeitszeit {duration(s.playTime.total)} (heute {duration(todayOf(s.playTime))}) · {done} von {ACHIEVEMENTS.length} Erfolgen erreicht · bisher {eur(ACHIEVEMENTS.filter((a) => s.achieved.includes(a.id)).reduce((sum, a) => sum + a.reward, 0))} Belohnung
       </p>
       {ACHIEVEMENTS.map((a) => {
         const got = s.achieved.includes(a.id);

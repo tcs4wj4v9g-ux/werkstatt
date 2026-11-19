@@ -685,3 +685,14 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Kollisionen:** Der Anteil der Geschwindigkeit zum Hindernis hin wird mit leichtem Rückprall aufgehoben, entlang gleitet das Auto weiter (frontal fast Stillstand, streifend nur langsamer).
 - **Unebener Boden:** Abseits der Straße rüttelt der Aufbau leicht (Feld stärker als Wiese und Schotter).
 - Tests: `markt.cjs` (Tag überspringen), `koop.cjs` („zuletzt online“ erst nach Antippen), `diagnose.cjs` (Fahrt endet erst auf dem Vorplatz).
+
+## Arbeitszeit je Spieler
+
+- Gezählt wird aktive Spielzeit (`game/playtime.ts`): Das Spiel ist sichtbar, nicht im Menü, und in den letzten 5 Minuten gab es eine Eingabe (Tippen oder Taste).
+- **Einzelspiel:** `playTime` im Spielstand (gesamt und je Kalendertag). Es wird jede aktive Sekunde gezählt und alle 30 s bzw. beim Verlassen übernommen, damit nicht jede Sekunde gespeichert wird. Die Anzeige steht im Menü und unter Erfolge.
+- **Koop:**
+  - Der Server zählt in `gk_touch` je Mitglied (`play_seconds`, `play_today` am Kalendertag `play_day`, deutsche Zeit).
+  - Es zählt der Abstand zum letzten Lebenszeichen, wenn er höchstens 60 s beträgt und der Spieler nicht als untätig gemeldet ist (`presence.idle`). Zwei Fenster desselben Kontos zählen nicht doppelt.
+  - Die Anzeige steht in der Koop-Übersicht (nach Antippen der Koop-Leiste).
+  - **Schema-Ergänzung nötig** (`alter table … add column if not exists`, neue `gk_touch` und `gk_members_json`). Ohne sie bleibt die Anzeige im Koop einfach leer.
+- Tests: Logiktest (Konto, Tageswechsel, Anzeige), SQL-Test (aktiv, untätig, Pause, neuer Tag), `koop.cjs` (Anzeige für beide Spieler und im Menü).

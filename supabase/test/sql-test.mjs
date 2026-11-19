@@ -289,3 +289,29 @@ test('Mega-Update: Motoren, Kran und Gebrauchtteile sind gemeinsame Felder – n
   // Schrottplatz-Regal hat eigene Werkzeugexemplare
   assert.equal((await a.rpc('gk_get_state', ws)).tools.filter((t) => t.home === 'schrott').length, 6);
 });
+
+test('Arbeitszeit: zählt die Zeit zwischen Lebenszeichen, nicht untätig, nicht nach langer Pause', async () => {
+  const { a, b, ws } = await workshop();
+  const play = async (p) => (await a.rpc('gk_sync', ws, 0, 0, null)).members.find((m) => m.id === p.id);
+  await a.rpc('gk_sync', ws, 0, 0, { x: 0 });
+  // 20 s seit dem letzten Lebenszeichen, aktiv: zählt
+  await admin.query(`update gk_members set last_seen = now() - interval '20 seconds' where user_id = $1`, [b.id]);
+  await b.rpc('gk_sync', ws, 0, 0, { x: 0, idle: false });
+  let m = await play(b);
+  assert.ok(m.play >= 19 && m.play <= 22, 'aktiv gezählt: ' + m.play);
+  assert.equal(m.today, m.play);
+  // Untätig gemeldet: zählt nicht
+  await admin.query(`update gk_members set last_seen = now() - interval '20 seconds' where user_id = $1`, [b.id]);
+  await b.rpc('gk_sync', ws, 0, 0, { x: 0, idle: true });
+  const idle = (await play(b)).play;
+  assert.ok(Math.abs(idle - m.play) < 1, 'untätig nicht gezählt');
+  // Lange weg (2 Minuten ohne Lebenszeichen): die Lücke zählt nicht
+  await admin.query(`update gk_members set last_seen = now() - interval '2 minutes' where user_id = $1`, [b.id]);
+  await b.rpc('gk_sync', ws, 0, 0, { x: 0 });
+  assert.ok(Math.abs((await play(b)).play - idle) < 1, 'Pause nicht gezählt');
+  // Neuer Kalendertag: „heute“ beginnt neu, gesamt bleibt
+  await admin.query(`update gk_members set play_day = play_day - 1, last_seen = now() - interval '10 seconds' where user_id = $1`, [b.id]);
+  await b.rpc('gk_sync', ws, 0, 0, { x: 0 });
+  m = await play(b);
+  assert.ok(m.today >= 9 && m.today <= 12 && m.play >= idle + 9, 'heute neu: ' + JSON.stringify(m));
+});

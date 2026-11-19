@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { duration } from '../game/playtime';
 import { CABINET_TOOLS, MAX_CARRIED, TOOL_MAP } from '../game/data/tools';
 import { useGame } from '../game/store';
 import { COOP_CONFIGURED } from '../net/config';
@@ -155,6 +156,11 @@ export function CoopModal() {
           <div key={m.id} className="meta" data-testid="coop-member">
             {m.online || m.id === c.me ? '🟢' : '⚪'} <b>{m.name}</b>
             {m.id === c.me ? ' (du)' : m.online ? '' : ` – zuletzt ${ago(m.seen)}`} · trägt: {tools.length ? tools.join(', ') : 'nichts'}
+            {m.play !== undefined && (
+              <span data-testid={`playtime-${m.name}`}>
+                {' '}· ⏱ Arbeitszeit {duration(m.play)} (heute {duration(m.today ?? 0)})
+              </span>
+            )}
           </div>
         );
       })}

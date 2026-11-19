@@ -29,9 +29,9 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   /** Vergleich ohne Rücksicht auf die Reihenfolge der Schlüssel (die Datenbank sortiert sie um). */
   const norm = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().filter((y) => x[y] !== null).map((y) => [y, x[y]])) : x));
   const reject = (p) => G(p, () => JSON.stringify(window.__gkCoop.state().lastReject));
-  /** Felder des Einzelspielstands, die sich gegenüber dem Stand vor dem Koop geändert haben (Auktionen laufen in Echtzeit weiter und zählen nicht). */
+  /** Felder des Einzelspielstands, die sich gegenüber dem Stand vor dem Koop geändert haben (Auktionen laufen in Echtzeit weiter, die Arbeitszeit zählt im Menü nach – beide zählen nicht). */
   let saveBefore = null;
-  const unchanged = (now) => { const s1 = JSON.parse(saveBefore).state, s2 = JSON.parse(now).state; return Object.keys(s1).filter((k) => k !== 'auctions' && norm(s1[k]) !== norm(s2[k])); };
+  const unchanged = (now) => { const s1 = JSON.parse(saveBefore).state, s2 = JSON.parse(now).state; return Object.keys(s1).filter((k) => k !== 'auctions' && k !== 'playTime' && norm(s1[k]) !== norm(s2[k])); };
   const sees = (p, name, car) => until(p, ([name, car]) => { const m = window.__gkCoop.useCoop.getState().members.find((x) => x.name === name); return m && (m.presence.car || null) === car; }, [name, car]);
   const p2shot = async (pl, name) => { await G(pl, () => Object.assign(window.__gkPlayer, { x: 4.6, z: -0.6, yaw: Math.atan2(4.6, -2.1), pitch: -0.12, zoom: false, work: null })); await pl.waitForTimeout(1200); await pl.screenshot({ path: `${S}/${name}.png` }); };
   const toolOf = (c, type, box) => c.tools.find((t) => t.type === type && t.box === box);
@@ -327,6 +327,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await B.getByTestId('coop-chip').click(); await B.waitForTimeout(400);
   const lines = await B.getByTestId('coop-member').allTextContents();
   expect(lines.some((t) => /Anna – zuletzt (gerade eben|vor \d+ min)/.test(t)), 'Nach Antippen: wann Spieler 1 zuletzt online war – ' + lines.join(' | '));
+  expect(lines.filter((t) => /⏱ Arbeitszeit (unter 1 min|\d+ min|\d+ h \d+ min) \(heute /.test(t)).length === 2, 'Arbeitszeit je Spieler (vom Server gezählt): ' + lines.join(' | '));
   await G(B, () => window.__gk.getState().setPanel(null));
   const after = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools) };
   expect(after.car === before.car && after.money === before.money, 'Reparaturfortschritt und Geld sind erhalten');
@@ -338,6 +339,7 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   const changed = unchanged(await save(A));
   expect(changed.length === 0, 'Einzelspielstand von Spieler 1 ist inhaltlich unverändert' + (changed.length ? ' – abweichend: ' + changed : ''));
   expect((await game(A)).money === 12345 && (await game(A)).started, 'Im Menü steht wieder der Einzelspielstand');
+  expect(/Arbeitszeit .* heute /.test(await A.getByTestId('playtime').textContent()), 'Arbeitszeit des Einzelspiels im Menü: ' + (await A.getByTestId('playtime').textContent()));
   await A.getByText('Einzelspieler fortsetzen').click(); await A.waitForTimeout(600);
   await G(A, () => window.__gk.setState({ money: 12000 })); await A.waitForTimeout(500);
   expect(JSON.parse(await save(A)).state.money === 12000 && (await game(A)).screen === 'garage', 'Einzelspieler läuft weiter und speichert wieder lokal');
