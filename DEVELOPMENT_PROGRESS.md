@@ -627,3 +627,28 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Teilesuche** im Ersatzteilregal und am Computer: Das Suchfeld oben sucht über alle Abteilungen und Betriebsflüssigkeiten. Groß- und Kleinschreibung spielen keine Rolle, Umlaute dürfen ausgeschrieben werden („zuendkerze“). Treffer, die nicht zum gewählten Auto passen, werden nur gezählt.
 - **Probefahrt im Koop:** Fährt ein Mitspieler, verschwindet das Auto bei den anderen von Bühne, Hofplatz oder Tiefgaragenplatz (`useAway` aus der Anwesenheit `scene: 'track'` und `car`). Es ist dann kein Hindernis und nicht anwählbar. Im Einzelspiel ist die Werkstatt während der Fahrt ohnehin nicht sichtbar.
 - Tests: `markt.cjs` prüft die Suche, `koop.cjs` das Verschwinden und Zurückkehren des Autos.
+
+## Fahren neu: Physik wie in Rennspielen, Schieberegler, freie Probefahrt auf Zeit, Koop-Fenstererkennung
+
+- **Reifen:** vereinfachte „Magic Formula“. Die Seitenkraft steigt bis etwa 7–8° Schräglauf und fällt beim Rutschen auf gut 85 %. Dadurch sind Drifts möglich, ohne dass das Auto schlagartig wegbricht.
+- **Lenkung:** 0,62 rad Radeinschlag im Stand (Wendekreis-Radius unter 6 m). Bei Tempo hält eine Lenkhilfe die Vorderräder nahe am besten Schräglaufwinkel, gemessen an der Bewegungsrichtung der Vorderachse. Voller Ausschlag heißt damit immer: so eng, wie die Reifen es hergeben. Rutscht das Auto, richten sich die Räder von selbst in Fahrtrichtung aus (Gegenlenken), ähnlich wie bei NFS oder Forza.
+- **ESP an (Standard):** Gierratenregelung, Schwimmwinkelbegrenzung, Antriebsschlupfregelung wie bisher.
+- **ESP aus:** Die Drift-Hilfe dämpft ab etwa 20° nur das weitere Eindrehen, nie das Zurückdrehen, und drückt ab etwa 50° zurück. Dreher passieren nur mit Absicht. Gas weg und Lenkung gerade: Das Auto fängt sich.
+- **Handbremse** (Knopf, Leertaste): blockiert die Hinterräder und dient zum Einleiten von Drifts und zum Wenden.
+- **Bedienung:**
+  - Links ein breiter Lenk-Schieberegler mit feinfühliger Kennlinie um die Mitte.
+  - Rechts ein kleiner Gas-Schieberegler. Beide federn beim Loslassen zurück (gerade bzw. kein Gas).
+  - Dazu Knöpfe für Bremse und Handbremse.
+  - Mehrere Finger gleichzeitig gehen (Pointer Capture).
+- **Probefahrt auf Zeit:** 2:30 Minuten freie Fahrt (`DRIVE_TIME`), gewertet ab 45 Sekunden (`DRIVE_MIN`). Danach geht es automatisch zurück. „Auf die Straße“ setzt das Auto stehend an den nächsten Straßenpunkt. Die Pylonen-Tore gibt es nicht mehr. Die Weltgrenze hält sanft zurück.
+- **Welt:**
+  - Testgelände (Asphalt, eben, Driftkreise, Slalomgasse) neben der Startgeraden.
+  - Vier Schotter-Feldwege durch die Landschaft.
+  - Vier Bauernhöfe mit Scheune und Heuballen.
+  - Untergründe mit eigener Haftung: Schotter 0,78, Wiese 0,64, Waldboden 0,6, Feld 0,55.
+- **Kamera:** Folgt im Drift zwischen Längsachse und Fahrtrichtung. Das Auto steht höher im Bild, der Drehzahlmesser verdeckt es nicht mehr.
+- **Koop:**
+  - Ein zweites Fenster mit demselben Konto (z. B. ein alter Safari-Tab) wird erkannt: Änderungen unter dem eigenen Konto, die nicht aus diesem Fenster stammen, oder eigene Positionsmeldungen mit fremder Fensterkennung.
+  - Dieses Fenster pausiert dann mit Hinweis und Knopf „Hier weiterspielen“.
+  - Ein Konflikt ohne anderen Spieler online meldet nicht mehr „Partner war schneller“.
+  - Serverabsagen nennen ihren Grund.

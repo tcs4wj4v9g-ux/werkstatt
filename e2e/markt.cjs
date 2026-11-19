@@ -98,6 +98,22 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   expect(prof && prof.layout === 'V8', 'Auf der Strecke klingt er als V8');
   console.log('  Tempo nach 6 s Vollgas:', (v * 3.6).toFixed(0), 'km/h');
   await p.screenshot({ path: S + '/s5-track.png' });
+  // Bedienung mit Schiebereglern: Gas hochziehen, Lenkung zur Seite; beim Loslassen zurück auf neutral
+  const gasBox = await p.getByTestId('gas').boundingBox();
+  await p.mouse.move(gasBox.x + gasBox.width / 2, gasBox.y + gasBox.height - 4); await p.mouse.down();
+  await p.mouse.move(gasBox.x + gasBox.width / 2, gasBox.y + gasBox.height * 0.35, { steps: 4 }); await p.waitForTimeout(400);
+  const thr = await p.evaluate(() => window.__gkDrive.input.throttle);
+  await p.mouse.up(); await p.waitForTimeout(200);
+  expect(thr > 0.5 && (await p.evaluate(() => window.__gkDrive.input.throttle)) === 0, 'Gasregler: hochgezogen ' + thr.toFixed(2) + ', losgelassen 0');
+  const stBox = await p.getByTestId('steer').boundingBox();
+  await p.mouse.move(stBox.x + stBox.width / 2, stBox.y + stBox.height / 2); await p.mouse.down();
+  await p.mouse.move(stBox.x + stBox.width - 6, stBox.y + stBox.height / 2, { steps: 4 }); await p.waitForTimeout(200);
+  const right = await p.evaluate(() => window.__gkDrive.input.steer);
+  await p.mouse.up(); await p.waitForTimeout(200);
+  expect(right < -0.9 && (await p.evaluate(() => window.__gkDrive.input.steer)) === 0, 'Lenkregler: ganz rechts ' + right.toFixed(2) + ', losgelassen gerade');
+  expect(/⏱ [12]:\d\d/.test(await p.getByTestId('drive-time').textContent()), 'Fahrzeit läuft: ' + (await p.getByTestId('drive-time').textContent()));
+  await p.getByTestId('respawn').click(); await p.waitForTimeout(400);
+  expect(await p.evaluate(() => Math.abs(window.__gkDrive.sim.vx) < 0.5), '„Auf die Straße“ setzt das Auto stehend auf die Fahrbahn');
   // ---------- Feierabend erst nach Ablauf des Spieltags (Timer) ----------
   await p.evaluate(() => { const g = window.__gk; window.__gkLib.dayClock.ms = 180000; g.setState({ dayStartedAt: Date.now(), screen: 'garage', panel: 'computer' }); });
   await p.waitForTimeout(400);

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { CAMERA_LABEL, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
+import { useRef, useState, type ReactNode } from 'react';
+import { CAMERA_LABEL, DRIVE_MIN, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
 import { DEFECTS } from '../game/data/defects';
 import { activeDefects } from '../game/repair';
 import { engineAudio } from '../game/audio';
@@ -37,6 +37,56 @@ function Hold({ on, off, className, children, testid }: { on(): void; off(): voi
   );
 }
 
+/**
+ * Schieberegler, der beim Loslassen in die Ruhelage zurückfedert (Lenkung: Mitte, Gas: unten).
+ * Der Finger darf beim Ziehen über den Regler hinaus wandern; mehrere Finger gleichzeitig (Lenken + Gas) gehen.
+ */
+function Spring({ axis, testid, className, onChange, label }: { axis: 'x' | 'y'; testid: string; className: string; onChange(v: number): void; label?: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [v, setV] = useState(0);
+  const [held, setHeld] = useState(false);
+  const read = (e: React.PointerEvent) => {
+    const r = ref.current!.getBoundingClientRect();
+    // Lenkung: −1 (links) … +1 (rechts) über die Breite; Gas: 0 (unten) … 1 (oben) über die Höhe
+    const val = axis === 'x' ? ((e.clientX - r.left) / r.width) * 2 - 1 : 1 - (e.clientY - r.top) / r.height;
+    const c = axis === 'x' ? Math.max(-1, Math.min(1, val * 1.12)) : Math.max(0, Math.min(1, val * 1.08 - 0.04));
+    setV(c);
+    onChange(c);
+  };
+  const release = () => {
+    setHeld(false);
+    setV(0);
+    onChange(0);
+  };
+  const pos = axis === 'x' ? { left: `${50 + v * 40}%` } : { bottom: `${8 + v * 70}%` };
+  return (
+    <div
+      ref={ref}
+      className={`spring ${className}${held ? ' held' : ''}`}
+      data-testid={testid}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        restart();
+        setHeld(true);
+        read(e);
+      }}
+      onPointerMove={(e) => held && read(e)}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={release}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div className="rail" />
+      {axis === 'y' && <div className="fill" style={{ height: `${8 + v * 70}%` }} />}
+      <div className="knob" style={pos}>{label}</div>
+    </div>
+  );
+}
+
+/** Lenkung: feinfühlig um die Mitte (Kennlinie), voller Ausschlag an den Enden. +1 = links für die Physik. */
+const steerCurve = (x: number) => -Math.sign(x) * Math.abs(x) ** 1.35;
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
 /** Drehzahlmesser mit rotem Bereich, darin Tempo und Gang. */
 function Gauge() {
   const { speed, rpm, redline, gear, wheelspin } = useDriveHud();
@@ -53,7 +103,7 @@ function Gauge() {
   const [nx, ny] = pt(rpm, 40);
   const ticks = Array.from({ length: max / 1000 + 1 }, (_, i) => i * 1000);
   return (
-    <svg className="tacho" viewBox="-56 -56 112 112" width="170" height="170" data-testid="gauge">
+    <svg className="tacho" viewBox="-56 -56 112 112" width="150" height="150" data-testid="gauge">
       <circle r="54" fill="rgba(18,20,24,0.82)" />
       <path d={arc(0, max, 46)} stroke="rgba(255,255,255,0.25)" strokeWidth="4" fill="none" />
       <path d={arc(redline, max, 46)} stroke="#e0402f" strokeWidth="5" fill="none" />
@@ -84,35 +134,38 @@ export function TrackUI() {
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
   const [esp, setEspState] = useState(driveInput.assist);
-  // ESP aus: Stabilitäts- und Antriebsschlupfregelung abgeschaltet – das Heck darf kommen (ABS bleibt)
+  // ESP aus: Stabilitäts- und Antriebsschlupfregelung abgeschaltet – das Heck darf kommen (ABS bleibt, Drift-Hilfe fängt Dreher ab)
   const setEsp = (on: boolean) => {
     driveInput.assist = on;
     setEspState(on);
   };
   const next = (c: DriveCamera): DriveCamera => (c === 'chase' ? 'hood' : c === 'hood' ? 'cockpit' : 'chase');
+  const counts = hud.elapsed >= DRIVE_MIN;
   return (
     <>
       <div className="topbar">
-        <button className="btn ghost" onClick={() => finishDrive(false)}>✕ Abbrechen</button>
-        <div className="title">Probefahrt – eine Runde durch alle Pylonen-Tore</div>
+        <button className="btn ghost" data-testid="drive-end" onClick={() => finishDrive(counts)}>{counts ? '🏁 Zurück zur Werkstatt' : '✕ Abbrechen'}</button>
+        <div className="title">Probefahrt – fahr, wohin du willst</div>
         <button className={`btn ${esp ? '' : 'active'}`} data-testid="esp" onClick={() => setEsp(!esp)}>{esp ? '🛡 ESP an' : '⚠ ESP aus'}</button>
         <button className="btn" data-testid="camera" onClick={() => hud.set({ camera: next(hud.camera) })}>🎥 {CAMERA_LABEL[hud.camera]}</button>
-        <div className="money">Tor {Math.min(hud.checkpoint, hud.total)}/{hud.total}</div>
+        <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>↺ Auf die Straße</button>
+        <div className="money" data-testid="drive-time">⏱ {clock(hud.left)}</div>
       </div>
       <div className="speedo">
         <Gauge />
-        <div className="meta">{(hud.distance / 1000).toFixed(1)} km</div>
+        <div className="meta">{(hud.distance / 1000).toFixed(1)} km{counts ? '' : ` · gewertet ab ${clock(DRIVE_MIN)}`}</div>
         {lamps.length > 0 && <div className="lamps">{lamps.map((l) => <span key={l}>{l}</span>)}</div>}
-        {hud.offTrack && <div className="bad">Zurück auf die Straße!</div>}
-        {hud.checkpoint >= hud.total && <div className="good">Runde geschafft!</div>}
+        {hud.drift > 0 && <div className="good" data-testid="drift">Drift {Math.round(hud.drift)}°</div>}
       </div>
       <div className="drive left">
-        <Hold className="steer" testid="steer-left" on={() => (driveInput.steer = 1)} off={() => driveInput.steer === 1 && (driveInput.steer = 0)}>◀</Hold>
-        <Hold className="steer" testid="steer-right" on={() => (driveInput.steer = -1)} off={() => driveInput.steer === -1 && (driveInput.steer = 0)}>▶</Hold>
+        <Spring axis="x" testid="steer" className="steer" onChange={(v) => (driveInput.steer = steerCurve(v))} label={<span>◀ ▶</span>} />
       </div>
       <div className="drive right">
-        <Hold className="brake" testid="brake" on={() => (driveInput.brake = 1)} off={() => (driveInput.brake = 0)}>BREMSE</Hold>
-        <Hold className="gas" testid="gas" on={() => (driveInput.throttle = 1)} off={() => (driveInput.throttle = 0)}>GAS</Hold>
+        <div className="pedals">
+          <Hold className="hand" testid="handbrake" on={() => (driveInput.handbrake = true)} off={() => (driveInput.handbrake = false)}>HAND­BREMSE</Hold>
+          <Hold className="brake" testid="brake" on={() => (driveInput.brake = 1)} off={() => (driveInput.brake = 0)}>BREMSE</Hold>
+        </div>
+        <Spring axis="y" testid="gas" className="gas" onChange={(v) => (driveInput.throttle = v)} label="GAS" />
       </div>
     </>
   );

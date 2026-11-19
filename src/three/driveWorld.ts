@@ -20,6 +20,20 @@ const ROUTE: [number, number, number][] = [
   [-470, 9, 25], [-380, 5, 55], [-280, 2, 40], [-180, 0.5, 10], [-70, 0, 0],
 ];
 
+/**
+ * Testgelände: große, ebene Asphaltfläche direkt neben der Startgeraden (zum freien Fahren, Wenden und Driften).
+ * Liegt zwischen Startgerade und dem Bogen nach Norden; die Höhe folgt der Startgeraden (kein Absatz am Rand).
+ */
+export const PAD = { minX: 125, maxX: 270, minZ: 7, maxZ: 130 };
+/** Feldwege (Schotter) quer durch Wiesen und Felder: Wegpunkte (x, z), Höhe folgt dem Gelände. */
+const TRACKS: [number, number][][] = [
+  [[285, 60], [330, 110], [360, 175], [352, 250], [300, 300]],
+  [[-60, -40], [-120, -110], [-200, -160], [-300, -190], [-400, -175]],
+  [[-150, 30], [-210, 95], [-300, 140], [-400, 120], [-470, 70]],
+  [[60, -60], [130, -120], [230, -150], [330, -130], [410, -60], [430, 40]],
+];
+export const TRACK_WIDTH = 3.6;
+
 /** Sanftes Rauschen aus überlagerten Sinuswellen (deterministisch, schnell). */
 function noise(x: number, z: number) {
   return (
@@ -63,6 +77,14 @@ export interface Obstacle {
 
 export interface DriveWorld {
   samples: RoadSample[];
+  /** Liegt der Punkt auf dem Testgelände (Asphalt)? */
+  onPad(x: number, z: number): boolean;
+  /** Untergrund abseits der Straße: Haftung und Rollwiderstand (Schotterweg, Wiese, Feld, Waldboden). */
+  surface(x: number, z: number): { grip: number; drag: number; kind: 'gravel' | 'grass' | 'field' | 'forest' };
+  /** Feldwege als Punktfolgen (für die Darstellung). */
+  tracks: { x: number; z: number }[][];
+  /** Höhe des Testgeländes. */
+  padY: number;
   length: number;
   start: { x: number; z: number; heading: number };
   ground(x: number, z: number): number;
@@ -70,6 +92,8 @@ export interface DriveWorld {
   nearest(x: number, z: number, hint: number): { i: number; lateral: number; along: number; dist: number };
   obstacles(x: number, z: number): Obstacle[];
   trees: { x: number; z: number; h: number; kind: 0 | 1 }[];
+  /** Heuballen auf den Feldern bei den Höfen (liegende Rundballen). */
+  bales: { x: number; z: number; rot: number }[];
   houses: { x: number; z: number; rot: number; w: number; d: number; h: number; color: string }[];
   lamps: { x: number; z: number; rot: number }[];
   signs: { x: number; z: number; rot: number; kind: 'town' | 'curveL' | 'curveR' | 'speed50' | 'speed100' | 'cross' }[];
@@ -129,7 +153,18 @@ export function driveWorld(): DriveWorld {
     return bi < 0 ? null : { i: bi, d: Math.sqrt(best) };
   };
   // Gelände: Rauschen, zur Straße hin auf Straßenhöhe angeglichen (Böschung), Ortskern flach
+  // Höhe des Testgeländes: wie die Startgerade daneben (dort fast eben)
+  const straight = samples.filter((p) => p.x > PAD.minX - 10 && p.x < PAD.maxX + 10 && Math.abs(p.z) < 12);
+  const padY = straight.reduce((a, p) => a + p.y, 0) / Math.max(1, straight.length);
+  const padDist = (x: number, z: number) => Math.hypot(Math.max(PAD.minX - x, 0, x - PAD.maxX), Math.max(PAD.minZ - z, 0, z - PAD.maxZ));
+  const onPad = (x: number, z: number) => x > PAD.minX && x < PAD.maxX && z > PAD.minZ && z < PAD.maxZ;
   const ground = (x: number, z: number) => {
+    const pd = padDist(x, z);
+    if (pd < 0.01) return padY;
+    const raw = groundRaw(x, z);
+    return pd < 40 ? padY + (raw - padY) * THREE.MathUtils.smoothstep(pd, 0, 40) : raw;
+  };
+  const groundRaw = (x: number, z: number) => {
     const base = noise(x, z) + 4;
     const town = Math.max(0, 1 - Math.hypot(x, z) / 170);
     const near = roadNear(x, z, 60);
@@ -192,6 +227,26 @@ export function driveWorld(): DriveWorld {
     if (cross.crossing && !samples[(i + 29) % n].crossing) signs.push({ ...right, rot: heading, kind: 'cross' });
   }
 
+  // --- Bauernhöfe an den Feldwegen: Wohnhaus, rote Scheune, Heuballen
+  // (x, z, Drehung, Seite der Heuballen: hinter (−1) oder vor (+1) dem Hof – jeweils weg vom Feldweg)
+  const FARMS: [number, number, number, number][] = [
+    [382, 192, 0.4, -1],
+    [-425, -205, -0.3, -1],
+    [-300, 168, 0.15, 1],
+    [258, -178, 0.7, -1],
+  ];
+  const bales: DriveWorld['bales'] = [];
+  for (const [fx, fz, rot, side] of FARMS) {
+    const c = Math.cos(rot);
+    const sn = Math.sin(rot);
+    const at = (dx: number, dz: number) => ({ x: fx + dx * c + dz * sn, z: fz - dx * sn + dz * c });
+    houses.push({ ...at(0, 0), rot, w: 10, d: 8, h: 6.5, color: '#efe6d2' });
+    houses.push({ ...at(18, 4), rot, w: 16, d: 11, h: 7.5, color: '#9b2d22' });
+    houses.push({ ...at(4, 16), rot: rot + Math.PI / 2, w: 9, d: 6, h: 4.5, color: '#7d6a55' });
+    for (let k = 0; k < 9; k++) bales.push({ ...at(-4 + (k % 3) * 5, side * (18 + Math.floor(k / 3) * 4.5)), rot: rot + (k % 2) * 0.4 });
+  }
+  const farmNear = (x: number, z: number) => FARMS.some(([fx, fz]) => Math.hypot(x - fx, z - fz) < 34);
+
   // --- Bäume: Wälder (Rauschen), einzelne Bäume an Wiesen; Abstand zur Straße und zum Ort
   const EXTENT = 820;
   // Grobes Abstandsraster zur Straße (Zellen à 24 m, Breitensuche ab den Straßenzellen) – schnell statt Einzelsuche
@@ -222,6 +277,23 @@ export function driveWorld(): DriveWorld {
     }
   }
   const roadCells = (x: number, z: number) => cellDist[(Math.floor(x / CELL) - off) * cells + (Math.floor(z / CELL) - off)] ?? 99;
+  // Feldwege: Punkte alle 2 m, in einem Raster für Abstandsabfragen
+  const tracks = TRACKS.map((pts) => {
+    const c = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+    return c.getSpacedPoints(Math.round(c.getLength() / 2)).map((p) => ({ x: p.x, z: p.z }));
+  });
+  const trackGrid = new Map<string, { x: number; z: number }[]>();
+  for (const t of tracks) for (const p of t) {
+    const k = key(Math.floor(p.x / CELL), Math.floor(p.z / CELL));
+    (trackGrid.get(k) ?? trackGrid.set(k, []).get(k)!).push(p);
+  }
+  function trackDist(x: number, z: number) {
+    let best = Infinity;
+    const cx = Math.floor(x / CELL);
+    const cz = Math.floor(z / CELL);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (const p of trackGrid.get(key(cx + dx, cz + dz)) ?? []) best = Math.min(best, (p.x - x) ** 2 + (p.z - z) ** 2);
+    return Math.sqrt(best);
+  }
   const trees: DriveWorld['trees'] = [];
   // nur bis gut 300 m neben der Straße (weiter weg verdeckt der Dunst ohnehin), Abstand 12 m
   for (let x = -EXTENT; x <= EXTENT; x += 12) {
@@ -231,6 +303,9 @@ export function driveWorld(): DriveWorld {
       const f = forestAt(jx, jz);
       if (f < 0.12 && rng() > 0.012) continue;
       if (Math.hypot(jx, jz) < 160) continue;
+      if (padDist(jx, jz) < 12) continue;
+      if (farmNear(jx, jz)) continue;
+      if (trackDist(jx, jz) < 6) continue;
       if (roadCells(jx, jz) > 13) continue;
       const near = roadNear(jx, jz, 30);
       if (near && near.d < 13) continue;
@@ -246,10 +321,22 @@ export function driveWorld(): DriveWorld {
   trees.forEach((t) => addObstacle({ x: t.x, z: t.z, r: 0.45 }));
   houses.forEach((h) => addObstacle({ x: h.x, z: h.z, r: Math.min(h.w, h.d) / 2 + 0.5 }));
   lamps.forEach((l) => addObstacle({ x: l.x, z: l.z, r: 0.2 }));
+  bales.forEach((b) => addObstacle({ x: b.x, z: b.z, r: 0.85 }));
 
   const startHeading = Math.atan2(-samples[0].tz, samples[0].tx);
   cached = {
     samples,
+    onPad,
+    padY,
+    tracks,
+    surface(x, z) {
+      if (trackDist(x, z) < TRACK_WIDTH / 2 + 0.4) return { grip: 0.78, drag: 0.025, kind: 'gravel' };
+      const fo = forestAt(x, z);
+      if (fo > 0.12) return { grip: 0.6, drag: 0.07, kind: 'forest' };
+      const field = Math.sin(x * 0.013 + 0.4) * Math.sin(z * 0.017 - 1.1);
+      if (Math.hypot(x, z) > 175 && (field > 0.55 || field < -0.6)) return { grip: 0.55, drag: 0.09, kind: 'field' };
+      return { grip: 0.64, drag: 0.05, kind: 'grass' };
+    },
     length,
     start: { x: samples[0].x, z: samples[0].z, heading: startHeading },
     ground,
@@ -284,6 +371,7 @@ export function driveWorld(): DriveWorld {
     },
     trees,
     houses,
+    bales,
     lamps,
     signs,
     extent: EXTENT,

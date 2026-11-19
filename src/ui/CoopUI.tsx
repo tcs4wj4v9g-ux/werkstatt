@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CABINET_TOOLS, MAX_CARRIED, TOOL_MAP } from '../game/data/tools';
 import { useGame } from '../game/store';
 import { COOP_CONFIGURED } from '../net/config';
-import { BOXES, buyTool, createWorkshop, joinWorkshop, lastWorkshop, leave, listWorkshops, loadLedger, openWorkshop, returnTool, sellPrice, sellTool, setInvite, takeTool, TOOL_PRICE, useCoop, type ToolItem } from '../net/coop';
+import { BOXES, buyTool, createWorkshop, joinWorkshop, lastWorkshop, leave, listWorkshops, loadLedger, openWorkshop, playHere, returnTool, sellPrice, sellTool, setInvite, takeTool, TOOL_PRICE, useCoop, type ToolItem } from '../net/coop';
 import { eur, Modal } from './common';
 
 const NAME_KEY = 'garage-kings-koop-name';
@@ -245,5 +245,21 @@ export function CoopCabinet() {
         Hand und Prüflampe hat jeder immer dabei.
       </p>
     </Modal>
+  );
+}
+
+/** Hinweis, wenn dieselbe Werkstatt mit deinem Konto noch in einem anderen Tab oder Fenster offen ist. */
+export function CoopElsewhere() {
+  const elsewhere = useCoop((c) => c.elsewhere && c.status !== 'off');
+  if (!elsewhere) return null;
+  return (
+    <div className="modal-back">
+      <div className="modal" data-testid="coop-elsewhere">
+        <h3>Werkstatt ist noch woanders offen</h3>
+        <p>Diese Koop-Werkstatt läuft mit deinem Konto auch in einem anderen Tab oder Fenster. Zwei Fenster würden sich gegenseitig den Stand überschreiben – deshalb ist dieses hier pausiert.</p>
+        <p className="meta">Schließe das andere Fenster (in Safari: Tab-Übersicht) oder spiele hier weiter – dann pausiert das andere.</p>
+        <button className="btn primary big" data-testid="play-here" onClick={() => void playHere()}>Hier weiterspielen</button>
+      </div>
+    </div>
   );
 }
