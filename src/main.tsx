@@ -1,4 +1,5 @@
 import { defOf, defsOf } from './game/data/components';
+import { raceForDay } from './game/races';
 import { performance } from './game/performance';
 import * as motor from './game/motor';
 import { beneath, blockersOf } from './game/repair';
@@ -36,4 +37,4 @@ import { engineAudio } from './game/audio';
 (window as any).__gkAudio = engineAudio;
 import { createCar } from './game/market';
 import { movePlayer } from './three/player';
-(window as any).__gkLib = { soundProfile, createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock, workPose, REAR_BAY, BODY_SPECS, REAR_ENGINE, beneath };
+(window as any).__gkLib = { raceForDay, soundProfile, createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock, workPose, REAR_BAY, BODY_SPECS, REAR_ENGINE, beneath };

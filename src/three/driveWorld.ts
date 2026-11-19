@@ -102,6 +102,15 @@ export interface Obstacle {
 }
 
 export interface DriveWorld {
+  /** 'land' = offene Landschaft der Probefahrt; sonst eine Rennstrecke (`circuits.ts`). */
+  id: string;
+  name: string;
+  /** Fahrbahnbreite und Abstand der Leitplanken/Mauern von der Mitte (m). */
+  roadWidth: number;
+  railOffset: number;
+  /** Rennstrecke: Tribünen, Boxengebäude, Wasser (Hafen) – nur zur Darstellung. */
+  stands: { x: number; z: number; rot: number; len: number }[];
+  water: { x: number; z: number; w: number; d: number; y: number } | null;
   samples: RoadSample[];
   /** Liegt der Punkt auf dem Testgelände (Asphalt)? */
   onPad(x: number, z: number): boolean;
@@ -401,6 +410,12 @@ export function driveWorld(): DriveWorld {
 
   const startHeading = Math.atan2(-samples[0].tz, samples[0].tx);
   cached = {
+    id: 'land',
+    name: 'Grünbach und Umgebung',
+    roadWidth: ROAD_WIDTH,
+    railOffset: RAIL_OFFSET,
+    stands: [],
+    water: null,
     samples,
     onPad,
     lakeY,
@@ -460,7 +475,7 @@ export function driveWorld(): DriveWorld {
   return cached;
 }
 
-function mulberry(seed: number) {
+export function mulberry(seed: number) {
   let a = seed;
   return () => {
     a |= 0;

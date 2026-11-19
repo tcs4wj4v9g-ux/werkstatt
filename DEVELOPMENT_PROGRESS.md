@@ -720,3 +720,23 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Danach das Ergebnisfenster mit Medaille, Auszahlung und „Nochmal“.
 - **Vorbereitet für Gegner:** `Race` und die Rennszene sind so gebaut, dass NPCs als weitere Fahrzeuge mit `aiTime`-Fahrer dazukommen können.
 - Tests: `races.test.ts` (Kalender, Sollzeiten, Tuning lohnt sich, Klassengrenze, Auszahlung), `karriere.cjs` (Rennen am Computer starten, Countdown, mit Autopilot ins Ziel, Konto).
+
+## Rennstrecken und Fahrphysik mit Aerodynamik
+
+- **Recherche:** Sims wie Gran Turismo, Assetto Corsa und RaceRoom rechnen die Reifenhaftung je Rad aus der Radlast (Lastempfindlichkeit, Gewichtsverlagerung) und fügen Abtrieb hinzu, der mit v² wächst. Serienautos haben leichten Auftrieb, Sportwagen und Flügel Abtrieb, und die Balance vorn/hinten bestimmt das Fahrverhalten. NFS setzt für Drifts auf Gasstoß und eine Drift-Hilfe; die gibt es hier schon.
+- **Physik (`vehicle.ts`):**
+  - **Abtrieb `clA`** je Auto: Serienlimousine −0,04 (leichter Auftrieb), Luxus 0,08, Sport 0,3, Mittelmotor-Supersportler 0,8.
+  - Dazu je Spoiler: Lippe +0,12, Entenbürzel +0,3, Heckflügel +0,9. Verbreiterungen bringen +0,08. Spoiler kosten Luftwiderstand (bis +10 %).
+  - Die Aufteilung `aeroFront` folgt den Teilen: Ein Heckflügel verschiebt den Abtrieb nach hinten, das Auto wird bei Tempo stabiler.
+  - **Lastempfindlichkeit** (0,12): Doppelte Radlast bringt nicht doppelte Haftung.
+  - **Querlastübertragung** je Achse über die Wankabstützung (`rollFront`): Serie 0,56 bzw. 0,6 bei Frontantrieb, Gewindefahrwerk ausgeglichener. Daraus ergibt sich die Haftung je Achse aus beiden Radlasten.
+  - Die Seitensteifigkeit wächst mit der Radlast, mit Abtrieb lenkt das Auto bei Tempo direkter ein.
+  - Ergebnis: M4 mit Flügel 1,11 g statt 1,06 g bei 220 km/h; Stradale 1,13 g bei 180 km/h gegenüber 1,05 g bei 60 km/h.
+- **Rennstrecken (`three/circuits.ts`)**, eigene Welten mit derselben Schnittstelle wie die Landschaft:
+  - Eifelring (4,3 km, nach der Nordschleife)
+  - Motodrom Kurpfalz (3,0 km, 2 Runden, nach dem alten Hockenheim)
+  - Hafenkurs Monte Azzurro (2,1 km, 2 Runden, nach Monaco, Leitplanken direkt am Rand, Hafenbecken)
+  - Ardennenring (3,5 km, nach Spa, 14 % Anstieg nach der Senke)
+  - Ausstattung: Kerbs in den Kurven, Kiesbetten außen (Haftung 0,45, starker Rollwiderstand), Leitplanken rundum, Tribünen und Boxengebäude an der Start-Ziel-Geraden, Wald drumherum.
+- **Rennen:** Ab Tag 4 stehen auch die Rennstrecken im Kalender. Das Preisgeld richtet sich nach der Renndistanz (×1,3 bis ×2,2), Gold also bis über 50.000 €. Kontrollpunkte gibt es je Runde, die Anzeige zeigt „Runde x/y“. Die Minikarte zeigt die Strecke.
+- Tests: `circuits.test.ts` (Länge, keine Überschneidung, Radien, Steigung, Computerfahrer kommt an; auf dem Motodrom zählt Leistung mehr als im Hafen). Dazu die bestehenden Physik-, Renn- und Browser-Tests.

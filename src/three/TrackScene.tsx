@@ -12,9 +12,11 @@ import { useGame } from '../game/store';
 import { initialState, stepVehicle, vehicleSpec } from '../game/vehicle';
 import { CarModel } from './CarModel';
 import { DriveScenery } from './DriveScenery';
-import { driveWorld, LAKE, RAIL_OFFSET, ROAD_WIDTH } from './driveWorld';
+import { LAKE } from './driveWorld';
+import { worldFor } from './circuits';
 import { Env } from './Env';
 import { DriveEffects } from './driveEffects';
+import type { DriveWorld } from './driveWorld';
 import { BODY_SPECS } from './carGeometry';
 
 const HALF_WIDTH = 0.9;
@@ -46,7 +48,7 @@ export function TrackScene() {
   const body = useRef<THREE.Group>(null);
   const steerVis = useRef(0);
   const spinVis = useRef({ f: 0, r: 0 });
-  const world = useMemo(() => driveWorld(), []);
+  const world = useMemo(() => worldFor(course?.world ?? 'land'), [course]);
   const spec = useMemo(() => vehicleSpec(car), [car]);
   const fx = useMemo(() => new DriveEffects(), []);
   const body3 = BODY_SPECS[CAR_MODELS[car.modelId].body];
@@ -78,7 +80,7 @@ export function TrackScene() {
       s.near = course.start;
       s.progress = 0;
     }
-    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, elapsed: 0, home: 0, away: false, tooShort: false, drift: 0, offTrack: false, distance: 0, raceT: -3, cp: 0, cpTotal: RACE_CP, racing: !!course });
+    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, elapsed: 0, home: 0, away: false, tooShort: false, drift: 0, offTrack: false, distance: 0, raceT: -3, cp: 0, cpTotal: RACE_CP * (course?.laps ?? 1), laps: course?.laps ?? 1, racing: !!course });
     const keys: Record<string, boolean> = {};
     const apply = () => {
       driveInput.steer = (keys.ArrowLeft || keys.a ? 1 : 0) - (keys.ArrowRight || keys.d ? 1 : 0);
@@ -163,14 +165,14 @@ export function TrackScene() {
     // Sprünge (querfeldein abgekürzt, Suche hat neu angesetzt) zählen nicht als Fortschritt
     if (Math.abs(step) <= 40) s.progress += step;
     s.near = near.i;
-    const onRoad = (Math.abs(near.lateral) < ROAD_WIDTH / 2 + 0.9 && near.dist < 30) || world.onPad(s.x, s.z);
+    const onRoad = (Math.abs(near.lateral) < world.roadWidth / 2 + 0.9 && near.dist < 30) || world.onPad(s.x, s.z);
     const surface = onRoad ? { grip: 1, drag: 0 } : world.surface(s.x, s.z);
     // Steigung in Fahrtrichtung aus der Bodenhöhe vor und hinter dem Wagen
     const c = Math.cos(s.heading);
     const sn = Math.sin(s.heading);
     const height = (x: number, z: number) => {
       const q = world.nearest(x, z, s.near);
-      if (Math.abs(q.lateral) < ROAD_WIDTH / 2 + 1 && q.dist < 20 && !world.onPad(x, z)) {
+      if (Math.abs(q.lateral) < world.roadWidth / 2 + 1 && q.dist < 20 && !world.onPad(x, z)) {
         const a = world.samples[q.i];
         const b = world.samples[(q.i + (q.along >= 0 ? 1 : n - 1)) % n];
         const k = Math.min(1, Math.abs(q.along) / 2);
@@ -207,11 +209,11 @@ export function TrackScene() {
     }
     // Kontrollpunkte der Reihe nach (nur auf der Straße), das Ziel erst nach allen
     if (course && !s.done && s.raceT >= 0) {
-      const need = ((s.cp + 1) * course.length) / RACE_CP;
+      const need = ((s.cp + 1) * course.length) / (RACE_CP * course.laps);
       if (s.progress >= need && near.dist < 12) {
         s.cp++;
         s.cpAt = { x: s.x, z: s.z, heading: s.heading, near: s.near, progress: s.progress };
-        if (s.cp >= RACE_CP) {
+        if (s.cp >= RACE_CP * course.laps) {
           s.done = true;
           const time = s.raceT;
           roadAudio.hit('clunk');
@@ -224,7 +226,7 @@ export function TrackScene() {
     // --- Leitplanken: Wagen bleibt davor, verliert Tempo
     const after = world.nearest(s.x, s.z, s.near);
     const p = world.samples[after.i];
-    const limit = RAIL_OFFSET - HALF_WIDTH;
+    const limit = world.railOffset - HALF_WIDTH;
     const hitRail = (p.railL && after.lateral > limit) || (p.railR && after.lateral < -limit);
     if (hitRail) {
       const side = after.lateral > 0 ? 1 : -1;
@@ -409,9 +411,9 @@ export function TrackScene() {
         <planeGeometry args={[6000, 6000]} />
         <meshLambertMaterial color="#5f8a4a" depthWrite={false} />
       </mesh>
-      <DriveScenery />
+      <DriveScenery world={world} />
       <primitive object={fx.group} />
-      {course && <RaceMarks start={course.start} length={course.length} />}
+      {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} />}
       <group ref={group}>
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}
@@ -427,8 +429,8 @@ export function TrackScene() {
 }
 
 /** Start- und Zielbogen über der Straße, Kontrollpunkte als Pfostenpaare mit Fahnen. */
-function RaceMarks({ start, length }: { start: number; length: number }) {
-  const w = driveWorld();
+function RaceMarks({ w, start, length, laps }: { w: DriveWorld; start: number; length: number; laps: number }) {
+  const ROAD_WIDTH = w.roadWidth;
   const n = w.samples.length;
   const arch = (i: number, label: string, color: string) => {
     const p = w.samples[i % n];
@@ -458,12 +460,13 @@ function RaceMarks({ start, length }: { start: number; length: number }) {
     );
   };
   const end = (start + length) % n;
+  const lap = length / laps;
   return (
     <>
       {arch(start, end === start ? 'START · ZIEL' : 'START', '#c8501e')}
       {end !== start && arch(end, 'ZIEL', '#1e7a3c')}
       {Array.from({ length: RACE_CP - 1 }, (_, k) => {
-        const p = w.samples[Math.round(start + ((k + 1) * length) / RACE_CP) % n];
+        const p = w.samples[Math.round(start + ((k + 1) * lap) / RACE_CP) % n];
         return [-1, 1].map((side) => (
           <group key={`${k}${side}`} position={[p.x + p.nx * side * (ROAD_WIDTH / 2 + 0.6), p.y, p.z + p.nz * side * (ROAD_WIDTH / 2 + 0.6)]}>
             <mesh position={[0, 0.9, 0]} raycast={() => null}>

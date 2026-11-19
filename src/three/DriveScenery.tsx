@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { driveWorld, forestAt, LAKE, PAD, RAIL_OFFSET, ROAD_WIDTH, TRACK_WIDTH, WORKSHOP, type DriveWorld } from './driveWorld';
+import { forestAt, LAKE, PAD, TRACK_WIDTH, WORKSHOP, type DriveWorld } from './driveWorld';
 import { doorTexture, grassDetailTexture, mountainTexture, roadTexture, textTexture } from './textures';
 
 /**
@@ -19,7 +19,9 @@ const LEVELS: [number, number][] = [
 ];
 
 /** Wiese, Feld, Waldboden: Farbe je Stelle (als Vertexfarbe). */
-function groundColor(x: number, z: number, h: number, out: THREE.Color) {
+function groundColor(x: number, z: number, h: number, out: THREE.Color, w: DriveWorld) {
+  // Rennstrecke: gepflegter Rasen, Kiesbetten in den Kurven, Wasser im Hafen dunkel
+  if (w.id !== 'land') return w.surface(x, z).kind === 'gravel' ? out.setRGB(0.72, 0.66, 0.5) : out.setRGB(0.34 + Math.sin(x * 0.05) * 0.02, 0.54 + Math.sin(z * 0.04) * 0.03, 0.26);
   const forest = forestAt(x, z);
   const field = Math.sin(x * 0.013 + 0.4) * Math.sin(z * 0.017 - 1.1);
   // Ufer am See: heller Sand bzw. Kies
@@ -42,7 +44,7 @@ function tileHeights(w: DriveWorld, cx: number, cz: number, seg: number) {
   return h;
 }
 
-function terrainTile(heights: Float32Array, fine: number, cx: number, cz: number, seg: number) {
+function terrainTile(w: DriveWorld, heights: Float32Array, fine: number, cx: number, cz: number, seg: number) {
   const k = fine / seg;
   const g = new THREE.PlaneGeometry(TILE, TILE, seg, seg);
   g.rotateX(-Math.PI / 2);
@@ -55,7 +57,7 @@ function terrainTile(heights: Float32Array, fine: number, cx: number, cz: number
     const iz = Math.round(((pos.getZ(i) + TILE / 2) / TILE) * seg);
     const h = heights[iz * k * (fine + 1) + ix * k];
     pos.setY(i, h);
-    groundColor(pos.getX(i) + cx, pos.getZ(i) + cz, h, c).toArray(colors, i * 3);
+    groundColor(pos.getX(i) + cx, pos.getZ(i) + cz, h, c, w).toArray(colors, i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   g.computeVertexNormals();
@@ -108,8 +110,8 @@ function rails(w: DriveWorld) {
           const p = s[i];
           const q = s[(i + 1) % n];
           for (const r of [p, q]) {
-            const x = r.x + r.nx * side * RAIL_OFFSET;
-            const z = r.z + r.nz * side * RAIL_OFFSET;
+            const x = r.x + r.nx * side * w.railOffset;
+            const z = r.z + r.nz * side * w.railOffset;
             pos.push(x, r.y + 0.48, z, x, r.y + 0.78, z);
           }
           idx.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
@@ -122,7 +124,7 @@ function rails(w: DriveWorld) {
         return g;
       })(),
     );
-    for (let i = 0; i < n; i += 2) if (on(i)) posts.push(new THREE.Matrix4().makeTranslation(s[i].x + s[i].nx * side * (RAIL_OFFSET + 0.08), s[i].y + 0.35, s[i].z + s[i].nz * side * (RAIL_OFFSET + 0.08)));
+    for (let i = 0; i < n; i += 2) if (on(i)) posts.push(new THREE.Matrix4().makeTranslation(s[i].x + s[i].nx * side * (w.railOffset + 0.08), s[i].y + 0.35, s[i].z + s[i].nz * side * (w.railOffset + 0.08)));
   }
   return { band: mergeGeometries(bands), posts };
 }
@@ -152,9 +154,10 @@ function Instances({ geometry, material, matrices, colors, cull = false }: { geo
   return <instancedMesh ref={ref} args={[geometry, material, matrices.length]} frustumCulled={cull} raycast={() => null} />;
 }
 
-let built: ReturnType<typeof build> | null = null;
-function build() {
-  const w = driveWorld();
+const built = new Map<string, ReturnType<typeof build>>();
+function build(w: DriveWorld) {
+  const ROAD_WIDTH = w.roadWidth;
+  const land = w.id === 'land';
   // Gelände-Kacheln mit Detailstufen
   const tiles: THREE.LOD[] = [];
   const grass = grassDetailTexture().clone();
@@ -166,7 +169,7 @@ function build() {
       const lod = new THREE.LOD();
       const heights = tileHeights(w, cx, cz, LEVELS[0][0]);
       for (const [seg, dist] of LEVELS) {
-        const m = new THREE.Mesh(terrainTile(heights, LEVELS[0][0], cx, cz, seg), groundMat);
+        const m = new THREE.Mesh(terrainTile(w, heights, LEVELS[0][0], cx, cz, seg), groundMat);
         m.raycast = () => null;
         lod.addLevel(m, dist);
       }
@@ -179,7 +182,14 @@ function build() {
   const dashed = (i: number) => !w.samples[i].crossing && Math.floor(w.samples[i].s / 6) % 2 === 0;
   const road = band(w, -ROAD_WIDTH / 2, ROAD_WIDTH / 2, 0.02, () => true);
   const shoulder = mergeGeometries([band(w, ROAD_WIDTH / 2, ROAD_WIDTH / 2 + 0.9, 0.0, () => true), band(w, -ROAD_WIDTH / 2 - 0.9, -ROAD_WIDTH / 2, 0.0, () => true)]);
-  const lines = mergeGeometries([band(w, ROAD_WIDTH / 2 - 0.35, ROAD_WIDTH / 2 - 0.2, 0.035, notCross), band(w, -ROAD_WIDTH / 2 + 0.2, -ROAD_WIDTH / 2 + 0.35, 0.035, notCross), band(w, -0.07, 0.07, 0.035, dashed)]);
+  const lines = mergeGeometries([band(w, ROAD_WIDTH / 2 - 0.35, ROAD_WIDTH / 2 - 0.2, 0.035, notCross), band(w, -ROAD_WIDTH / 2 + 0.2, -ROAD_WIDTH / 2 + 0.35, 0.035, notCross), ...(land ? [band(w, -0.07, 0.07, 0.035, dashed)] : [])]);
+  // Rennstrecke: rot-weiße Randsteine (Kerbs) in den Kurven, auf beiden Seiten
+  const curvy = (i: number) => {
+    for (let k = -6; k <= 6; k += 2) if (Math.abs(w.samples[(i + k + w.samples.length) % w.samples.length].curv) > 1 / 140) return true;
+    return false;
+  };
+  const kerbRed = land ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 0)));
+  const kerbWhite = land ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 1)));
   const rail = rails(w);
   // Bäume: Nadelbaum (Kegel) und Laubbaum (Kugel), Stamm gemeinsam
   const cone = new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0);
@@ -257,7 +267,7 @@ function build() {
   const baleGeo = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 12).rotateZ(Math.PI / 2).translate(0, 0.72, 0);
   const baleMats = w.bales.map((b) => new THREE.Matrix4().compose(new THREE.Vector3(b.x, w.ground(b.x, b.z), b.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.rot), new THREE.Vector3(1, 1, 1)));
   // Feldwege: Schotterband, das dem Gelände folgt (etwas angehoben, damit es nicht im Boden versinkt)
-  const gravel = mergeGeometries(
+  const gravel = !w.tracks.length ? new THREE.BufferGeometry() : mergeGeometries(
     w.tracks.map((t) => {
       const pos: number[] = [];
       const idx: number[] = [];
@@ -299,11 +309,28 @@ function build() {
       }
     }
   const fence = fenceRails.length ? mergeGeometries(fenceRails) : new THREE.BufferGeometry();
-  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
+  // Tribünen: Unterbau, ansteigende Sitzreihen (bunt), Dach auf Stützen
+  const standParts: { geo: THREE.BufferGeometry; color: string }[] = [];
+  for (const st of w.stands) {
+    const y = w.ground(st.x, st.z);
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), st.rot);
+    const m = (geo: THREE.BufferGeometry, dx: number, dy: number, dz: number) => geo.applyQuaternion(q).translate(st.x + dx * Math.cos(st.rot) + dz * Math.sin(st.rot), y + dy, st.z - dx * Math.sin(st.rot) + dz * Math.cos(st.rot));
+    // lokal −z zeigt von der Strecke weg: die Reihen steigen nach hinten an, Blick auf die Fahrbahn
+    for (let r = 0; r < 6; r++) standParts.push({ geo: m(new THREE.BoxGeometry(st.len, 0.9 + r * 0.9, 1.6), 0, (0.9 + r * 0.9) / 2, -(0.8 + r * 1.6)), color: r % 2 ? '#2f5fa8' : '#d0d4d8' });
+    standParts.push({ geo: m(new THREE.BoxGeometry(st.len + 2, 0.25, 11), 0, 8.4, -4.8), color: '#e8ecef' });
+    for (const dx of [-st.len / 2, 0, st.len / 2]) standParts.push({ geo: m(new THREE.BoxGeometry(0.3, 8.4, 0.3), dx, 4.2, -9.8), color: '#8d949b' });
+  }
+  const standGeo = standParts.length ? new Map(['#2f5fa8', '#d0d4d8', '#e8ecef', '#8d949b'].map((c) => [c, mergeGeometries(standParts.filter((p) => p.color === c).map((p) => p.geo))])) : new Map();
+  const water = w.water ? new THREE.PlaneGeometry(w.water.w, w.water.d).rotateX(-Math.PI / 2).translate(w.water.x, w.water.y, w.water.z) : null;
+  return { land, kerbRed, kerbWhite, standGeo, water, w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
 }
 
-export function DriveScenery() {
-  const b = useMemo(() => (built ??= build()), []);
+export function DriveScenery({ world }: { world: DriveWorld }) {
+  const b = useMemo(() => {
+    let x = built.get(world.id);
+    if (!x) built.set(world.id, (x = build(world)));
+    return x;
+  }, [world]);
   const mats = useMemo(
     () => ({
       road: new THREE.MeshLambertMaterial({ color: '#4f5257', map: roadTexture(), side: THREE.DoubleSide }),
@@ -330,6 +357,8 @@ export function DriveScenery() {
       gravel: new THREE.MeshLambertMaterial({ color: '#a39784', side: THREE.DoubleSide }),
       cone: new THREE.MeshLambertMaterial({ color: '#ff7a1a' }),
       bale: new THREE.MeshLambertMaterial({ color: '#d9bd6a' }),
+      kerbRed: new THREE.MeshLambertMaterial({ color: '#c8231e', side: THREE.DoubleSide }),
+      kerbWhite: new THREE.MeshLambertMaterial({ color: '#f2f2f2', side: THREE.DoubleSide }),
     }),
     [],
   );
@@ -343,17 +372,29 @@ export function DriveScenery() {
       <mesh geometry={b.road} material={mats.road} raycast={() => null} />
       <mesh geometry={b.lines} material={mats.line} raycast={() => null} />
       <mesh geometry={b.rail.band} material={mats.rail} raycast={() => null} />
-      <mesh geometry={b.pad} material={mats.pad} raycast={() => null} />
-      <mesh geometry={b.marks} material={mats.line} raycast={() => null} />
-      <Instances geometry={b.coneGeo} material={mats.cone} matrices={b.cones} />
-      <mesh geometry={b.gravel} material={mats.gravel} raycast={() => null} />
-      <Instances geometry={b.baleGeo} material={mats.bale} matrices={b.baleMats} />
-      <mesh geometry={b.lake} material={mats.water} raycast={() => null} />
-      <Instances geometry={postGeo} material={mats.wood} matrices={b.fencePosts} />
-      <mesh geometry={b.fence} material={mats.wood} raycast={() => null} />
-      <Workshop y={b.w.apronY} />
+      {b.land && (
+        <>
+          <mesh geometry={b.pad} material={mats.pad} raycast={() => null} />
+          <mesh geometry={b.marks} material={mats.line} raycast={() => null} />
+          <Instances geometry={b.coneGeo} material={mats.cone} matrices={b.cones} />
+          <mesh geometry={b.gravel} material={mats.gravel} raycast={() => null} />
+          <Instances geometry={b.baleGeo} material={mats.bale} matrices={b.baleMats} />
+          <mesh geometry={b.lake} material={mats.water} raycast={() => null} />
+          <Instances geometry={postGeo} material={mats.wood} matrices={b.fencePosts} />
+          <mesh geometry={b.fence} material={mats.wood} raycast={() => null} />
+          <Workshop y={b.w.apronY} />
+          <Sign x={PAD.minX + 6} y={b.w.padY} z={PAD.minZ + 2} rot={0} kind="pad" />
+        </>
+      )}
+      {b.kerbRed && <mesh geometry={b.kerbRed} material={mats.kerbRed} raycast={() => null} />}
+      {b.kerbWhite && <mesh geometry={b.kerbWhite} material={mats.kerbWhite} raycast={() => null} />}
+      {[...b.standGeo.entries()].map(([c, g]) => (
+        <mesh key={c} geometry={g} raycast={() => null}>
+          <meshLambertMaterial color={c} />
+        </mesh>
+      ))}
+      {b.water && <mesh geometry={b.water} material={mats.water} raycast={() => null} />}
       <Mountains />
-      <Sign x={PAD.minX + 6} y={b.w.padY} z={PAD.minZ + 2} rot={0} kind="pad" />
       <Instances geometry={postGeo} material={mats.post} matrices={b.rail.posts} />
       {b.chunks.map((c, i) => (
         <group key={i}>
