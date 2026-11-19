@@ -9,7 +9,7 @@ import { GarageScene } from './three/GarageScene';
 import { MarketScene } from './three/MarketScene';
 import { TrackScene } from './three/TrackScene';
 import { HelpModal, Toast } from './ui/common';
-import { CoopModal } from './ui/CoopUI';
+import { CoopModal, CoopElsewhere } from './ui/CoopUI';
 import { ChatFeed, ChatPanel } from './ui/Chat';
 import { GarageUI } from './ui/GarageUI';
 import { MarketUI } from './ui/MarketUI';
@@ -85,6 +85,7 @@ export function App() {
         <Toast />
         <ChatFeed />
         <ChatPanel />
+        <CoopElsewhere />
       </div>
       </Recover>
       <div className="rotate">

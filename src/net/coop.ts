@@ -37,6 +37,8 @@ export interface Presence {
   /** Werkstatt oder Schrottplatz. */
   place?: string;
   car: string | null;
+  /** Fensterkennung (zweites Fenster desselben Kontos erkennen). */
+  sid?: string;
   /** Letzte Chatnachricht (bleibt ~30 s in der Lage, damit sie auch ohne Realtime über den Abgleich ankommt). */
   chat?: ChatLine | null;
 }
@@ -89,9 +91,11 @@ interface CoopState {
   error: string | null;
   /** Läuft gerade ein Anlegen/Beitreten/Öffnen? */
   working: boolean;
+  /** Dieselbe Werkstatt ist mit deinem Konto noch in einem anderen Tab/Fenster offen: hier wird pausiert. */
+  elsewhere: boolean;
 }
 
-export const useCoop = create<CoopState>(() => ({ status: 'off', ws: null, name: '', code: '', inviteOpen: true, me: null, members: [], tools: [], box: 'schrank', ledger: [], list: [], error: null, working: false }));
+export const useCoop = create<CoopState>(() => ({ status: 'off', ws: null, name: '', code: '', inviteOpen: true, me: null, members: [], tools: [], box: 'schrank', ledger: [], list: [], error: null, working: false, elsewhere: false }));
 export const coopActive = () => useCoop.getState().status !== 'off';
 
 /** Letzte bekannte Lage der Mitspieler (für die Figuren in der Halle). */
@@ -108,6 +112,8 @@ export const isAway = (uid: string | undefined) => !!uid && useAway.getState().u
 const SESSION_KEY = 'garage-kings-koop';
 const TEXT: Record<string, string> = {
   konflikt: 'Dein Partner war schneller – der Stand wurde abgeglichen.',
+  /** Konflikt ohne anderen Spieler online: kam von einem zweiten Fenster oder einer verspäteten eigenen Änderung. */
+  konflikt_allein: 'Stand mit dem Server abgeglichen – deine letzte Änderung wurde nicht übernommen. Bitte noch einmal.',
   geld: 'Dafür reicht das gemeinsame Konto nicht mehr.',
   bestand: 'Das Teil ist nicht mehr im gemeinsamen Lager.',
   doppelt: 'Das Auto steht schon woanders.',
@@ -127,6 +133,21 @@ const TEXT: Record<string, string> = {
   anonym_aus: 'Der Server lässt noch keine Anmeldung zu: Im Supabase-Projekt muss „Allow anonymous sign-ins“ eingeschaltet sein.',
 };
 const text = (reason: string) => TEXT[reason] ?? `Server: ${reason}`;
+/** Kennung dieses Fensters (jedes Neuladen eine neue): erkennt ein zweites offenes Fenster mit demselben Konto. */
+const SID = Math.random().toString(36).slice(2, 10);
+let startedAt = 0;
+let foreignSeen = 0;
+/** Ein zweites Fenster mit meinem Konto arbeitet in derselben Werkstatt: hier pausieren (nicht gleich beim Öffnen). */
+function foreignSession() {
+  if (performance.now() - startedAt < 4000 || useCoop.getState().elsewhere) return;
+  foreignSeen++;
+  useCoop.setState({ elsewhere: true });
+}
+/** Ist außer mir gerade jemand online? */
+const othersOnline = () => {
+  const c = useCoop.getState();
+  return c.members.some((m) => m.id !== c.me && m.online);
+};
 
 class NetError extends Error {}
 let client: SupabaseClient | null = null;
@@ -187,7 +208,7 @@ function presence(): Presence {
   const car = g.screen === 'track' ? g.cars[g.driveBay]?.uid : g.screen === 'garage' && near >= 0 ? g.cars[near]?.uid : null;
   const r = (v: number) => Math.round(v * 100) / 100;
   const chat = myChat && Date.now() - myChat.at < 30_000 ? myChat : null;
-  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, ...(chat ? { chat } : {}) };
+  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, sid: SID, ...(chat ? { chat } : {}) };
 }
 
 // ---------------------------------------------------------------- Chat
@@ -287,6 +308,8 @@ function dropBrokenCars() {
 
 /** Übernimmt Schritte des Partners. Felder mit eigener, noch nicht bestätigter Änderung bleiben unberührt. */
 function applyRemote(changes: { rev: number; by: string; commit: string | null; patches: Patch[] }[]) {
+  // Änderung mit meinem Konto, aber nicht aus diesem Fenster: dieselbe Werkstatt ist noch woanders offen.
+  if (changes.some((c) => c.by === useCoop.getState().me && c.commit && !mine.has(c.commit))) foreignSession();
   const foreign = changes.filter((c) => !(c.commit && mine.has(c.commit))).flatMap((c) => c.patches);
   if (!foreign.length || !shadow) return;
   const local = pickShared(useGame.getState() as any);
@@ -365,12 +388,14 @@ async function resync(reason?: string) {
   const s = await rpc('gk_get_state', { p_ws: ws });
   loadState(s, false);
   // Nur melden, wenn der Spieler gerade selbst etwas getan hat – stille Abgleiche stören sonst.
-  if (reason && performance.now() - lastInput < 2500) useGame.getState().say(text(reason), true);
+  // Ohne anderen Spieler online war es kein Partner (zweites Fenster, verspätete eigene Änderung).
+  const r = reason === 'konflikt' && !othersOnline() ? 'konflikt_allein' : reason;
+  if (r && performance.now() - lastInput < 2500) useGame.getState().say(text(r), true);
 }
 
 async function step() {
   const c = useCoop.getState();
-  if (busy || c.status === 'off' || !c.ws || !shadow) return;
+  if (busy || c.status === 'off' || !c.ws || !shadow || c.elsewhere) return;
   const now = performance.now();
   if (!inflight && dirty) {
     dirty = false;
@@ -430,10 +455,13 @@ async function step() {
         useGame.getState().say('Verbindung unterbrochen – du kannst weiterarbeiten, der Abgleich folgt automatisch.', true);
       }
     } else {
-      // Absage des Servers (z. B. nicht mehr Mitglied): Stand neu laden; gelingt das nicht, Werkstatt verlassen.
+      // Absage des Servers (z. B. nicht mehr Mitglied, ungültige Änderung): Stand neu laden; gelingt das nicht, Werkstatt verlassen.
       inflight = null;
+      const why = String((e as Error).message).slice(0, 80);
+      lastReject = { reason: 'fehler', message: why };
       try {
-        await resync('konflikt');
+        await resync();
+        if (performance.now() - lastInput < 2500) useGame.getState().say(`Der Server hat die letzte Änderung abgelehnt (${why}) – Stand neu geladen.`, true);
       } catch {
         await leave(String((e as Error).message));
       }
@@ -474,6 +502,10 @@ function openChannel(ws: string) {
     channel = db().channel(`gk:${ws}`, { config: { broadcast: { self: false } } });
     channel
       .on('broadcast', { event: 'pos' }, ({ payload }) => {
+        if (payload.id === useCoop.getState().me) {
+          if (payload.sid && payload.sid !== SID) foreignSession();
+          return;
+        }
         const m = useCoop.getState().members.find((x) => x.id === payload.id);
         if (m) remotePlayers.set(payload.id, { ...(payload as Presence), name: m.name, at: performance.now(), rt: true });
         if (m) syncAway();
@@ -494,7 +526,9 @@ function openChannel(ws: string) {
 let unsub: (() => void) | null = null;
 function start(ws: string) {
   localStorage.setItem(SESSION_KEY, ws);
-  useCoop.setState({ status: 'online', ws, error: null });
+  useCoop.setState({ status: 'online', ws, error: null, elsewhere: false });
+  startedAt = performance.now();
+  foreignSeen = 0;
   lastSync = performance.now();
   failures = 0;
   unsub = useGame.subscribe((s, prev) => {
@@ -628,6 +662,19 @@ export const sellTool = (tool: ToolItem) =>
 export const sellPrice = (type: ToolId) => (TOOL_PRICE[type] ? Math.round(TOOL_PRICE[type]! / 2) : null);
 export const buyTool = (type: ToolId, box: string) => toolCall('gk_buy_tool', { p_type: type, p_box: box }, () => useGame.getState().say(`${TOOL_MAP[type].name} gekauft – liegt in ${BOXES[box].name}.`));
 
+/** In diesem Fenster weiterspielen: frischen Stand holen; das andere Fenster bemerkt es und pausiert. */
+export async function playHere() {
+  foreignSeen = 0;
+  // Einige Sekunden Vorrang: in dieser Zeit sieht das andere Fenster unsere Änderungen und pausiert seinerseits.
+  startedAt = performance.now() + 8000;
+  useCoop.setState({ elsewhere: false });
+  try {
+    await resync();
+  } catch {
+    /* nächster Abgleich holt es nach */
+  }
+}
+
 export async function loadLedger() {
   const ws = useCoop.getState().ws;
   if (!ws) return;
@@ -668,4 +715,4 @@ export const openBox = (box: string) => {
   useGame.getState().setPanel('cabinet');
 };
 
-if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, useAway, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
+if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, useAway, playHere, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
