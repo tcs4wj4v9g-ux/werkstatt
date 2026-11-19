@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
-import { driveInput, useDriveHud } from '../game/drive';
+import { DRIVE_TIME, driveInput, useDriveHud } from '../game/drive';
 import { activeDefects } from '../game/repair';
 import { engineAudio, roadAudio } from '../game/audio';
 import { soundProfile } from '../game/diagnosis';
@@ -13,13 +13,13 @@ import { DriveScenery } from './DriveScenery';
 import { driveWorld, RAIL_OFFSET, ROAD_WIDTH } from './driveWorld';
 import { Env } from './Env';
 
-const GATES = 8;
 const HALF_WIDTH = 0.9;
 const SKY = '#a9cbea';
 
 /**
- * Probefahrt: Fahrphysik (`game/vehicle.ts`) auf der Landstraße (`driveWorld.ts`). Der Wagen folgt dem Gelände,
- * Leitplanken und Hindernisse halten ihn auf, die Tore entlang der Runde zählen der Reihe nach.
+ * Probefahrt: Fahrphysik (`game/vehicle.ts`) in der offenen Landschaft (`driveWorld.ts`): Landstraßen, Ort, Testgelände,
+ * Wiesen und Feldwege. Gefahren wird auf Zeit (`DRIVE_TIME`); gewertet ist die Fahrt ab `DRIVE_MIN` Sekunden.
+ * Der Wagen folgt dem Gelände, Leitplanken und Hindernisse halten ihn auf.
  */
 export function TrackScene() {
   const car = useGame((s) => s.cars[s.driveBay])!;
@@ -35,7 +35,7 @@ export function TrackScene() {
     return d.includes('turbo') ? '#8fa3c4' : d.includes('egr') || d.includes('dpf') ? '#1b1b1b' : '#e9e9e9';
   }, [car]);
   const n = world.samples.length;
-  const sim = useRef(Object.assign(initialState(world.start.x, world.start.z, world.start.heading), { v: 0, near: 0, progress: 0, gate: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0 }));
+  const sim = useRef(Object.assign(initialState(world.start.x, world.start.z, world.start.heading), { camYaw: undefined as number | undefined, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
 
@@ -48,12 +48,15 @@ export function TrackScene() {
     camPos.current.set(s.x - Math.cos(s.heading) * 7, s.y + 2.6, s.z + Math.sin(s.heading) * 7);
     (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec };
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
-    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, checkpoint: 0, total: GATES, offTrack: false, distance: 0 });
+    driveInput.handbrake = false;
+    s.respawn = useDriveHud.getState().respawn;
+    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, left: DRIVE_TIME, elapsed: 0, drift: 0, offTrack: false, distance: 0 });
     const keys: Record<string, boolean> = {};
     const apply = () => {
       driveInput.steer = (keys.ArrowLeft || keys.a ? 1 : 0) - (keys.ArrowRight || keys.d ? 1 : 0);
       driveInput.throttle = keys.ArrowUp || keys.w ? 1 : 0;
       driveInput.brake = keys.ArrowDown || keys.s ? 1 : 0;
+      driveInput.handbrake = !!keys[' '];
     };
     const down = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
@@ -83,6 +86,25 @@ export function TrackScene() {
     // timeScale > 1 nur für automatische Tests (Zeitraffer).
     const dt = Math.min(rawDt, 0.1) * s.timeScale;
 
+    // --- „Zurück auf die Straße“: an den nächsten Straßenpunkt, in Fahrtrichtung, im Stand
+    const want = useDriveHud.getState().respawn;
+    if (want !== s.respawn) {
+      s.respawn = want;
+      const q = world.nearest(s.x, s.z, s.near);
+      const p = world.samples[q.i];
+      Object.assign(s, { x: p.x - p.nx * 1.8, z: p.z - p.nz * 1.8, heading: Math.atan2(-p.tz, p.tx), vx: 0, vy: 0, yawRate: 0, gear: 1, near: q.i });
+      s.y = p.y;
+    }
+    // --- Rand der Welt: sanft zurückhalten (dahinter kommt nur noch Wiese bis zum Horizont)
+    const edge = Math.hypot(s.x, s.z) - (world.extent - 40);
+    if (edge > 0) {
+      const k = (world.extent - 40) / Math.hypot(s.x, s.z);
+      s.x *= k;
+      s.z *= k;
+      s.vx *= 0.9;
+      s.vy *= 0.5;
+    }
+
     // --- Wo auf der Straße? (lokale Suche ab dem letzten Punkt, an der Kreuzung bleibt man auf seinem Ast)
     const near = world.nearest(s.x, s.z, s.near);
     let step = near.i - s.near;
@@ -90,13 +112,14 @@ export function TrackScene() {
     if (step < -n / 2) step += n;
     s.progress += step;
     s.near = near.i;
-    const onRoad = Math.abs(near.lateral) < ROAD_WIDTH / 2 + 0.9 && near.dist < 30;
+    const onRoad = (Math.abs(near.lateral) < ROAD_WIDTH / 2 + 0.9 && near.dist < 30) || world.onPad(s.x, s.z);
+    const surface = onRoad ? { grip: 1, drag: 0 } : world.surface(s.x, s.z);
     // Steigung in Fahrtrichtung aus der Bodenhöhe vor und hinter dem Wagen
     const c = Math.cos(s.heading);
     const sn = Math.sin(s.heading);
     const height = (x: number, z: number) => {
       const q = world.nearest(x, z, s.near);
-      if (Math.abs(q.lateral) < ROAD_WIDTH / 2 + 1 && q.dist < 20) {
+      if (Math.abs(q.lateral) < ROAD_WIDTH / 2 + 1 && q.dist < 20 && !world.onPad(x, z)) {
         const a = world.samples[q.i];
         const b = world.samples[(q.i + (q.along >= 0 ? 1 : n - 1)) % n];
         const k = Math.min(1, Math.abs(q.along) / 2);
@@ -120,7 +143,7 @@ export function TrackScene() {
       driveInput.throttle = s.vx < s.autopilot ? 1 : 0;
       driveInput.brake = s.vx > s.autopilot + 4 ? 0.5 : 0;
     }
-    stepVehicle(spec, s, driveInput, onRoad ? { grade, grip: 1, drag: 0 } : { grade, grip: 0.6, drag: 0.06 }, dt);
+    stepVehicle(spec, s, driveInput, { grade, ...surface }, dt);
     s.v = s.vx;
 
     // --- Leitplanken: Wagen bleibt davor, verliert Tempo
@@ -207,8 +230,11 @@ export function TrackScene() {
       g.updateMatrixWorld();
       const src = body.current ?? g;
       if (mode === 'chase') {
-        const fx = Math.cos(s.heading);
-        const fz = -Math.sin(s.heading);
+        // Blickrichtung zwischen Fahrzeuglängsachse und Fahrtrichtung: im Drift sieht man das Auto schräg (wie in Rennspielen)
+        const travel = Math.abs(s.vx) > 4 ? s.heading + Math.atan2(s.vy, Math.abs(s.vx)) * 0.6 : s.heading;
+        s.camYaw = s.camYaw === undefined ? travel : s.camYaw + Math.atan2(Math.sin(travel - s.camYaw), Math.cos(travel - s.camYaw)) * Math.min(1, dt * 4);
+        const fx = Math.cos(s.camYaw);
+        const fz = -Math.sin(s.camYaw);
         const want = new THREE.Vector3(s.x - fx * 6.8, s.y + 2.5, s.z - fz * 6.8);
         // nicht ins Gelände: Mindesthöhe über dem Boden an der Kameraposition
         want.y = Math.max(want.y, world.ground(want.x, want.z) + 1.2);
@@ -231,29 +257,20 @@ export function TrackScene() {
       }
     }
 
-    // --- Tore der Reihe nach (Fortschritt entlang der Runde, nur auf der Straße)
-    if (!s.done && onRoad && s.progress >= ((s.gate + 1) * n) / GATES) {
-      s.gate++;
-      if (s.gate >= GATES) {
-        s.done = true;
-        setTimeout(() => finishDrive(true), 900);
-      }
+    // --- Fahrzeit: nach Ablauf geht es automatisch zurück in die Werkstatt
+    s.elapsed += dt;
+    if (!s.done && s.elapsed >= DRIVE_TIME) {
+      s.done = true;
+      setTimeout(() => finishDrive(true), 600);
     }
     s.hud += dt;
     if (s.hud > 0.08) {
       s.hud = 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, checkpoint: s.gate, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
+      const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, left: Math.max(0, DRIVE_TIME - s.elapsed), elapsed: s.elapsed, drift: drift > 12 ? drift : 0, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
     }
   });
 
-  const gates = useMemo(
-    () =>
-      Array.from({ length: GATES }, (_, k) => {
-        const p = world.samples[Math.round(((k + 1) * n) / GATES) % n];
-        return [-1, 1].map((side) => ({ x: p.x + p.nx * side * (ROAD_WIDTH / 2 + 0.4), y: p.y, z: p.z + p.nz * side * (ROAD_WIDTH / 2 + 0.4) }));
-      }).flat(),
-    [world],
-  );
   const start = world.samples[0];
   const startHeading = Math.atan2(-start.tz, start.tx);
   return (
@@ -286,12 +303,6 @@ export function TrackScene() {
           <meshLambertMaterial color="#1b1c1f" />
         </mesh>
       </group>
-      {gates.map((g, i) => (
-        <mesh key={i} position={[g.x, g.y + 0.4, g.z]} raycast={() => null}>
-          <coneGeometry args={[0.25, 0.8, 8]} />
-          <meshLambertMaterial color="#ff7a1a" />
-        </mesh>
-      ))}
       <group ref={group}>
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}

@@ -169,34 +169,87 @@ describe('Fahrbarkeit: nicht dauernd ausbrechen, Driften nur mit Absicht', () =>
     }
   });
 
-  it('mit Knöpfen (Lenken voll/aus, Gas/Bremse voll/aus) schafft man die Runde ohne Abkommen', () => {
+  it('Lenkung: enger Wendekreis beim Rangieren, voller Ausschlag nutzt bei Tempo die Haftung ganz aus', () => {
+    const sp = mk('bavaria_330');
+    const s = initialState(0, 0, 0);
+    s.vx = 10 / 3.6;
+    for (let i = 0; i < 240; i++) stepVehicle(sp, s, { steer: 1, throttle: s.vx < 10 / 3.6 ? 0.3 : 0, brake: 0 }, flat, 1 / 60);
+    const radius = (s.vx * s.vx) / Math.abs(s.ay);
+    expect(radius, 'Wendekreis-Radius bei Schritttempo').toBeLessThan(6);
+    // Bei 100 km/h: voller Einschlag ergibt annähernd die höchste Querbeschleunigung, ohne dass das Auto schiebt
+    const q = initialState(0, 0, 0);
+    q.vx = 100 / 3.6;
+    q.gear = 4;
+    let ay = 0;
+    for (let i = 0; i < 180; i++) {
+      stepVehicle(sp, q, { steer: 1, throttle: 0.4, brake: 0 }, flat, 1 / 60);
+      if (i > 90) ay = Math.max(ay, Math.abs(q.ay));
+    }
+    expect(ay / 9.81).toBeGreaterThan(0.85);
+  });
+
+  it('mit Schieberegler (analog lenken, Gas dosieren) schafft man die Runde ohne Abkommen – mit und ohne ESP', () => {
     const w = driveWorld();
     const n = w.samples.length;
-    for (const id of ['renard_twingle', 'bmv_m4_g82', 'zuffen_946']) {
-      const sp = mk(id);
-      const st = initialState(w.start.x, w.start.z, w.start.heading);
-      let near = 0;
-      let prog = 0;
-      let off = 0;
-      for (let t = 0; t < 300 && prog < n; t += 1 / 60) {
-        const q = w.nearest(st.x, st.z, near);
-        let d = q.i - near;
-        if (d > n / 2) d -= n;
-        if (d < -n / 2) d += n;
-        prog += d;
-        near = q.i;
-        if (Math.abs(q.lateral) > 4.4) off += 1 / 60;
-        const tg = w.samples[(near + 10) % n];
-        let diff = Math.atan2(-(tg.z - st.z), tg.x - st.x) - st.heading;
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        let curv = 0;
-        for (let k = 5; k < 60; k++) curv = Math.max(curv, Math.abs(w.samples[(near + k) % n].curv));
-        const vt = Math.min(28, Math.sqrt((0.75 * 9.81) / Math.max(1e-4, curv)));
-        stepVehicle(sp, st, { steer: diff > 0.04 ? 1 : diff < -0.04 ? -1 : 0, throttle: st.vx < vt ? 1 : 0, brake: st.vx > vt + 3 ? 1 : 0 }, flat, 1 / 60);
+    for (const id of ['renard_twingle', 'bmv_m4_g82', 'zuffen_946', 'veloce_stradale']) {
+      for (const assist of [true, false]) {
+        const sp = mk(id);
+        const st = initialState(w.start.x, w.start.z, w.start.heading);
+        let near = 0;
+        let prog = 0;
+        let off = 0;
+        for (let t = 0; t < 300 && prog < n; t += 1 / 60) {
+          const q = w.nearest(st.x, st.z, near);
+          let d = q.i - near;
+          if (d > n / 2) d -= n;
+          if (d < -n / 2) d += n;
+          prog += d;
+          near = q.i;
+          if (Math.abs(q.lateral) > 4.4) off += 1 / 60;
+          const tg = w.samples[(near + Math.round(8 + st.vx * 0.5)) % n];
+          let diff = Math.atan2(-(tg.z - st.z), tg.x - st.x) - st.heading;
+          diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+          let curv = 0;
+          for (let k = 3; k < 50 + st.vx * 2; k++) curv = Math.max(curv, Math.abs(w.samples[(near + k) % n].curv));
+          const vt = Math.min(45, Math.sqrt((0.85 * 9.81) / Math.max(1e-4, curv)));
+          const steer = Math.max(-1, Math.min(1, diff * 3 - q.lateral * 0.04));
+          stepVehicle(sp, st, { steer, throttle: st.vx < vt ? 1 : 0, brake: st.vx > vt + 2 ? 1 : 0, assist }, flat, 1 / 60);
+        }
+        expect(prog, `${id} ESP ${assist} Runde geschafft`).toBeGreaterThanOrEqual(n);
+        expect(off, `${id} ESP ${assist} Sekunden neben der Straße`).toBeLessThan(0.5);
       }
-      expect(prog, `${id} Runde geschafft`).toBeGreaterThanOrEqual(n);
-      expect(off, `${id} Sekunden neben der Straße`).toBeLessThan(1);
     }
+  });
+
+  it('ohne ESP: Drift hält sich mit Gas, Drift-Hilfe verhindert Dreher, nach Gas weg und Lenkung gerade fängt sich das Auto', () => {
+    for (const id of ['bmv_m4_g82', 'bavaria_330', 'veloce_stradale']) {
+      const sp = mk(id);
+      const s = initialState(0, 0, 0);
+      s.vx = 60 / 3.6;
+      s.gear = 2;
+      let b = 0;
+      for (let i = 0; i < 300; i++) {
+        stepVehicle(sp, s, { steer: 0.8, throttle: 1, brake: 0, assist: false, handbrake: i < 20 }, flat, 1 / 60);
+        b = Math.max(b, beta(s));
+      }
+      expect(b, `${id} Driftwinkel`).toBeGreaterThan(15);
+      expect(b, `${id} kein Dreher`).toBeLessThan(60);
+      for (let i = 0; i < 150; i++) stepVehicle(sp, s, { steer: 0, throttle: 0.15, brake: 0, assist: false }, flat, 1 / 60);
+      expect(beta(s), `${id} gefangen`).toBeLessThan(6);
+    }
+  });
+
+  it('Handbremse dreht das Auto ein (Wenden, Drift einleiten)', () => {
+    const sp = mk('renard_twingle');
+    const s = initialState(0, 0, 0);
+    s.vx = 40 / 3.6;
+    s.gear = 2;
+    for (let i = 0; i < 60; i++) stepVehicle(sp, s, { steer: 1, throttle: 0, brake: 0, handbrake: true, assist: false }, flat, 1 / 60);
+    const plain = initialState(0, 0, 0);
+    plain.vx = 40 / 3.6;
+    plain.gear = 2;
+    for (let i = 0; i < 60; i++) stepVehicle(sp, plain, { steer: 1, throttle: 0, brake: 0, assist: false }, flat, 1 / 60);
+    expect(s.heading).toBeGreaterThan(plain.heading + 0.25);
   });
 
   it('ohne ESP: starker Hecktriebler driftet mit Vollgas in der Kurve, Frontantrieb nicht', () => {
@@ -215,6 +268,22 @@ describe('Fahrbarkeit: nicht dauernd ausbrechen, Driften nur mit Absicht', () =>
     expect(drift('bmv_m4_g82', false)).toBeGreaterThan(25);
     expect(drift('bmv_m4_g82', true)).toBeLessThan(10);
     expect(drift('vw_golf2_gti', false)).toBeLessThan(10);
+  });
+});
+
+describe('Fahrwelt', () => {
+  it('Testgelände ist eben und zählt als Asphalt; abseits gibt es Schotter, Wiese, Feld und Wald', () => {
+    const w = driveWorld();
+    expect(w.onPad(200, 60)).toBe(true);
+    expect(w.onPad(0, 0)).toBe(false);
+    const ys = [[130, 10], [200, 60], [265, 125]].map(([x, z]) => w.ground(x, z));
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(0.01);
+    const p = w.tracks[0][20];
+    expect(w.surface(p.x, p.z).kind).toBe('gravel');
+    const kinds = new Set<string>();
+    for (let x = -700; x < 700; x += 37) for (let z = -700; z < 700; z += 41) kinds.add(w.surface(x, z).kind);
+    expect([...kinds].sort()).toEqual(['field', 'forest', 'grass', 'gravel'].filter((k) => kinds.has(k)).sort());
+    expect(kinds.has('grass') && kinds.has('forest') && kinds.has('field')).toBe(true);
   });
 });
 

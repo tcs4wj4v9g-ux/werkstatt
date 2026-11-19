@@ -296,7 +296,7 @@ export function GarageUI() {
         <Modal title="Probefahrt-Bericht" onClose={() => s.setPanel(null)}>
           {s.driveReport?.length ? (
             <>
-              <p>Runde geschafft. Dabei ist dir aufgefallen:</p>
+              <p>Probefahrt beendet. Dabei ist dir aufgefallen:</p>
               {s.driveReport.map((r) => <div key={r} className="finding">⚠ {r}</div>)}
               <p className="meta">Das sind Symptome, keine Diagnose – die möglichen Ursachen stehen in der Fahrzeugakte.</p>
             </>
@@ -401,6 +401,13 @@ function DriveModal() {
   return (
     <Modal title="Probefahrt" onClose={() => s.setPanel(null)}>
       {!any && <p className="meta">Du besitzt noch kein Auto. Am Computer findest du den Gebrauchtwagenmarkt.</p>}
+      {any && (
+        <p className="meta">
+          2½ Minuten freie Fahrt: Landstraßen, Ort, Feldwege und ein Testgelände zum Driften. Gewertet ist die Fahrt ab 45 Sekunden.
+          Links lenkst du mit dem Schieberegler, rechts gibst du mit dem kleinen Regler Gas – beide federn beim Loslassen zurück.
+          ESP aus und Handbremse für Drifts.
+        </p>
+      )}
       {s.cars.map((car, i) => {
         if (!car || !isFleet(i)) return null;
         const blocker = driveBlocker(car);

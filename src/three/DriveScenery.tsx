@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { driveWorld, forestAt, RAIL_OFFSET, ROAD_WIDTH, type DriveWorld } from './driveWorld';
+import { driveWorld, forestAt, PAD, RAIL_OFFSET, ROAD_WIDTH, TRACK_WIDTH, type DriveWorld } from './driveWorld';
 import { textTexture } from './textures';
 
 /**
@@ -124,6 +124,7 @@ const SIGN_TEXT: Record<string, { text: string; bg: string; fg: string; sub?: st
   curveL: { text: '↰', bg: '#ffffff', fg: '#c01818' },
   curveR: { text: '↱', bg: '#ffffff', fg: '#c01818' },
   cross: { text: '✕', bg: '#ffffff', fg: '#c01818', sub: 'Kreuzung' },
+  pad: { text: 'Testgelände', bg: '#1d3f8f', fg: '#ffffff', sub: 'Freies Fahren · Driften' },
 };
 
 /** Viele gleiche Objekte in einem Zeichenaufruf; `cull`: Block wird bei Blick weg gar nicht gezeichnet. */
@@ -219,7 +220,52 @@ function build() {
     const ang = Math.atan2(-(s.z - l.z), s.x - l.x);
     return new THREE.Matrix4().compose(new THREE.Vector3(l.x, w.ground(l.x, l.z), l.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ang), new THREE.Vector3(1, 1, 1));
   });
-  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat };
+  // Testgelände: Asphaltfläche mit Driftkreisen, Slalomlinie und Pylonen (nur Deko, man darf sie umfahren)
+  const pw = PAD.maxX - PAD.minX;
+  const pd = PAD.maxZ - PAD.minZ;
+  const pad = new THREE.PlaneGeometry(pw, pd).rotateX(-Math.PI / 2).translate((PAD.minX + PAD.maxX) / 2, w.padY + 0.03, (PAD.minZ + PAD.maxZ) / 2);
+  const circles = [
+    { x: PAD.minX + 42, z: PAD.minZ + 62, r: 24 },
+    { x: PAD.maxX - 42, z: PAD.minZ + 62, r: 16 },
+  ];
+  const marks = mergeGeometries([
+    ...circles.map((c) => new THREE.RingGeometry(c.r - 0.15, c.r + 0.15, 64).rotateX(-Math.PI / 2).translate(c.x, w.padY + 0.045, c.z)),
+    // Randlinie und Slalomgasse in der Mitte
+    ...[PAD.minZ + 1, PAD.maxZ - 1].map((z) => new THREE.PlaneGeometry(pw - 2, 0.2).rotateX(-Math.PI / 2).translate((PAD.minX + PAD.maxX) / 2, w.padY + 0.045, z)),
+    ...[PAD.minX + 1, PAD.maxX - 1].map((x) => new THREE.PlaneGeometry(0.2, pd - 2).rotateX(-Math.PI / 2).translate(x, w.padY + 0.045, (PAD.minZ + PAD.maxZ) / 2)),
+    ...Array.from({ length: 12 }, (_, i) => new THREE.PlaneGeometry(3, 0.2).rotateX(-Math.PI / 2).translate(PAD.minX + 20 + i * 10, w.padY + 0.045, PAD.maxZ - 18)),
+  ]);
+  const cones = [
+    ...Array.from({ length: 10 }, (_, i) => [PAD.minX + 25 + i * 11, PAD.maxZ - 18 + (i % 2 ? 0 : 0)] as const),
+    ...circles.flatMap((c) => Array.from({ length: 8 }, (_, i) => [c.x + Math.cos((i / 8) * Math.PI * 2) * 2.5, c.z + Math.sin((i / 8) * Math.PI * 2) * 2.5] as const)),
+  ].map(([x, z]) => new THREE.Matrix4().makeTranslation(x, w.padY + 0.03, z));
+  const coneGeo = new THREE.ConeGeometry(0.22, 0.7, 8).translate(0, 0.35, 0);
+  // Feldwege: Schotterband, das dem Gelände folgt (etwas angehoben, damit es nicht im Boden versinkt)
+  const gravel = mergeGeometries(
+    w.tracks.map((t) => {
+      const pos: number[] = [];
+      const idx: number[] = [];
+      for (let i = 0; i < t.length; i++) {
+        const a = t[Math.max(0, i - 1)];
+        const b2 = t[Math.min(t.length - 1, i + 1)];
+        const l = Math.hypot(b2.x - a.x, b2.z - a.z) || 1;
+        const nx = (b2.z - a.z) / l;
+        const nz = -(b2.x - a.x) / l;
+        for (const side of [-1, 1]) {
+          const x = t[i].x + nx * side * (TRACK_WIDTH / 2);
+          const z = t[i].z + nz * side * (TRACK_WIDTH / 2);
+          pos.push(x, w.ground(x, z) + 0.14, z);
+        }
+        if (i > 0) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
+    }),
+  );
+  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel };
 }
 
 export function DriveScenery() {
@@ -239,6 +285,9 @@ export function DriveScenery() {
       win: new THREE.MeshLambertMaterial({ color: '#3a4656' }),
       pole: new THREE.MeshLambertMaterial({ color: '#5d636a' }),
       lamp: new THREE.MeshBasicMaterial({ color: '#fff4d0' }),
+      pad: new THREE.MeshLambertMaterial({ color: '#55585d' }),
+      gravel: new THREE.MeshLambertMaterial({ color: '#a39784', side: THREE.DoubleSide }),
+      cone: new THREE.MeshLambertMaterial({ color: '#ff7a1a' }),
     }),
     [],
   );
@@ -252,6 +301,11 @@ export function DriveScenery() {
       <mesh geometry={b.road} material={mats.road} raycast={() => null} />
       <mesh geometry={b.lines} material={mats.line} raycast={() => null} />
       <mesh geometry={b.rail.band} material={mats.rail} raycast={() => null} />
+      <mesh geometry={b.pad} material={mats.pad} raycast={() => null} />
+      <mesh geometry={b.marks} material={mats.line} raycast={() => null} />
+      <Instances geometry={b.coneGeo} material={mats.cone} matrices={b.cones} />
+      <mesh geometry={b.gravel} material={mats.gravel} raycast={() => null} />
+      <Sign x={PAD.minX + 6} y={b.w.padY} z={PAD.minZ + 2} rot={0} kind="pad" />
       <Instances geometry={postGeo} material={mats.post} matrices={b.rail.posts} />
       {b.chunks.map((c, i) => (
         <group key={i}>
@@ -273,15 +327,16 @@ export function DriveScenery() {
 }
 
 const signTex = new Map<string, THREE.Texture>();
+const wide0 = (kind: string) => kind === 'town' || kind === 'pad';
 function Sign({ x, y, z, rot, kind }: { x: number; y: number; z: number; rot: number; kind: string }) {
   const t = SIGN_TEXT[kind];
   const tex = useMemo(() => {
     let tx = signTex.get(kind);
-    if (!tx) signTex.set(kind, (tx = textTexture(t.text, { bg: t.bg, fg: t.fg, w: 256, h: kind === 'town' ? 128 : 256, font: kind === 'town' ? 60 : 140, sub: t.sub })));
+    if (!tx) signTex.set(kind, (tx = textTexture(t.text, { bg: t.bg, fg: t.fg, w: 256, h: wide0(kind) ? 128 : 256, font: wide0(kind) ? 52 : 140, sub: t.sub })));
     return tx;
   }, [kind]);
   const round = kind === 'speed50' || kind === 'speed100';
-  const wide = kind === 'town';
+  const wide = kind === 'town' || kind === 'pad';
   // Schild blickt dem ankommenden Verkehr entgegen (Vorderseite gegen die Fahrtrichtung)
   return (
     <group position={[x, y, z]} rotation={[0, rot - Math.PI / 2, 0]}>
