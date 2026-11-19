@@ -1,4 +1,5 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { driveWorld, FARMS, LAKE, PAD, WORKSHOP } from '../three/driveWorld';
 import { CAMERA_LABEL, DRIVE_MIN, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
 import { DEFECTS } from '../game/data/defects';
 import { activeDefects } from '../game/repair';
@@ -83,6 +84,135 @@ function Spring({ axis, testid, className, onChange, label }: { axis: 'x' | 'y';
   );
 }
 
+/** Gezeichnete Karte der ganzen Gegend (einmal, 0,75 px je Meter), Norden = −z oben. */
+const MAP_K = 0.75;
+let mapImage: HTMLCanvasElement | null = null;
+function worldMap() {
+  if (mapImage) return mapImage;
+  const w = driveWorld();
+  const E = w.extent;
+  const size = Math.round(2 * E * MAP_K);
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d')!;
+  const X = (x: number) => (x + E) * MAP_K;
+  g.fillStyle = '#6f9152';
+  g.fillRect(0, 0, size, size);
+  // Wald und Felder
+  for (let x = -E; x < E; x += 8)
+    for (let z = -E; z < E; z += 8) {
+      const s = w.surface(x, z).kind;
+      if (s === 'forest') g.fillStyle = '#3f6334';
+      else if (s === 'field') g.fillStyle = '#b9a557';
+      else continue;
+      g.fillRect(X(x), X(z), 8 * MAP_K + 0.5, 8 * MAP_K + 0.5);
+    }
+  // See
+  g.fillStyle = '#4f86b0';
+  g.beginPath();
+  g.ellipse(X(LAKE.x), X(LAKE.z), LAKE.rx * MAP_K, LAKE.rz * MAP_K, 0, 0, Math.PI * 2);
+  g.fill();
+  // Testgelände
+  g.fillStyle = '#5d6066';
+  g.fillRect(X(PAD.minX), X(PAD.minZ), (PAD.maxX - PAD.minX) * MAP_K, (PAD.maxZ - PAD.minZ) * MAP_K);
+  // Feldwege
+  g.strokeStyle = '#d8c79e';
+  g.lineWidth = 4 * MAP_K * 1.6;
+  g.lineCap = g.lineJoin = 'round';
+  for (const t of w.tracks) {
+    g.beginPath();
+    t.forEach((p, i) => (i ? g.lineTo(X(p.x), X(p.z)) : g.moveTo(X(p.x), X(p.z))));
+    g.stroke();
+  }
+  // Straßen: Rand und Belag
+  for (const [col, wd] of [['#f4f1e6', 11], ['#55585e', 7.5]] as const) {
+    g.strokeStyle = col;
+    g.lineWidth = wd * MAP_K * 1.4;
+    g.beginPath();
+    w.samples.forEach((p, i) => (i ? g.lineTo(X(p.x), X(p.z)) : g.moveTo(X(p.x), X(p.z))));
+    g.closePath();
+    g.stroke();
+  }
+  // Häuser
+  g.fillStyle = '#b4553f';
+  for (const h of w.houses) {
+    g.save();
+    g.translate(X(h.x), X(h.z));
+    g.rotate(-h.rot);
+    g.fillRect((-h.w / 2) * MAP_K, (-h.d / 2) * MAP_K, h.w * MAP_K, h.d * MAP_K);
+    g.restore();
+  }
+  g.fillStyle = '#ff7a1a';
+  g.fillRect(X(WORKSHOP.x - WORKSHOP.w / 2), X(WORKSHOP.z - WORKSHOP.d / 2), WORKSHOP.w * MAP_K, WORKSHOP.d * MAP_K);
+  mapImage = c;
+  return c;
+}
+const LABELS: [string, number, number][] = [
+  ['Grünbach', 0, 0],
+  ['Werkstatt', WORKSHOP.x, WORKSHOP.z - 14],
+  ['Testgelände', (PAD.minX + PAD.maxX) / 2, (PAD.minZ + PAD.maxZ) / 2],
+  ['Waldsee', LAKE.x, LAKE.z],
+  ...FARMS.map((f) => [f.name, f.x, f.z - 14] as [string, number, number]),
+];
+
+/** Minikarte oben links: Fahrtrichtung zeigt nach oben, Umkreis gut 250 m. */
+function MiniMap() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const { px, pz, ph } = useDriveHud();
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const S = 170;
+    if (c.width !== S * dpr) c.width = c.height = S * dpr;
+    const g = c.getContext('2d')!;
+    const img = worldMap();
+    const E = driveWorld().extent;
+    const zoom = 0.36; // Bildschirmpunkte je Meter
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, S, S);
+    g.save();
+    g.beginPath();
+    g.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2);
+    g.clip();
+    g.fillStyle = '#6f9152';
+    g.fillRect(0, 0, S, S);
+    g.translate(S / 2, S / 2);
+    g.rotate(ph - Math.PI / 2);
+    g.scale(zoom / MAP_K, zoom / MAP_K);
+    g.drawImage(img, -(px + E) * MAP_K, -(pz + E) * MAP_K);
+    g.restore();
+    // Beschriftungen (aufrecht)
+    g.font = '600 10px system-ui, sans-serif';
+    g.textAlign = 'center';
+    const rot = ph - Math.PI / 2;
+    for (const [t, x, z] of LABELS) {
+      const dx = (x - px) * zoom;
+      const dz = (z - pz) * zoom;
+      const sx = S / 2 + dx * Math.cos(rot) - dz * Math.sin(rot);
+      const sy = S / 2 + dx * Math.sin(rot) + dz * Math.cos(rot);
+      if (Math.hypot(sx - S / 2, sy - S / 2) > S / 2 - 14) continue;
+      g.fillStyle = 'rgba(0,0,0,0.55)';
+      g.fillText(t, sx + 1, sy + 1);
+      g.fillStyle = '#ffffff';
+      g.fillText(t, sx, sy);
+    }
+    // eigenes Auto: Pfeil nach oben
+    g.fillStyle = '#ff7a1a';
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(S / 2, S / 2 - 9);
+    g.lineTo(S / 2 + 6, S / 2 + 7);
+    g.lineTo(S / 2, S / 2 + 3);
+    g.lineTo(S / 2 - 6, S / 2 + 7);
+    g.closePath();
+    g.fill();
+    g.stroke();
+  }, [px, pz, ph]);
+  return <canvas ref={ref} className="minimap" data-testid="minimap" style={{ width: 170, height: 170 }} />;
+}
+
 /** Lenkung: feinfühlig um die Mitte (Kennlinie), voller Ausschlag an den Enden. +1 = links für die Physik. */
 const steerCurve = (x: number) => -Math.sign(x) * Math.abs(x) ** 1.35;
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -151,6 +281,7 @@ export function TrackUI() {
         <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>↺ Auf die Straße</button>
         <div className="money" data-testid="drive-time">⏱ {clock(hud.left)}</div>
       </div>
+      <MiniMap />
       <div className="speedo">
         <Gauge />
         <div className="meta">{(hud.distance / 1000).toFixed(1)} km{counts ? '' : ` · gewertet ab ${clock(DRIVE_MIN)}`}</div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCar } from './market';
 import { initialState, stepVehicle, vehicleSpec, type DriveInput, type VehicleSpec } from './vehicle';
-import { driveWorld } from '../three/driveWorld';
+import { driveWorld, FARMS, LAKE, WORKSHOP } from '../three/driveWorld';
 import type { CarInstance } from './types';
 
 const flat = { grade: 0, grip: 1, drag: 0 };
@@ -284,6 +284,23 @@ describe('Fahrwelt', () => {
     for (let x = -700; x < 700; x += 37) for (let z = -700; z < 700; z += 41) kinds.add(w.surface(x, z).kind);
     expect([...kinds].sort()).toEqual(['field', 'forest', 'grass', 'gravel'].filter((k) => kinds.has(k)).sort());
     expect(kinds.has('grass') && kinds.has('forest') && kinds.has('field')).toBe(true);
+  });
+
+  it('Karte ergibt Sinn: Feldwege beginnen an Straßen und führen zu den Höfen, See und Werkstatt liegen frei', () => {
+    const w = driveWorld();
+    for (const t of w.tracks) {
+      const q = w.nearest(t[0].x, t[0].z, 0);
+      expect(q.dist, 'Feldweg beginnt am Straßenrand').toBeLessThan(5);
+    }
+    for (const f of FARMS) {
+      const near = Math.min(...w.tracks.flat().map((p) => Math.hypot(p.x - f.x, p.z - f.z)));
+      expect(near, `${f.name} liegt an einem Feldweg`).toBeLessThan(22);
+    }
+    expect(w.inLake(LAKE.x, LAKE.z)).toBe(true);
+    expect(w.ground(LAKE.x, LAKE.z)).toBeLessThan(w.lakeY);
+    expect(w.signs.filter((s) => s.kind === 'dir').length).toBeGreaterThanOrEqual(5);
+    // Kein Baum im See, auf dem Testgelände oder an der Werkstatt
+    expect(w.trees.some((t) => w.inLake(t.x, t.z) || w.onPad(t.x, t.z) || Math.hypot(t.x - WORKSHOP.x, t.z - WORKSHOP.z) < 20)).toBe(false);
   });
 });
 

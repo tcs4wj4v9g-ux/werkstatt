@@ -105,6 +105,9 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const thr = await p.evaluate(() => window.__gkDrive.input.throttle);
   await p.mouse.up(); await p.waitForTimeout(200);
   expect(thr > 0.5 && (await p.evaluate(() => window.__gkDrive.input.throttle)) === 0, 'Gasregler: hochgezogen ' + thr.toFixed(2) + ', losgelassen 0');
+  const spin = await p.evaluate(() => window.__gkDrive.spin);
+  expect(spin.f > 5 && spin.r > 5, 'Räder drehen sich beim Fahren mit (' + spin.f.toFixed(0) + ' / ' + spin.r.toFixed(0) + ' rad)');
+  expect(await p.getByTestId('minimap').isVisible(), 'Minikarte sichtbar');
   const stBox = await p.getByTestId('steer').boundingBox();
   await p.mouse.move(stBox.x + stBox.width / 2, stBox.y + stBox.height / 2); await p.mouse.down();
   await p.mouse.move(stBox.x + stBox.width - 6, stBox.y + stBox.height / 2, { steps: 4 }); await p.waitForTimeout(200);

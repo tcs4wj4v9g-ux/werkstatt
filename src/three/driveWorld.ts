@@ -25,12 +25,38 @@ const ROUTE: [number, number, number][] = [
  * Liegt zwischen Startgerade und dem Bogen nach Norden; die Höhe folgt der Startgeraden (kein Absatz am Rand).
  */
 export const PAD = { minX: 125, maxX: 270, minZ: 7, maxZ: 130 };
-/** Feldwege (Schotter) quer durch Wiesen und Felder: Wegpunkte (x, z), Höhe folgt dem Gelände. */
-const TRACKS: [number, number][][] = [
-  [[285, 60], [330, 110], [360, 175], [352, 250], [300, 300]],
-  [[-60, -40], [-120, -110], [-200, -160], [-300, -190], [-400, -175]],
-  [[-150, 30], [-210, 95], [-300, 140], [-400, 120], [-470, 70]],
-  [[60, -60], [130, -120], [230, -150], [330, -130], [410, -60], [430, 40]],
+/** Eigene Werkstatt am Ortsrand (Start der Probefahrt) mit asphaltiertem Vorplatz zur Straße. */
+export const WORKSHOP = { x: 62, z: -21, w: 26, d: 12, h: 6.5 };
+const APRON = { minX: 47, maxX: 77, minZ: -15, maxZ: -2 };
+/** Waldsee im Hügelland nördlich des Testgeländes (Ellipse). */
+export const LAKE = { x: 228, z: 232, rx: 56, rz: 38 };
+/** Bauernhöfe: Lage, Drehung, Seite der Heuballen (+1/−1, weg vom Hofweg) und Name. */
+export const FARMS: { x: number; z: number; rot: number; side: number; name: string }[] = [
+  { x: 382, z: 192, rot: 0.4, side: -1, name: 'Hof Lindner' },
+  { x: -425, z: -205, rot: -0.3, side: 1, name: 'Hof Brandt' },
+  { x: -300, z: 168, rot: 0.15, side: 1, name: 'Hof Wiesner' },
+  { x: 258, z: -178, rot: 0.7, side: 1, name: 'Hof Sommer' },
+];
+/** Punkt relativ zu einem Hof (dx längs, dz quer zum Wohnhaus). */
+export const farmAt = (f: (typeof FARMS)[number], dx: number, dz: number) => ({ x: f.x + dx * Math.cos(f.rot) + dz * Math.sin(f.rot), z: f.z - dx * Math.sin(f.rot) + dz * Math.cos(f.rot) });
+/** Hofplatz vor Wohnhaus und Scheune: dort enden bzw. kreuzen die Feldwege. */
+const yard = (i: number): [number, number] => {
+  const p = farmAt(FARMS[i], 10, -9);
+  return [p.x, p.z];
+};
+/**
+ * Feldwege (Schotter): beginnen an einer Straße (erster Punkt wird auf die Straße gezogen) und führen zu einem Hof,
+ * teils weiter bis zur nächsten Straße. `sign`: Wegweiser an der Einmündung.
+ */
+const TRACKS: { pts: [number, number][]; endRoad: boolean; sign: string }[] = [
+  // Ostschleife: Hof Lindner, am Waldsee vorbei zur Nordstraße
+  { pts: [[449, 140], [418, 160], [396, 171], yard(0), [365, 180], [335, 200], [306, 270], [256, 322], [205, 380]], endRoad: true, sign: 'Hof Lindner · Waldsee' },
+  // Westschleife: von der Südstraße über Hof Brandt nach Norden
+  { pts: [[-440, -258], [-428, -234], yard(1), [-392, -200], [-386, -150], [-392, -80], [-388, -10], [-381, 50]], endRoad: true, sign: 'Hof Brandt' },
+  // Stichweg zu Hof Wiesner
+  { pts: [[-281, 44], [-286, 95], yard(2)], endRoad: false, sign: 'Hof Wiesner' },
+  // Südweg: von der Startgeraden über Hof Sommer zurück nach Grünbach
+  { pts: [[236, -1], [241, -60], [250, -130], yard(3), [220, -200], [130, -190], [50, -160], [-4, -120]], endRoad: true, sign: 'Hof Sommer · Grünbach' },
 ];
 export const TRACK_WIDTH = 3.6;
 
@@ -85,6 +111,13 @@ export interface DriveWorld {
   tracks: { x: number; z: number }[][];
   /** Höhe des Testgeländes. */
   padY: number;
+  /** Wasserspiegel des Sees und ob ein Punkt im Wasser liegt (dort kann man nicht fahren). */
+  lakeY: number;
+  inLake(x: number, z: number): boolean;
+  /** Pfosten des Zauns ums Testgelände (die Einfahrt bleibt offen). */
+  fence: { x: number; z: number }[];
+  apron: typeof APRON;
+  apronY: number;
   length: number;
   start: { x: number; z: number; heading: number };
   ground(x: number, z: number): number;
@@ -96,7 +129,7 @@ export interface DriveWorld {
   bales: { x: number; z: number; rot: number }[];
   houses: { x: number; z: number; rot: number; w: number; d: number; h: number; color: string }[];
   lamps: { x: number; z: number; rot: number }[];
-  signs: { x: number; z: number; rot: number; kind: 'town' | 'curveL' | 'curveR' | 'speed50' | 'speed100' | 'cross' }[];
+  signs: { x: number; z: number; rot: number; kind: 'town' | 'curveL' | 'curveR' | 'speed50' | 'speed100' | 'cross' | 'dir'; text?: string }[];
   /** Kachelweise Bodenhöhen für das Gelände. */
   extent: number;
 }
@@ -156,13 +189,26 @@ export function driveWorld(): DriveWorld {
   // Höhe des Testgeländes: wie die Startgerade daneben (dort fast eben)
   const straight = samples.filter((p) => p.x > PAD.minX - 10 && p.x < PAD.maxX + 10 && Math.abs(p.z) < 12);
   const padY = straight.reduce((a, p) => a + p.y, 0) / Math.max(1, straight.length);
-  const padDist = (x: number, z: number) => Math.hypot(Math.max(PAD.minX - x, 0, x - PAD.maxX), Math.max(PAD.minZ - z, 0, z - PAD.maxZ));
-  const onPad = (x: number, z: number) => x > PAD.minX && x < PAD.maxX && z > PAD.minZ && z < PAD.maxZ;
+  const rectDist = (r: { minX: number; maxX: number; minZ: number; maxZ: number }, x: number, z: number) => Math.hypot(Math.max(r.minX - x, 0, x - r.maxX), Math.max(r.minZ - z, 0, z - r.maxZ));
+  const padDist = (x: number, z: number) => rectDist(PAD, x, z);
+  const apronY = samples[0].y;
+  const onPad = (x: number, z: number) => (x > PAD.minX && x < PAD.maxX && z > PAD.minZ && z < PAD.maxZ) || (x > APRON.minX && x < APRON.maxX && z > APRON.minZ && z < APRON.maxZ);
+  const lakeK = (x: number, z: number) => Math.hypot((x - LAKE.x) / LAKE.rx, (z - LAKE.z) / LAKE.rz);
   const ground = (x: number, z: number) => {
     const pd = padDist(x, z);
     if (pd < 0.01) return padY;
-    const raw = groundRaw(x, z);
-    return pd < 40 ? padY + (raw - padY) * THREE.MathUtils.smoothstep(pd, 0, 40) : raw;
+    const ad = rectDist(APRON, x, z);
+    if (ad < 0.01) return apronY;
+    let h = groundRaw(x, z);
+    if (pd < 40) h = padY + (h - padY) * THREE.MathUtils.smoothstep(pd, 0, 40);
+    if (ad < 12) h = apronY + (h - apronY) * THREE.MathUtils.smoothstep(ad, 0, 12);
+    // See: Mulde unter dem Wasserspiegel, flaches Ufer
+    const k = lakeK(x, z);
+    if (k < 1.45) {
+      const bed = lakeY - 0.35 - 2.4 * Math.max(0, 1 - k * k);
+      h = k < 1 ? bed : bed + (Math.max(h, lakeY + 0.2) - bed) * THREE.MathUtils.smoothstep(k, 1, 1.45);
+    }
+    return h;
   };
   const groundRaw = (x: number, z: number) => {
     const base = noise(x, z) + 4;
@@ -173,6 +219,10 @@ export function driveWorld(): DriveWorld {
     const k = THREE.MathUtils.smoothstep(near.d, ROAD_WIDTH / 2 + 2, 48);
     return samples[near.i].y - 0.12 + (flat - samples[near.i].y + 0.12) * k;
   };
+  // Wasserspiegel des Sees: knapp unter dem tiefsten Punkt des Ufers
+  let lakeY = Infinity;
+  for (let a = 0; a < 32; a++) lakeY = Math.min(lakeY, groundRaw(LAKE.x + Math.cos(a) * LAKE.rx * 1.2, LAKE.z + Math.sin(a) * LAKE.rz * 1.2));
+  lakeY -= 0.6;
   // Leitplanken: in engen Kurven außen und dort, wo das Gelände neben der Straße steil abfällt
   for (let i = 0; i < n; i++) {
     const p = samples[i];
@@ -200,10 +250,11 @@ export function driveWorld(): DriveWorld {
   const COLORS = ['#e8dcc4', '#d9c3a0', '#f0ebe0', '#c9b6a0', '#e2d2b8', '#b9c4c9', '#e9d6c8'];
   samples.forEach((p, i) => {
     if (!p.town || p.crossing || Math.hypot(p.x, p.z) < 22) return;
+    const nearShop = Math.hypot(p.x - WORKSHOP.x, p.z - WORKSHOP.z) < 34;
     const heading = Math.atan2(-p.tz, p.tx);
     if (i % 9 === 0)
       for (const side of [-1, 1]) {
-        if (rng() < 0.25) continue;
+        if (rng() < 0.25 || nearShop) continue;
         const off = 14 + rng() * 6;
         const w = 8 + rng() * 4;
         const d = 7 + rng() * 3;
@@ -211,6 +262,9 @@ export function driveWorld(): DriveWorld {
       }
     if (i % 15 === 0) lamps.push({ x: p.x + p.nx * (ROAD_WIDTH / 2 + 1.2), z: p.z + p.nz * (ROAD_WIDTH / 2 + 1.2), rot: heading });
   });
+  // Kirche am Ortskern (Schiff und Turm) – Orientierungspunkt von weit her
+  houses.push({ x: 36, z: 36, rot: Math.PI / 4, w: 16, d: 9, h: 8, color: '#ece4d4' });
+  houses.push({ x: 28, z: 44, rot: Math.PI / 4, w: 4.5, d: 4.5, h: 22, color: '#e2d8c4' });
   // Ortsschilder an den Ortsgrenzen, Kurvenschilder vor engen Kurven, Tempo nach dem Ort
   for (let i = 0; i < n; i++) {
     const p = samples[i];
@@ -228,24 +282,16 @@ export function driveWorld(): DriveWorld {
   }
 
   // --- Bauernhöfe an den Feldwegen: Wohnhaus, rote Scheune, Heuballen
-  // (x, z, Drehung, Seite der Heuballen: hinter (−1) oder vor (+1) dem Hof – jeweils weg vom Feldweg)
-  const FARMS: [number, number, number, number][] = [
-    [382, 192, 0.4, -1],
-    [-425, -205, -0.3, -1],
-    [-300, 168, 0.15, 1],
-    [258, -178, 0.7, -1],
-  ];
   const bales: DriveWorld['bales'] = [];
-  for (const [fx, fz, rot, side] of FARMS) {
-    const c = Math.cos(rot);
-    const sn = Math.sin(rot);
-    const at = (dx: number, dz: number) => ({ x: fx + dx * c + dz * sn, z: fz - dx * sn + dz * c });
+  for (const farm of FARMS) {
+    const { rot, side } = farm;
+    const at = (dx: number, dz: number) => farmAt(farm, dx, dz);
     houses.push({ ...at(0, 0), rot, w: 10, d: 8, h: 6.5, color: '#efe6d2' });
     houses.push({ ...at(18, 4), rot, w: 16, d: 11, h: 7.5, color: '#9b2d22' });
     houses.push({ ...at(4, 16), rot: rot + Math.PI / 2, w: 9, d: 6, h: 4.5, color: '#7d6a55' });
     for (let k = 0; k < 9; k++) bales.push({ ...at(-4 + (k % 3) * 5, side * (18 + Math.floor(k / 3) * 4.5)), rot: rot + (k % 2) * 0.4 });
   }
-  const farmNear = (x: number, z: number) => FARMS.some(([fx, fz]) => Math.hypot(x - fx, z - fz) < 34);
+  const farmNear = (x: number, z: number) => FARMS.some((f) => Math.hypot(x - f.x, z - f.z) < 34);
 
   // --- Bäume: Wälder (Rauschen), einzelne Bäume an Wiesen; Abstand zur Straße und zum Ort
   const EXTENT = 820;
@@ -278,8 +324,24 @@ export function driveWorld(): DriveWorld {
   }
   const roadCells = (x: number, z: number) => cellDist[(Math.floor(x / CELL) - off) * cells + (Math.floor(z / CELL) - off)] ?? 99;
   // Feldwege: Punkte alle 2 m, in einem Raster für Abstandsabfragen
-  const tracks = TRACKS.map((pts) => {
-    const c = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+  // Einmündung: Endpunkt an den Straßenrand ziehen (auf der Seite, von der der Weg kommt), Wegweiser dorthin
+  const toRoad = (x: number, z: number, from: [number, number]) => {
+    const q = roadNear(x, z, 120)!;
+    const p = samples[q.i];
+    const side = Math.sign((from[0] - p.x) * p.nx + (from[1] - p.z) * p.nz) || 1;
+    return { x: p.x + p.nx * side * (ROAD_WIDTH / 2 + 0.6), z: p.z + p.nz * side * (ROAD_WIDTH / 2 + 0.6), p, side };
+  };
+  const tracks = TRACKS.map((t) => {
+    const pts = t.pts.map(([x, z]) => ({ x, z }));
+    const a = toRoad(pts[0].x, pts[0].z, t.pts[1]);
+    pts[0] = { x: a.x, z: a.z };
+    // Wegweiser am Straßenrand neben der Einmündung, zum ankommenden Verkehr gedreht
+    signs.push({ x: a.x + a.p.tx * 5 + a.p.nx * a.side * 0.8, z: a.z + a.p.tz * 5 + a.p.nz * a.side * 0.8, rot: Math.atan2(-a.p.tz, a.p.tx), kind: 'dir', text: t.sign });
+    if (t.endRoad) {
+      const e = toRoad(pts[pts.length - 1].x, pts[pts.length - 1].z, t.pts[t.pts.length - 2]);
+      pts[pts.length - 1] = { x: e.x, z: e.z };
+    }
+    const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p.x, 0, p.z)), false, 'centripetal');
     return c.getSpacedPoints(Math.round(c.getLength() / 2)).map((p) => ({ x: p.x, z: p.z }));
   });
   const trackGrid = new Map<string, { x: number; z: number }[]>();
@@ -305,6 +367,7 @@ export function driveWorld(): DriveWorld {
       if (Math.hypot(jx, jz) < 160) continue;
       if (padDist(jx, jz) < 12) continue;
       if (farmNear(jx, jz)) continue;
+      if (lakeK(jx, jz) < 1.35) continue;
       if (trackDist(jx, jz) < 6) continue;
       if (roadCells(jx, jz) > 13) continue;
       const near = roadNear(jx, jz, 30);
@@ -322,11 +385,29 @@ export function driveWorld(): DriveWorld {
   houses.forEach((h) => addObstacle({ x: h.x, z: h.z, r: Math.min(h.w, h.d) / 2 + 0.5 }));
   lamps.forEach((l) => addObstacle({ x: l.x, z: l.z, r: 0.2 }));
   bales.forEach((b) => addObstacle({ x: b.x, z: b.z, r: 0.85 }));
+  // Werkstatthalle: Reihe von Kreisen entlang der Länge
+  for (let dx = -WORKSHOP.w / 2 + WORKSHOP.d / 2; dx <= WORKSHOP.w / 2 - WORKSHOP.d / 2 + 0.01; dx += 3) addObstacle({ x: WORKSHOP.x + dx, z: WORKSHOP.z, r: WORKSHOP.d / 2 });
+  // Zaun ums Testgelände (1,5 m Abstand), an der Straßenseite eine 30 m breite Einfahrt
+  const fence: { x: number; z: number }[] = [];
+  const F = { minX: PAD.minX - 1.5, maxX: PAD.maxX + 1.5, minZ: PAD.minZ - 1.5, maxZ: PAD.maxZ + 1.5 };
+  const gate = (x: number) => x > 182 && x < 212;
+  for (let x = F.minX; x <= F.maxX; x += 2.5) {
+    if (!gate(x)) fence.push({ x, z: F.minZ });
+    fence.push({ x, z: F.maxZ });
+  }
+  for (let z = F.minZ + 2.5; z < F.maxZ; z += 2.5) fence.push({ x: F.minX, z }, { x: F.maxX, z });
+  fence.forEach((p) => addObstacle({ x: p.x, z: p.z, r: 0.15 }));
+  signs.push({ x: 180, z: 3.6 + 1.6, rot: 0, kind: 'dir', text: 'Testgelände' });
 
   const startHeading = Math.atan2(-samples[0].tz, samples[0].tx);
   cached = {
     samples,
     onPad,
+    lakeY,
+    inLake: (x, z) => lakeK(x, z) < 0.97,
+    fence,
+    apron: APRON,
+    apronY,
     padY,
     tracks,
     surface(x, z) {

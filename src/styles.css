@@ -292,3 +292,5 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
 
 .search-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
 .search-row input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.3); color: var(--text); }
+
+.minimap { position: absolute; top: calc(68px + var(--sat, 0px)); left: calc(16px + var(--sal)); border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.75); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45); pointer-events: none; }

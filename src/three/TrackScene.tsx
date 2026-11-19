@@ -10,7 +10,7 @@ import { useGame } from '../game/store';
 import { initialState, stepVehicle, vehicleSpec } from '../game/vehicle';
 import { CarModel } from './CarModel';
 import { DriveScenery } from './DriveScenery';
-import { driveWorld, RAIL_OFFSET, ROAD_WIDTH } from './driveWorld';
+import { driveWorld, LAKE, RAIL_OFFSET, ROAD_WIDTH } from './driveWorld';
 import { Env } from './Env';
 
 const HALF_WIDTH = 0.9;
@@ -28,6 +28,7 @@ export function TrackScene() {
   const group = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
   const steerVis = useRef(0);
+  const spinVis = useRef({ f: 0, r: 0 });
   const world = useMemo(() => driveWorld(), []);
   const spec = useMemo(() => vehicleSpec(car), [car]);
   const smoke = useMemo(() => {
@@ -46,7 +47,7 @@ export function TrackScene() {
     camera.far = 800;
     camera.updateProjectionMatrix();
     camPos.current.set(s.x - Math.cos(s.heading) * 7, s.y + 2.6, s.z + Math.sin(s.heading) * 7);
-    (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec };
+    (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec, spin: spinVis.current };
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     driveInput.handbrake = false;
     s.respawn = useDriveHud.getState().respawn;
@@ -103,6 +104,22 @@ export function TrackScene() {
       s.z *= k;
       s.vx *= 0.9;
       s.vy *= 0.5;
+    }
+
+    // --- Ins Wasser fährt man nicht: am Ufer stehen bleiben (mit Platschen)
+    if (world.inLake(s.x, s.z)) {
+      const dx = (s.x - LAKE.x) / LAKE.rx;
+      const dz = (s.z - LAKE.z) / LAKE.rz;
+      const k = Math.hypot(dx, dz) || 1;
+      s.x = LAKE.x + (dx / k) * LAKE.rx * 0.975;
+      s.z = LAKE.z + (dz / k) * LAKE.rz * 0.975;
+      if (s.bump <= 0 && Math.abs(s.vx) > 3) {
+        roadAudio.hit('bump');
+        s.bump = 0.6;
+      }
+      s.vx *= 0.3;
+      s.vy *= 0.3;
+      s.yawRate *= 0.5;
     }
 
     // --- Wo auf der Straße? (lokale Suche ab dem letzten Punkt, an der Kreuzung bleibt man auf seinem Ast)
@@ -202,6 +219,12 @@ export function TrackScene() {
       body.current.position.y = misfireJolt;
     }
     steerVis.current = s.steer;
+    // Räder rollen mit; angetriebene drehen beim Durchdrehen schneller, die Handbremse blockiert hinten
+    const roll = (s.vx / spec.wheelRadius) * dt;
+    const spinBoost = s.wheelspin * 25 * dt * Math.sign(s.vx || 1);
+    const rearDriven = spec.drive !== 'FWD';
+    spinVis.current.f += roll + (spec.drive !== 'RWD' ? spinBoost : 0);
+    if (!driveInput.handbrake) spinVis.current.r += roll + (rearDriven ? spinBoost : 0);
     if (smokeRef.current) {
       smokeRef.current.visible = spec.faults.smoke || (onRoad && s.wheelspin > 0.5);
       (smokeRef.current.material as THREE.MeshBasicMaterial).opacity = spec.faults.smoke ? 0.35 : Math.min(0.4, Math.max(s.wheelspin, s.slide) * 0.5);
@@ -267,12 +290,10 @@ export function TrackScene() {
     if (s.hud > 0.08) {
       s.hud = 0;
       const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, left: Math.max(0, DRIVE_TIME - s.elapsed), elapsed: s.elapsed, drift: drift > 12 ? drift : 0, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, left: Math.max(0, DRIVE_TIME - s.elapsed), elapsed: s.elapsed, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
     }
   });
 
-  const start = world.samples[0];
-  const startHeading = Math.atan2(-start.tz, start.tx);
   return (
     <>
       <color attach="background" args={[SKY]} />
@@ -281,32 +302,16 @@ export function TrackScene() {
       <hemisphereLight args={['#eaf4ff', '#5d6b45', 1.15]} />
       <directionalLight position={[120, 180, 60]} intensity={2.1} />
       {/* Ferne Wiese bis zum Horizont (Nebel verdeckt die Kante) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} raycast={() => null}>
+      {/* Zuerst gezeichnet und ohne Tiefe: das Gelände liegt immer darüber, auch wo es tiefer liegt (See, Senken) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} renderOrder={-2} raycast={() => null}>
         <planeGeometry args={[6000, 6000]} />
-        <meshLambertMaterial color="#5f8a4a" />
+        <meshLambertMaterial color="#5f8a4a" depthWrite={false} />
       </mesh>
       <DriveScenery />
-      {/* Start und Ziel: Bogen über die Straße */}
-      <group position={[start.x, start.y, start.z]} rotation={[0, startHeading, 0]}>
-        <mesh position={[0, 0.045, 0]} raycast={() => null}>
-          <boxGeometry args={[0.8, 0.01, ROAD_WIDTH]} />
-          <meshBasicMaterial color="#ffffff" />
-        </mesh>
-        {[-1, 1].map((k) => (
-          <mesh key={k} position={[0, 2.6, k * (ROAD_WIDTH / 2 + 0.8)]} raycast={() => null}>
-            <boxGeometry args={[0.3, 5.2, 0.3]} />
-            <meshLambertMaterial color="#c8501e" />
-          </mesh>
-        ))}
-        <mesh position={[0, 5.3, 0]} raycast={() => null}>
-          <boxGeometry args={[0.5, 0.9, ROAD_WIDTH + 2]} />
-          <meshLambertMaterial color="#1b1c1f" />
-        </mesh>
-      </group>
       <group ref={group}>
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}
-          <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} modelId={car.modelId} car={car} lod="simple" />
+          <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} spin={spinVis} modelId={car.modelId} car={car} lod="simple" />
         </group>
         <mesh ref={smokeRef} position={[-2.3, 0.5, 0]} visible={false} raycast={() => null}>
           <sphereGeometry args={[0.45, 8, 6]} />
