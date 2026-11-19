@@ -111,7 +111,7 @@ function DayButton() {
   const left = dayLeft(s);
   const sec = Math.ceil(left / 1000);
   return (
-    <button className="btn big" data-testid="nextday" disabled={left > 0} onClick={s.nextDay}>
+    <button className="btn big" data-testid="nextday" disabled={left > 0} onClick={() => s.nextDay()}>
       {left > 0 ? `🕒 Neuer Tag in ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} – läuft automatisch` : '🌙 Feierabend – nächster Tag (neue Angebote, neue Marktlage)'}
     </button>
   );

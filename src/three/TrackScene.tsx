@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
-import { DRIVE_TIME, driveInput, useDriveHud } from '../game/drive';
+import { DRIVE_MIN, driveInput, useDriveHud } from '../game/drive';
 import { activeDefects } from '../game/repair';
 import { engineAudio, roadAudio } from '../game/audio';
 import { soundProfile } from '../game/diagnosis';
@@ -12,13 +12,20 @@ import { CarModel } from './CarModel';
 import { DriveScenery } from './DriveScenery';
 import { driveWorld, LAKE, RAIL_OFFSET, ROAD_WIDTH } from './driveWorld';
 import { Env } from './Env';
+import { DriveEffects } from './driveEffects';
+import { BODY_SPECS } from './carGeometry';
 
 const HALF_WIDTH = 0.9;
+const SKID_ROAD = new THREE.Color('#141414');
+const SKID_GRAVEL = new THREE.Color('#6b5d48');
+const SKID_GRASS = new THREE.Color('#3f4a26');
+const SMOKE = new THREE.Color('#f2f2f2');
+const DUST = new THREE.Color('#b9a27c');
 const SKY = '#a9cbea';
 
 /**
  * Probefahrt: Fahrphysik (`game/vehicle.ts`) in der offenen Landschaft (`driveWorld.ts`): Landstraßen, Ort, Testgelände,
- * Wiesen und Feldwege. Gefahren wird auf Zeit (`DRIVE_TIME`); gewertet ist die Fahrt ab `DRIVE_MIN` Sekunden.
+ * Wiesen und Feldwege. Gewertet ist die Fahrt ab `DRIVE_MIN` Sekunden; beendet wird sie durch Anhalten auf dem Werkstatt-Vorplatz.
  * Der Wagen folgt dem Gelände, Leitplanken und Hindernisse halten ihn auf.
  */
 export function TrackScene() {
@@ -31,12 +38,14 @@ export function TrackScene() {
   const spinVis = useRef({ f: 0, r: 0 });
   const world = useMemo(() => driveWorld(), []);
   const spec = useMemo(() => vehicleSpec(car), [car]);
+  const fx = useMemo(() => new DriveEffects(), []);
+  const body3 = BODY_SPECS[CAR_MODELS[car.modelId].body];
   const smoke = useMemo(() => {
     const d = activeDefects(car);
     return d.includes('turbo') ? '#8fa3c4' : d.includes('egr') || d.includes('dpf') ? '#1b1b1b' : '#e9e9e9';
   }, [car]);
   const n = world.samples.length;
-  const sim = useRef(Object.assign(initialState(world.start.x, world.start.z, world.start.heading), { camYaw: undefined as number | undefined, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
+  const sim = useRef(Object.assign(initialState(world.start.x, world.start.z, world.start.heading), { camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
 
@@ -51,7 +60,7 @@ export function TrackScene() {
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     driveInput.handbrake = false;
     s.respawn = useDriveHud.getState().respawn;
-    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, left: DRIVE_TIME, elapsed: 0, drift: 0, offTrack: false, distance: 0 });
+    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, elapsed: 0, home: 0, away: false, tooShort: false, drift: 0, offTrack: false, distance: 0 });
     const keys: Record<string, boolean> = {};
     const apply = () => {
       driveInput.steer = (keys.ArrowLeft || keys.a ? 1 : 0) - (keys.ArrowRight || keys.d ? 1 : 0);
@@ -195,13 +204,28 @@ export function TrackScene() {
       if (d < min && d > 0.001) {
         s.x = o.x + (dx / d) * min;
         s.z = o.z + (dz / d) * min;
-        if (s.bump <= 0 && Math.abs(s.vx) > 2) {
-          roadAudio.hit('bump');
-          s.bump = 0.6;
+        // Aufprall: der Anteil zum Hindernis hin wird (mit etwas Rückprall) aufgehoben, entlang gleitet das Auto weiter.
+        // Frontal: fast Stillstand; streifend: nur etwas langsamer.
+        const nx = dx / d;
+        const nz = dz / d;
+        const ch = Math.cos(s.heading);
+        const sh = Math.sin(s.heading);
+        let wx = s.vx * ch - s.vy * sh;
+        let wz = -(s.vx * sh + s.vy * ch);
+        const vn = wx * nx + wz * nz;
+        if (vn < 0) {
+          wx -= 1.25 * vn * nx;
+          wz -= 1.25 * vn * nz;
+          wx *= 0.85;
+          wz *= 0.85;
+          s.vx = wx * ch - wz * sh;
+          s.vy = -(wx * sh + wz * ch);
+          s.yawRate = s.yawRate * 0.5 + Math.max(-1.5, Math.min(1.5, vn * 0.06 * Math.sign(nx * -sh - nz * ch)));
+          if (s.bump <= 0 && -vn > 1.5) {
+            roadAudio.hit('bump');
+            s.bump = 0.6;
+          }
         }
-        s.vx *= 0.25;
-        s.vy *= 0.25;
-        s.yawRate *= 0.3;
       }
     }
     s.bump -= dt;
@@ -226,8 +250,32 @@ export function TrackScene() {
     spinVis.current.f += roll + (spec.drive !== 'RWD' ? spinBoost : 0);
     if (!driveInput.handbrake) spinVis.current.r += roll + (rearDriven ? spinBoost : 0);
     if (smokeRef.current) {
-      smokeRef.current.visible = spec.faults.smoke || (onRoad && s.wheelspin > 0.5);
-      (smokeRef.current.material as THREE.MeshBasicMaterial).opacity = spec.faults.smoke ? 0.35 : Math.min(0.4, Math.max(s.wheelspin, s.slide) * 0.5);
+      smokeRef.current.visible = spec.faults.smoke;
+      (smokeRef.current.material as THREE.MeshBasicMaterial).opacity = 0.35;
+    }
+    // --- Reifenspuren und Wölkchen an den Hinterrädern: Driften, Durchdrehen, Handbremse, Vollbremsung; abseits Staub
+    const speed = Math.hypot(s.vx, s.vy);
+    const sliding = speed > 3 && (s.slide > 0.25 || s.wheelspin > 0.35 || (driveInput.handbrake && Math.abs(s.vx) > 2) || (driveInput.brake > 0.8 && Math.abs(s.ax) > 7));
+    const ch = Math.cos(s.heading);
+    const shd = Math.sin(s.heading);
+    const side = { x: shd, z: ch };
+    const kind = onRoad ? 'road' : world.surface(s.x, s.z).kind;
+    for (const [i, k] of [[0, -1], [1, 1]] as const) {
+      const lx = body3.rearAxle;
+      const lz = k * (0.8 + body3.trackR);
+      const wx = s.x + ch * lx + shd * lz;
+      const wz = s.z - shd * lx + ch * lz;
+      const marks = sliding || (!onRoad && speed > 4);
+      fx.mark(i, marks ? { x: wx, y: height(wx, wz) + 0.04, z: wz } : null, side, onRoad ? SKID_ROAD : kind === 'gravel' ? SKID_GRAVEL : SKID_GRASS);
+      if (sliding && onRoad) fx.emit({ x: wx, y: s.y, z: wz }, 14 * Math.min(1, speed / 12), dt, SMOKE, 1.1);
+      else if (!onRoad && speed > 6) fx.emit({ x: wx, y: s.y, z: wz }, (kind === 'gravel' || kind === 'field' ? 12 : 6) * Math.min(1, speed / 20), dt, DUST, 1.5);
+    }
+    fx.update(dt);
+    // Unebener Boden abseits der Straße: der Aufbau rüttelt leicht
+    if (!onRoad && body.current) {
+      const amp = (kind === 'field' ? 0.018 : kind === 'gravel' ? 0.008 : 0.012) * Math.min(1, speed / 15);
+      body.current.rotation.x += Math.sin(s.t * 23) * amp;
+      body.current.rotation.z += Math.sin(s.t * 17 + 1) * amp * 0.7;
     }
 
     // --- Klang: echte Drehzahl und Last, Reifen und Wind; Getriebeschaden kracht beim Schalten
@@ -280,17 +328,22 @@ export function TrackScene() {
       }
     }
 
-    // --- Fahrzeit: nach Ablauf geht es automatisch zurück in die Werkstatt
+    // --- Ende der Fahrt: zurück zur Werkstatt und auf dem Vorplatz anhalten (erst nachdem man weggefahren ist)
     s.elapsed += dt;
-    if (!s.done && s.elapsed >= DRIVE_TIME) {
+    const A = world.apron;
+    const home = Math.hypot(s.x - (A.minX + A.maxX) / 2, s.z - (A.minZ + A.maxZ) / 2);
+    if (home > 60) s.away = true;
+    const onApron = s.x > A.minX && s.x < A.maxX && s.z > A.minZ && s.z < A.maxZ;
+    s.tooShort = s.away && onApron && s.elapsed < DRIVE_MIN;
+    if (!s.done && s.away && onApron && s.elapsed >= DRIVE_MIN && Math.abs(s.vx) < 2) {
       s.done = true;
-      setTimeout(() => finishDrive(true), 600);
+      setTimeout(() => finishDrive(true), 500);
     }
     s.hud += dt;
     if (s.hud > 0.08) {
       s.hud = 0;
       const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, left: Math.max(0, DRIVE_TIME - s.elapsed), elapsed: s.elapsed, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
     }
   });
 
@@ -308,6 +361,7 @@ export function TrackScene() {
         <meshLambertMaterial color="#5f8a4a" depthWrite={false} />
       </mesh>
       <DriveScenery />
+      <primitive object={fx.group} />
       <group ref={group}>
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}

@@ -403,7 +403,8 @@ function DriveModal() {
       {!any && <p className="meta">Du besitzt noch kein Auto. Am Computer findest du den Gebrauchtwagenmarkt.</p>}
       {any && (
         <p className="meta">
-          2½ Minuten freie Fahrt: Landstraßen, Ort, Feldwege und ein Testgelände zum Driften. Gewertet ist die Fahrt ab 45 Sekunden.
+          Freie Fahrt: Landstraßen, Ort, Feldwege, Waldsee und ein Testgelände zum Driften. Gewertet ist die Fahrt ab 45 Sekunden –
+          beendet wird sie, wenn du zur Werkstatt zurückfährst und auf dem Vorplatz anhältst.
           Links lenkst du mit dem Schieberegler, rechts gibst du mit dem kleinen Regler Gas – beide federn beim Loslassen zurück.
           ESP aus und Handbremse für Drifts.
         </p>

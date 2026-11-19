@@ -274,17 +274,18 @@ export function TrackUI() {
   return (
     <>
       <div className="topbar">
-        <button className="btn ghost" data-testid="drive-end" onClick={() => finishDrive(counts)}>{counts ? '🏁 Zurück zur Werkstatt' : '✕ Abbrechen'}</button>
-        <div className="title">Probefahrt – fahr, wohin du willst</div>
+        <button className="btn ghost" data-testid="drive-end" onClick={() => finishDrive(counts)}>✕ Abbrechen</button>
+        <div className="title">{counts ? 'Zum Beenden auf dem Werkstatt-Vorplatz anhalten' : 'Probefahrt – fahr, wohin du willst'}</div>
         <button className={`btn ${esp ? '' : 'active'}`} data-testid="esp" onClick={() => setEsp(!esp)}>{esp ? '🛡 ESP an' : '⚠ ESP aus'}</button>
         <button className="btn" data-testid="camera" onClick={() => hud.set({ camera: next(hud.camera) })}>🎥 {CAMERA_LABEL[hud.camera]}</button>
         <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>↺ Auf die Straße</button>
-        <div className="money" data-testid="drive-time">⏱ {clock(hud.left)}</div>
+        <div className="money" data-testid="drive-time">⏱ {clock(hud.elapsed)}</div>
       </div>
       <MiniMap />
       <div className="speedo">
         <Gauge />
-        <div className="meta">{(hud.distance / 1000).toFixed(1)} km{counts ? '' : ` · gewertet ab ${clock(DRIVE_MIN)}`}</div>
+        <div className="meta">{(hud.distance / 1000).toFixed(1)} km{counts ? ` · 🏠 Werkstatt ${hud.home < 1000 ? `${Math.round(hud.home / 10) * 10} m` : `${(hud.home / 1000).toFixed(1)} km`}` : ` · gewertet ab ${clock(DRIVE_MIN)}`}</div>
+        {hud.tooShort && <div className="bad" data-testid="too-short">Noch keine {DRIVE_MIN} s gefahren – dreh noch eine Runde</div>}
         {lamps.length > 0 && <div className="lamps">{lamps.map((l) => <span key={l}>{l}</span>)}</div>}
         {hud.drift > 0 && <div className="good" data-testid="drift">Drift {Math.round(hud.drift)}°</div>}
       </div>

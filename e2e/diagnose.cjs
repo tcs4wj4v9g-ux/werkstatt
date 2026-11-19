@@ -194,9 +194,12 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.waitForTimeout(500);
   await p.getByTestId('drive').click(); await p.waitForTimeout(1500);
   expect((await st()).screen === 'track' && await p.evaluate(() => window.__gkAudio.running()), 'Probefahrt gestartet, Motor zu hören');
-  // Eingebauter Autopilot (lenkt in jedem Physikschritt) und Zeitraffer: die Runde ist knapp 3 km lang
+  // Eingebauter Autopilot (lenkt in jedem Physikschritt) und Zeitraffer; nach 45 s Fahrt zurück auf den Vorplatz und anhalten
   await p.evaluate(() => { const d = window.__gkDrive; d.sim.autopilot = 20; d.sim.timeScale = 3; });
-  for (let i = 0; i < 240 && (await st()).screen === 'track'; i++) await p.waitForTimeout(1000);
+  for (let i = 0; i < 120 && (await p.evaluate(() => window.__gkDrive.sim.elapsed)) < 47; i++) await p.waitForTimeout(500);
+  expect((await st()).screen === 'track' && (await p.evaluate(() => window.__gkDrive.sim.away)), 'Nach 45 s Fahrt geht es nicht von selbst zurück');
+  await p.evaluate(() => { const d = window.__gkDrive; Object.assign(d.sim, { autopilot: 0, timeScale: 1, x: 62, z: -8.5, vx: 0, vy: 0, yawRate: 0 }); d.input.throttle = 0; d.input.brake = 0; d.input.steer = 0; });
+  for (let i = 0; i < 20 && (await st()).screen === 'track'; i++) await p.waitForTimeout(500);
   s = await st();
   expect(s.screen === 'garage' && s.cars[0].testDriven && s.cars[0].observed.includes('brake_grind'), 'Probefahrt gewertet; Bremsproblem erst dabei bemerkt');
   expect(!(await p.evaluate(() => window.__gkAudio.running())), 'Motorklang nach der Fahrt beendet');

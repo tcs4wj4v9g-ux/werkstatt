@@ -114,7 +114,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const right = await p.evaluate(() => window.__gkDrive.input.steer);
   await p.mouse.up(); await p.waitForTimeout(200);
   expect(right < -0.9 && (await p.evaluate(() => window.__gkDrive.input.steer)) === 0, 'Lenkregler: ganz rechts ' + right.toFixed(2) + ', losgelassen gerade');
-  expect(/⏱ [12]:\d\d/.test(await p.getByTestId('drive-time').textContent()), 'Fahrzeit läuft: ' + (await p.getByTestId('drive-time').textContent()));
+  expect(/⏱ \d:\d\d/.test(await p.getByTestId('drive-time').textContent()), 'Fahrzeit läuft: ' + (await p.getByTestId('drive-time').textContent()));
   await p.getByTestId('respawn').click(); await p.waitForTimeout(400);
   expect(await p.evaluate(() => Math.abs(window.__gkDrive.sim.vx) < 0.5), '„Auf die Straße“ setzt das Auto stehend auf die Fahrbahn');
   // ---------- Feierabend erst nach Ablauf des Spieltags (Timer) ----------
@@ -132,6 +132,12 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await btn.click(); await p.waitForTimeout(400);
   const after = await p.evaluate(() => ({ day: window.__gk.getState().day, left: window.__gk.getState().dayStartedAt > Date.now() - 5000 }));
   expect(after.day === day0 + 1 && after.left && (await btn.isDisabled()), `Neuer Tag ${after.day} beginnt, der Timer läuft wieder`);
+  // Tag überspringen: geht jederzeit, aber erst beim zweiten Tippen
+  await p.evaluate(() => window.__gk.getState().setPanel(null)); await p.waitForTimeout(200);
+  await p.getByTestId('skipday').click(); await p.waitForTimeout(200);
+  const still = await p.evaluate(() => window.__gk.getState().day);
+  await p.getByTestId('skipday').click(); await p.waitForTimeout(300);
+  expect(still === day0 + 1 && (await p.evaluate(() => window.__gk.getState().day)) === day0 + 2, 'Tag überspringen: erstes Tippen fragt nach, zweites beginnt sofort den nächsten Tag');
   await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; window.__gk.getState().setPanel(null); });
 
   // ---------- Tuning-Kundenauftrag: Sportauspuff einbauen, abrechnen ----------

@@ -51,6 +51,30 @@ function DayClock() {
   return <span data-testid="dayclock">🕒 {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span>;
 }
 
+/** Tag sofort beenden (zweimal tippen, damit es nicht aus Versehen passiert). Der Tag endet sonst nach drei Minuten von selbst. */
+function SkipDay() {
+  const nextDay = useGame((s) => s.nextDay);
+  const [ask, setAsk] = useState(false);
+  useEffect(() => {
+    if (!ask) return;
+    const t = setTimeout(() => setAsk(false), 3000);
+    return () => clearTimeout(t);
+  }, [ask]);
+  return (
+    <button
+      className={`btn ghost${ask ? ' active' : ''}`}
+      data-testid="skipday"
+      onClick={() => {
+        if (!ask) return setAsk(true);
+        setAsk(false);
+        nextDay(true);
+      }}
+    >
+      {ask ? 'Wirklich? ⏭' : '⏭ Tag'}
+    </button>
+  );
+}
+
 export function TopBar({ title, back }: { title: string; back?: { label: string; onClick(): void } }) {
   const money = useGame((s) => s.money);
   const day = useGame((s) => s.day);
@@ -69,6 +93,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <div className="daychip" title={marketLabel(index)}>
         Tag {day} <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
+      <SkipDay />
       <button className="btn ghost" data-testid="sound" aria-label="Ton ein/aus" onClick={() => setSound(!sound)}>{sound ? '🔊' : '🔇'}</button>
       <button className="btn ghost" onClick={() => setPanel('help')}>? Hilfe</button>
       <div className="money" data-testid="money">{eur(money)}</div>
