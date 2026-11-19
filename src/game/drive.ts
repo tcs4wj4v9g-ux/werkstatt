@@ -5,8 +5,7 @@ import { create } from 'zustand';
 /** steer: +1 = voll links, −1 = voll rechts; throttle/brake 0..1; assist: ESP an (Standard) oder aus (Driften). */
 export const driveInput = { steer: 0, throttle: 0, brake: 0, handbrake: false, assist: true };
 
-/** Dauer der Probefahrt (s, Spielzeit) und ab wann sie als gefahren zählt. */
-export const DRIVE_TIME = 150;
+/** Ab wann die Probefahrt als gefahren zählt (s Spielzeit). Beendet wird sie durch Anhalten auf dem Werkstatt-Vorplatz. */
 export const DRIVE_MIN = 45;
 
 export type DriveCamera = 'chase' | 'hood' | 'cockpit';
@@ -18,9 +17,13 @@ interface DriveHud {
   redline: number;
   /** -1 = R, 0 = N, 1… */
   gear: number;
-  /** Restzeit und gefahrene Zeit (s). */
-  left: number;
+  /** Gefahrene Zeit (s). */
   elapsed: number;
+  /** Entfernung zur Werkstatt (m) und ob man schon weggefahren ist (dann beendet Anhalten auf dem Vorplatz die Fahrt). */
+  home: number;
+  away: boolean;
+  /** Steht auf dem Vorplatz, aber noch keine 45 s gefahren. */
+  tooShort: boolean;
   /** Driftwinkel (°), 0 wenn nicht gedriftet wird. */
   drift: number;
   /** Lage für die Minikarte: Position (m) und Kurs (rad). */
@@ -43,7 +46,9 @@ export const useDriveHud = create<DriveHud>((set) => ({
   rpm: 0,
   redline: 7000,
   gear: 1,
-  left: 150,
+  home: 0,
+  away: false,
+  tooShort: false,
   elapsed: 0,
   drift: 0,
   respawn: 0,

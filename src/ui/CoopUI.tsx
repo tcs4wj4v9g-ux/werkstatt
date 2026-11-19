@@ -133,7 +133,7 @@ export function CoopChip() {
         : others.map((m, i) => (
             <span key={m.id} className={m.online ? 'mem-on' : 'mem-off'} data-testid={`member-${m.name}`}>
               {i > 0 ? ', ' : ''}
-              {m.online ? m.name : `${m.name} (zuletzt ${ago(m.seen)})`}
+              {m.name}
             </span>
           ))}
     </button>

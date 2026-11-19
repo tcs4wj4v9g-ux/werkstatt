@@ -431,6 +431,7 @@ function Workshop({ y }: { y: number }) {
   const W = WORKSHOP;
   const sign = useMemo(() => textTexture('GARAGE KINGS', { bg: '#16181d', fg: '#ff7a1a', w: 1024, h: 160, font: 110 }), []);
   const door = useMemo(() => doorTexture(), []);
+  const stop = useMemo(() => textTexture('HIER ANHALTEN · ENDE PROBEFAHRT', { bg: 'rgba(0,0,0,0)', fg: '#f4f4f0', w: 1024, h: 292, font: 70 }), []);
   const front = W.z + W.d / 2;
   return (
     <group position={[0, y, 0]}>
@@ -460,6 +461,11 @@ function Workshop({ y }: { y: number }) {
       <mesh position={[W.x, 4.1, front + 0.035]} raycast={() => null}>
         <planeGeometry args={[W.w, 0.18]} />
         <meshBasicMaterial color="#ff7a1a" />
+      </mesh>
+      {/* Halteplatz für das Ende der Probefahrt */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[W.x, 0.035, -8.5]} raycast={() => null}>
+        <planeGeometry args={[14, 4]} />
+        <meshBasicMaterial map={stop} transparent />
       </mesh>
       {/* Vorplatz */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(47 + 77) / 2, 0.025, (-15 + -2) / 2]} raycast={() => null}>

@@ -133,7 +133,8 @@ export interface GameState {
   selectListing(i: number): void;
   checkListing(check: string): void;
   offer(amount: number, args?: string[]): void;
-  nextDay(): void;
+  /** Neuer Tag – nach Ablauf der Tageszeit, mit `skip` auch vorher (Knopf „Tag überspringen“). */
+  nextDay(skip?: boolean): void;
   acceptJob(i: number): void;
   returnJob(bay: number, unrepaired?: boolean): void;
   tapHood(bay: number): void;
@@ -660,10 +661,10 @@ export const useGame = create<GameState>()(
           get().say(`${l.seller}: ${l.sellerLine} – Gekauft für ${r.price.toLocaleString('de-DE')} €${transport ? ` plus ${transport} € Transport` : ''}. Das Auto steht jetzt hier: ${SLOTS[bay].label}.`);
         },
 
-        nextDay: () => {
+        nextDay: (skip) => {
           const s = get();
           const left = dayLeft(s);
-          if (left > 0) {
+          if (left > 0 && !skip) {
             sfx.error();
             const sec = Math.ceil(left / 1000);
             return s.say(`Noch nicht Feierabend – der Tag läuft noch ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} Minuten.`, true);

@@ -669,3 +669,19 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Der Start-/Zielbogen ist entfernt.
 - **Minikarte** oben links: Fahrtrichtung zeigt nach oben, Umkreis gut 250 m. Sie zeigt Straßen, Feldwege, Wald, Felder, See, Testgelände, Häuser und Namen. Die Karte wird einmal vorgezeichnet (0,75 px/m).
 - Tests: Logiktest „Karte ergibt Sinn“; `markt.cjs` prüft drehende Räder und die Minikarte.
+
+## Tag überspringen, „zuletzt online“ nach Antippen, Probefahrt endet an der Werkstatt, Fahreffekte
+
+- **Tag überspringen:** Knopf „⏭ Tag“ in der oberen Leiste (zweimal tippen). Er ruft `nextDay(true)` auf und geht auch vor Ablauf der drei Minuten. Der Tag endet weiterhin automatisch nach drei Minuten. Der Feierabend-Knopf am Computer bleibt bis dahin gesperrt.
+- **Koop-Leiste:** Mitglieder nur noch mit Namen (offline grau). Wann jemand zuletzt online war, steht nach Antippen in der Koop-Übersicht.
+- **Probefahrt ohne Zeitlimit:**
+  - Gewertet ist sie ab 45 s.
+  - Beendet wird sie, wenn man nach dem Wegfahren (über 60 m) zurück auf dem Werkstatt-Vorplatz anhält. Dort ist eine Markierung „Hier anhalten“.
+  - Die Anzeige zeigt die gefahrene Zeit und nach 45 s die Entfernung zur Werkstatt.
+  - „Abbrechen“ beendet jederzeit (ab 45 s gewertet).
+- **Fahreffekte (`driveEffects.ts`):**
+  - Reifenspuren beim Driften, Durchdrehen, mit Handbremse und bei Vollbremsung: dunkel auf Asphalt, braun auf Schotter, grün-braun auf Wiese.
+  - Weißer Reifenqualm, abseits der Straße Staub. Alles aus festen Puffern, kein Speicherzuwachs.
+- **Kollisionen:** Der Anteil der Geschwindigkeit zum Hindernis hin wird mit leichtem Rückprall aufgehoben, entlang gleitet das Auto weiter (frontal fast Stillstand, streifend nur langsamer).
+- **Unebener Boden:** Abseits der Straße rüttelt der Aufbau leicht (Feld stärker als Wiese und Schotter).
+- Tests: `markt.cjs` (Tag überspringen), `koop.cjs` („zuletzt online“ erst nach Antippen), `diagnose.cjs` (Fahrt endet erst auf dem Vorplatz).
