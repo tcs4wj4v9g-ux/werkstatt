@@ -71,6 +71,15 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const inv = await p.evaluate(() => window.__gk.getState().inventory);
   expect(inv['ignition_coil@V8'] === 1, 'Kauf per Knopf legt die V8-Spule ins Regal – ' + JSON.stringify(inv));
   await p.screenshot({ path: S + '/s5-shop-v8.png' });
+  // Suche: findet über alle Abteilungen, Umlaute egal; nicht passende Treffer werden nur gezählt
+  await p.getByTestId('part-search').fill('zuendkerze'); await p.waitForTimeout(250);
+  const found = await p.locator('.modal .shop-row b').allTextContents();
+  expect(found.some((t) => /Zündkerze/.test(t)) && !found.some((t) => /Zündspule|Bremsscheibe/.test(t)), 'Suche „zuendkerze“ findet die Zündkerze und blendet anderes aus: ' + found.join(', '));
+  await p.getByTestId('part-search').fill('Turbo'); await p.waitForTimeout(250);
+  const meta = await p.getByTestId('search-meta').textContent();
+  expect(/passen nicht/.test(meta), 'Turbo-Teile passen nicht zum Sauger und werden nur gezählt: ' + meta);
+  await p.screenshot({ path: S + '/s5-shop-suche.png' });
+  await p.getByTestId('part-search').fill('');
   await p.evaluate(() => window.__gk.getState().setPanel('file', 1)); await p.waitForTimeout(400);
   const file = await p.locator('.modal').textContent();
   expect(/8 Zylinder/.test(file) && /420 PS/.test(file) && /V-Motor/.test(file), 'Fahrzeugakte zeigt Motordaten des V8');

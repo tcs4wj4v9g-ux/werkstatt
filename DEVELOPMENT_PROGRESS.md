@@ -620,3 +620,10 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Werkzeug verkaufen (Koop):** Knopf „Verkaufen“ in der Kiste und für Werkzeug in der eigenen Leiste. Erstattet wird der halbe Kaufpreis. Das letzte Exemplar einer Art und Werkzeug in fremder Hand lassen sich nicht verkaufen. Serverseitig über `gk_sell_tool`, mit Buchung im Kassenbuch.
 - **Schema:** `gk_box_cap` kennt `halle2` und `spezial2`, neu ist `gk_sell_tool`, und `gk_reclaim` nutzt die neuen Kisten als Ausweichplatz. **`supabase/schema.sql` muss einmal im Supabase-SQL-Editor ausgeführt werden.**
 - Tests: Logiktest Slotzahl; `schrott.cjs` prüft Ständer 2 (gesperrt ohne Halle 2, Kranfenster „Halle 2“, auf/ab, drehen, Ständer 1 unberührt); `koop.cjs` prüft das Verkaufen; SQL-Test für `gk_sell_tool`.
+
+## Motorenbau-Nische, Teilesuche, Auto auf Probefahrt nicht in der Werkstatt
+
+- **Nische hinter Halle 2** (`NICHE` in `player.ts`, x 6,4–10,6 / z −10,8 bis −7,0), zur Halle hin ganz offen: Motorständer 2, Kran 2, Spezialwerkzeugschrank, Werkzeugwagen und Terminal stehen dort. Damit sind sie weg von Hebebühne 3. Das Teileregal steht weiter in der Halle, das Schild „HALLE 2“ hängt jetzt an der Torseite. Die Rückwand von Halle 2 hat eine Öffnung zur Nische. Die Nische ist Teil des Laufbereichs.
+- **Teilesuche** im Ersatzteilregal und am Computer: Das Suchfeld oben sucht über alle Abteilungen und Betriebsflüssigkeiten. Groß- und Kleinschreibung spielen keine Rolle, Umlaute dürfen ausgeschrieben werden („zuendkerze“). Treffer, die nicht zum gewählten Auto passen, werden nur gezählt.
+- **Probefahrt im Koop:** Fährt ein Mitspieler, verschwindet das Auto bei den anderen von Bühne, Hofplatz oder Tiefgaragenplatz (`useAway` aus der Anwesenheit `scene: 'track'` und `car`). Es ist dann kein Hindernis und nicht anwählbar. Im Einzelspiel ist die Werkstatt während der Fahrt ohnehin nicht sichtbar.
+- Tests: `markt.cjs` prüft die Suche, `koop.cjs` das Verschwinden und Zurückkehren des Autos.

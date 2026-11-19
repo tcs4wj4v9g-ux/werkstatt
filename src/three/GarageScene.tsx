@@ -24,7 +24,7 @@ import { DECO } from './workshopDecor';
 import { decoMaterials, liftCarriage, liftFrame } from './workshopDecor';
 import { TEST_MODE, useGfxSettings } from './gfx';
 import { Avatars, coopBoxes, ToolBoxes } from './CoopScene';
-import { coopActive } from '../net/coop';
+import { coopActive, isAway, useAway } from '../net/coop';
 
 const SPEED = 2.7;
 const FOV = 64;
@@ -108,7 +108,7 @@ function FirstPerson() {
         const dx = (-sin * moveInput.y + cos * moveInput.x) * k;
         const dz = (-cos * moveInput.y - sin * moveInput.x) * k;
         // Autos am Boden sind Hindernisse; unter angehobenen kann man durchlaufen.
-        const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted && SLOTS[i].kind !== 'stand' && slotPlace(i) === place.at ? [carBox(i)] : []));
+        const dynamic: Box[] = s.cars.flatMap((c, i) => (c && !c.lifted && SLOTS[i].kind !== 'stand' && slotPlace(i) === place.at && !isAway(c.uid) ? [carBox(i)] : []));
         dynamic.push(...engineShopBoxes(s.upgrades.includes('hoist'), s.upgrades.includes('loc_pro')), { minX: -21.3, maxX: -17.7, minZ: 1.2, maxZ: 3.3 });
         if (s.upgrades.includes('expansion')) dynamic.push({ minX: -22.9, maxX: -21.3, minZ: 0.1, maxZ: 3.9 });
         if (s.upgrades.includes('paint')) dynamic.push({ minX: -22.9, maxX: -16, minZ: 8.6, maxZ: 9 });
@@ -159,7 +159,7 @@ function FirstPerson() {
         break;
       }
       const st = useGame.getState();
-      const nearBay = nearestSlot(player.x, player.z, (i) => slotAvailable(SLOTS[i], st.upgrades) && slotPlace(i) === place.at);
+      const nearBay = nearestSlot(player.x, player.z, (i) => slotAvailable(SLOTS[i], st.upgrades) && slotPlace(i) === place.at && !isAway(st.cars[i]?.uid));
       const f = useFocus.getState();
       if (f.id !== id || f.label !== label || f.nearBay !== nearBay) f.set({ id, label, nearBay });
     }
@@ -170,7 +170,10 @@ function FirstPerson() {
 
 /** Zwei-Säulen-Hebebühne mit Bedienkasten; trägt das Auto des Stellplatzes. */
 function Bay({ index }: { index: number }) {
-  const car = useGame((s) => s.cars[index]);
+  const stored = useGame((s) => s.cars[index]);
+  // Fährt ein Mitspieler gerade Probe, steht das Auto nicht auf der Bühne.
+  const away = useAway((a) => !!stored && a.uids.includes(stored.uid));
+  const car = away ? null : stored;
   const up = useGame((s) => (s.cars[index] ? s.cars[index]!.lifted : s.liftUp[index]));
   const tool = useGame((s) => s.tool);
   // iPad-Leistung: Motorraum, Schrauben und Bremsen werden nur an dem Auto aufgebaut, an dem gerade gearbeitet wird
@@ -330,7 +333,9 @@ function Blob() {
 
 /** Auto auf einem Hofplatz, am Waschplatz oder in der Lackierkabine: vereinfachtes Modell, Karosserie antippbar. */
 function Parked({ slot }: { slot: number }) {
-  const car = useGame((s) => s.cars[slot]);
+  const stored = useGame((s) => s.cars[slot]);
+  const away = useAway((a) => !!stored && a.uids.includes(stored.uid));
+  const car = away ? null : stored;
   const handlers = useMemo(() => {
     const g = useGame.getState;
     const lift = () => g().say('Für Arbeiten an Motor und Fahrwerk das Auto auf eine Hebebühne umparken.', true);

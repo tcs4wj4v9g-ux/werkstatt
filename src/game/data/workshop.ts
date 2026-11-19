@@ -130,7 +130,7 @@ SLOTS.push(
   })),
 );
 // Zweiter Motorständer in Halle 2 (mit der Profi-Werkstatt): hinten angehängt, damit alte Spielstände gültig bleiben
-SLOTS.push({ id: SLOTS.length, kind: 'stand', label: 'Motorständer Halle 2', x: 3.1, z: -10.0, rot: 0, needs: 'loc_pro' });
+SLOTS.push({ id: SLOTS.length, kind: 'stand', label: 'Motorständer Halle 2', x: 8.0, z: -9.8, rot: 0, needs: 'loc_pro' });
 export const STAND2_SLOT = SLOTS.length - 1;
 export const isExpo = (slot: number) => SLOTS[slot]?.kind === 'expo';
 /** Ausstellungsfläche mit Verkaufsbonus (Showroom im Headquarters oder Autohaus). */

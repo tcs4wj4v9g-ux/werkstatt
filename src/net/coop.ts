@@ -96,6 +96,14 @@ export const coopActive = () => useCoop.getState().status !== 'off';
 
 /** Letzte bekannte Lage der Mitspieler (für die Figuren in der Halle). */
 export const remotePlayers = new Map<string, Presence & { name: string; at: number; rt?: boolean }>();
+/** Autos (uid), mit denen ein Mitspieler gerade Probe fährt: sie stehen solange nicht in der Werkstatt. */
+export const useAway = create<{ uids: string[] }>(() => ({ uids: [] }));
+function syncAway() {
+  const uids = [...remotePlayers.values()].filter((p) => p.scene === 'track' && p.car).map((p) => p.car!).sort();
+  if (uids.join() !== useAway.getState().uids.join()) useAway.setState({ uids });
+}
+/** Fährt ein Mitspieler gerade mit diesem Auto? */
+export const isAway = (uid: string | undefined) => !!uid && useAway.getState().uids.includes(uid);
 
 const SESSION_KEY = 'garage-kings-koop';
 const TEXT: Record<string, string> = {
@@ -251,6 +259,7 @@ function setMembers(members: Member[]) {
     else if (typeof m.presence.x === 'number' && (!known || (known.rt ? now - known.at > 6000 : now - known.at > 900))) remotePlayers.set(m.id, { ...(m.presence as Presence), name: m.name, at: now });
     else if (known && known.name !== m.name) known.name = m.name;
   }
+  syncAway();
   useCoop.setState({ members });
 }
 
@@ -467,6 +476,7 @@ function openChannel(ws: string) {
       .on('broadcast', { event: 'pos' }, ({ payload }) => {
         const m = useCoop.getState().members.find((x) => x.id === payload.id);
         if (m) remotePlayers.set(payload.id, { ...(payload as Presence), name: m.name, at: performance.now(), rt: true });
+        if (m) syncAway();
         if (m) receiveChat(payload.id, payload.chat);
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => receiveChat(payload.id, payload.chat))
@@ -578,6 +588,7 @@ export async function leave(error?: string) {
   }
   channel = null;
   remotePlayers.clear();
+  syncAway();
   myChat = null;
   useChat.setState({ log: [], bubbles: {}, unread: 0, open: false });
   shadow = null;
@@ -657,4 +668,4 @@ export const openBox = (box: string) => {
   useGame.getState().setPanel('cabinet');
 };
 
-if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
+if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, useAway, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };

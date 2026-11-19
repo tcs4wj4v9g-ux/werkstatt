@@ -309,6 +309,13 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(await until(B, () => { const c = window.__gk.getState().cars[0]; return c && c.visual && c.visual.rim === 'five' && c.visual.spoiler === 3; }), 'Tuningteile von Spieler 1 sind bei Spieler 2 am selben Auto montiert');
   await p2shot(B, 'koop-tuning');
 
+  // Probefahrt: solange Spieler 2 fährt, steht das Auto bei Spieler 1 nicht in der Werkstatt
+  const uid0 = (await game(B)).cars[0].uid;
+  await G(B, () => window.__gk.setState({ screen: 'track', driveBay: 0, panel: null }));
+  expect(await until(A, (u) => window.__gkCoop.useAway.getState().uids.includes(u), uid0, 20000), 'Spieler 2 fährt Probe: bei Spieler 1 ist das Auto aus der Werkstatt verschwunden');
+  await G(B, () => window.__gk.setState({ screen: 'garage' }));
+  expect(await until(A, (u) => !window.__gkCoop.useAway.getState().uids.includes(u), uid0, 20000), 'Nach der Probefahrt steht es wieder da');
+
   // ---------- Test 7: Wiederbeitritt ----------
   const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools), stand: norm(await G(B, () => window.__gk.getState().cars[15])) };
   await G(A, () => window.__gkCoop.leave()); await G(B, () => window.__gkCoop.leave()); await B.waitForTimeout(600);

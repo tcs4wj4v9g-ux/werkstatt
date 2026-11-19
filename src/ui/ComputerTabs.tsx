@@ -128,6 +128,10 @@ export function EventsTab() {
   );
 }
 
+/** Für die Teilesuche: klein, ohne Akzente, Umlaute und ß wie ausgeschrieben (Zündkerze = zuendkerze). */
+export const normSearch = (t: string) =>
+  t.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 /** Teile und Flüssigkeiten bestellen – mit Sonderangeboten und Großhandelsrabatt. */
 export function ShopList() {
   const s = useGame();
@@ -141,11 +145,21 @@ export function ShopList() {
   const fitted = partsCar ? new Set(defsOf(partsCar).flatMap((d) => [d.partId, ...(d.variants ?? [])]).filter(Boolean)) : new Set();
   if (car && car.motor !== null && !engineOf(car).turbo && !car.motor?.turboKit) fitted.add('turbo_kit');
   const [dept, setDept] = useState<'parts' | 'revision' | 'tuning' | 'swap'>('parts');
+  // Suche über alle Abteilungen (Name und Beschreibung, ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute)
+  const [query, setQuery] = useState('');
+  const q = normSearch(query.trim());
+  const hits = q ? PART_LIST.filter((p) => normSearch(`${p.name} ${p.desc}`).includes(q)) : [];
+  const unfit = hits.filter((p) => !fitted.has(p.id)).length;
+  const fluidHits = q ? FLUID_LIST.filter((f) => normSearch(`${f.name} ${f.desc}`).includes(q)) : FLUID_LIST;
   const motors = [s.crane, ...s.engines, ...STAND_SLOTS.filter((i) => s.cars[i]).map((i) => fromStand(s.cars[i]!))].filter((u): u is EngineUnit => !!u);
   return (
     <>
-      <h4>Betriebsflüssigkeiten</h4>
-      {FLUID_LIST.map((f) => (
+      <div className="search-row">
+        <input data-testid="part-search" type="text" enterKeyHint="search" value={query} placeholder="🔍 Teil suchen, z. B. Bremse, Zündkerze, Turbo …" onChange={(e) => setQuery(e.target.value)} />
+        {query && <button className="btn small" onClick={() => setQuery('')}>✕</button>}
+      </div>
+      {fluidHits.length > 0 && <h4>Betriebsflüssigkeiten</h4>}
+      {fluidHits.map((f) => (
         <div key={f.id} className="shop-row">
           <div>
             <b>{f.name}</b>
@@ -169,14 +183,20 @@ export function ShopList() {
           <p className="meta"><b>{CAR_MODELS[car.modelId].name}</b> · {engineOf(car).name} · Teilefamilie {engineOf(car).family}</p>
         </>
       )}
-      {car && (
+      {car && q && (
+        <p className="meta" data-testid="search-meta">
+          {hits.length - unfit === 0 ? 'Kein passendes Teil für dieses Auto gefunden.' : `${hits.length - unfit} Treffer für dieses Auto.`}
+          {unfit > 0 && ` ${unfit} weitere Treffer passen nicht zu ${CAR_MODELS[car.modelId].name}.`}
+        </p>
+      )}
+      {car && !q && (
         <div className="chips">
           {([['parts', 'Ersatzteile'], ['revision', 'Motorrevision'], ['tuning', 'Tuning'], ['swap', 'Umbau']] as const).map(([d, l]) => (
             <button key={d} className={`btn small${dept === d ? ' primary' : ''}`} data-testid={`dept-${d}`} onClick={() => setDept(d)}>{l}</button>
           ))}
         </div>
       )}
-      {car && dept === 'swap' && (
+      {car && !q && dept === 'swap' && (
         <>
           <h4>Austauschmotor (fabrikneu)</h4>
           <p className="meta">Wenn der Motorblock gerissen ist oder sich eine Revision nicht lohnt: neuer Motor, komplett montiert, ohne Öl. Wird ins Motorlager geliefert ({s.engines.length}/8 Paletten). Günstiger: ein Motor vom Schrottplatz.</p>
@@ -206,7 +226,7 @@ export function ShopList() {
           })}
         </>
       )}
-      {car && dept !== 'swap' && PART_LIST.filter((p) => fitted.has(p.id) && (dept === 'parts' ? !p.kind : p.kind === dept)).map((p) => {
+      {car && (q || dept !== 'swap') && (q ? hits.filter((p) => fitted.has(p.id)) : PART_LIST.filter((p) => fitted.has(p.id) && (dept === 'parts' ? !p.kind : p.kind === dept))).map((p) => {
         const price = partPrice(s, p.id, partsCar!);
         const list = partPrice({ events: [], upgrades: s.upgrades, day: s.day }, p.id, car);
         return (
