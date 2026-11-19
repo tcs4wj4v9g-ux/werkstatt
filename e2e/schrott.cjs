@@ -309,8 +309,11 @@ const URL = process.env.GK_URL || 'http://localhost:4173/?test';
     const car = window.__gkLib.createCar('bavaria_320', ['coil'], Math.random, {}); car.purchasePrice = 3000;
     for (const k of ['wheel_rl', 'caliper_rl', 'pads_rl', 'disc_rl', 'wheel_rr', 'caliper_rr', 'pads_rr', 'disc_rr', 'harness', 'mounts', 'downpipe', 'fuel_pump', 'intake_manifold', 'exhaust_manifold', 'timing_chain', 'camshaft', 'oil_pump', 'mainbrg', 'crank', 'piston1', 'piston2', 'piston3', 'piston4']) delete car.components[k];
     const cars = Array(15).fill(null); cars[0] = car;
-    localStorage.setItem('garage-kings-save-v1', JSON.stringify({ version: 5, state: { money: 7777, cars, started: true, screen: 'garage', upgrades: [], inventory: { 'spark_plug@R4': 2 }, day: 9 } }));
+    window.__oldSave = JSON.stringify({ version: 5, state: { money: 7777, cars, started: true, screen: 'garage', upgrades: [], inventory: { 'spark_plug@R4': 2 }, day: 9 } });
   });
+  // Erst beim Laden der neuen Seite einschleusen: beim Verlassen speichert das Spiel noch (z. B. die Arbeitszeit)
+  const oldSave = await G(() => window.__oldSave);
+  await p.addInitScript((save) => localStorage.setItem('garage-kings-save-v1', save), oldSave);
   await p.reload(); await p.waitForTimeout(1500);
   const old = await G(() => { const s = window.__gk.getState(); return { money: s.money, len: s.cars.length, junk: s.cars.slice(16).filter(Boolean).length, coil: Object.keys(s.cars[0].components).filter((k) => /^coil/.test(k)).length, harness: s.cars[0].components.harness && s.cars[0].components.harness.installed && s.cars[0].components.pads_rr && s.cars[0].components.pads_rr.installed, def: window.__gkLib.defsOf(s.cars[0]).length === Object.keys(s.cars[0].components).length, engines: s.engines.length }; });
   expect(old.money === 7777 && old.len === 132 && old.junk === 6 && old.harness && old.def && old.engines === 0, `Alter Spielstand übernommen: Geld, Auto mit neuen Teilen ergänzt, Schrottplatz gefüllt (${JSON.stringify(old)})`);
