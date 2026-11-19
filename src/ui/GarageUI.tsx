@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { raceForDay } from '../game/races';
 import { engineAudio } from '../game/audio';
 import { CAR_MODELS, REAR_ENGINE } from '../game/data/cars';
 import { COMPONENT_MAP } from '../game/data/components';
 import { fitOf, splitKey } from '../game/fitment';
 import { MarketTab } from './MarketTab';
-import { AchievementsTab, CollectionTab, ContestResultModal, ContestsTab, DynoModal, UnlockedModal } from './CareerTabs';
+import { AchievementsTab, CollectionTab, ContestResultModal, ContestsTab, DynoModal, RaceResultModal, RacesTab, UnlockedModal } from './CareerTabs';
 import { DEFECTS } from '../game/data/defects';
 import { PARTS } from '../game/data/parts';
 import { availableSlots, SLOTS, isFleet, isJunk } from '../game/data/workshop';
@@ -27,6 +28,9 @@ import { Joystick } from './Joystick';
 import { BODY_SPECS } from '../three/carGeometry';
 import { CranePanel, EnginesPanel, EngineTestPanel, JunkPanel, PartChoice, TuningPanel, UsedPartsList } from './EngineUI';
 import { engineOf } from '../game/data/components';
+
+/** Computer direkt im Reiter „Rennen“ öffnen (über panelBay). */
+const RACES_TAB = -77;
 
 /** Beschriftung der Arbeitsansicht: Heckmotor von hinten, vorn angeschlagene Haube von oben. */
 const viewLabel = (v: WorkView, car: CarInstance) =>
@@ -278,6 +282,7 @@ export function GarageUI() {
       <UnlockedModal />
       {!s.lastSale && s.contestResult && <ContestResultModal />}
       {s.panel === 'drive' && <DriveModal />}
+      {s.panel === 'raceResult' && <RaceResultModal />}
       {s.panel === 'obd' && <ObdModal />}
       {s.panel === 'file' && <FileModal />}
       {s.panel === 'fluids' && <FluidModal />}
@@ -409,6 +414,15 @@ function DriveModal() {
           ESP aus und Handbremse für Drifts.
         </p>
       )}
+      {raceForDay(s.day) && (
+        <div className="shop-row">
+          <div>
+            <b>🏁 Heute: {raceForDay(s.day)!.title}</b>
+            <div className="meta">Gold bringt {eur(raceForDay(s.day)!.prize.gold)} – Sollzeiten und Start am Computer unter „Rennen“.</div>
+          </div>
+          <button className="btn" data-testid="to-races" onClick={() => s.setPanel('computer', RACES_TAB)}>Zum Rennen</button>
+        </div>
+      )}
       {s.cars.map((car, i) => {
         if (!car || !isFleet(i)) return null;
         const blocker = driveBlocker(car);
@@ -445,7 +459,7 @@ function ObdModal() {
 
 function ComputerModal() {
   const s = useGame();
-  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'contests' | 'news'>('market');
+  const [tab, setTab] = useState<'market' | 'auctions' | 'mine' | 'collection' | 'jobs' | 'parts' | 'build' | 'career' | 'contests' | 'races' | 'news'>(s.panelBay === RACES_TAB ? 'races' : 'market');
   const free = availableSlots(s.upgrades).filter((x) => !s.cars[x.id] && x.kind !== 'wash' && x.kind !== 'paint' && x.kind !== 'garage' && x.kind !== 'expo').length;
   const news = s.events.filter((e) => e.expiresDay >= s.day).length;
   return (
@@ -461,6 +475,7 @@ function ComputerModal() {
           ['build', 'Ausbau'],
           ['career', `Erfolge (${s.achieved.length})`],
           ['contests', s.meet && !s.meet.result ? 'Wettbewerbe ●' : 'Wettbewerbe'],
+          ['races', raceForDay(s.day) && !(s.career.racePaid ?? {})[raceForDay(s.day)!.id] ? 'Rennen ●' : 'Rennen'],
           ['news', news ? `Neuigkeiten (${news})` : 'Neuigkeiten'],
         ] as const).map(([id, label]) => (
           <button key={id} className={`btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>
@@ -481,6 +496,7 @@ function ComputerModal() {
       {tab === 'collection' && <CollectionTab />}
       {tab === 'career' && <AchievementsTab />}
       {tab === 'contests' && <ContestsTab />}
+      {tab === 'races' && <RacesTab />}
       {tab === 'jobs' && <JobsTab />}
       {tab === 'parts' && <ShopList />}
       {tab === 'build' && <UpgradesTab />}

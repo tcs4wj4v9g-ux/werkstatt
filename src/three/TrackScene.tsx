@@ -1,4 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
+import { textTexture } from './textures';
+import { courseOf, raceForDay } from '../game/races';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
@@ -16,6 +18,8 @@ import { DriveEffects } from './driveEffects';
 import { BODY_SPECS } from './carGeometry';
 
 const HALF_WIDTH = 0.9;
+/** Kontrollpunkte je Rennstrecke (der letzte ist das Ziel). */
+const RACE_CP = 8;
 const SKID_ROAD = new THREE.Color('#141414');
 const SKID_GRAVEL = new THREE.Color('#6b5d48');
 const SKID_GRASS = new THREE.Color('#3f4a26');
@@ -31,6 +35,12 @@ const SKY = '#a9cbea';
 export function TrackScene() {
   const car = useGame((s) => s.cars[s.driveBay])!;
   const finishDrive = useGame((s) => s.finishDrive);
+  const finishRace = useGame((s) => s.finishRace);
+  const raceRun = useGame((s) => s.race);
+  const day = useGame((s) => s.day);
+  // Zeitrennen: Strecke und Kontrollpunkte (gleichmäßig verteilt, der letzte ist das Ziel)
+  const race = useMemo(() => (raceRun ? raceForDay(day) : null), [raceRun, day]);
+  const course = useMemo(() => (race ? courseOf(race.course) : null), [race]);
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const group = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
@@ -45,7 +55,11 @@ export function TrackScene() {
     return d.includes('turbo') ? '#8fa3c4' : d.includes('egr') || d.includes('dpf') ? '#1b1b1b' : '#e9e9e9';
   }, [car]);
   const n = world.samples.length;
-  const sim = useRef(Object.assign(initialState(world.start.x, world.start.z, world.start.heading), { camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
+  const startAt = course ? world.samples[course.start] : null;
+  const sim = useRef(Object.assign(startAt ? initialState(startAt.x - startAt.nx * 1.8, startAt.z - startAt.nz * 1.8, Math.atan2(-startAt.tz, startAt.tx)) : initialState(world.start.x, world.start.z, world.start.heading), {
+    raceT: -3,
+    cp: 0,
+    cpAt: null as null | { x: number; z: number; heading: number; near: number; progress: number }, camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
 
@@ -60,7 +74,11 @@ export function TrackScene() {
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     driveInput.handbrake = false;
     s.respawn = useDriveHud.getState().respawn;
-    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, elapsed: 0, home: 0, away: false, tooShort: false, drift: 0, offTrack: false, distance: 0 });
+    if (course) {
+      s.near = course.start;
+      s.progress = 0;
+    }
+    useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, elapsed: 0, home: 0, away: false, tooShort: false, drift: 0, offTrack: false, distance: 0, raceT: -3, cp: 0, cpTotal: RACE_CP, racing: !!course });
     const keys: Record<string, boolean> = {};
     const apply = () => {
       driveInput.steer = (keys.ArrowLeft || keys.a ? 1 : 0) - (keys.ArrowRight || keys.d ? 1 : 0);
@@ -98,7 +116,13 @@ export function TrackScene() {
 
     // --- „Zurück auf die Straße“: an den nächsten Straßenpunkt, in Fahrtrichtung, im Stand
     const want = useDriveHud.getState().respawn;
-    if (want !== s.respawn) {
+    if (want !== s.respawn && course) {
+      // Im Rennen: zurück zum letzten Kontrollpunkt (bzw. an den Start) – die Uhr läuft weiter
+      s.respawn = want;
+      const at = s.cpAt ?? { x: startAt!.x - startAt!.nx * 1.8, z: startAt!.z - startAt!.nz * 1.8, heading: Math.atan2(-startAt!.tz, startAt!.tx), near: course.start, progress: 0 };
+      Object.assign(s, { x: at.x, z: at.z, heading: at.heading, near: at.near, progress: at.progress, vx: 0, vy: 0, yawRate: 0, gear: 1 });
+      s.y = world.samples[at.near].y;
+    } else if (want !== s.respawn) {
       s.respawn = want;
       const q = world.nearest(s.x, s.z, s.near);
       const p = world.samples[q.i];
@@ -136,7 +160,8 @@ export function TrackScene() {
     let step = near.i - s.near;
     if (step > n / 2) step -= n;
     if (step < -n / 2) step += n;
-    s.progress += step;
+    // Sprünge (querfeldein abgekürzt, Suche hat neu angesetzt) zählen nicht als Fortschritt
+    if (Math.abs(step) <= 40) s.progress += step;
     s.near = near.i;
     const onRoad = (Math.abs(near.lateral) < ROAD_WIDTH / 2 + 0.9 && near.dist < 30) || world.onPad(s.x, s.z);
     const surface = onRoad ? { grip: 1, drag: 0 } : world.surface(s.x, s.z);
@@ -169,7 +194,31 @@ export function TrackScene() {
       driveInput.throttle = s.vx < s.autopilot ? 1 : 0;
       driveInput.brake = s.vx > s.autopilot + 4 ? 0.5 : 0;
     }
-    stepVehicle(spec, s, driveInput, { grade, ...surface }, dt);
+    // Countdown: Auto steht (Gas geben geht – die Drehzahl steigt), los geht es bei null
+    if (course && !s.done) s.raceT += dt;
+    const held = course && s.raceT < 0;
+    stepVehicle(spec, s, held ? { ...driveInput, brake: 0, handbrake: false } : driveInput, { grade, ...surface }, dt);
+    if (held) {
+      // Am Start festhalten (wie mit getretener Kupplung): erster Gang, Gas lässt nur die Drehzahl steigen
+      s.vx = 0;
+      s.vy = 0;
+      s.yawRate = 0;
+      s.gear = 1;
+    }
+    // Kontrollpunkte der Reihe nach (nur auf der Straße), das Ziel erst nach allen
+    if (course && !s.done && s.raceT >= 0) {
+      const need = ((s.cp + 1) * course.length) / RACE_CP;
+      if (s.progress >= need && near.dist < 12) {
+        s.cp++;
+        s.cpAt = { x: s.x, z: s.z, heading: s.heading, near: s.near, progress: s.progress };
+        if (s.cp >= RACE_CP) {
+          s.done = true;
+          const time = s.raceT;
+          roadAudio.hit('clunk');
+          setTimeout(() => finishRace(Math.round(time * 100) / 100), 1200);
+        }
+      }
+    }
     s.v = s.vx;
 
     // --- Leitplanken: Wagen bleibt davor, verliert Tempo
@@ -335,7 +384,7 @@ export function TrackScene() {
     if (home > 60) s.away = true;
     const onApron = s.x > A.minX && s.x < A.maxX && s.z > A.minZ && s.z < A.maxZ;
     s.tooShort = s.away && onApron && s.elapsed < DRIVE_MIN;
-    if (!s.done && s.away && onApron && s.elapsed >= DRIVE_MIN && Math.abs(s.vx) < 2) {
+    if (!course && !s.done && s.away && onApron && s.elapsed >= DRIVE_MIN && Math.abs(s.vx) < 2) {
       s.done = true;
       setTimeout(() => finishDrive(true), 500);
     }
@@ -343,7 +392,7 @@ export function TrackScene() {
     if (s.hud > 0.08) {
       s.hud = 0;
       const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer });
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp });
     }
   });
 
@@ -362,6 +411,7 @@ export function TrackScene() {
       </mesh>
       <DriveScenery />
       <primitive object={fx.group} />
+      {course && <RaceMarks start={course.start} length={course.length} />}
       <group ref={group}>
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}
@@ -374,4 +424,65 @@ export function TrackScene() {
       </group>
     </>
   );
+}
+
+/** Start- und Zielbogen über der Straße, Kontrollpunkte als Pfostenpaare mit Fahnen. */
+function RaceMarks({ start, length }: { start: number; length: number }) {
+  const w = driveWorld();
+  const n = w.samples.length;
+  const arch = (i: number, label: string, color: string) => {
+    const p = w.samples[i % n];
+    return (
+      <group key={label + i} position={[p.x, p.y, p.z]} rotation={[0, Math.atan2(-p.tz, p.tx), 0]}>
+        <mesh position={[0, 0.045, 0]} raycast={() => null}>
+          <boxGeometry args={[0.8, 0.01, ROAD_WIDTH]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        {[-1, 1].map((k) => (
+          <mesh key={k} position={[0, 2.6, k * (ROAD_WIDTH / 2 + 0.8)]} raycast={() => null}>
+            <boxGeometry args={[0.3, 5.2, 0.3]} />
+            <meshLambertMaterial color={color} />
+          </mesh>
+        ))}
+        <mesh position={[0, 5.3, 0]} raycast={() => null}>
+          <boxGeometry args={[0.5, 0.9, ROAD_WIDTH + 2]} />
+          <meshLambertMaterial color="#1b1c1f" />
+        </mesh>
+        {[-0.26, 0.26].map((x) => (
+          <mesh key={x} position={[x, 5.3, 0]} rotation={[0, x < 0 ? -Math.PI / 2 : Math.PI / 2, 0]} raycast={() => null}>
+            <planeGeometry args={[ROAD_WIDTH + 1.6, 0.7]} />
+            <meshBasicMaterial map={archText(label)} />
+          </mesh>
+        ))}
+      </group>
+    );
+  };
+  const end = (start + length) % n;
+  return (
+    <>
+      {arch(start, end === start ? 'START · ZIEL' : 'START', '#c8501e')}
+      {end !== start && arch(end, 'ZIEL', '#1e7a3c')}
+      {Array.from({ length: RACE_CP - 1 }, (_, k) => {
+        const p = w.samples[Math.round(start + ((k + 1) * length) / RACE_CP) % n];
+        return [-1, 1].map((side) => (
+          <group key={`${k}${side}`} position={[p.x + p.nx * side * (ROAD_WIDTH / 2 + 0.6), p.y, p.z + p.nz * side * (ROAD_WIDTH / 2 + 0.6)]}>
+            <mesh position={[0, 0.9, 0]} raycast={() => null}>
+              <cylinderGeometry args={[0.06, 0.06, 1.8, 6]} />
+              <meshLambertMaterial color="#e8e8e8" />
+            </mesh>
+            <mesh position={[0, 1.55, 0]} raycast={() => null}>
+              <boxGeometry args={[0.04, 0.5, 0.7]} />
+              <meshLambertMaterial color="#ff7a1a" />
+            </mesh>
+          </group>
+        ));
+      })}
+    </>
+  );
+}
+const archTex = new Map<string, THREE.Texture>();
+function archText(label: string) {
+  let t = archTex.get(label);
+  if (!t) archTex.set(label, (t = textTexture(label, { bg: '#1b1c1f', fg: '#ffffff', w: 512, h: 96, font: 56 })));
+  return t;
 }

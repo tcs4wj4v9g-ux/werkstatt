@@ -696,3 +696,27 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Die Anzeige steht in der Koop-Übersicht (nach Antippen der Koop-Leiste).
   - **Schema-Ergänzung nötig** (`alter table … add column if not exists`, neue `gk_touch` und `gk_members_json`). Ohne sie bleibt die Anzeige im Koop einfach leer.
 - Tests: Logiktest (Konto, Tageswechsel, Anzeige), SQL-Test (aktiv, untätig, Pause, neuer Tag), `koop.cjs` (Anzeige für beide Spieler und im Menü).
+
+## Zeitrennen
+
+- **Rennkalender (`game/races.ts`):** An zwei von drei Tagen findet ein Zeitrennen statt, am dritten das Fahrzeugtreffen. Strecke und Klasse folgen festem Zufall aus dem Spieltag: Im Koop sehen alle dasselbe Rennen, ohne zusätzlichen gemeinsamen Zustand. Angekündigt wird es in der Tagesmeldung.
+- **Strecken auf dem Straßennetz:**
+  - Große Runde um Grünbach (≈ 2,9 km, Preisgeld ×1,4)
+  - Bergsprint Ost (≈ 1,2 km)
+  - Waldsprint West (≈ 1,2 km)
+  - Dazu Start- und Zielbogen sowie 7 Kontrollpunkte (Pfostenpaare). Gezählt werden sie nur auf der Straße und der Reihe nach. Abkürzen (Sprünge im Fortschritt) zählt nicht. „Letzter Kontrollpunkt“ setzt zurück, die Uhr läuft weiter.
+- **Klassen:**
+  - bis 150 PS: Gold 6.000 €, Startgeld 300 €
+  - bis 250 PS: Gold 10.000 €, Startgeld 500 €
+  - bis 400 PS: Gold 16.000 €, Startgeld 800 €
+  - offen: Gold 25.000 €, Startgeld 1.200 €
+  - Silber bringt 55 %, Bronze 25 % von Gold. Zu starke Autos dürfen nicht starten (`raceBlocker`).
+- **Sollzeiten:** Ein Computerfahrer (`aiTime`) fährt die Strecke mit Tempoplan (Kurvengrenze aus der Krümmung, Bremsweg bis dorthin) und einem Referenzauto genau an der Klassengrenze: 1,2 t, Klassenreifen. Gold liegt bei Referenz ×1,02, Silber bei ×1,10, Bronze bei ×1,20. Ein Serien-Twingo bekommt so Silber in der 150er-Klasse, eine Stradale Gold in der offenen. Tuning bis an die Grenze lohnt sich.
+- **Auszahlung:** Je Rennen und Tag einmal das Preisgeld der besten Medaille. Eine Verbesserung zahlt die Differenz, jeder Versuch kostet Startgeld. Bestzeit, ausgezahlter Betrag und Goldsiege liegen in `career` (gemeinsam im Koop, die letzten 12 Rennen).
+- **Ablauf:**
+  - Start im Computer-Reiter „Rennen“ (auch aus dem Probefahrt-Fenster erreichbar).
+  - Countdown 3-2-1, das Auto steht dabei, Gas lässt nur die Drehzahl steigen.
+  - Anzeige: Uhr, Kontrollpunkte, Sollzeiten.
+  - Danach das Ergebnisfenster mit Medaille, Auszahlung und „Nochmal“.
+- **Vorbereitet für Gegner:** `Race` und die Rennszene sind so gebaut, dass NPCs als weitere Fahrzeuge mit `aiTime`-Fahrer dazukommen können.
+- Tests: `races.test.ts` (Kalender, Sollzeiten, Tuning lohnt sich, Klassengrenze, Auszahlung), `karriere.cjs` (Rennen am Computer starten, Countdown, mit Autopilot ins Ziel, Konto).

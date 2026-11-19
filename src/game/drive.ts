@@ -26,6 +26,11 @@ interface DriveHud {
   tooShort: boolean;
   /** Driftwinkel (°), 0 wenn nicht gedriftet wird. */
   drift: number;
+  /** Zeitrennen: Uhr (s, negativ = Countdown), erreichte Kontrollpunkte, ob ein Rennen läuft. */
+  raceT: number;
+  cp: number;
+  cpTotal: number;
+  racing: boolean;
   /** Lage für die Minikarte: Position (m) und Kurs (rad). */
   px: number;
   pz: number;
@@ -52,6 +57,10 @@ export const useDriveHud = create<DriveHud>((set) => ({
   elapsed: 0,
   drift: 0,
   respawn: 0,
+  raceT: 0,
+  cp: 0,
+  cpTotal: 0,
+  racing: false,
   px: 0,
   pz: 0,
   ph: 0,
