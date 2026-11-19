@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { courseOf, payoutFor, raceBlocker, raceForDay, raceTargets, type Medal } from './races';
 import { emptyPlayTime, type PlayTime } from './playtime';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
@@ -33,7 +34,7 @@ export const START_MONEY = 6000;
 const noSlots = (): boolean[] => Array(SLOT_COUNT).fill(false);
 /** Sekunden, bis der Motor im Stand warm ist. */
 export const WARM_AFTER = 9;
-export type Panel = 'crane' | 'engines' | 'junk' | 'tuning' | 'enginetest' | 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | 'garages' | null;
+export type Panel = 'crane' | 'engines' | 'junk' | 'tuning' | 'enginetest' | 'coop' | 'dyno' | 'cabinet' | 'computer' | 'shop' | 'bench' | 'obd' | 'drive' | 'report' | 'help' | 'file' | 'fluids' | 'move' | 'garages' | 'races' | 'raceResult' | null;
 
 interface Toast {
   id: number;
@@ -123,6 +124,9 @@ export interface GameState {
   paintColor: string;
   lastSale: { title: string; price: number; profit: number; lines?: { label: string; amount: number }[] } | null;
   driveReport: string[] | null;
+  /** Laufendes Zeitrennen (nur auf diesem Gerät) und Ergebnis des letzten. */
+  race: { id: string; bay: number } | null;
+  raceResult: RaceResult | null;
 
   newGame(): void;
   goto(screen: Screen): void;
@@ -158,6 +162,10 @@ export interface GameState {
   engineTick(): void;
   revEngine(): void;
   startDrive(bay: number): void;
+  /** Mit diesem Auto beim heutigen Zeitrennen starten (Startgeld wird fällig). */
+  startRace(bay: number): void;
+  /** Rennen beendet: Zeit in s (oder null = abgebrochen). Zahlt Preisgeld bzw. die Verbesserung aus. */
+  finishRace(time: number | null): void;
   finishDrive(completed: boolean): void;
   haggle(bay: number): void;
   sell(bay: number): void;
@@ -327,6 +335,18 @@ const describe = (o: Observation, quiet: string) =>
 /** Länge eines Spieltags in Echtzeit. Im Testmodus (`?test`) kein Warten. */
 export const dayClock = { ms: typeof location !== 'undefined' && new URLSearchParams(location.search).has('test') ? 0 : 3 * 60_000 };
 /** Wie lange es noch bis zum Feierabend dauert (ms). */
+/** Ergebnis des letzten Zeitrennens (für das Ergebnisfenster). */
+export interface RaceResult {
+  title: string;
+  car: string;
+  time: number;
+  best: number;
+  medal: Medal;
+  prize: number;
+  payout: number;
+  targets: { gold: number; silver: number; bronze: number };
+  improved: boolean;
+}
 export const dayLeft = (s: Pick<GameState, 'dayStartedAt'>) => Math.max(0, (s.dayStartedAt ?? 0) + dayClock.ms - Date.now());
 
 export const useGame = create<GameState>()(
@@ -545,6 +565,8 @@ export const useGame = create<GameState>()(
         paintColor: PAINT_COLORS[0],
         lastSale: null,
         driveReport: null,
+        race: null,
+        raceResult: null,
 
         newGame: () => {
           stopEngine();
@@ -719,7 +741,7 @@ export const useGame = create<GameState>()(
             selected: 0,
             dayStartedAt: Date.now(),
           });
-          get().say(`Tag ${day}: neue Angebote, Auktionen und Kundenanfragen.${fresh.length ? ` Neuigkeit: ${fresh[0].title}.` : ''}${meet ? ` Heute: ${meet.title}.` : ''}`);
+          get().say(`Tag ${day}: neue Angebote, Auktionen und Kundenanfragen.${fresh.length ? ` Neuigkeit: ${fresh[0].title}.` : ''}${meet ? ` Heute: ${meet.title}.` : ''}${raceForDay(day) ? ` Heute: ${raceForDay(day)!.title}.` : ''}`);
         },
 
         acceptJob: (i) => {
@@ -973,6 +995,63 @@ export const useGame = create<GameState>()(
           const cars = [...s.cars];
           cars[bay] = { ...car, hoodOpen: false };
           set({ cars, driveBay: bay, screen: 'track', panel: null, driveReport: null });
+        },
+
+        startRace: (bay) => {
+          const s = get();
+          const car = s.cars[bay];
+          const race = raceForDay(s.day);
+          if (!car || !race) return;
+          const blocker = raceBlocker(car, race);
+          if (blocker) {
+            sfx.error();
+            return s.say(blocker, true);
+          }
+          if (s.money < race.fee) return s.say(`Für das Startgeld (${race.fee} €) reicht das Konto nicht.`, true);
+          stopEngine();
+          const cars = [...s.cars];
+          cars[bay] = { ...car, hoodOpen: false };
+          set({ cars, money: s.money - race.fee, race: { id: race.id, bay }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
+        },
+
+        finishRace: (time) => {
+          const s = get();
+          const race = raceForDay(s.day);
+          const run = s.race;
+          if (!run || !race || run.id !== race.id || time === null) {
+            set({ race: null, screen: 'garage' });
+            return s.say('Rennen abgebrochen – das Startgeld ist weg.');
+          }
+          const current = s.cars[run.bay];
+          const paid = (s.career.racePaid ?? {})[race.id] ?? 0;
+          const { medal, prize, payout } = payoutFor(race, time, paid);
+          const before = (s.career.raceBest ?? {})[race.id];
+          const best = before === undefined ? time : Math.min(before, time);
+          // Nur die letzten Rennen merken (die Liste soll nicht endlos wachsen)
+          const keep = (m: Record<string, number>, v: number) => Object.fromEntries([...Object.entries(m).filter(([k]) => k !== race.id).slice(-11), [race.id, v]]);
+          const career = {
+            ...s.career,
+            raceBest: keep(s.career.raceBest ?? {}, best),
+            racePaid: keep(s.career.racePaid ?? {}, Math.max(paid, prize)),
+            racesWon: (s.career.racesWon ?? 0) + (medal === 'gold' && paid < race.prize.gold ? 1 : 0),
+          };
+          const cars = [...s.cars];
+          if (current) {
+            const car = clone(current);
+            if (car.motor) car.motor = { ...car.motor, km: car.motor.km + Math.round((courseOf(race.course).length * 2) / 1000) };
+            for (const z of Object.values(car.zones)) z.dirt = Math.min(1, z.dirt + 0.08);
+            cars[run.bay] = car;
+          }
+          if (payout > 0) sfx.cash();
+          set({
+            cars,
+            money: s.money + payout,
+            career,
+            race: null,
+            screen: 'garage',
+            panel: 'raceResult',
+            raceResult: { title: race.title, time, best, medal, payout, prize, targets: raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && time < before },
+          });
         },
 
         finishDrive: (completed) => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { raceClock, raceForDay, raceTargets } from '../game/races';
 import { driveWorld, FARMS, LAKE, PAD, WORKSHOP } from '../three/driveWorld';
 import { CAMERA_LABEL, DRIVE_MIN, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
 import { DEFECTS } from '../game/data/defects';
@@ -258,9 +259,37 @@ function Gauge() {
   );
 }
 
+/** Anzeige im Zeitrennen: Countdown, Uhr, Kontrollpunkte, Sollzeiten. */
+function RaceHud() {
+  const hud = useDriveHud();
+  const day = useGame((s) => s.day);
+  const race = raceForDay(day);
+  if (!race) return null;
+  const t = raceTargets(race);
+  const run = Math.max(0, hud.raceT);
+  const medal = run <= t.gold ? 'gold' : run <= t.silver ? 'silver' : run <= t.bronze ? 'bronze' : null;
+  return (
+    <>
+      {hud.raceT < 0.8 && (
+        <div className="countdown" data-testid="countdown">{hud.raceT < 0 ? Math.ceil(-hud.raceT) : 'LOS!'}</div>
+      )}
+      <div className="race-hud" data-testid="race-hud">
+        <div className="race-time">{raceClock(run)}</div>
+        <div className="meta">Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}</div>
+        <div className={`race-targets ${medal ?? 'none'}`}>
+          🥇 {raceClock(t.gold)} · 🥈 {raceClock(t.silver)} · 🥉 {raceClock(t.bronze)}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function TrackUI() {
   const hud = useDriveHud();
   const finishDrive = useGame((s) => s.finishDrive);
+  const finishRace = useGame((s) => s.finishRace);
+  const racing = useGame((s) => !!s.race);
+  const raceTitle = useGame((s) => (s.race ? raceForDay(s.day)?.title : null));
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
   const [esp, setEspState] = useState(driveInput.assist);
@@ -274,17 +303,18 @@ export function TrackUI() {
   return (
     <>
       <div className="topbar">
-        <button className="btn ghost" data-testid="drive-end" onClick={() => finishDrive(counts)}>✕ Abbrechen</button>
-        <div className="title">{counts ? 'Zum Beenden auf dem Werkstatt-Vorplatz anhalten' : 'Probefahrt – fahr, wohin du willst'}</div>
+        <button className="btn ghost" data-testid="drive-end" onClick={() => (racing ? finishRace(null) : finishDrive(counts))}>✕ Abbrechen</button>
+        <div className="title">{racing ? raceTitle : counts ? 'Zum Beenden auf dem Werkstatt-Vorplatz anhalten' : 'Probefahrt – fahr, wohin du willst'}</div>
         <button className={`btn ${esp ? '' : 'active'}`} data-testid="esp" onClick={() => setEsp(!esp)}>{esp ? '🛡 ESP an' : '⚠ ESP aus'}</button>
         <button className="btn" data-testid="camera" onClick={() => hud.set({ camera: next(hud.camera) })}>🎥 {CAMERA_LABEL[hud.camera]}</button>
-        <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>↺ Auf die Straße</button>
-        <div className="money" data-testid="drive-time">⏱ {clock(hud.elapsed)}</div>
+        <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>{racing ? '↺ Letzter Kontrollpunkt' : '↺ Auf die Straße'}</button>
+        {!racing && <div className="money" data-testid="drive-time">⏱ {clock(hud.elapsed)}</div>}
       </div>
       <MiniMap />
+      {racing && <RaceHud />}
       <div className="speedo">
         <Gauge />
-        <div className="meta">{(hud.distance / 1000).toFixed(1)} km{counts ? ` · 🏠 Werkstatt ${hud.home < 1000 ? `${Math.round(hud.home / 10) * 10} m` : `${(hud.home / 1000).toFixed(1)} km`}` : ` · gewertet ab ${clock(DRIVE_MIN)}`}</div>
+        <div className="meta">{(hud.distance / 1000).toFixed(1)} km{racing ? '' : counts ? ` · 🏠 Werkstatt ${hud.home < 1000 ? `${Math.round(hud.home / 10) * 10} m` : `${(hud.home / 1000).toFixed(1)} km`}` : ` · gewertet ab ${clock(DRIVE_MIN)}`}</div>
         {hud.tooShort && <div className="bad" data-testid="too-short">Noch keine {DRIVE_MIN} s gefahren – dreh noch eine Runde</div>}
         {lamps.length > 0 && <div className="lamps">{lamps.map((l) => <span key={l}>{l}</span>)}</div>}
         {hud.drift > 0 && <div className="good" data-testid="drift">Drift {Math.round(hud.drift)}°</div>}

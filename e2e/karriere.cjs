@@ -168,6 +168,26 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const meet = await G(() => window.__gk.getState().meet.result);
   expect(meet && meet.place >= 1 && meet.table.length === 6, 'Am Treffen teilgenommen: ' + (meet && meet.car) + ', Platz ' + (meet && meet.place) + ', ' + (meet && meet.score) + ' Punkte');
   await G(() => { const g = window.__gk.getState(); g.dismissContestResult(); g.setPanel(null); });
+  // ---------- Zeitrennen: am Computer starten, Countdown, mit Autopilot ins Ziel, Ergebnis und Preisgeld ----------
+  await G(() => { const g = window.__gk; const s = g.getState(); let d = s.day; while (d % 3 === 0) d++; const cars = [...s.cars]; const c = window.__gkLib.createCar('renard_twingle', [], Math.random); c.fluids.oil.level = 4; cars[0] = c; g.setState({ day: d, cars, money: Math.max(s.money, 20000), panel: 'computer' }); });
+  await p.waitForTimeout(400);
+  await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
+  expect(await p.getByTestId('race-today').isVisible(), 'Rennen des Tages am Computer: ' + (await p.getByTestId('race-today').locator('b').first().textContent()));
+  const m0 = await G(() => window.__gk.getState().money);
+  const raceFee = Number((await p.getByTestId('race-start-0').textContent()).replace(/[^0-9]/g, ''));
+  await p.getByTestId('race-start-0').click(); await p.waitForTimeout(1500);
+  expect(await G(() => window.__gk.getState().screen === 'track' && !!window.__gk.getState().race) && (await p.getByTestId('race-hud').isVisible()), 'Rennen läuft: Anzeige mit Uhr und Kontrollpunkten');
+  const held = await G(() => ({ t: window.__gkDrive.sim.raceT, v: window.__gkDrive.sim.vx }));
+  expect(held.t < 0 && Math.abs(held.v) < 0.1, 'Countdown: das Auto steht noch (' + held.t.toFixed(1) + ' s)');
+  await G(() => { const d = window.__gkDrive; d.sim.autopilot = 24; d.sim.timeScale = 3; });
+  for (let i = 0; i < 160 && (await G(() => window.__gk.getState().panel)) !== 'raceResult'; i++) await p.waitForTimeout(500);
+  const rr = await G(() => { const s = window.__gk.getState(); return { r: s.raceResult, money: s.money, best: s.career.raceBest }; });
+  expect(rr.r && rr.r.time > 20 && Object.values(rr.best).length >= 1, 'Ziel erreicht: ' + (rr.r && rr.r.time) + ' s, Medaille ' + (rr.r && rr.r.medal) + ', ausgezahlt ' + (rr.r && rr.r.payout));
+  expect(raceFee > 0 && rr.money === m0 - raceFee + rr.r.payout, 'Konto: Startgeld ' + raceFee + ' € abgezogen, Preisgeld ' + rr.r.payout + ' € gutgeschrieben');
+  expect(await p.getByTestId('race-medal').isVisible(), 'Ergebnisfenster mit Medaille bzw. Hinweis');
+  await p.screenshot({ path: S + '/rennen-ergebnis.png' });
+  await G(() => window.__gk.getState().setPanel(null));
+
   // Speichern und Laden: alles bleibt
   const before = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.money, a: s.achieved, c: s.career, u: s.upgrades, cars: s.cars.map((c) => c && c.uid), dyno: s.cars[11] && s.cars[11].dyno, meet: s.meet && s.meet.result && s.meet.result.place }); });
   await p.reload(); await p.waitForTimeout(3000);

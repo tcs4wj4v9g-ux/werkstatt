@@ -294,3 +294,10 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
 .search-row input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.3); color: var(--text); }
 
 .minimap { position: absolute; top: calc(68px + var(--sat, 0px)); left: calc(16px + var(--sal)); border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.75); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45); pointer-events: none; }
+
+.countdown { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: 120px; font-weight: 900; color: #fff; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6); pointer-events: none; }
+.race-hud { position: absolute; top: calc(68px + var(--sat)); right: calc(16px + var(--sar)); text-align: right; background: rgba(18, 20, 24, 0.7); border-radius: 16px; padding: 8px 14px; pointer-events: none; }
+.race-hud .race-time { font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.race-hud .race-targets { font-size: 13px; opacity: 0.9; font-variant-numeric: tabular-nums; }
+.race-hud .race-targets.none { color: #ff8a7a; }
+.race-table { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0; font-weight: 600; }

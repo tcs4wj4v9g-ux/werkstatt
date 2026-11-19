@@ -1,4 +1,5 @@
 import { CarStatsCard } from './CarStatsCard';
+import { courseOf, MEDAL_LABEL, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
 import { duration, todayOf } from '../game/playtime';
 import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
@@ -210,6 +211,100 @@ export function ContestResultModal() {
       ))}
       <p>{r.payout > 0 ? `Auszahlung: ${eur(r.payout)}` : 'Diesmal kein Preisgeld.'}</p>
       <button className="btn primary big" onClick={s.dismissContestResult}>Weiter</button>
+    </Modal>
+  );
+}
+
+/** Zeitrennen: heutiges Rennen mit Sollzeiten und Startknöpfen je Auto, dazu die nächsten Termine. */
+export function RacesTab() {
+  const s = useGame();
+  const race = raceForDay(s.day);
+  const upcoming = upcomingRaces(s.day + 1, 4);
+  const best = race ? (s.career.raceBest ?? {})[race.id] : undefined;
+  const paid = race ? (s.career.racePaid ?? {})[race.id] ?? 0 : 0;
+  return (
+    <>
+      <p className="meta">
+        Zeitrennen auf dem Straßennetz rund um Grünbach: Durch alle Kontrollpunkte bis ins Ziel, die Zeit entscheidet. Preisgeld gibt es für Gold, Silber
+        und Bronze – fährst du später eine bessere Medaille, wird die Differenz nachgezahlt. Jeder Versuch kostet Startgeld. Tuning bis an die
+        Klassengrenze, Reifen und Fahrwerk machen den Unterschied. Gegner auf der Strecke folgen später.
+      </p>
+      {!race && <p className="bigline">Heute ist kein Rennen – heute ist Fahrzeugtreffen (unter „Wettbewerbe“).</p>}
+      {race && (
+        <div className="shop-row col" data-testid="race-today">
+          <b>Heute: {race.title}</b>
+          <div className="meta">{courseOf(race.course).desc} · {((courseOf(race.course).length * 2) / 1000).toFixed(1)} km</div>
+          <RaceTargets race={race} />
+          <div className="meta">
+            Startgeld {eur(race.fee)}
+            {best !== undefined && <> · deine Bestzeit {raceClock(best)}</>}
+            {paid > 0 && <> · schon ausgezahlt {eur(paid)}</>}
+          </div>
+          {s.cars.map((car, i) => {
+            if (!car || !isFleet(i) || car.junk) return null;
+            const blocker = raceBlocker(car, race);
+            return (
+              <div key={i} className="shop-row">
+                <div>
+                  <b>{CAR_MODELS[car.modelId].name}</b> <span className="meta">– {performance(car).ps} PS</span>
+                  {blocker && <div className="meta bad">{blocker}</div>}
+                </div>
+                <button className="btn primary" data-testid={`race-start-${i}`} disabled={!!blocker || s.money < race.fee} onClick={() => s.startRace(i)}>
+                  🏁 Starten ({eur(race.fee)})
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <h4>Nächste Rennen</h4>
+      {upcoming.map((r) => (
+        <div key={r.id} className="shop-row">
+          <div>
+            <b>Tag {r.day}: {r.title}</b>
+            <div className="meta">Gold {eur(r.prize.gold)} · Silber {eur(r.prize.silver)} · Bronze {eur(r.prize.bronze)} · Startgeld {eur(r.fee)}</div>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function RaceTargets({ race }: { race: Race }) {
+  const t = raceTargets(race);
+  return (
+    <div className="race-table">
+      <span>🥇 Gold unter {raceClock(t.gold)} → {eur(race.prize.gold)}</span>
+      <span>🥈 Silber unter {raceClock(t.silver)} → {eur(race.prize.silver)}</span>
+      <span>🥉 Bronze unter {raceClock(t.bronze)} → {eur(race.prize.bronze)}</span>
+    </div>
+  );
+}
+
+/** Ergebnis nach dem Zieleinlauf. */
+export function RaceResultModal() {
+  const s = useGame();
+  const r = s.raceResult;
+  if (!r) return null;
+  const race = raceForDay(s.day);
+  return (
+    <Modal title="Ergebnis Zeitrennen" onClose={() => s.setPanel(null)}>
+      <p className="meta">{r.title} · {r.car}</p>
+      <p className="bigline" data-testid="race-time">Zeit {raceClock(r.time)}{r.improved ? ' – neue Bestzeit!' : ''}</p>
+      <p className={`bigline ${r.medal ? 'good' : 'bad'}`} data-testid="race-medal">
+        {r.medal ? `${MEDAL_LABEL[r.medal]} – Preisgeld ${eur(r.prize)}` : `Keine Medaille (Bronze unter ${raceClock(r.targets.bronze)})`}
+      </p>
+      <p className="meta" data-testid="race-payout">
+        {r.payout > 0 ? `Ausgezahlt: ${eur(r.payout)}` : r.medal ? 'Diese Medaille wurde für das heutige Rennen schon ausgezahlt.' : 'Kein Preisgeld.'} · Bestzeit heute {raceClock(r.best)}
+      </p>
+      <div className="row">
+        {race && s.race === null && s.cars[s.driveBay] && (
+          <button className="btn primary" data-testid="race-again" disabled={s.money < race.fee} onClick={() => s.startRace(s.driveBay)}>
+            Nochmal ({eur(race.fee)})
+          </button>
+        )}
+        <button className="btn" onClick={() => s.setPanel(null)}>Zur Werkstatt</button>
+      </div>
     </Modal>
   );
 }
