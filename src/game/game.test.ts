@@ -1363,3 +1363,18 @@ describe('Wirtschaft', () => {
     expect(500000 / l.avg).toBeGreaterThan(25);
   });
 });
+
+describe('Arbeitszeit', () => {
+  it('zählt gesamt und je Kalendertag, Anzeige in Stunden und Minuten', async () => {
+    const { addPlay, duration, emptyPlayTime } = await import('./playtime');
+    let p = addPlay(emptyPlayTime(), 1800, '2026-11-19');
+    p = addPlay(p, 1500, '2026-11-19');
+    expect(p).toEqual({ total: 3300, day: '2026-11-19', today: 3300 });
+    p = addPlay(p, 60, '2026-11-20');
+    expect(p.total).toBe(3360);
+    expect(p.today).toBe(60);
+    expect(duration(3360)).toBe('56 min');
+    expect(duration(3 * 3600 + 12 * 60 + 5)).toBe('3 h 12 min');
+    expect(duration(20)).toBe('unter 1 min');
+  });
+});

@@ -1,4 +1,5 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
+import { isActive } from '../game/playtime';
 import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
 import { CAR_MODELS } from '../game/data/cars';
@@ -39,6 +40,8 @@ export interface Presence {
   car: string | null;
   /** Fensterkennung (zweites Fenster desselben Kontos erkennen). */
   sid?: string;
+  /** Untätig (Spiel im Hintergrund oder seit 5 min keine Eingabe): zählt nicht als Arbeitszeit. */
+  idle?: boolean;
   /** Letzte Chatnachricht (bleibt ~30 s in der Lage, damit sie auch ohne Realtime über den Abgleich ankommt). */
   chat?: ChatLine | null;
 }
@@ -54,6 +57,9 @@ export interface Member {
   online: boolean;
   seen: number;
   presence: Partial<Presence>;
+  /** Arbeitszeit (s) gesamt und heute – fehlt bei einem Server ohne das neue Schema. */
+  play?: number;
+  today?: number;
 }
 export interface LedgerRow {
   at: number;
@@ -208,7 +214,7 @@ function presence(): Presence {
   const car = g.screen === 'track' ? g.cars[g.driveBay]?.uid : g.screen === 'garage' && near >= 0 ? g.cars[near]?.uid : null;
   const r = (v: number) => Math.round(v * 100) / 100;
   const chat = myChat && Date.now() - myChat.at < 30_000 ? myChat : null;
-  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, sid: SID, ...(chat ? { chat } : {}) };
+  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, sid: SID, idle: !isActive(), ...(chat ? { chat } : {}) };
 }
 
 // ---------------------------------------------------------------- Chat

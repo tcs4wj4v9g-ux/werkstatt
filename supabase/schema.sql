@@ -36,6 +36,10 @@ create table if not exists gk_members (
   primary key (workshop_id, user_id)
 );
 create index if not exists gk_members_user on gk_members(user_id);
+-- Arbeitszeit je Mitglied (aktive Spielzeit in Sekunden, gesamt und am Kalendertag play_day, deutsche Zeit)
+alter table gk_members add column if not exists play_seconds double precision not null default 0;
+alter table gk_members add column if not exists play_day date;
+alter table gk_members add column if not exists play_today double precision not null default 0;
 
 create table if not exists gk_changes (
   workshop_id uuid not null references gk_workshops(id) on delete cascade,
@@ -144,13 +148,29 @@ $$;
 
 create or replace function gk_members_json(p_ws uuid) returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', user_id, 'name', name, 'presence', presence,
-    'online', last_seen > now() - interval '15 seconds', 'seen', extract(epoch from last_seen)) order by joined_at), '[]'::jsonb)
+    'online', last_seen > now() - interval '15 seconds', 'seen', extract(epoch from last_seen),
+    'play', round(play_seconds), 'today', case when play_day = (now() at time zone 'Europe/Berlin')::date then round(play_today) else 0 end) order by joined_at), '[]'::jsonb)
   from gk_members where workshop_id = p_ws;
 $$;
 
+-- Lebenszeichen eines Mitglieds. Arbeitszeit: die Zeit seit dem letzten Lebenszeichen zählt, wenn dieses höchstens
+-- 60 s zurückliegt und der Spieler nicht als untätig gemeldet ist (keine Eingabe seit 5 Minuten bzw. Spiel im Hintergrund).
+-- Zwei Fenster desselben Kontos zählen nicht doppelt: es zählt immer nur der Abstand zum letzten Lebenszeichen.
 create or replace function gk_touch(p_ws uuid, p_user uuid, p_presence jsonb) returns void language plpgsql security definer set search_path = public as $$
+declare today date := (now() at time zone 'Europe/Berlin')::date;
 begin
-  update gk_members set last_seen = now(), presence = coalesce(p_presence, presence) where workshop_id = p_ws and user_id = p_user;
+  update gk_members set
+    play_seconds = play_seconds + d.add,
+    play_today = case when play_day = today then play_today + d.add else d.add end,
+    play_day = today,
+    last_seen = now(),
+    presence = coalesce(p_presence, presence)
+  from (
+    select case when m.last_seen > now() - interval '60 seconds' and coalesce((p_presence->>'idle')::boolean, false) = false
+      then extract(epoch from now() - m.last_seen) else 0 end as add
+    from gk_members m where m.workshop_id = p_ws and m.user_id = p_user
+  ) d
+  where workshop_id = p_ws and user_id = p_user;
 end $$;
 
 -- Werkzeuge lange abwesender Spieler kontrolliert zurückführen: dasselbe Exemplar wandert in seine

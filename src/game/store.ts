@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { emptyPlayTime, type PlayTime } from './playtime';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
 import { engineAudio, setMuted, sfx } from './audio';
@@ -106,6 +107,8 @@ export interface GameState {
   engineSince: number;
   /** Wann der aktuelle Spieltag begonnen hat (ms). Feierabend geht erst nach `dayClock.ms`. Nur auf diesem Gerät. */
   dayStartedAt: number;
+  /** Arbeitszeit im Einzelspiel (aktive Spielzeit, s). */
+  playTime: PlayTime;
   engineWarm: boolean;
   toast: Toast | null;
   partPrompt: { bay: number; compId: string; partId: PartId; choose?: boolean } | null;
@@ -524,6 +527,7 @@ export const useGame = create<GameState>()(
           perceive(slot, ['idle', 'sound', 'dash', 'rev', 'drive'], true, 'Messung abgeschlossen – beim Lauf auf der Rolle fällt dir nichts weiter auf.');
         },
         jobEarnings: 0,
+        playTime: emptyPlayTime(),
         sound: true,
         started: false,
         panel: null,
@@ -546,6 +550,7 @@ export const useGame = create<GameState>()(
           stopEngine();
           set({
             dayStartedAt: Date.now(),
+            playTime: emptyPlayTime(),
             money: START_MONEY,
             cars: refreshJunk(Array(SLOT_COUNT).fill(null), Math.random, 1),
             engines: [],
@@ -1601,6 +1606,7 @@ export const useGame = create<GameState>()(
           .map((l: Listing) => ({ ...l, usedArgs: l.usedArgs ?? [], gone: !!l.gone, car: normalizeCar(l.car)! }));
         merged.jobs = (p.jobs ?? []).filter((j: JobOffer) => j?.car?.job).map((j: JobOffer) => ({ ...j, car: normalizeCar(j.car)! }));
         merged.sound = p.sound ?? true;
+        merged.playTime = { ...emptyPlayTime(), ...(p.playTime ?? {}) };
         merged.career = { ...emptyCareer(), ...(p.career ?? {}) };
         merged.achieved = Array.isArray(p.achieved) ? p.achieved : [];
         merged.unlocked = [];
@@ -1621,6 +1627,7 @@ export const useGame = create<GameState>()(
         screen: s.screen === 'track' || s.screen === 'market' ? 'garage' : s.screen,
         cars: s.cars,
         dayStartedAt: s.dayStartedAt,
+        playTime: s.playTime,
         upgrades: s.upgrades,
         fluidStock: s.fluidStock,
         drainPan: s.drainPan,
