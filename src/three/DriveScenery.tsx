@@ -240,6 +240,9 @@ function build() {
     ...circles.flatMap((c) => Array.from({ length: 8 }, (_, i) => [c.x + Math.cos((i / 8) * Math.PI * 2) * 2.5, c.z + Math.sin((i / 8) * Math.PI * 2) * 2.5] as const)),
   ].map(([x, z]) => new THREE.Matrix4().makeTranslation(x, w.padY + 0.03, z));
   const coneGeo = new THREE.ConeGeometry(0.22, 0.7, 8).translate(0, 0.35, 0);
+  // Heuballen: liegende Rundballen (Achse quer)
+  const baleGeo = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 12).rotateZ(Math.PI / 2).translate(0, 0.72, 0);
+  const baleMats = w.bales.map((b) => new THREE.Matrix4().compose(new THREE.Vector3(b.x, w.ground(b.x, b.z), b.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), b.rot), new THREE.Vector3(1, 1, 1)));
   // Feldwege: Schotterband, das dem Gelände folgt (etwas angehoben, damit es nicht im Boden versinkt)
   const gravel = mergeGeometries(
     w.tracks.map((t) => {
@@ -265,7 +268,7 @@ function build() {
       return g;
     }),
   );
-  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel };
+  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats };
 }
 
 export function DriveScenery() {
@@ -288,6 +291,7 @@ export function DriveScenery() {
       pad: new THREE.MeshLambertMaterial({ color: '#55585d' }),
       gravel: new THREE.MeshLambertMaterial({ color: '#a39784', side: THREE.DoubleSide }),
       cone: new THREE.MeshLambertMaterial({ color: '#ff7a1a' }),
+      bale: new THREE.MeshLambertMaterial({ color: '#d9bd6a' }),
     }),
     [],
   );
@@ -305,6 +309,7 @@ export function DriveScenery() {
       <mesh geometry={b.marks} material={mats.line} raycast={() => null} />
       <Instances geometry={b.coneGeo} material={mats.cone} matrices={b.cones} />
       <mesh geometry={b.gravel} material={mats.gravel} raycast={() => null} />
+      <Instances geometry={b.baleGeo} material={mats.bale} matrices={b.baleMats} />
       <Sign x={PAD.minX + 6} y={b.w.padY} z={PAD.minZ + 2} rot={0} kind="pad" />
       <Instances geometry={postGeo} material={mats.post} matrices={b.rail.posts} />
       {b.chunks.map((c, i) => (

@@ -92,6 +92,8 @@ export interface DriveWorld {
   nearest(x: number, z: number, hint: number): { i: number; lateral: number; along: number; dist: number };
   obstacles(x: number, z: number): Obstacle[];
   trees: { x: number; z: number; h: number; kind: 0 | 1 }[];
+  /** Heuballen auf den Feldern bei den Höfen (liegende Rundballen). */
+  bales: { x: number; z: number; rot: number }[];
   houses: { x: number; z: number; rot: number; w: number; d: number; h: number; color: string }[];
   lamps: { x: number; z: number; rot: number }[];
   signs: { x: number; z: number; rot: number; kind: 'town' | 'curveL' | 'curveR' | 'speed50' | 'speed100' | 'cross' }[];
@@ -225,6 +227,26 @@ export function driveWorld(): DriveWorld {
     if (cross.crossing && !samples[(i + 29) % n].crossing) signs.push({ ...right, rot: heading, kind: 'cross' });
   }
 
+  // --- Bauernhöfe an den Feldwegen: Wohnhaus, rote Scheune, Heuballen
+  // (x, z, Drehung, Seite der Heuballen: hinter (−1) oder vor (+1) dem Hof – jeweils weg vom Feldweg)
+  const FARMS: [number, number, number, number][] = [
+    [382, 192, 0.4, -1],
+    [-425, -205, -0.3, -1],
+    [-300, 168, 0.15, 1],
+    [258, -178, 0.7, -1],
+  ];
+  const bales: DriveWorld['bales'] = [];
+  for (const [fx, fz, rot, side] of FARMS) {
+    const c = Math.cos(rot);
+    const sn = Math.sin(rot);
+    const at = (dx: number, dz: number) => ({ x: fx + dx * c + dz * sn, z: fz - dx * sn + dz * c });
+    houses.push({ ...at(0, 0), rot, w: 10, d: 8, h: 6.5, color: '#efe6d2' });
+    houses.push({ ...at(18, 4), rot, w: 16, d: 11, h: 7.5, color: '#9b2d22' });
+    houses.push({ ...at(4, 16), rot: rot + Math.PI / 2, w: 9, d: 6, h: 4.5, color: '#7d6a55' });
+    for (let k = 0; k < 9; k++) bales.push({ ...at(-4 + (k % 3) * 5, side * (18 + Math.floor(k / 3) * 4.5)), rot: rot + (k % 2) * 0.4 });
+  }
+  const farmNear = (x: number, z: number) => FARMS.some(([fx, fz]) => Math.hypot(x - fx, z - fz) < 34);
+
   // --- Bäume: Wälder (Rauschen), einzelne Bäume an Wiesen; Abstand zur Straße und zum Ort
   const EXTENT = 820;
   // Grobes Abstandsraster zur Straße (Zellen à 24 m, Breitensuche ab den Straßenzellen) – schnell statt Einzelsuche
@@ -282,6 +304,7 @@ export function driveWorld(): DriveWorld {
       if (f < 0.12 && rng() > 0.012) continue;
       if (Math.hypot(jx, jz) < 160) continue;
       if (padDist(jx, jz) < 12) continue;
+      if (farmNear(jx, jz)) continue;
       if (trackDist(jx, jz) < 6) continue;
       if (roadCells(jx, jz) > 13) continue;
       const near = roadNear(jx, jz, 30);
@@ -298,6 +321,7 @@ export function driveWorld(): DriveWorld {
   trees.forEach((t) => addObstacle({ x: t.x, z: t.z, r: 0.45 }));
   houses.forEach((h) => addObstacle({ x: h.x, z: h.z, r: Math.min(h.w, h.d) / 2 + 0.5 }));
   lamps.forEach((l) => addObstacle({ x: l.x, z: l.z, r: 0.2 }));
+  bales.forEach((b) => addObstacle({ x: b.x, z: b.z, r: 0.85 }));
 
   const startHeading = Math.atan2(-samples[0].tz, samples[0].tx);
   cached = {
@@ -347,6 +371,7 @@ export function driveWorld(): DriveWorld {
     },
     trees,
     houses,
+    bales,
     lamps,
     signs,
     extent: EXTENT,

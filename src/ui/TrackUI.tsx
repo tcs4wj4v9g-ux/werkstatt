@@ -103,7 +103,7 @@ function Gauge() {
   const [nx, ny] = pt(rpm, 40);
   const ticks = Array.from({ length: max / 1000 + 1 }, (_, i) => i * 1000);
   return (
-    <svg className="tacho" viewBox="-56 -56 112 112" width="170" height="170" data-testid="gauge">
+    <svg className="tacho" viewBox="-56 -56 112 112" width="150" height="150" data-testid="gauge">
       <circle r="54" fill="rgba(18,20,24,0.82)" />
       <path d={arc(0, max, 46)} stroke="rgba(255,255,255,0.25)" strokeWidth="4" fill="none" />
       <path d={arc(redline, max, 46)} stroke="#e0402f" strokeWidth="5" fill="none" />

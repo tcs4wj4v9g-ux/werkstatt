@@ -235,12 +235,12 @@ export function TrackScene() {
         s.camYaw = s.camYaw === undefined ? travel : s.camYaw + Math.atan2(Math.sin(travel - s.camYaw), Math.cos(travel - s.camYaw)) * Math.min(1, dt * 4);
         const fx = Math.cos(s.camYaw);
         const fz = -Math.sin(s.camYaw);
-        const want = new THREE.Vector3(s.x - fx * 6.8, s.y + 2.5, s.z - fz * 6.8);
+        const want = new THREE.Vector3(s.x - fx * 6.6, s.y + 2.3, s.z - fz * 6.6);
         // nicht ins Gelände: Mindesthöhe über dem Boden an der Kameraposition
         want.y = Math.max(want.y, world.ground(want.x, want.z) + 1.2);
         camPos.current.lerp(want, Math.min(1, dt * 5));
         camera.position.copy(camPos.current);
-        camera.lookAt(s.x + fx * 3.5, s.y + 1.0, s.z + fz * 3.5);
+        camera.lookAt(s.x + fx * 2.5, s.y + 0.35, s.z + fz * 2.5);
       } else {
         const eye = mode === 'hood' ? new THREE.Vector3(0.75, 1.22, 0) : new THREE.Vector3(-0.32, 1.13, -0.36);
         const look = mode === 'hood' ? new THREE.Vector3(30, 0.6, 0) : new THREE.Vector3(30, 0.5, -0.36);
