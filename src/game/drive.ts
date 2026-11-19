@@ -23,6 +23,10 @@ interface DriveHud {
   elapsed: number;
   /** Driftwinkel (°), 0 wenn nicht gedriftet wird. */
   drift: number;
+  /** Lage für die Minikarte: Position (m) und Kurs (rad). */
+  px: number;
+  pz: number;
+  ph: number;
   /** Zähler: „Zurück auf die Straße“ gedrückt. */
   respawn: number;
   offTrack: boolean;
@@ -43,6 +47,9 @@ export const useDriveHud = create<DriveHud>((set) => ({
   elapsed: 0,
   drift: 0,
   respawn: 0,
+  px: 0,
+  pz: 0,
+  ph: 0,
   offTrack: false,
   wheelspin: false,
   distance: 0,

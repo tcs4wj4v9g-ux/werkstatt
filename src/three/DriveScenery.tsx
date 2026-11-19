@@ -1,8 +1,9 @@
+import { useFrame } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { driveWorld, forestAt, PAD, RAIL_OFFSET, ROAD_WIDTH, TRACK_WIDTH, type DriveWorld } from './driveWorld';
-import { textTexture } from './textures';
+import { driveWorld, forestAt, LAKE, PAD, RAIL_OFFSET, ROAD_WIDTH, TRACK_WIDTH, WORKSHOP, type DriveWorld } from './driveWorld';
+import { doorTexture, grassDetailTexture, mountainTexture, roadTexture, textTexture } from './textures';
 
 /**
  * Darstellung der Probefahrt-Landschaft. Rechenaufwand fürs iPad klein gehalten:
@@ -21,8 +22,11 @@ const LEVELS: [number, number][] = [
 function groundColor(x: number, z: number, h: number, out: THREE.Color) {
   const forest = forestAt(x, z);
   const field = Math.sin(x * 0.013 + 0.4) * Math.sin(z * 0.017 - 1.1);
+  // Ufer am See: heller Sand bzw. Kies
+  const lk = Math.hypot((x - LAKE.x) / LAKE.rx, (z - LAKE.z) / LAKE.rz);
+  if (lk < 1.12) return out.setRGB(0.66, 0.6, 0.45);
   // Im Ort Rasen statt Feld
-  if (Math.hypot(x, z) < 175) return out.setRGB(0.38, 0.55, 0.27);
+  if (Math.hypot(x, z) < 175) return out.setRGB(0.4, 0.58, 0.28);
   if (forest > 0.12) out.setRGB(0.2, 0.3, 0.16);
   else if (field > 0.55) out.setRGB(0.72, 0.64, 0.3); // reifes Feld
   else if (field < -0.6) out.setRGB(0.44, 0.38, 0.24); // Acker
@@ -64,17 +68,23 @@ function band(w: DriveWorld, a: number, b: number, lift: number, keep: (i: numbe
   const idx: number[] = [];
   const s = w.samples;
   const n = s.length;
+  const uv: number[] = [];
   let v = 0;
   for (let i = 0; i < n; i++) {
     if (!keep(i)) continue;
     const p = s[i];
     const q = s[(i + 1) % n];
     for (const r of [p, q]) pos.push(r.x + r.nx * a, r.y + lift, r.z + r.nz * a, r.x + r.nx * b, r.y + lift, r.z + r.nz * b);
+    // Asphaltstruktur: 6 m je Kachel längs, quer über die ganze Breite
+    const v0 = p.s / 6;
+    const v1 = v0 + 2 / 6;
+    uv.push(0, v0, (b - a) / 6, v0, 0, v1, (b - a) / 6, v1);
     idx.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
     v += 4;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
@@ -147,7 +157,10 @@ function build() {
   const w = driveWorld();
   // Gelände-Kacheln mit Detailstufen
   const tiles: THREE.LOD[] = [];
-  const groundMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const grass = grassDetailTexture().clone();
+  grass.repeat.set(TILE / 4, TILE / 4);
+  grass.needsUpdate = true;
+  const groundMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: grass, color: '#ffffff' });
   for (let cx = -w.extent + TILE / 2; cx < w.extent; cx += TILE)
     for (let cz = -w.extent + TILE / 2; cz < w.extent; cz += TILE) {
       const lod = new THREE.LOD();
@@ -268,14 +281,32 @@ function build() {
       return g;
     }),
   );
-  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats };
+  // See: Wasserfläche (Ellipse)
+  const lake = new THREE.CircleGeometry(1, 72).rotateX(-Math.PI / 2).scale(LAKE.rx, 1, LAKE.rz).translate(LAKE.x, w.lakeY, LAKE.z);
+  // Zaun: Pfosten und zwei Querlatten je Feld (zwischen benachbarten Pfosten, nicht über die Einfahrt)
+  const fencePosts = w.fence.map((p) => new THREE.Matrix4().makeTranslation(p.x, w.ground(p.x, p.z) + 0.6, p.z));
+  const fenceRails: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < w.fence.length; i++)
+    for (let j = i + 1; j < Math.min(w.fence.length, i + 4); j++) {
+      const a = w.fence[i];
+      const c = w.fence[j];
+      const d = Math.hypot(c.x - a.x, c.z - a.z);
+      if (d > 2.6 || d < 2.4) continue;
+      for (const hgt of [0.55, 1.05]) {
+        const g = new THREE.BoxGeometry(d, 0.08, 0.04).rotateY(-Math.atan2(c.z - a.z, c.x - a.x));
+        g.translate((a.x + c.x) / 2, (w.ground(a.x, a.z) + w.ground(c.x, c.z)) / 2 + hgt, (a.z + c.z) / 2);
+        fenceRails.push(g);
+      }
+    }
+  const fence = fenceRails.length ? mergeGeometries(fenceRails) : new THREE.BufferGeometry();
+  return { w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
 }
 
 export function DriveScenery() {
   const b = useMemo(() => (built ??= build()), []);
   const mats = useMemo(
     () => ({
-      road: new THREE.MeshLambertMaterial({ color: '#4a4d52', side: THREE.DoubleSide }),
+      road: new THREE.MeshLambertMaterial({ color: '#4f5257', map: roadTexture(), side: THREE.DoubleSide }),
       shoulder: new THREE.MeshLambertMaterial({ color: '#7b7466', side: THREE.DoubleSide }),
       line: new THREE.MeshBasicMaterial({ color: '#e9e9e4', side: THREE.DoubleSide }),
       rail: new THREE.MeshLambertMaterial({ color: '#c6ccd2', side: THREE.DoubleSide }),
@@ -288,7 +319,14 @@ export function DriveScenery() {
       win: new THREE.MeshLambertMaterial({ color: '#3a4656' }),
       pole: new THREE.MeshLambertMaterial({ color: '#5d636a' }),
       lamp: new THREE.MeshBasicMaterial({ color: '#fff4d0' }),
-      pad: new THREE.MeshLambertMaterial({ color: '#55585d' }),
+      pad: new THREE.MeshLambertMaterial({ color: '#55585d', map: (() => {
+        const t = roadTexture().clone();
+        t.repeat.set((PAD.maxX - PAD.minX) / 6, (PAD.maxZ - PAD.minZ) / 6);
+        t.needsUpdate = true;
+        return t;
+      })() }),
+      water: new THREE.MeshPhongMaterial({ color: '#3f7192', specular: '#cfe6ff', shininess: 80, transparent: true, opacity: 0.88 }),
+      wood: new THREE.MeshLambertMaterial({ color: '#8a6a48' }),
       gravel: new THREE.MeshLambertMaterial({ color: '#a39784', side: THREE.DoubleSide }),
       cone: new THREE.MeshLambertMaterial({ color: '#ff7a1a' }),
       bale: new THREE.MeshLambertMaterial({ color: '#d9bd6a' }),
@@ -310,6 +348,11 @@ export function DriveScenery() {
       <Instances geometry={b.coneGeo} material={mats.cone} matrices={b.cones} />
       <mesh geometry={b.gravel} material={mats.gravel} raycast={() => null} />
       <Instances geometry={b.baleGeo} material={mats.bale} matrices={b.baleMats} />
+      <mesh geometry={b.lake} material={mats.water} raycast={() => null} />
+      <Instances geometry={postGeo} material={mats.wood} matrices={b.fencePosts} />
+      <mesh geometry={b.fence} material={mats.wood} raycast={() => null} />
+      <Workshop y={b.w.apronY} />
+      <Mountains />
       <Sign x={PAD.minX + 6} y={b.w.padY} z={PAD.minZ + 2} rot={0} kind="pad" />
       <Instances geometry={postGeo} material={mats.post} matrices={b.rail.posts} />
       {b.chunks.map((c, i) => (
@@ -324,9 +367,9 @@ export function DriveScenery() {
       <Instances geometry={b.box} material={mats.win} matrices={b.winRows} />
       <Instances geometry={b.pole} material={mats.pole} matrices={b.poles} />
       <Instances geometry={b.lampHead} material={mats.lamp} matrices={b.heads} />
-      {b.w.signs.map((s, i) => (
-        <Sign key={i} {...s} y={b.w.ground(s.x, s.z)} />
-      ))}
+      {b.w.signs.map((s, i) =>
+        s.kind === 'dir' ? <Pointer key={i} {...s} text={s.text ?? ''} y={b.w.ground(s.x, s.z)} /> : <Sign key={i} {...s} y={b.w.ground(s.x, s.z)} />,
+      )}
     </>
   );
 }
@@ -360,5 +403,88 @@ function Sign({ x, y, z, rot, kind }: { x: number; y: number; z: number; rot: nu
         </mesh>
       )}
     </group>
+  );
+}
+
+/** Wegweiser (gelb mit schwarzer Schrift) an Einmündungen: Höfe, See, Testgelände. */
+function Pointer({ x, y, z, rot, text }: { x: number; y: number; z: number; rot: number; text: string }) {
+  const tex = useMemo(() => textTexture(text, { bg: '#f2c200', fg: '#111111', w: 512, h: 96, font: 46 }), [text]);
+  return (
+    <group position={[x, y, z]} rotation={[0, rot - Math.PI / 2, 0]}>
+      <mesh position={[0, 1.2, 0]} raycast={() => null}>
+        <cylinderGeometry args={[0.05, 0.05, 2.4, 5]} />
+        <meshLambertMaterial color="#8d949b" />
+      </mesh>
+      {/* zwei Seiten, beide lesbar */}
+      {[0, Math.PI].map((r) => (
+        <mesh key={r} position={[0, 2.3, 0]} rotation={[0, r, 0]} raycast={() => null}>
+          <planeGeometry args={[2.4, 0.45]} />
+          <meshBasicMaterial map={tex} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Eigene Werkstatt am Ortsrand: Halle mit drei Rolltoren zur Straße, Schriftzug, Vorplatz. */
+function Workshop({ y }: { y: number }) {
+  const W = WORKSHOP;
+  const sign = useMemo(() => textTexture('GARAGE KINGS', { bg: '#16181d', fg: '#ff7a1a', w: 1024, h: 160, font: 110 }), []);
+  const door = useMemo(() => doorTexture(), []);
+  const front = W.z + W.d / 2;
+  return (
+    <group position={[0, y, 0]}>
+      <mesh position={[W.x, W.h / 2, W.z]} raycast={() => null}>
+        <boxGeometry args={[W.w, W.h, W.d]} />
+        <meshLambertMaterial color="#d9d6cc" />
+      </mesh>
+      <mesh position={[W.x, W.h + 0.15, W.z]} raycast={() => null}>
+        <boxGeometry args={[W.w + 0.6, 0.3, W.d + 0.6]} />
+        <meshLambertMaterial color="#3f4650" />
+      </mesh>
+      {/* Sockel und oranges Band wie in der Halle */}
+      <mesh position={[W.x, 0.5, front + 0.02]} raycast={() => null}>
+        <planeGeometry args={[W.w, 1]} />
+        <meshLambertMaterial color="#3f4a57" />
+      </mesh>
+      {[-7.5, 0, 7.5].map((dx) => (
+        <mesh key={dx} position={[W.x + dx, 1.9, front + 0.03]} raycast={() => null}>
+          <planeGeometry args={[5.2, 3.8]} />
+          <meshLambertMaterial map={door} color="#c9ccd1" />
+        </mesh>
+      ))}
+      <mesh position={[W.x, W.h - 0.9, front + 0.04]} raycast={() => null}>
+        <planeGeometry args={[11, 1.7]} />
+        <meshBasicMaterial map={sign} />
+      </mesh>
+      <mesh position={[W.x, 4.1, front + 0.035]} raycast={() => null}>
+        <planeGeometry args={[W.w, 0.18]} />
+        <meshBasicMaterial color="#ff7a1a" />
+      </mesh>
+      {/* Vorplatz */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[(47 + 77) / 2, 0.025, (-15 + -2) / 2]} raycast={() => null}>
+        <planeGeometry args={[30, 13]} />
+        <meshLambertMaterial color="#5b5e63" />
+      </mesh>
+    </group>
+  );
+}
+
+/** Berge am Horizont: ein Band rund um die Kamera, ohne Nebel – hinter dem Dunst der fernen Wiesen. */
+function Mountains() {
+  const ref = useRef<THREE.Mesh>(null);
+  const mat = useMemo(() => {
+    const t = mountainTexture().clone();
+    t.repeat.set(2, 1);
+    t.needsUpdate = true;
+    return new THREE.MeshBasicMaterial({ map: t, transparent: true, fog: false, depthWrite: false, side: THREE.BackSide });
+  }, []);
+  useFrame(({ camera }) => {
+    if (ref.current) ref.current.position.set(camera.position.x, camera.position.y - 18, camera.position.z);
+  });
+  return (
+    <mesh ref={ref} material={mat} renderOrder={-1} raycast={() => null} frustumCulled={false}>
+      <cylinderGeometry args={[680, 680, 150, 64, 1, true]} />
+    </mesh>
   );
 }

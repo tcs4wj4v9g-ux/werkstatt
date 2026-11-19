@@ -257,3 +257,80 @@ export function screenTexture() {
     }
   });
 }
+
+/** Feine Grasstruktur zum Einfärben des Geländes (Graustufen um Weiß: hellt die Vertexfarben nur leicht ab). */
+export function grassDetailTexture() {
+  const t = canvasTexture('grassDetail', [256, 256], (c, w, h) => {
+    const r = rng(53);
+    c.fillStyle = '#ececec';
+    c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 9000; i++) {
+      const v = 175 + Math.floor(r() * 80);
+      c.fillStyle = `rgba(${v},${v},${v},0.55)`;
+      // kurze Halme
+      const x = r() * w;
+      const y = r() * h;
+      c.fillRect(x, y, 1, 2 + r() * 3);
+    }
+    for (let i = 0; i < 18; i++) {
+      const sx = r() * w;
+      const sy = r() * h;
+      const g = c.createRadialGradient(sx, sy, 2, sx, sy, 20 + r() * 50);
+      g.addColorStop(0, 'rgba(160,160,160,0.25)');
+      g.addColorStop(1, 'rgba(160,160,160,0)');
+      c.fillStyle = g;
+      c.fillRect(0, 0, w, h);
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+/** Bergkette am Horizont: mehrere hintereinander liegende Silhouetten im Dunst (oben durchsichtig). */
+export function mountainTexture() {
+  const t = canvasTexture('mountains', [2048, 256], (c, w, h) => {
+    const r = rng(77);
+    c.clearRect(0, 0, w, h);
+    const layers: [string, number, number, number][] = [
+      ['rgba(150,170,195,0.9)', 0.42, 70, 3],
+      ['rgba(120,145,170,0.95)', 0.55, 55, 5],
+      ['rgba(95,120,120,1)', 0.7, 30, 9],
+    ];
+    for (const [col, base, amp, freq] of layers) {
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(0, h);
+      const ph = r() * 10;
+      const ph2 = r() * 10;
+      for (let x = 0; x <= w; x += 8) {
+        const u = (x / w) * Math.PI * 2;
+        // Periodisch über die volle Breite (nahtlos um den Horizont)
+        const y = h * base - amp * (0.55 * Math.sin(u * freq + ph) + 0.3 * Math.sin(u * freq * 2.7 + ph2) + 0.15 * Math.sin(u * freq * 6.1));
+        c.lineTo(x, y);
+      }
+      c.lineTo(w, h);
+      c.closePath();
+      c.fill();
+    }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Straßenbelag: feine Körnung ohne Risse (wird über 6 m gekachelt). */
+export function roadTexture() {
+  const t = canvasTexture('road', [256, 256], (c, w, h) => {
+    const r = rng(91);
+    c.fillStyle = '#9a9da2';
+    c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 14000; i++) {
+      const v = 110 + Math.floor(r() * 110);
+      c.fillStyle = `rgba(${v},${v},${v + 2},0.45)`;
+      c.fillRect(r() * w, r() * h, 1 + r(), 1 + r());
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}

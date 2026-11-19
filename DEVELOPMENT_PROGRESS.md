@@ -652,3 +652,20 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Dieses Fenster pausiert dann mit Hinweis und Knopf „Hier weiterspielen“.
   - Ein Konflikt ohne anderen Spieler online meldet nicht mehr „Partner war schneller“.
   - Serverabsagen nennen ihren Grund.
+
+## Räder drehen sich, Fahrwelt mit Sinn und schöner, Minikarte
+
+- **Räder:** Sie rollen auf der Probefahrt mit (`spin` am `CarModel`, nur einfache Darstellung). Angetriebene Räder drehen beim Durchdrehen schneller, die Handbremse blockiert hinten.
+- **Karte:**
+  - Die Fahrt beginnt vor der eigenen Werkstatt (Halle „GARAGE KINGS“ mit Vorplatz am Ortsrand von Grünbach).
+  - Im Ort steht eine Kirche als Orientierungspunkt.
+  - Die Feldwege beginnen an Straßen (Endpunkt wird an den Straßenrand gezogen) und führen zu den vier Höfen, teils weiter zur nächsten Straße. An jeder Einmündung steht ein gelber Wegweiser.
+  - Das Testgelände ist eingezäunt und hat eine Einfahrt mit Wegweiser.
+  - Der Waldsee mit Sandufer ist nicht befahrbar, das Auto bleibt am Ufer stehen.
+- **Optik:**
+  - Grasstruktur auf dem Gelände, eigene Straßentextur (Körnung, keine Risse).
+  - Berge am Horizont: ein Band um die Kamera, ohne Nebel.
+  - Die Fernwiese wird zuerst und ohne Tiefe gezeichnet, Senken und der See liegen also nie darunter.
+  - Der Start-/Zielbogen ist entfernt.
+- **Minikarte** oben links: Fahrtrichtung zeigt nach oben, Umkreis gut 250 m. Sie zeigt Straßen, Feldwege, Wald, Felder, See, Testgelände, Häuser und Namen. Die Karte wird einmal vorgezeichnet (0,75 px/m).
+- Tests: Logiktest „Karte ergibt Sinn“; `markt.cjs` prüft drehende Räder und die Minikarte.

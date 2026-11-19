@@ -49,6 +49,8 @@ interface Props {
   /** 'simple' lässt Motorraum, Schrauben und Bremsenteile weg (Hof, Waschplatz, Markt). */
   lod?: 'full' | 'simple';
   steer?: React.MutableRefObject<number>;
+  /** Drehwinkel der Räder vorn/hinten (rad) – auf der Probefahrt rollen sie mit (hinten auch durchdrehend oder blockiert). */
+  spin?: React.MutableRefObject<{ f: number; r: number }>;
   /** Motorhaube auch in der einfachen Darstellung bedienbar (Auto auf einer Hebebühne, aber gerade nicht in Arbeit). */
   hoodTap?: boolean;
   /** Modell für Front, Felgen und Auspuff, falls kein `car` übergeben wird. */
@@ -449,7 +451,7 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
   attr.needsUpdate = true;
 }
 
-export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, modelId, hoodTap }: Props) {
+export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, spin, modelId, hoodTap }: Props) {
   const G = useGfxSettings();
   const flares = !!car?.visual?.flares;
   const shared = useMemo(() => carGeometry(body, G.detail, flares), [body, G.detail, flares]);
@@ -475,6 +477,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const hood = useRef<THREE.Group>(null);
   const wheelFL = useRef<THREE.Group>(null);
   const wheelFR = useRef<THREE.Group>(null);
+  /** Drehende Teile je Rad (fl, fr, rl, rr) – nur in der einfachen Darstellung (Probefahrt, Hof). */
+  const rolling = useRef<(THREE.Group | null)[]>([]);
   const doorL = useRef<THREE.Group>(null);
   const doorR = useRef<THREE.Group>(null);
   const doorsOpen = [!!car?.doors?.[0], !!car?.doors?.[1]];
@@ -556,6 +560,12 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     }
     if (steer) {
       for (const w of [wheelFL.current, wheelFR.current]) if (w) w.rotation.y = steer.current * 0.45;
+    }
+    if (spin) {
+      // Achse quer zum Auto (z): vorwärts rollen heißt Drehung um −z
+      rolling.current.forEach((g, i) => {
+        if (g) g.rotation.z = -(i < 2 ? spin.current.f : spin.current.r);
+      });
     }
     [doorL.current, doorR.current].forEach((d, k) => {
       if (!d) return;
@@ -792,7 +802,9 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     if (!full || (rear && !st(`wheel_${s}`))) {
       return (
         <group key={s} ref={wheelRef} position={[WX, WY, z(WZ)]} onClick={wheelTap}>
-          <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={rimColor} />
+          <group ref={(g) => void (rolling.current[['fl', 'fr', 'rl', 'rr'].indexOf(s)] = g)}>
+            <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={rimColor} />
+          </group>
           <mesh position={[0, 0, -sign * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.17, 0.17, 0.02, 24]} />
             <meshStandardMaterial color="#a9aeb4" metalness={0.9} roughness={0.3} />
