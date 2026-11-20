@@ -100,7 +100,7 @@ export function MarketTab() {
   );
 }
 
-/** Der Spieltag endet nach drei Minuten automatisch (App.tsx); hier läuft die Uhr sichtbar herunter. */
+/** Feierabend-Knopf. Bei automatischem Ablauf endet der Tag nach drei Minuten (App.tsx) und die Uhr läuft hier sichtbar herunter; von Hand geht er jederzeit. */
 function DayButton() {
   const s = useGame();
   const [, tick] = useState(0);

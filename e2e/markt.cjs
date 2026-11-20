@@ -127,19 +127,37 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   expect((await btn.count()) === 1 && (await btn.isDisabled()) && /Neuer Tag in [23]:\d\d/.test(dayTxt), 'Feierabend-Knopf gesperrt, Countdown läuft: ' + dayTxt);
   await p.evaluate(() => window.__gk.getState().nextDay());
   expect(await p.evaluate(() => window.__gk.getState().day) === day0, 'Vor Ablauf kein Tageswechsel – ' + (await p.evaluate(() => window.__gk.getState().toast && window.__gk.getState().toast.text)));
-  await p.evaluate(() => window.__gk.setState({ dayStartedAt: Date.now() - 181000 })); await p.waitForTimeout(1200);
-  expect(!(await btn.isDisabled()), 'Nach drei Minuten ist Feierabend möglich');
+  // Mit automatischem Ablauf wechselt der Tag nach drei Minuten von selbst und die Uhr beginnt neu
+  await p.evaluate(() => window.__gk.setState({ dayStartedAt: Date.now() - 181000 }));
+  for (let i = 0; i < 30 && (await p.evaluate(() => window.__gk.getState().day)) === day0; i++) await p.waitForTimeout(100);
+  const auto1 = await p.evaluate(() => ({ day: window.__gk.getState().day, fresh: window.__gk.getState().dayStartedAt > Date.now() - 5000 }));
+  expect(auto1.day === day0 + 1 && auto1.fresh && (await btn.isDisabled()), 'Nach drei Minuten beginnt der nächste Tag von selbst, die Uhr läuft wieder');
+  // Von Hand: Feierabend jederzeit möglich
+  await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; }); await p.waitForTimeout(1200);
+  expect(!(await btn.isDisabled()), 'Ohne automatischen Ablauf ist Feierabend jederzeit möglich');
   await btn.click(); await p.waitForTimeout(400);
-  const after = await p.evaluate(() => ({ day: window.__gk.getState().day, left: window.__gk.getState().dayStartedAt > Date.now() - 5000 }));
-  expect(after.day === day0 + 1 && after.left && (await btn.isDisabled()), `Neuer Tag ${after.day} beginnt, der Timer läuft wieder`);
+  const after = await p.evaluate(() => ({ day: window.__gk.getState().day }));
+  expect(after.day === day0 + 2, `Feierabend: neuer Tag ${after.day} beginnt`);
+  const day1 = day0 + 1;
   // Tag überspringen: geht jederzeit, aber erst beim zweiten Tippen
   await p.evaluate(() => window.__gk.getState().setPanel(null)); await p.waitForTimeout(200);
   await p.getByTestId('skipday').click(); await p.waitForTimeout(200);
   const still = await p.evaluate(() => window.__gk.getState().day);
   await p.getByTestId('skipday').click();
-  for (let i = 0; i < 30 && (await p.evaluate(() => window.__gk.getState().day)) !== day0 + 2; i++) await p.waitForTimeout(100);
-  expect(still === day0 + 1 && (await p.evaluate(() => window.__gk.getState().day)) === day0 + 2, 'Tag überspringen: erstes Tippen fragt nach, zweites beginnt sofort den nächsten Tag');
+  for (let i = 0; i < 30 && (await p.evaluate(() => window.__gk.getState().day)) !== day1 + 2; i++) await p.waitForTimeout(100);
+  expect(still === day1 + 1 && (await p.evaluate(() => window.__gk.getState().day)) === day1 + 2, 'Tag überspringen: erstes Tippen fragt nach, zweites beginnt sofort den nächsten Tag');
   await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; window.__gk.getState().setPanel(null); });
+  // ---------- Tagesablauf: Standard von Hand, umschaltbar auf automatisch (Einstellung bleibt nach dem Neuladen) ----------
+  await p.evaluate(() => { window.__gkLib.dayClock.len = 180000; window.__gkLib.dayClock.auto = false; }); await p.waitForTimeout(1100);
+  expect((await p.getByTestId('autoday').textContent()).includes('Manuell') && (await p.getByTestId('dayclock').count()) === 0, 'Tagesablauf von Hand: keine Uhr in der Kopfleiste');
+  await p.getByTestId('autoday').click(); await p.waitForTimeout(1200);
+  const autoOn = await p.evaluate(() => ({ ms: window.__gkLib.dayClock.ms, saved: localStorage.getItem('gk-autoday') }));
+  expect((await p.getByTestId('autoday').textContent()).includes('Auto') && (await p.getByTestId('dayclock').count()) === 1 && autoOn.ms === 180000 && autoOn.saved === '1', 'Automatisch eingeschaltet: Uhr läuft (' + (await p.getByTestId('dayclock').textContent()) + '), Einstellung gespeichert');
+  await p.getByTestId('autoday').click(); await p.waitForTimeout(1200);
+  const d0 = await p.evaluate(() => window.__gk.getState().day);
+  await p.evaluate(() => window.__gk.setState({ dayStartedAt: Date.now() - 600000 })); await p.waitForTimeout(2500);
+  expect((await p.evaluate(() => window.__gk.getState().day)) === d0 && (await p.evaluate(() => localStorage.getItem('gk-autoday'))) === '0', 'Wieder von Hand: auch nach langer Zeit kein automatischer Tageswechsel');
+  await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; });
 
   // ---------- Tuning-Kundenauftrag: Sportauspuff einbauen, abrechnen ----------
   await p.evaluate(() => {

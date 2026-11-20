@@ -335,7 +335,39 @@ const describe = (o: Observation, quiet: string) =>
     .join(' ') || quiet;
 
 /** Länge eines Spieltags in Echtzeit. Im Testmodus (`?test`) kein Warten. */
-export const dayClock = { ms: typeof location !== 'undefined' && new URLSearchParams(location.search).has('test') ? 0 : 3 * 60_000 };
+const AUTO_DAY_KEY = 'gk-autoday';
+const readAutoDay = () => {
+  try {
+    return localStorage.getItem(AUTO_DAY_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+/**
+ * Spieltag: Standard ist wieder „von Hand“ – der Tag endet erst, wenn man „⏭ Tag“ bzw. „Feierabend“ drückt.
+ * Wer will, schaltet den automatischen Ablauf ein (`setAuto`, Einstellung nur auf diesem Gerät): dann endet der Tag
+ * nach `len` (drei Minuten). `ms` ist die wirksame Tageslänge (0 = kein Zeitlimit). Im Testmodus (`?test`) ist `len` 0.
+ */
+export const dayClock = {
+  len: typeof location !== 'undefined' && new URLSearchParams(location.search).has('test') ? 0 : 3 * 60_000,
+  auto: typeof localStorage !== 'undefined' ? readAutoDay() : false,
+  get ms() {
+    return this.auto ? this.len : 0;
+  },
+  /** Für Tests: feste Tageslänge setzen (> 0 schaltet den Ablauf ein, 0 aus) – ohne die Einstellung zu speichern. */
+  set ms(v: number) {
+    this.len = v;
+    this.auto = v > 0;
+  },
+  setAuto(on: boolean) {
+    this.auto = on;
+    try {
+      localStorage.setItem(AUTO_DAY_KEY, on ? '1' : '0');
+    } catch {
+      /* privater Modus: gilt dann nur bis zum Neuladen */
+    }
+  },
+};
 /** Wie lange es noch bis zum Feierabend dauert (ms). */
 /** Ergebnis des letzten Zeitrennens (für das Ergebnisfenster). */
 export interface RaceResult {

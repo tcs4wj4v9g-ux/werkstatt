@@ -70,11 +70,12 @@ export function App() {
       window.removeEventListener('pagehide', flush);
     };
   }, []);
-  // Der Spieltag endet nach drei Minuten von selbst. Im Koop schaltet nur ein Gerät um (sonst zwei Tage auf einmal),
+  // Mit eingeschaltetem automatischem Ablauf endet der Spieltag nach drei Minuten von selbst. Im Koop schaltet nur ein Gerät um (sonst zwei Tage auf einmal),
   // auf Probefahrt oder im Menü wird gewartet. Im Testmodus (Tageslänge 0) bleibt es beim Knopf.
   useEffect(() => {
-    if (!dayClock.ms) return;
     const t = setInterval(() => {
+      // Ablauf von Hand (Standard): nie automatisch umschalten
+      if (!dayClock.ms) return;
       const s = useGame.getState();
       if (!s.started || (s.screen !== 'garage' && s.screen !== 'market') || !isLeader()) return;
       if (dayLeft(s) <= 0) s.nextDay();
