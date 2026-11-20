@@ -11,7 +11,7 @@ import type { BodyStyle, CarInstance, FluidId, ToolId, VisualTune, ZoneId } from
 import { CAR_MODELS, REAR_ENGINE } from '../game/data/cars';
 import { REAR_BAY } from './player';
 import { BODY_SPECS, carGeometry, doorHinge } from './carGeometry';
-import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, trimGeometry, wheelGeometry, type RimStyle } from './carParts';
+import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, TIRE_MARK, trimGeometry, wheelGeometry, type RimStyle, type TireLook } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
 import { dropOf } from '../game/data/visual';
 import { fastenerText } from '../game/data/tools';
@@ -384,21 +384,24 @@ export function zoneAt(x: number, y: number, z: number): ZoneId {
 
 const wheelMats = new Map<string, THREE.Material[]>();
 /** Materialien eines Rads: Reifen, Felge (mit Schmutz), dunkel, Felgenbett. */
-function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' | 'defect', color?: string) {
-  const key = `${style}:${dirt}:${mode}:${color ?? ''}`;
+function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' | 'defect', color?: string, tire: TireLook = 'stock') {
+  const key = `${style}:${dirt}:${mode}:${color ?? ''}:${tire}`;
   let m = wheelMats.get(key);
   if (!m) {
     if (mode === 'ghost') {
       const g = new THREE.MeshBasicMaterial({ color: '#39e06f', transparent: true, opacity: 0.4, depthWrite: false });
-      m = [g, g, g, g];
+      m = [g, g, g, g, g];
     } else {
       const em = mode === 'defect' ? { emissive: new THREE.Color('#ff2a1a'), emissiveIntensity: 0.6 } : {};
       const rim = new THREE.Color(color ?? RIM_COLOR[style]).lerp(DIRT, dirt * 0.8);
       m = [
-        new THREE.MeshStandardMaterial({ color: new THREE.Color('#131415').lerp(DIRT, dirt * 0.35), roughness: 0.92, ...em }),
+        // Reifen: Semi-Slicks glänzen leicht, Driftreifen sind abgefahren-grau, Schotterreifen staubig
+        new THREE.MeshStandardMaterial({ color: new THREE.Color(tire === 'drift' ? '#232427' : '#131415').lerp(DIRT, dirt * 0.35 + (tire === 'gravel' ? 0.18 : 0)), roughness: tire === 'semislick' ? 0.55 : 0.92, ...em }),
         new THREE.MeshStandardMaterial({ color: rim, metalness: style === 'steel' ? 0.55 : 0.95, roughness: (style === 'steel' ? 0.5 : 0.2) + dirt * 0.6, ...em }),
         new THREE.MeshStandardMaterial({ color: '#16171a', metalness: 0.5, roughness: 0.6, ...em }),
         new THREE.MeshStandardMaterial({ color: new THREE.Color('#9aa0a7').lerp(DIRT, dirt * 0.7), metalness: 0.9, roughness: 0.32 + dirt * 0.5, side: THREE.DoubleSide, ...em }),
+        // Flankenmarkierung der Reifenart
+        new THREE.MeshStandardMaterial({ color: new THREE.Color(TIRE_MARK[tire]?.color ?? '#ffffff').lerp(DIRT, dirt * 0.5), roughness: 0.6, side: THREE.DoubleSide, ...em }),
       ];
     }
     wheelMats.set(key, m);
@@ -407,10 +410,10 @@ function wheelMaterials(style: RimStyle, dirt: number, mode: 'normal' | 'ghost' 
 }
 
 /** Rad als ein einziges Netz. `out` = Außenseite (+1/-1); `lugs` = Zier-Radschrauben (nicht demontierbare Räder). */
-function WheelMeshes({ out, dirt = 0, style = 'double5', lugs = false, size = 0, color }: { out: number; dirt?: number; style?: RimStyle; lugs?: boolean; size?: number; color?: string }) {
+function WheelMeshes({ out, dirt = 0, style = 'double5', lugs = false, size = 0, color, tire = 'stock' }: { out: number; dirt?: number; style?: RimStyle; lugs?: boolean; size?: number; color?: string; tire?: TireLook }) {
   const mode = useContext(GhostCtx);
   const detail = useGfxSettings().detail;
-  return <mesh geometry={wheelGeometry(style, detail, lugs, size)} material={wheelMaterials(style, Math.round(dirt * 5) / 5, mode, color)} rotation={[(out * Math.PI) / 2, 0, 0]} castShadow />;
+  return <mesh geometry={wheelGeometry(style, detail, lugs, size, tire)} material={wheelMaterials(style, Math.round(dirt * 5) / 5, mode, color, tire)} rotation={[(out * Math.PI) / 2, 0, 0]} castShadow />;
 }
 
 /** Färbt die Karosserie-Eckpunkte je Bereich: Lackfarbe, Schmutz, Schaum, Rostflecken. */
@@ -803,7 +806,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
       return (
         <group key={s} ref={wheelRef} position={[WX, WY, z(WZ)]} onClick={wheelTap}>
           <group ref={(g) => void (rolling.current[['fl', 'fr', 'rl', 'rr'].indexOf(s)] = g)}>
-            <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={rimColor} />
+            <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} lugs size={look.rimSize} color={rimColor} tire={look.tires} />
           </group>
           <mesh position={[0, 0, -sign * 0.08]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.17, 0.17, 0.02, 24]} />
@@ -907,7 +910,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
           </group>
         )}
         <group ref={wheelRef} position={[WX, WY, z(WZ)]}>
-          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} size={look.rimSize} color={rimColor} />)}
+          {part(`wheel_${s}`, <WheelMeshes out={sign} dirt={wheelDirt} style={look.rim} size={look.rimSize} color={rimColor} tire={look.tires} />)}
           <group position={[-WX, -WY, -z(WZ)]}>{bolts(`wheel_${s}`, lug, axis)}</group>
         </group>
       </group>

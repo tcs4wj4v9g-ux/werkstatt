@@ -33,6 +33,8 @@ export interface CarLook {
   flares: boolean;
   tips: 'stock' | 'dual' | 'quad' | 'oval';
   rimSize: number;
+  /** Reifenart (Profil und Flankenmarkierung). */
+  tires: TireLook;
   sportSeats: boolean;
   sportWheel: boolean;
 }
@@ -76,6 +78,7 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     flares: !!visual?.flares,
     tips: visual?.tips ?? 'stock',
     rimSize: visual?.rimSize ?? (nine2 || e34 || g87 || g82 ? 1 : 0),
+    tires: visual?.tires ?? 'stock',
     sportSeats: visual?.seats === 'sport',
     sportWheel: visual?.wheel === 'sport',
     ...(visual?.rim ? { rim: visual.rim as RimStyle } : {}),
@@ -87,7 +90,18 @@ export const lookKey = (l: CarLook) => [l.rim, l.grille, l.lamps, +l.chromeBumpe
 // ---------------------------------------------------------------- Räder
 
 /** Materialgruppen eines Rads: Reifen, Felge (Farbe/Schmutz), dunkel, Felgenbett. */
-export const WHEEL_SLOT = { tire: 0, rim: 1, dark: 2, barrel: 3 } as const;
+export const WHEEL_SLOT = { tire: 0, rim: 1, dark: 2, barrel: 3, mark: 4 } as const;
+export type TireLook = NonNullable<VisualTune['tires']>;
+/** Flankenmarkierung je Reifenart: Farbe und Breite des Rings (m); Serie ohne. */
+export const TIRE_MARK: Record<TireLook, { color: string; width: number } | null> = {
+  stock: null,
+  sport: { color: '#f2c200', width: 0.008 },
+  semislick: { color: '#d8231c', width: 0.01 },
+  drift: { color: '#f2f2ee', width: 0.03 },
+  winter: { color: '#3d8fe0', width: 0.008 },
+  gravel: { color: '#ff7a1a', width: 0.008 },
+  spikes: { color: '#c9ccd1', width: 0.008 },
+};
 export const RIM_R: Record<RimStyle, number> = { rally: 0.235, steel: 0.215, double5: 0.232, multi: 0.242, turbine: 0.24, classic: 0.215, five: 0.25 };
 export const RIM_COLOR: Record<RimStyle, string> = { rally: '#f1f1ec', steel: '#aab0b7', double5: '#cdd2d8', multi: '#2a2c30', turbine: '#e4e7eb', classic: '#dfe3e8', five: '#3a3d42' };
 
@@ -107,21 +121,45 @@ function spoke(m: Mesher, slot: number, angle: number, r0: number, r1: number, w
 
 const wheels = new Map<string, THREE.BufferGeometry>();
 /** Rad mit Achse entlang +Y (Außenseite = +Y). `lugs` = Radschrauben als Zierde (an den nicht demontierbaren Rädern). */
-export function wheelGeometry(style: RimStyle, detail: number, lugs: boolean, size = 0) {
-  const key = `${style}${detail}${+lugs}${size}`;
+export function wheelGeometry(style: RimStyle, detail: number, lugs: boolean, size = 0, tire: TireLook = 'stock') {
+  const key = `${style}${detail}${+lugs}${size}${tire}`;
   let g = wheels.get(key);
   if (g) return g;
-  const m = new Mesher(4);
+  const m = new Mesher(5);
   // Größere Felge, gleicher Außendurchmesser: der Reifen wird flacher.
   const R = RIM_R[style] + 0.025 * size;
   const W = WHEEL_SLOT;
   const seg = detail ? 36 : 20;
   // Reifen: Flanke mit Wulst, Lauffläche mit zwei Längsrillen
   const prof: [number, number][] = [[R, -0.098], [R + 0.022, -0.108], [0.292, -0.113], [0.318, -0.1], [0.329, -0.076], [0.331, -0.044]];
-  if (detail) prof.push([0.331, -0.038], [0.323, -0.035], [0.323, -0.027], [0.331, -0.024], [0.331, 0.024], [0.323, 0.027], [0.323, 0.035], [0.331, 0.038]);
+  // Semi-Slicks: glatte Lauffläche ohne Längsrillen
+  if (detail && tire !== 'semislick') prof.push([0.331, -0.038], [0.323, -0.035], [0.323, -0.027], [0.331, -0.024], [0.331, 0.024], [0.323, 0.027], [0.323, 0.035], [0.331, 0.038]);
   prof.push([0.331, 0.044], [0.329, 0.076], [0.318, 0.1], [0.292, 0.113], [R + 0.022, 0.108], [R, 0.098]);
   // Drehkörper: Profil (Radius, Höhe) um die Y-Achse
   m.add(W.tire, new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), seg));
+  // Profilblöcke auf der Lauffläche: Schotter grobe Stollen, Spikes Stollen mit Metallstiften, Winter feine Lamellenblöcke
+  const blocks = (n: number, rows: number[], size: [number, number, number], lift: number, stagger = true) => {
+    for (let i = 0; i < n; i++)
+      rows.forEach((y, k) => {
+        const a = ((i + (stagger && k % 2 ? 0.5 : 0)) / n) * Math.PI * 2;
+        const r = 0.331 + lift;
+        m.box(W.tire, size, [Math.cos(a) * r, y, Math.sin(a) * r], [0, -a, 0]);
+      });
+  };
+  if (tire === 'gravel') blocks(detail ? 22 : 14, [-0.026, 0.026], [0.024, 0.036, 0.055], 0.007);
+  if (tire === 'spikes' || tire === 'winter') blocks(detail ? 26 : 16, [-0.03, 0, 0.03], [tire === 'spikes' ? 0.018 : 0.012, 0.024, 0.04], tire === 'spikes' ? 0.005 : 0.003);
+  if (tire === 'spikes')
+    for (let i = 0; i < (detail ? 26 : 16); i++)
+      for (const y of [-0.03, 0.03]) {
+        const a = (i / (detail ? 26 : 16)) * Math.PI * 2;
+        m.sphere(W.barrel, 0.006, [Math.cos(a) * 0.3455, y, Math.sin(a) * 0.3455], 1, 4);
+      }
+  // Flankenmarkierung (außen): farbiger Ring, beim Driftreifen breites weißes Band
+  const mark = TIRE_MARK[tire];
+  if (mark) {
+    const r0 = 0.272;
+    m.add(W.mark, new THREE.LatheGeometry([new THREE.Vector2(r0 - mark.width / 2, 0.1146), new THREE.Vector2(r0 + mark.width / 2, 0.1146)], seg));
+  }
   // Felgenbett und Felgenhorn
   m.add(W.barrel, new THREE.LatheGeometry([[R - 0.004, 0.096], [R - 0.016, 0.07], [R - 0.022, 0.0], [R - 0.016, -0.094], [R, -0.098]].map(([r, y]) => new THREE.Vector2(r, y)), seg));
   m.torus(W.rim, R - 0.003, 0.011, [0, 0.094, 0], [Math.PI / 2, 0, 0], seg);
