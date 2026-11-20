@@ -33,6 +33,8 @@ const SKID_GRAVEL = new THREE.Color('#6b5d48');
 const SKID_GRASS = new THREE.Color('#3f4a26');
 const SMOKE = new THREE.Color('#f2f2f2');
 const DUST = new THREE.Color('#b9a27c');
+const SNOWDUST = new THREE.Color('#f4f7fb');
+const MUD = new THREE.Color('#5e4a36');
 
 /**
  * Probefahrt: Fahrphysik (`game/vehicle.ts`) in der offenen Landschaft (`driveWorld.ts`): Landstraßen, Ort, Testgelände,
@@ -486,10 +488,13 @@ export function TrackScene() {
       const lz = k * (0.8 + body3.trackR);
       const wx = s.x + ch * lx + shd * lz;
       const wz = s.z - shd * lx + ch * lz;
-      const marks = sliding || (!onRoad && speed > 4);
-      fx.mark(i, marks ? { x: wx, y: height(wx, wz) + 0.04, z: wz } : null, side, onRoad ? SKID_ROAD : kind === 'gravel' ? SKID_GRAVEL : SKID_GRASS);
-      if (sliding && onRoad) fx.emit({ x: wx, y: s.y, z: wz }, 14 * Math.min(1, speed / 12), dt, SMOKE, 1.1);
-      else if (!onRoad && speed > 6) fx.emit({ x: wx, y: s.y, z: wz }, (kind === 'gravel' || kind === 'field' ? 12 : 6) * Math.min(1, speed / 20), dt, DUST, 1.5);
+      // Rallyepiste: Schotter-, Matsch- bzw. Schneespuren und aufgewirbelter Staub statt Reifenqualm
+      const loose = onRoad && !!world.roadKind;
+      const marks = sliding || (!onRoad && speed > 4) || (loose && speed > 6);
+      fx.mark(i, marks ? { x: wx, y: height(wx, wz) + 0.04, z: wz } : null, side, loose ? SKID_GRAVEL : onRoad ? SKID_ROAD : kind === 'gravel' ? SKID_GRAVEL : SKID_GRASS);
+      if (loose && speed > 6) fx.emit({ x: wx, y: s.y, z: wz }, (sliding ? 16 : 7) * Math.min(1, speed / 20), dt, world.roadKind === 'snow' || look.snowy ? SNOWDUST : world.roadKind === 'mud' ? MUD : DUST, 1.5);
+      else if (sliding && onRoad) fx.emit({ x: wx, y: s.y, z: wz }, 14 * Math.min(1, speed / 12), dt, SMOKE, 1.1);
+      else if (!onRoad && speed > 6) fx.emit({ x: wx, y: s.y, z: wz }, (kind === 'gravel' || kind === 'field' ? 12 : 6) * Math.min(1, speed / 20), dt, look.snowy ? SNOWDUST : DUST, 1.5);
     }
     fx.update(dt);
     // Unebener Boden abseits der Straße: der Aufbau rüttelt leicht
@@ -561,7 +566,9 @@ export function TrackScene() {
       setTimeout(() => finishDrive(true), 500);
     }
     // Driftwettbewerb: Punkte für Winkel × Tempo, Kombo; von der Fahrbahn abkommen oder anstoßen kostet die laufende Kette
-    if (race?.kind === 'drift' && s.raceT >= 0 && !s.done) {
+    // Freier Driftmodus: in der Probefahrt mit ESP aus zählen ebenfalls Punkte (zum Üben, ohne Preisgeld)
+    const freeDrift = !course && !driveInput.assist;
+    if ((race?.kind === 'drift' && s.raceT >= 0 && !s.done) || freeDrift) {
       const ang = Math.abs(s.vx) > 3 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
       driftStep(s.drift, ang, Math.hypot(s.vx, s.vy) * 3.6, onRoad && s.bump < 0.45, dt);
     }

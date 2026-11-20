@@ -117,6 +117,11 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   expect(/⏱ \d:\d\d/.test(await p.getByTestId('drive-time').textContent()), 'Fahrzeit läuft: ' + (await p.getByTestId('drive-time').textContent()));
   await p.getByTestId('respawn').click(); await p.waitForTimeout(400);
   expect(await p.evaluate(() => Math.abs(window.__gkDrive.sim.vx) < 0.5), '„Auf die Straße“ setzt das Auto stehend auf die Fahrbahn');
+  // Freier Driftmodus: ESP aus → Driftpunkte-Anzeige (zum Üben); ESP an → wieder weg
+  expect((await p.getByTestId('free-drift').count()) === 0, 'Mit ESP keine Driftpunkte-Anzeige');
+  await p.getByTestId('esp').click(); await p.waitForTimeout(300);
+  expect(await p.getByTestId('free-drift').isVisible(), 'ESP aus: Driftmodus mit Punkteanzeige');
+  await p.getByTestId('esp').click(); await p.waitForTimeout(300);
   // ---------- Feierabend erst nach Ablauf des Spieltags (Timer) ----------
   await p.evaluate(() => { const g = window.__gk; window.__gkLib.dayClock.ms = 180000; g.setState({ dayStartedAt: Date.now(), screen: 'garage', panel: 'computer' }); });
   await p.waitForTimeout(400);

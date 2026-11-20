@@ -393,6 +393,20 @@ export function TrackUI() {
         <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>{racing ? '↺ Letzter Kontrollpunkt' : '↺ Auf die Straße'}</button>
         {!racing && <div className="money" data-testid="drive-time">⏱ {clock(hud.elapsed)}</div>}
       </div>
+      {/* Freier Driftmodus: in der Probefahrt mit ESP aus Driftpunkte sammeln (zum Üben) */}
+      {!racing && !esp && (
+        <div className="race-hud" data-testid="free-drift">
+          <div className="drift-score">
+            {(hud.driftPts + hud.driftChain).toLocaleString('de-DE')} <span>Driftpunkte</span>
+          </div>
+          {hud.driftChain > 0 && (
+            <div className="drift-chain">
+              +{hud.driftChain.toLocaleString('de-DE')} <b>×{hud.driftCombo.toFixed(1).replace('.', ',')}</b>
+            </div>
+          )}
+          <div className="meta">Driftmodus · zum Üben</div>
+        </div>
+      )}
       <MiniMap world={world} />
       {racing && <RaceHud />}
       <div className="speedo">
