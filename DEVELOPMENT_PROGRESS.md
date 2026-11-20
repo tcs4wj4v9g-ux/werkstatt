@@ -776,3 +776,23 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Werkzeugwagen, Terminal und Spezialschrank stehen an der Rückwand.
   - Liegt die Nische über das Ende der kurzen Halle 2 hinaus, schließt eine eigene Wand sie ab. Der Laufbereich ist sauber getrennt (Nische und Öffnung).
 - Tests: Lenken beim Bremsen (≥ 10° in 1 s, trotzdem langsamer), Tuning bringt bei 160 km/h mehr als 10 % Querbeschleunigung. Rundgang um den Ständer geprüft (Skript), Werkzeugkasten in Bildern angesehen.
+
+## Keine Überschneidungen im Rennen, Koop-Rennen gegeneinander
+
+- **Kollision (`game/carCollision.ts`):** Jedes Auto besteht aus drei Kreisen (r 0,95 m) bei −1,45 / 0 / +1,45 m entlang der Längsachse, passend zu einem 4,5 m langen Auto.
+  - Bei Berührung wird sofort getrennt (nach Masse geteilt) und ein Stoß am Berührpunkt gerechnet, mit Drehimpuls (Treffer am Heck dreht das Auto), Rückprall 0,2 und Reibung 0,25.
+  - Zwei Durchgänge, damit Berührungen von drei Autos sauber aufgehen.
+  - Ein „festes“ Gegenüber (Koop-Mitspieler) bewegt sich nicht.
+  - Tests: Auffahren von hinten, Treffer am Heck von der Seite, festes Gegenüber – nie mehr als 5 cm Überschneidung.
+- **Koop-Rennen (`net/coopRace.ts`, `ui/CoopRaceUI.tsx`):** Läuft vollständig über die Lage der Mitglieder (Presence), ohne Schema-Änderung.
+  - `lobby`: Strecke und Startzeit, `join`: Teilnahme mit Auto, `rr`: eigene Fahrzeuglage im Rennen.
+  - **Ablauf:**
+    - Am Computer unter „Rennen“ wählt man Strecke und Auto und schreibt das Rennen aus. Mitspieler bekommen eine Ansage und fahren mit ihrem Auto mit.
+    - Der Ausschreibende startet. Die Startzeit liegt 10 s voraus, die Strecke wird schon beim Ausschreiben bzw. Mitfahren vorberechnet.
+    - Alle Geräte wechseln von selbst in die Startaufstellung, der Countdown läuft nach der Startzeit.
+  - **Im Rennen:**
+    - Jedes Gerät rechnet nur sein eigenes Auto. Die anderen werden aus ihrer Lage gezeichnet (bis 0,6 s vorausgerechnet) und sind für das eigene Auto feste Hindernisse.
+    - Live-Platz unter den Teilnehmern.
+  - **Ergebnis:** Tabelle live aus den Lagen; wer noch fährt, steht mit „fährt noch …“ da. Kein Startgeld, kein Preisgeld (gemeinsames Konto).
+  - Grenze: Die Startzeit ist die Uhr des Ausschreibenden. Gehen die Uhren der Geräte stark auseinander, startet ein Gerät entsprechend früher oder später (Geräte mit Netzzeit liegen meist unter einer Sekunde auseinander).
+- Tests: `carCollision.test.ts`, `koop.cjs` (Ausschreibung sehen, mitfahren, Start, beide auf der Strecke, Platzanzeige, beide im Ziel, gemeinsamer Endstand).

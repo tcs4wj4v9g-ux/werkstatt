@@ -316,6 +316,28 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await G(B, () => window.__gk.setState({ screen: 'garage' }));
   expect(await until(A, (u) => !window.__gkCoop.useAway.getState().uids.includes(u), uid0, 20000), 'Nach der Probefahrt steht es wieder da');
 
+  // ---------- Koop-Rennen gegeneinander: ausschreiben, mitfahren, gemeinsamer Start, Ergebnis bei beiden ----------
+  await G(A, () => { const g = window.__gk; const L = window.__gkLib; const cars = [...g.getState().cars]; for (const i of [2, 3]) { const c = L.createCar('renard_twingle', [], Math.random); c.fluids.oil.level = 4; cars[i] = c; } g.setState({ cars }); });
+  await both(A, B);
+  await G(A, () => window.__gk.getState().setPanel('computer', -77)); await A.waitForTimeout(500);
+  await A.getByTestId('coop-race-course').selectOption('ost');
+  await A.getByTestId('coop-race-host-2').click();
+  await G(B, () => window.__gk.getState().setPanel('computer', -77));
+  expect(await until(B, () => !!document.querySelector('[data-testid="coop-race-join-3"]'), null, 15000), 'Spieler 2 sieht die Ausschreibung von Spieler 1');
+  await B.getByTestId('coop-race-join-3').click();
+  expect(await until(A, () => { const b = document.querySelector('[data-testid="coop-race-start"]'); return !!b && !b.disabled; }, null, 15000), 'Spieler 1 sieht den Mitfahrer – Start möglich: ' + (await G(A, () => (document.querySelector('[data-testid="coop-lobby-members"]') || {}).textContent)));
+  await A.getByTestId('coop-race-start').click();
+  expect(await until(A, () => window.__gk.getState().screen === 'track', null, 12000) && await until(B, () => window.__gk.getState().screen === 'track', null, 12000), 'Beide stehen in der Startaufstellung');
+  expect(await until(A, () => document.querySelector('[data-testid="race-place"]') && /\/2/.test(document.querySelector('[data-testid="race-place"]').textContent), null, 12000), 'Platzanzeige unter zwei Fahrern');
+  await until(A, () => window.__gkDrive.sim.raceT > 0, null, 15000);
+  for (const P of [A, B]) await G(P, () => { const d = window.__gkDrive; d.sim.autopilot = 22; d.sim.timeScale = 3; });
+  const sawRival = await until(B, () => { const d = window.__gkDrive; return d && d.sim.raceT > 2; }, null, 15000);
+  expect(sawRival, 'Rennen läuft auf beiden Geräten');
+  expect(await until(A, () => window.__gk.getState().panel === 'raceResult', null, 120000) && await until(B, () => window.__gk.getState().panel === 'raceResult', null, 120000), 'Beide sind im Ziel');
+  const rows = async (P) => until(P, () => { const t = document.querySelector('[data-testid="coop-race-results"]'); return !!t && t.querySelectorAll('.race-row').length === 2 && !/fährt noch/.test(t.textContent); }, null, 15000);
+  expect(await rows(A) && await rows(B), 'Gemeinsamer Endstand mit beiden Zeiten: ' + (await G(A, () => document.querySelector('[data-testid="coop-race-results"]').textContent)));
+  for (const P of [A, B]) await G(P, () => window.__gk.getState().setPanel(null));
+
   // ---------- Test 7: Wiederbeitritt ----------
   const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools), stand: norm(await G(B, () => window.__gk.getState().cars[15])) };
   await G(A, () => window.__gkCoop.leave()); await G(B, () => window.__gkCoop.leave()); await B.waitForTimeout(600);

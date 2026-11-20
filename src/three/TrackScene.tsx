@@ -1,4 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
+import { remotePlayers, useCoop } from '../net/coop';
+import { coopRaceOut, participantsOf } from '../net/coopRace';
 import { textTexture } from './textures';
 import { aiInput, courseOf, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
 import { createCar } from '../game/market';
@@ -17,6 +19,7 @@ import { LAKE } from './driveWorld';
 import { worldFor } from './circuits';
 import { Env } from './Env';
 import { DriveEffects } from './driveEffects';
+import { collideAll } from '../game/carCollision';
 import type { DriveWorld } from './driveWorld';
 import { BODY_SPECS } from './carGeometry';
 
@@ -42,8 +45,21 @@ export function TrackScene() {
   const raceRun = useGame((s) => s.race);
   const day = useGame((s) => s.day);
   // Zeitrennen: Strecke und Kontrollpunkte (gleichmäßig verteilt, der letzte ist das Ziel)
-  const race = useMemo(() => (raceRun ? raceForDay(day) : null), [raceRun, day]);
-  const course = useMemo(() => (race ? courseOf(race.course) : null), [race]);
+  const coop = raceRun?.coop ?? null;
+  const race = useMemo(() => (raceRun && !coop ? raceForDay(day) : null), [raceRun, coop, day]);
+  const course = useMemo(() => (race ? courseOf(race.course) : coop ? courseOf(coop.course) : null), [race, coop]);
+  // Koop-Rennen: Teilnehmer (feste Reihenfolge = Startplätze); ich selbst rechne nur mein Auto
+  const me = useCoop.getState().me;
+  const rivals = useMemo(() => {
+    if (!coop) return [];
+    return participantsOf(useCoop.getState().members as never, me, coop.lobby).map((p) => {
+      const look = createCar(p.join.modelId, [], () => 0.5, {});
+      look.color = p.join.color;
+      return { id: p.member.id, name: p.member.name, join: p.join, look, st: initialState(0, 0, 0), seen: false };
+    });
+  }, [coop, me]);
+  const myIndex = Math.max(0, rivals.findIndex((r) => r.id === me));
+  const rivalRefs = useRef<(THREE.Group | null)[]>([]);
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const group = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
@@ -61,7 +77,7 @@ export function TrackScene() {
   const startAt = course ? world.samples[course.start] : null;
   // Rennen gegen Gegner: Startaufstellung zu zweit nebeneinander, der Spieler in der Mitte des Feldes
   const grid = race?.kind === 'grid' && course;
-  const mySlot = grid ? gridSlot(world, course, PLAYER_GRID) : null;
+  const mySlot = grid ? gridSlot(world, course, PLAYER_GRID) : coop && course ? gridSlot(world, course, myIndex) : null;
   const npcs = useMemo(
     () =>
       grid
@@ -82,6 +98,18 @@ export function TrackScene() {
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
 
+  /** Platz im Koop-Rennen: Mitspieler im Ziel (vor mir) oder mit mehr Fortschritt liegen vorn. */
+  const coopPlace = () => {
+    const s = sim.current;
+    let ahead = 0;
+    for (const r of rivals) {
+      if (r.id === me) continue;
+      const rr = remotePlayers.get(r.id)?.rr;
+      if (!rr || rr.id !== coop?.lobby) continue;
+      if (rr.fin !== null ? !s.done || rr.fin < s.raceT : rr.p > s.progress) ahead++;
+    }
+    return ahead + 1;
+  };
   /** Aktueller Platz des Spielers: Gegner im Ziel oder mit mehr Fortschritt liegen vorn. */
   const placeNow = () => {
     const s = sim.current;
@@ -233,7 +261,8 @@ export function TrackScene() {
       driveInput.brake = s.vx > s.autopilot + 4 ? 0.5 : 0;
     }
     // Countdown: Auto steht (Gas geben geht – die Drehzahl steigt), los geht es bei null
-    if (course && !s.done) s.raceT += dt;
+    if (coop) s.raceT = s.done ? s.raceT : (Date.now() - coop.startAt) / 1000;
+    else if (course && !s.done) s.raceT += dt;
     const held = course && s.raceT < 0;
     stepVehicle(spec, s, held ? { ...driveInput, brake: 0, handbrake: false } : driveInput, { grade, ...surface }, dt);
     if (held) {
@@ -253,11 +282,47 @@ export function TrackScene() {
           s.done = true;
           const time = s.raceT;
           roadAudio.hit('clunk');
+          if (coop && coopRaceOut.car) coopRaceOut.car.fin = Math.round(time * 100) / 100;
           setTimeout(() => finishRace(Math.round(time * 100) / 100, grid ? standings(time) : undefined), 1200);
         }
       }
     }
     s.v = s.vx;
+
+    // --- Koop-Rennen: eigene Lage hinaus, Autos der Mitspieler aus ihrer Lage (kurz vorausgerechnet), feste Hindernisse
+    if (coop) {
+      const prev = coopRaceOut.car;
+      coopRaceOut.car = { id: coop.lobby, x: Math.round(s.x * 100) / 100, z: Math.round(s.z * 100) / 100, h: Math.round(s.heading * 1000) / 1000, vx: Math.round(s.vx * 10) / 10, vy: Math.round(s.vy * 10) / 10, yr: Math.round(s.yawRate * 100) / 100, p: s.progress, fin: prev?.id === coop.lobby ? prev.fin : null };
+      const bodies: { st: VehicleState; mass: number; inertia: number; fixed?: boolean }[] = [{ st: s, mass: spec.mass, inertia: spec.yawInertia }];
+      rivals.forEach((r, k) => {
+        const g = rivalRefs.current[k];
+        if (r.id === me) {
+          if (g) g.visible = false;
+          return;
+        }
+        const rp = remotePlayers.get(r.id);
+        const rr = rp?.rr;
+        if (!rr || rr.id !== coop.lobby) {
+          if (g) g.visible = false;
+          return;
+        }
+        const ahead = Math.min(0.6, Math.max(0, (performance.now() - rp!.at) / 1000));
+        const c = Math.cos(rr.h);
+        const sn = Math.sin(rr.h);
+        Object.assign(r.st, { x: rr.x + (rr.vx * c - rr.vy * sn) * ahead, z: rr.z - (rr.vx * sn + rr.vy * c) * ahead, heading: rr.h + rr.yr * ahead, vx: rr.vx, vy: rr.vy, yawRate: rr.yr });
+        r.seen = true;
+        bodies.push({ st: r.st, mass: 1400, inertia: 2400, fixed: true });
+        if (g) {
+          g.visible = true;
+          g.position.set(r.st.x, height(r.st.x, r.st.z), r.st.z);
+          g.rotation.set(0, r.st.heading, 0);
+        }
+      });
+      if (collideAll(bodies) > 1.5 && s.bump <= 0) {
+        roadAudio.hit('bump');
+        s.bump = 0.5;
+      }
+    }
 
     // --- Gegner: fahren mit derselben Physik, überholen langsamere Autos, berühren sich (Abstoßen)
     if (grid) {
@@ -296,37 +361,12 @@ export function TrackScene() {
         if (c.finished === null && c.ai.prog >= course!.length) c.finished = s.raceT;
       });
       if (s.raceT < 0) for (const c of npcs) Object.assign(c.st, { vx: 0, vy: 0, yawRate: 0 });
-      // Berührungen: Autos als Kreise (r 1,15 m), auseinanderschieben und Geschwindigkeit längs der Verbindung austauschen
-      for (let a = 0; a < cars.length; a++)
-        for (let b = a + 1; b < cars.length; b++) {
-          const A = cars[a].st;
-          const B = cars[b].st;
-          const dx = B.x - A.x;
-          const dz = B.z - A.z;
-          const d = Math.hypot(dx, dz);
-          if (d > 2.3 || d < 1e-3) continue;
-          const nx = dx / d;
-          const nz = dz / d;
-          const push = (2.3 - d) / 2;
-          A.x -= nx * push;
-          A.z -= nz * push;
-          B.x += nx * push;
-          B.z += nz * push;
-          const va = toWorld(A);
-          const vb = toWorld(B);
-          const rel = (vb.x - va.x) * nx + (vb.z - va.z) * nz;
-          if (rel < 0) {
-            const j = -rel * 0.6;
-            fromWorld(A, va.x - nx * j, va.z - nz * j);
-            fromWorld(B, vb.x + nx * j, vb.z + nz * j);
-            A.yawRate += (Math.random() - 0.5) * 0.4 * Math.min(1, -rel / 5);
-            B.yawRate += (Math.random() - 0.5) * 0.4 * Math.min(1, -rel / 5);
-            if (a === 0 && s.bump <= 0 && -rel > 1.5) {
-              roadAudio.hit('bump');
-              s.bump = 0.5;
-            }
-          }
-        }
+      // Berührungen: jedes Auto als drei Kreise (Heck, Mitte, Front) – nichts schiebt sich ineinander
+      const hit = collideAll([{ st: s, mass: spec.mass, inertia: spec.yawInertia }, ...npcs.map((c) => ({ st: c.st, mass: c.spec.mass, inertia: c.spec.yawInertia }))]);
+      if (hit > 1.5 && s.bump <= 0) {
+        roadAudio.hit('bump');
+        s.bump = 0.5;
+      }
       // Gegner zeichnen
       npcs.forEach((c, k) => {
         const g = npcRefs.current[k];
@@ -508,7 +548,7 @@ export function TrackScene() {
     if (s.hud > 0.08) {
       s.hud = 0;
       const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp, place: grid ? placeNow() : 0, field: grid ? npcs.length + 1 : 0 });
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp, place: grid ? placeNow() : coop ? coopPlace() : 0, field: grid ? npcs.length + 1 : coop ? rivals.length : 0 });
     }
   });
 
@@ -528,6 +568,11 @@ export function TrackScene() {
       <DriveScenery world={world} />
       <primitive object={fx.group} />
       {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} />}
+      {rivals.map((r, k) => (
+        <group key={r.id} ref={(g) => void (rivalRefs.current[k] = g)} visible={false}>
+          <CarModel body={CAR_MODELS[r.look.modelId].body} color={r.join.color} modelId={r.look.modelId} car={r.look} lod="simple" />
+        </group>
+      ))}
       {npcs.map((c, k) => (
         <group key={k} ref={(g) => void (npcRefs.current[k] = g)}>
           <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
@@ -618,16 +663,4 @@ function gridSlot(w: DriveWorld, course: { start: number }, g: number) {
   const p = w.samples[idx];
   const lat = (g % 2 === 0 ? 1 : -1) * Math.min(2.3, w.roadWidth / 4);
   return { x: p.x + p.nx * lat, z: p.z + p.nz * lat, heading: Math.atan2(-p.tz, p.tx), near: idx, prog: -steps };
-}
-/** Geschwindigkeit eines Autos in Weltkoordinaten (x, z) bzw. zurück ins Fahrzeug. */
-function toWorld(v: VehicleState) {
-  const c = Math.cos(v.heading);
-  const sn = Math.sin(v.heading);
-  return { x: v.vx * c - v.vy * sn, z: -(v.vx * sn + v.vy * c) };
-}
-function fromWorld(v: VehicleState, wx: number, wz: number) {
-  const c = Math.cos(v.heading);
-  const sn = Math.sin(v.heading);
-  v.vx = wx * c - wz * sn;
-  v.vy = -(wx * sn + wz * c);
 }

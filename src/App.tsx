@@ -1,4 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber';
+import { CoopRaceWatcher } from './ui/CoopRaceUI';
 import { addPlay, isActive } from './game/playtime';
 import { useEffect, useState } from 'react';
 import { dayClock, dayLeft, useGame } from './game/store';
@@ -110,6 +111,7 @@ export function App() {
         <ChatFeed />
         <ChatPanel />
         <CoopElsewhere />
+        <CoopRaceWatcher />
       </div>
       </Recover>
       <div className="rotate">

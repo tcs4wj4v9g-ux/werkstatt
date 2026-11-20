@@ -31,6 +31,8 @@ const OPEN_REF_PS = 600;
 const REF_GRIP: Record<RaceClass, number> = { c150: 1, c250: 1.04, c400: 1.1, open: 1.16 };
 
 export type CourseId = 'runde' | 'ost' | 'west' | CircuitId;
+/** Alle Strecken (Auswahl für Koop-Rennen). */
+export const COURSE_IDS: CourseId[] = ['ost', 'west', 'runde', 'eifel', 'motodrom', 'hafen', 'ardennen'];
 export interface Course {
   id: CourseId;
   name: string;

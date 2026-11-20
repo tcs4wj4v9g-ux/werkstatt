@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { leaveCoopRace } from '../net/coopRace';
 import { courseOf, raceClock, raceForDay, raceTargets } from '../game/races';
 import { FARMS, LAKE, PAD, WORKSHOP, type DriveWorld } from '../three/driveWorld';
 import { worldFor } from '../three/circuits';
@@ -273,6 +274,28 @@ function Gauge() {
 function RaceHud() {
   const hud = useDriveHud();
   const day = useGame((s) => s.day);
+  const coop = useGame((s) => s.race?.coop);
+  if (coop) {
+    // Koop-Rennen: Countdown, Platz unter den Mitspielern, Uhr, Kontrollpunkte
+    return (
+      <>
+        {hud.raceT < 0.8 && <div className="countdown" data-testid="countdown">{hud.raceT < 0 ? Math.ceil(-hud.raceT) : 'LOS!'}</div>}
+        <div className="race-hud" data-testid="race-hud">
+          {hud.field > 1 && (
+            <div className="race-place" data-testid="race-place">
+              P{hud.place}<span>/{hud.field}</span>
+            </div>
+          )}
+          <div className="race-time">{raceClock(Math.max(0, hud.raceT))}</div>
+          <div className="meta">
+            {hud.laps > 1 && <b>Runde {Math.min(hud.laps, Math.floor(hud.cp / (hud.cpTotal / hud.laps)) + 1)}/{hud.laps} · </b>}
+            Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}
+          </div>
+          <div className="race-targets">Koop-Rennen</div>
+        </div>
+      </>
+    );
+  }
   const race = raceForDay(day);
   if (!race) return null;
   const t = raceTargets(race);
@@ -311,8 +334,8 @@ export function TrackUI() {
   const finishDrive = useGame((s) => s.finishDrive);
   const finishRace = useGame((s) => s.finishRace);
   const racing = useGame((s) => !!s.race);
-  const raceTitle = useGame((s) => (s.race ? raceForDay(s.day)?.title : null));
-  const worldId = useGame((s) => (s.race ? courseOf(raceForDay(s.day)?.course ?? 'ost').world : 'land'));
+  const raceTitle = useGame((s) => (s.race?.coop ? `Koop-Rennen ${courseOf(s.race.coop.course).name}` : s.race ? raceForDay(s.day)?.title : null));
+  const worldId = useGame((s) => (s.race?.coop ? courseOf(s.race.coop.course).world : s.race ? courseOf(raceForDay(s.day)?.course ?? 'ost').world : 'land'));
   const world = worldFor(worldId);
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
@@ -327,7 +350,12 @@ export function TrackUI() {
   return (
     <>
       <div className="topbar">
-        <button className="btn ghost" data-testid="drive-end" onClick={() => (racing ? finishRace(null) : finishDrive(counts))}>✕ Abbrechen</button>
+        <button className="btn ghost" data-testid="drive-end" onClick={() => {
+            if (!racing) return finishDrive(counts);
+            const wasCoop = !!useGame.getState().race?.coop;
+            finishRace(null);
+            if (wasCoop) leaveCoopRace();
+          }}>✕ Abbrechen</button>
         <div className="title">{racing ? raceTitle : counts ? 'Zum Beenden auf dem Werkstatt-Vorplatz anhalten' : 'Probefahrt – fahr, wohin du willst'}</div>
         <button className={`btn ${esp ? '' : 'active'}`} data-testid="esp" onClick={() => setEsp(!esp)}>{esp ? '🛡 ESP an' : '⚠ ESP aus'}</button>
         <button className="btn" data-testid="camera" onClick={() => hud.set({ camera: next(hud.camera) })}>🎥 {CAMERA_LABEL[hud.camera]}</button>
