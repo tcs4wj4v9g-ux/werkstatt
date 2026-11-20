@@ -361,3 +361,31 @@ describe('Fahrzeugstatistik', () => {
     expect(carStats(worn).brake100).toBeGreaterThan(carStats(base).brake100 * 1.2);
   });
 });
+
+describe('ABS: lenkfähig beim Bremsen', () => {
+  it('Vollbremsung mit Einlenken: fast so viel Kurswechsel wie ohne Bremse, trotzdem deutliche Verzögerung; stabil', () => {
+    for (const id of ['renard_twingle', 'bavaria_330', 'bmv_m4_g82']) {
+      const sp = mk(id);
+      const go = (brake: number, steer: number) => {
+        const s = initialState(0, 0, 0);
+        s.vx = 90 / 3.6;
+        s.gear = 4;
+        let b = 0;
+        for (let i = 0; i < 60; i++) {
+          stepVehicle(sp, s, { steer, throttle: 0, brake }, flat, 1 / 60);
+          b = Math.max(b, beta(s));
+        }
+        return { head: Math.abs(s.heading), v: s.vx * 3.6, beta: b };
+      };
+      for (const steer of [0.6, 1]) {
+        const free = go(0, steer);
+        const braked = go(1, steer);
+        expect(braked.head, `${id} Lenkung ${steer}: Kurswechsel beim Bremsen`).toBeGreaterThan(free.head * 0.85);
+        expect(braked.v, `${id} Lenkung ${steer}: bremst trotzdem`).toBeLessThan(free.v - 10);
+        expect(braked.beta, `${id} Lenkung ${steer}: bleibt stabil`).toBeLessThan(12);
+      }
+      // Geradeaus bremsen: volle Verzögerung wie bisher (kein Lenkwunsch, keine Reserve)
+      expect(go(1, 0).v).toBeLessThan(go(1, 0.6).v);
+    }
+  });
+});
