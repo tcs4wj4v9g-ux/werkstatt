@@ -115,6 +115,15 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const brk = await p.evaluate(() => window.__gkDrive.input.brake);
   await p.mouse.up(); await p.waitForTimeout(200);
   expect(brk > 0.3 && brk < 0.7 && (await p.evaluate(() => window.__gkDrive.input.brake)) === 0, 'Bremsregler dosierbar: halb ' + brk.toFixed(2) + ', losgelassen 0');
+  // Rückwärtsgang: Wählhebel auf R, Gas → Auto fährt rückwärts, Anzeige „R“; zurück auf D
+  await p.getByTestId('respawn').click(); await p.waitForTimeout(400);
+  await p.getByTestId('gearsel').dispatchEvent('pointerdown'); await p.waitForTimeout(200);
+  await p.evaluate(() => { window.__gkDrive.input.throttle = 1; }); await p.waitForTimeout(1500);
+  const back = await p.evaluate(() => ({ vx: window.__gkDrive.sim.vx, gear: window.__gkDrive.sim.gear }));
+  await p.evaluate(() => { window.__gkDrive.input.throttle = 0; window.__gkDrive.input.brake = 1; }); await p.waitForTimeout(1200);
+  expect(back.gear === -1 && back.vx < -1 && (await p.getByTestId('gear').textContent()) === 'R', 'Rückwärtsgang: R eingelegt, fährt rückwärts (' + back.vx.toFixed(1) + ' m/s)');
+  await p.getByTestId('gearsel').dispatchEvent('pointerdown'); await p.evaluate(() => { window.__gkDrive.input.brake = 0; }); await p.waitForTimeout(300);
+  expect((await p.evaluate(() => window.__gkDrive.input.reverse)) === false, 'Wählhebel zurück auf D');
   const stBox = await p.getByTestId('steer').boundingBox();
   await p.mouse.move(stBox.x + stBox.width / 2, stBox.y + stBox.height / 2); await p.mouse.down();
   await p.mouse.move(stBox.x + stBox.width - 6, stBox.y + stBox.height / 2, { steps: 4 }); await p.waitForTimeout(200);

@@ -261,6 +261,8 @@ export interface VisualTune {
   hbrake?: boolean;
   /** Unterfahrschutz (Rallye): Aluplatte unter Motor und Getriebe – gleitet über Schotter, Matsch und Schnee. */
   skid?: boolean;
+  /** Überrollkäfig (rein optisch, im Innenraum sichtbar). */
+  cage?: boolean;
   front?: number;
   rear?: number;
   skirts?: boolean;

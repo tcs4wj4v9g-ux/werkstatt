@@ -47,6 +47,8 @@ export function TrackScene() {
   const finishRace = useGame((s) => s.finishRace);
   const raceRun = useGame((s) => s.race);
   const day = useGame((s) => s.day);
+  // Kameraart (Cockpit: Scheiben von innen fast klar)
+  const camMode = useDriveHud((h) => h.camera);
   // Zeitrennen: Strecke und Kontrollpunkte (gleichmäßig verteilt, der letzte ist das Ziel)
   const coop = raceRun?.coop ?? null;
   const race = useMemo(() => (raceRun && !coop ? raceForDay(day) : null), [raceRun, coop, day]);
@@ -154,6 +156,7 @@ export function TrackScene() {
     (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec, spin: spinVis.current };
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     driveInput.handbrake = false;
+    driveInput.reverse = false;
     s.respawn = useDriveHud.getState().respawn;
     if (course) {
       s.near = mySlot ? mySlot.near : course.start;
@@ -614,7 +617,7 @@ export function TrackScene() {
         <CarShadow />
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}
-          <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} spin={spinVis} modelId={car.modelId} car={car} lod="simple" />
+          <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} spin={spinVis} modelId={car.modelId} car={car} lod="simple" inside={camMode === 'cockpit'} />
         </group>
         <mesh ref={smokeRef} position={[-2.3, 0.5, 0]} visible={false} raycast={() => null}>
           <sphereGeometry args={[0.45, 8, 6]} />

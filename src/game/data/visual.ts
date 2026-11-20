@@ -43,6 +43,7 @@ export const VISUAL_PARTS: VisualPart[] = [
   P('diff:welded', 'diff', 'welded', 'Differential verschweißt', 150, 'Antrieb', 'Beide Räder starr verbunden: driftet sehr leicht, rangiert ruppig, schiebt in engen Kurven'),
   P('steerkit', 'steerKit', true, 'Lenkwinkel-Kit', 1250, 'Drift & Rallye', 'Mehr Radeinschlag – größere Driftwinkel möglich'),
   P('hbrake', 'hbrake', true, 'Hydraulische Handbremse', 480, 'Drift & Rallye', 'Hebel am Mitteltunnel: blockiert die Hinterräder schlagartig'),
+  P('cage', 'cage', true, 'Überrollkäfig', 1600, 'Drift & Rallye', 'Stahlrohrkäfig im Innenraum – Hauptbügel, A-Säulen- und Türstreben'),
   P('skid', 'skid', true, 'Unterfahrschutz', 540, 'Drift & Rallye', 'Aluplatte unter Motor und Getriebe – gleitet über Schotter, Matsch und Schnee'),
   P('front:1', 'front', 1, 'Frontstoßstange Sport', 690, 'Karosserie', 'Große Lufteinlässe, Splitter'),
   P('front:2', 'front', 2, 'Frontstoßstange Rennsport', 990, 'Karosserie', 'Tiefer Frontsplitter, offene Einlässe'),

@@ -122,6 +122,11 @@ h4 { margin-top: 12px; margin-bottom: 4px; font-size: 12px; text-transform: uppe
 .pedal.brake { width: 104px; height: 84px; background: rgba(179, 38, 30, 0.6); }
 .pedal.hand { width: 96px; height: 96px; font-size: 13px; background: rgba(120, 90, 20, 0.6); }
 .pedals { display: flex; flex-direction: column; gap: 10px; }
+/* Wählhebel D/R: aktiver Gang hell, R rot hinterlegt */
+.pedal.gearsel { width: 96px; height: 56px; font-size: 20px; letter-spacing: 2px; }
+.pedal.gearsel span { opacity: 0.35; }
+.pedal.gearsel span.on { opacity: 1; }
+.pedal.gearsel.rev { background: rgba(179, 38, 30, 0.6); }
 /* Federnde Schieberegler: Lenkung (breit, links), Gas (schmal, rechts) */
 .spring { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 24px; background: rgba(20, 22, 26, 0.5); border: 2px solid rgba(255, 255, 255, 0.35); }
 .spring .rail { position: absolute; background: rgba(255, 255, 255, 0.25); border-radius: 4px; }

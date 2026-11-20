@@ -853,3 +853,12 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Schotter: grobe Stollen in zwei versetzten Reihen, staubig, orange Linie
   - Spikes: Stollen mit Metallstiften, graue Linie
 - Bei niedriger Grafikstufe gibt es weniger Profilblöcke.
+
+## Cockpit: drehendes Lenkrad, sichtbare Tuningteile
+
+- Das Lenkrad ist ein eigenes Netz (`steeringWheelGeometry`, `steeringWheelPose`) und dreht mit der Lenkung: voller Einschlag sind etwa 140° am Lenkrad.
+- Sportlenkrad: kleiner, dickerer Kranz, unten abgeflacht, rote Markierung oben, drei schmale Speichen.
+- Hydraulische Handbremse: hoher Hebel mit rotem Griff rechts neben dem Lenkrad, mit Ausgleichsbehälter.
+- Neues Teil **Überrollkäfig** (Drift & Rallye, 1.600 €, rein optisch): Hauptbügel, A-Säulen-, Dach- und Türstreben, Diagonale. Die Rohre folgen der Innenseite der Kabine.
+- Im Cockpit sind die Scheiben von innen fast klar (vorher stark getönt).
+- Sportsitze und Haubenhutze waren schon sichtbar.

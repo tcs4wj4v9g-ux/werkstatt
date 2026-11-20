@@ -189,7 +189,7 @@ export function JunkPanel() {
 
 const FIELDS: { field: keyof VisualTune; label: string }[] = [
   { field: 'rim', label: 'Felgen' }, { field: 'rimSize', label: 'Felgengröße' }, { field: 'rimColor', label: 'Felgenfarbe' }, { field: 'suspension', label: 'Fahrwerk' },
-  { field: 'tires', label: 'Reifen' }, { field: 'diff', label: 'Differential' }, { field: 'steerKit', label: 'Lenkwinkel-Kit' }, { field: 'hbrake', label: 'Handbremse' }, { field: 'skid', label: 'Unterfahrschutz' },
+  { field: 'tires', label: 'Reifen' }, { field: 'diff', label: 'Differential' }, { field: 'steerKit', label: 'Lenkwinkel-Kit' }, { field: 'hbrake', label: 'Handbremse' }, { field: 'skid', label: 'Unterfahrschutz' }, { field: 'cage', label: 'Überrollkäfig' },
   { field: 'front', label: 'Frontstoßstange' }, { field: 'rear', label: 'Heckschürze' }, { field: 'skirts', label: 'Seitenschweller' }, { field: 'spoiler', label: 'Spoiler' },
   { field: 'hood', label: 'Motorhaube' }, { field: 'flares', label: 'Verbreiterungen' }, { field: 'finish', label: 'Lackart' }, { field: 'wrap', label: 'Folie' },
   { field: 'lamps', label: 'Rückleuchten' }, { field: 'tips', label: 'Endrohre' }, { field: 'seats', label: 'Sitze' }, { field: 'wheel', label: 'Lenkrad' },

@@ -11,7 +11,7 @@ import type { BodyStyle, CarInstance, FluidId, ToolId, VisualTune, ZoneId } from
 import { CAR_MODELS, REAR_ENGINE } from '../game/data/cars';
 import { REAR_BAY } from './player';
 import { BODY_SPECS, carGeometry, doorHinge } from './carGeometry';
-import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, TIRE_MARK, trimGeometry, wheelGeometry, type RimStyle, type TireLook } from './carParts';
+import { doorTrimGeometry, interiorGeometry, lookOf, RIM_COLOR, SLOT, steeringWheelGeometry, steeringWheelPose, TIRE_MARK, trimGeometry, wheelGeometry, type RimStyle, type TireLook } from './carParts';
 import { TEST_MODE, useGfxSettings } from './gfx';
 import { dropOf } from '../game/data/visual';
 import { fastenerText } from '../game/data/tools';
@@ -49,6 +49,8 @@ interface Props {
   /** 'simple' lässt Motorraum, Schrauben und Bremsenteile weg (Hof, Waschplatz, Markt). */
   lod?: 'full' | 'simple';
   steer?: React.MutableRefObject<number>;
+  /** Kamera sitzt im Auto (Cockpit): Scheiben von innen fast klar statt getönt. */
+  inside?: boolean;
   /** Drehwinkel der Räder vorn/hinten (rad) – auf der Probefahrt rollen sie mit (hinten auch durchdrehend oder blockiert). */
   spin?: React.MutableRefObject<{ f: number; r: number }>;
   /** Motorhaube auch in der einfachen Darstellung bedienbar (Auto auf einer Hebebühne, aber gerade nicht in Arbeit). */
@@ -454,7 +456,7 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
   attr.needsUpdate = true;
 }
 
-export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, spin, modelId, hoodTap }: Props) {
+export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, spin, modelId, hoodTap, inside = false }: Props) {
   const G = useGfxSettings();
   const flares = !!car?.visual?.flares;
   const shared = useMemo(() => carGeometry(body, G.detail, flares), [body, G.detail, flares]);
@@ -478,6 +480,7 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
 
   const root = useRef<THREE.Group>(null);
   const hood = useRef<THREE.Group>(null);
+  const steeringWheel = useRef<THREE.Mesh>(null);
   const wheelFL = useRef<THREE.Group>(null);
   const wheelFR = useRef<THREE.Group>(null);
   /** Drehende Teile je Rad (fl, fr, rl, rr) – nur in der einfachen Darstellung (Probefahrt, Hof). */
@@ -553,7 +556,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   mats.solid.roughness = 0.26 + dirt * 0.5;
   mats.glass.color.set('#0b1217').lerp(DIRT, glassDirt * 0.5);
   mats.glass.roughness = 0.03 + glassDirt * 0.55;
-  mats.glass.opacity = 0.5 + glassDirt * 0.3;
+  // Von innen (Cockpit) sieht man durch die Scheibe fast ungetönt hinaus
+  mats.glass.opacity = inside ? 0.14 + glassDirt * 0.3 : 0.5 + glassDirt * 0.3;
 
   useFrame((_, dt) => {
     if (hood.current) {
@@ -563,6 +567,8 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
     }
     if (steer) {
       for (const w of [wheelFL.current, wheelFR.current]) if (w) w.rotation.y = steer.current * 0.45;
+      // Lenkrad dreht mit (Übersetzung: voller Einschlag ≈ 140° am Lenkrad)
+      if (steeringWheel.current) steeringWheel.current.rotation.x = -steer.current * 2.4;
     }
     if (spin) {
       // Achse quer zum Auto (z): vorwärts rollen heißt Drehung um −z
@@ -582,7 +588,9 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
   const look = useMemo(() => lookOf(model, body, engine, car?.visual), [model, body, engine, car?.visual]);
   const trim = useMemo(() => trimGeometry(body, look, G.detail), [body, look, G.detail]);
   const doorTrim = useMemo(() => doorTrimGeometry(body, look), [body, look]);
-  const interior = useMemo(() => interiorGeometry(body, G.detail, look.sportSeats, look.sportWheel), [body, G.detail, look.sportSeats, look.sportWheel]);
+  const interior = useMemo(() => interiorGeometry(body, G.detail, look.sportSeats, look.sportWheel, { hbrake: look.hbrake, cage: look.cage }), [body, G.detail, look.sportSeats, look.sportWheel, look.hbrake, look.cage]);
+  const swPose = useMemo(() => steeringWheelPose(body), [body]);
+  const swGeo = useMemo(() => steeringWheelGeometry(G.detail, look.sportWheel), [G.detail, look.sportWheel]);
   mats.seat.color.set(look.seat);
   mats.seat2.color.set(look.seat2);
   const trimMats = useMemo(() => {
@@ -946,6 +954,10 @@ export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'ful
         <mesh geometry={geo.cabin} material={cabinMats} castShadow />
         <mesh geometry={trim} material={trimMats} />
         <mesh geometry={interior} material={trimMats} />
+        {/* Lenkrad als eigenes Netz an der Lenksäule – dreht sich mit der Lenkung */}
+        <group position={swPose.pos} rotation={[0, 0, -swPose.tilt]}>
+          <mesh ref={steeringWheel} geometry={swGeo} material={trimMats} />
+        </group>
         {/* Unterboden und Spritzwand */}
         {/* Unterbodenplatte nur unter Innenraum und Kofferraum – unter dem Motor offen (dort kommt man von unten an Ölwanne und Lager) */}
         {(() => {
