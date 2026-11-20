@@ -35,6 +35,9 @@ export interface CarLook {
   rimSize: number;
   /** Reifenart (Profil und Flankenmarkierung). */
   tires: TireLook;
+  /** Im Innenraum sichtbar: hydraulische Handbremse, Überrollkäfig. */
+  hbrake: boolean;
+  cage: boolean;
   sportSeats: boolean;
   sportWheel: boolean;
 }
@@ -79,6 +82,8 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
     tips: visual?.tips ?? 'stock',
     rimSize: visual?.rimSize ?? (nine2 || e34 || g87 || g82 ? 1 : 0),
     tires: visual?.tires ?? 'stock',
+    hbrake: !!visual?.hbrake,
+    cage: !!visual?.cage,
     sportSeats: visual?.seats === 'sport',
     sportWheel: visual?.wheel === 'sport',
     ...(visual?.rim ? { rim: visual.rim as RimStyle } : {}),
@@ -1485,8 +1490,50 @@ function seat(m: Mesher, x: number, z: number, sporty: boolean) {
   for (const s of [-1, 1]) m.box(SLOT.dark, [0.5, 0.03, 0.03], [x, 0.42, z + s * 0.17]);
 }
 
-export function interiorGeometry(body: BodyStyle, detail: number, sportSeats = false, sportWheel = false) {
-  const key = body + detail + +sportSeats + +sportWheel;
+/** Lage des Lenkrads (Nabe) und Neigung der Lenksäule – das Lenkrad selbst ist ein eigenes, drehbares Netz. */
+export function steeringWheelPose(body: BodyStyle): { pos: V3; tilt: number } {
+  const S = bodyShape(body);
+  const dashDy = Math.min(0, S.F.cowlY - 0.99);
+  return { pos: [0.33, 0.95 + dashDy * 0.7, -0.36], tilt: 0.36 };
+}
+
+const steeringWheels = new Map<string, THREE.BufferGeometry>();
+/**
+ * Lenkrad um seine Nabe (Lenksäule = x-Achse, Kranz in der y-z-Ebene), damit es sich mit der Lenkung drehen lässt.
+ * Sportlenkrad: kleiner, dickerer Kranz, unten abgeflacht, rote Mittenmarkierung oben.
+ */
+export function steeringWheelGeometry(detail: number, sport: boolean) {
+  const key = `${detail}${+sport}`;
+  let g = steeringWheels.get(key);
+  if (g) return g;
+  const m = new Mesher(SLOTS);
+  if (sport) {
+    const R = 0.15;
+    // Kranz ohne das untere Stück, dazu ein gerader Abschluss (abgeflacht)
+    const flat = 0.62;
+    // Bogen beginnt bei 0 und läuft gegen den Uhrzeigersinn: so drehen, dass die Lücke unten (270°) liegt
+    m.torus(SLOT.dark, R, 0.024, [0, 0, 0], [0, Math.PI / 2, (3 * Math.PI) / 2 + flat], detail ? 28 : 16, Math.PI * 2 - flat * 2);
+    const yB = -R * Math.cos(flat);
+    m.cyl(SLOT.dark, 0.024, 0.024, 2 * R * Math.sin(flat), [0, yB, 0], [Math.PI / 2, 0, 0], 10);
+    // rote Markierung oben (12 Uhr)
+    m.rbox(SLOT.tail, [0.05, 0.03, 0.022], 0.01, [0, R, 0]);
+    // drei schmale Speichen, Prallplatte mit Emblem
+    for (const a of [0, Math.PI, -Math.PI / 2]) m.rbox(SLOT.gloss, [0.02, 0.03, 0.11], 0.008, [0.004, Math.sin(a) * 0.085, Math.cos(a) * 0.085], [a + Math.PI, 0, 0]);
+    m.cyl(SLOT.dark, 0.05, 0.05, 0.05, [0.01, 0, 0], [0, 0, Math.PI / 2], 16);
+    m.cyl(SLOT.chrome, 0.018, 0.018, 0.004, [-0.017, 0, 0], [0, 0, Math.PI / 2], 12);
+  } else {
+    m.torus(SLOT.dark, 0.165, 0.019, [0, 0, 0], [0, Math.PI / 2, 0], detail ? 28 : 16);
+    m.rbox(SLOT.dark, [0.05, 0.1, 0.12], 0.025, [0.01, 0, 0]);
+    m.rbox(SLOT.chrome, [0.008, 0.03, 0.03], 0.004, [-0.018, 0, 0]);
+    for (const a of [0, Math.PI, Math.PI / 2 + Math.PI]) m.rbox(SLOT.gloss, [0.022, 0.035, 0.12], 0.008, [0.005, Math.sin(a) * 0.1, Math.cos(a) * 0.1], [a + Math.PI, 0, 0]);
+  }
+  g = m.build();
+  steeringWheels.set(key, g);
+  return g;
+}
+
+export function interiorGeometry(body: BodyStyle, detail: number, sportSeats = false, sportWheel = false, extras: { hbrake?: boolean; cage?: boolean } = {}) {
+  const key = body + detail + +sportSeats + +sportWheel + +!!extras.hbrake + +!!extras.cage;
   let g = interiors.get(key);
   if (g) return g;
   const S = bodyShape(body);
@@ -1569,15 +1616,10 @@ export function interiorGeometry(body: BodyStyle, detail: number, sportSeats = f
     for (const z of [-0.05, 0.05]) m.cyl(SLOT.chrome, 0.018, 0.018, 0.02, [0.38, 0.71, z], [0, 0, Math.PI / 2], 10);
     m.box(SLOT.gloss, [0.004, 0.11, 0.34], [0.448, 0.76, 0.4]);
   }
-  // Lenkrad mit Speichen, Nabe und Lenksäule; dahinter Lenkstockhebel
+  // Lenksäule und Lenkstockhebel (das Lenkrad selbst ist ein eigenes, drehbares Netz: steeringWheelGeometry)
   m.base.identity();
-  const sw: V3 = [0.33, 0.95 + dashDy * 0.7, -0.36];
-  const tilt = 0.36;
+  const { pos: sw, tilt } = steeringWheelPose(body);
   m.base.copy(mat(sw, [0, 0, -tilt]));
-  m.torus(SLOT.dark, 0.165, 0.019, [0, 0, 0], [0, Math.PI / 2, 0], detail ? 28 : 16);
-  m.rbox(SLOT.dark, [0.05, 0.1, 0.12], 0.025, [0.01, 0, 0]);
-  m.rbox(SLOT.chrome, [0.008, 0.03, 0.03], 0.004, [-0.018, 0, 0]);
-  for (const a of [0, Math.PI, Math.PI / 2 + Math.PI]) m.rbox(SLOT.gloss, [0.022, 0.035, 0.12], 0.008, [0.005, Math.sin(a) * 0.1, Math.cos(a) * 0.1], [a + Math.PI, 0, 0]);
   m.cyl(SLOT.dark, 0.03, 0.035, 0.26, [0.14, 0, 0], [0, 0, Math.PI / 2], 10);
   for (const s of [-1, 1]) m.rbox(SLOT.dark, [0.015, 0.015, 0.13], 0.005, [0.07, 0.01, s * 0.11], [s * 0.2, 0, 0]);
   m.base.identity();
@@ -1601,6 +1643,46 @@ export function interiorGeometry(body: BodyStyle, detail: number, sportSeats = f
   }
   // Innenspiegel
   m.rbox(SLOT.dark, [0.02, 0.05, 0.2], 0.01, [B.x2 + 0.16, B.roof - 0.1, 0]);
+  // Hydraulische Handbremse: hoher Hebel neben dem Schalthebel (zum Fahrer geneigt), roter Griff, Ausgleichsbehälter
+  if (extras.hbrake) {
+    // hoch aufragend, damit er aus dem Cockpit rechts neben dem Lenkrad zu sehen ist
+    m.tube(SLOT.chrome, [[0.13, 0.6, -0.1], [0.1, 0.78, -0.13], [0.07, 0.93, -0.17]], 0.012, 8);
+    m.rbox(SLOT.tail, [0.045, 0.1, 0.045], 0.016, [0.065, 0.97, -0.175], [0.25, 0, -0.18]);
+    m.rbox(SLOT.dark, [0.12, 0.05, 0.08], 0.015, [0.14, 0.6, -0.1]);
+    m.cyl(SLOT.lens, 0.018, 0.018, 0.06, [0.18, 0.66, -0.1], undefined, 10);
+  }
+  // Überrollkäfig: Hauptbügel hinter den Vordersitzen, Bügel entlang der A-Säulen, Dach- und Türstreben, Diagonale.
+  // Die Rohre folgen der Innenseite der Fahrgastzelle (unter der Gürtellinie die Seitenwand, darüber das Dachprofil).
+  if (extras.cage) {
+    const zAt = (x: number, y: number) => {
+      const yb = S.beltY(x);
+      if (y <= yb) return Math.max(0.3, S.sideZ(Math.min(B.seams[0], Math.max(B.seams[1], x)), y) - 0.11);
+      const yt = S.roofY(x);
+      const wb = S.cabinBase(x);
+      const wr = wb - B.tumble * Math.min(1, Math.max(0, (yt - yb) / (B.roof - yb)));
+      return Math.max(0.25, wb + (wr - wb) * Math.min(1, (y - yb) / Math.max(0.05, yt - yb)) - 0.09);
+    };
+    const topY = (x: number) => S.roofY(x) - 0.075;
+    const xh = -0.5;
+    const yh = topY(xh);
+    // vorn: am Fuß der Frontscheibe beginnen und ihr unter dem Glas bis zur Dachkante folgen
+    const xa0 = S.F.cabinX1 - 0.12;
+    const ya0 = S.beltY(xa0) + 0.03;
+    const xa1 = B.x2 - 0.06;
+    const ya1 = topY(xa1);
+    const p = (x: number, y: number, s: number, dz = 0): V3 => [x, y, s * (zAt(x, y) - dz)];
+    for (const s of [-1, 1]) {
+      m.tube(SLOT.chrome, [p(xh, 0.43, s), p(xh, S.beltY(xh), s), p(xh, yh - 0.1, s), p(xh, yh, s, 0.08)], 0.02, 6);
+      m.tube(SLOT.chrome, [p(xa0, 0.6, s), p(xa0, ya0, s), p((xa0 + xa1) / 2 - 0.04, (ya0 + ya1) / 2, s), p(xa1, ya1, s, 0.06)], 0.018, 6);
+      m.tube(SLOT.chrome, [p(xh, yh, s, 0.08), p(xa1, ya1, s, 0.06)], 0.018, 6);
+      m.tube(SLOT.chrome, [p(xh, 0.5, s), p(xa0 - 0.05, 0.64, s)], 0.016, 6);
+      // Streben nach hinten
+      const xr = Math.max(B.x0 + 0.45, xh - 0.85);
+      m.tube(SLOT.chrome, [p(xh, yh - 0.04, s, 0.07), [xr, S.beltY(xr) - 0.05, s * Math.max(0.3, zAt(xr, S.beltY(xr) - 0.05) - 0.05)]], 0.016, 6);
+    }
+    m.tube(SLOT.chrome, [p(xh, yh, -1, 0.08), p(xh, yh, 1, 0.08)], 0.02, 6);
+    m.tube(SLOT.chrome, [p(xh, 0.46, -1), p(xh, yh - 0.03, 1, 0.1)], 0.017, 6);
+  }
   g = m.build();
   interiors.set(key, g);
   return g;

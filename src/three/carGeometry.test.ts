@@ -124,3 +124,29 @@ describe('Grafikstufen', () => {
     expect(pads.z).toBeLessThan(B.width);
   });
 });
+
+describe('Innenraum: drehbares Lenkrad und sichtbare Tuningteile', () => {
+  it('Lenkrad ist ein eigenes Netz (Serie und Sport verschieden), Käfig und Handbremse ergänzen den Innenraum, Käfig bleibt in der Kabine', async () => {
+    const { steeringWheelGeometry, steeringWheelPose } = await import('./carParts');
+    const count = (g: { getAttribute(n: string): { count: number } }) => g.getAttribute('position').count;
+    expect(count(steeringWheelGeometry(1, false))).toBeGreaterThan(100);
+    expect(count(steeringWheelGeometry(1, true))).not.toBe(count(steeringWheelGeometry(1, false)));
+    for (const body of Object.keys(BODY_SPECS) as (keyof typeof BODY_SPECS)[]) {
+      const plain = interiorGeometry(body, 1);
+      const tuned = interiorGeometry(body, 1, true, true, { hbrake: true, cage: true });
+      expect(count(tuned), body).toBeGreaterThan(count(plain));
+      // Käfig innerhalb der Karosserie: höchste Stelle unter dem Dach, seitlich innerhalb der Breite
+      const S = bodyShape(body);
+      const pos = tuned.getAttribute('position');
+      let maxY = 0;
+      let maxZ = 0;
+      for (let i = 0; i < pos.count; i++) {
+        maxY = Math.max(maxY, pos.getY(i));
+        maxZ = Math.max(maxZ, Math.abs(pos.getZ(i)));
+      }
+      expect(maxY, body).toBeLessThan(S.B.roof);
+      expect(maxZ, body).toBeLessThan(S.B.width + 0.02);
+      expect(steeringWheelPose(body).pos[1]).toBeGreaterThan(0.7);
+    }
+  });
+});
