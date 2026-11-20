@@ -841,3 +841,15 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Rennkalender:** An jedem dritten Tag, an dem bisher kein Rennen war, gibt es abwechselnd eine Rallye oder einen Driftwettbewerb. Die übrigen Rennen bleiben unverändert.
 - **Freier Driftmodus:** In der Probefahrt mit ESP aus zählen Driftpunkte, zum Üben.
 - Tests: `grip.test.ts` (Reifen je Untergrund, Drift-Teile, Wetter), Rallye und Drift in `races.test.ts`, `karriere.cjs` (Teile montieren, Rallye, Driftwettbewerb), `markt.cjs` (Tagesablauf, freier Driftmodus).
+
+## Reifen optisch unterscheidbar
+
+- Jede Reifenart hat ein eigenes Aussehen (`carParts.ts` `wheelGeometry` mit `TIRE_MARK`, Material in `CarModel.tsx`):
+  - Serie: unverändert
+  - Sport: gelbe Flankenlinie
+  - Semi-Slicks: glatte Lauffläche ohne Rillen, leichter Glanz, rote Linie
+  - Drift: breites weißes Flankenband, etwas abgefahren-grau
+  - Winter: feine Lamellenblöcke in drei Reihen, blaue Linie
+  - Schotter: grobe Stollen in zwei versetzten Reihen, staubig, orange Linie
+  - Spikes: Stollen mit Metallstiften, graue Linie
+- Bei niedriger Grafikstufe gibt es weniger Profilblöcke.
