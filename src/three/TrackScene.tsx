@@ -12,9 +12,10 @@ import { activeDefects } from '../game/repair';
 import { engineAudio, roadAudio } from '../game/audio';
 import { soundProfile } from '../game/diagnosis';
 import { useGame } from '../game/store';
-import { initialState, stepVehicle, vehicleSpec, type VehicleState } from '../game/vehicle';
+import { initialState, stepVehicle, surfaceGrip, vehicleSpec, type VehicleState } from '../game/vehicle';
+import { offRoadCond, roadCond, seasonOf, weatherOf } from '../game/grip';
 import { CarModel } from './CarModel';
-import { CarShadow, DriveSky, HAZE } from './DriveSky';
+import { CarShadow, DriveSky, HAZE, Precip } from './DriveSky';
 import { DriveScenery } from './DriveScenery';
 import { LAKE } from './driveWorld';
 import { worldFor } from './circuits';
@@ -66,6 +67,17 @@ export function TrackScene() {
   const steerVis = useRef(0);
   const spinVis = useRef({ f: 0, r: 0 });
   const world = useMemo(() => worldFor(course?.world ?? 'land'), [course]);
+  // Witterung des Tages (für alle Geräte gleich): Fahrbahnzustand, Optik. Rallyepisten haben ihren eigenen Belag.
+  const weather = useMemo(() => weatherOf(day), [day]);
+  const road = useMemo(() => roadCond(weather, world.road), [weather, world]);
+  const season = useMemo(() => seasonOf(day), [day]);
+  // Aussehen: Dunst und Sichtweite, Bewölkung, trübes Licht; Schnee liegt bei Schneefall und auf Schneepisten
+  const look = useMemo(() => {
+    const dull = weather === 'rain' ? 0.75 : weather === 'snow' ? 0.6 : weather === 'fog' ? 0.55 : weather === 'cloudy' ? 0.25 : 0;
+    const haze = weather === 'fog' ? '#c3c8cc' : weather === 'rain' ? '#a9b1b8' : weather === 'snow' ? '#d4d9de' : HAZE;
+    const fog: [number, number] = weather === 'fog' ? [25, 230] : weather === 'rain' ? [90, 480] : weather === 'snow' ? [70, 420] : [240, 760];
+    return { dull, haze, fog, cover: weather === 'sun' ? 0 : weather === 'cloudy' ? 0.6 : 1, snowy: weather === 'snow' || road.cls === 'snow' };
+  }, [weather, road]);
   const spec = useMemo(() => vehicleSpec(car), [car]);
   const fx = useMemo(() => new DriveEffects(), []);
   const body3 = BODY_SPECS[CAR_MODELS[car.modelId].body];
@@ -230,7 +242,7 @@ export function TrackScene() {
     if (Math.abs(step) <= 40) s.progress += step;
     s.near = near.i;
     const onRoad = (Math.abs(near.lateral) < world.roadWidth / 2 + 0.9 && near.dist < 30) || world.onPad(s.x, s.z);
-    const surface = onRoad ? { grip: 1, drag: 0 } : world.surface(s.x, s.z);
+    const surface = onRoad ? road : offRoadCond(world.surface(s.x, s.z), weather);
     // Steigung in Fahrtrichtung aus der Bodenhöhe vor und hinter dem Wagen
     const c = Math.cos(s.heading);
     const sn = Math.sin(s.heading);
@@ -257,8 +269,10 @@ export function TrackScene() {
       let diff = Math.atan2(-(t.z - s.z), t.x - s.x) - s.heading;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
       driveInput.steer = Math.max(-1, Math.min(1, diff * 2.5));
-      driveInput.throttle = s.vx < s.autopilot ? 1 : 0;
-      driveInput.brake = s.vx > s.autopilot + 4 ? 0.5 : 0;
+      // auf glatter Fahrbahn langsamer (Kurvengrenze wächst mit der Wurzel der Haftung)
+      const vmax = s.autopilot * Math.min(1, Math.sqrt(surfaceGrip(spec, road)));
+      driveInput.throttle = s.vx < vmax ? 1 : 0;
+      driveInput.brake = s.vx > vmax + 4 ? 0.5 : 0;
     }
     // Countdown: Auto steht (Gas geben geht – die Drehzahl steigt), los geht es bei null
     if (coop) s.raceT = s.done ? s.raceT : (syncedNow() - coop.startAt) / 1000;
@@ -345,9 +359,9 @@ export function TrackScene() {
           want = oq.lateral > 0 ? -side : side;
         }
         c.offset += Math.max(-dt * 2.5, Math.min(dt * 2.5, want - c.offset));
-        const input = aiInput(c.spec, me, world, c.ai, c.o.skill, c.offset);
+        const input = aiInput(c.spec, me, world, c.ai, c.o.skill, c.offset, true, road);
         const on = Math.abs(q.lateral) < world.roadWidth / 2 + 0.9;
-        stepVehicle(c.spec, me, input, on ? { grade: 0, grip: 1, drag: 0 } : { grade: 0, ...world.surface(me.x, me.z) }, dt);
+        stepVehicle(c.spec, me, input, on ? { grade: 0, ...road } : { grade: 0, ...offRoadCond(world.surface(me.x, me.z), weather) }, dt);
         // Leitplanke
         const p = world.samples[q.i];
         const lim = world.railOffset - HALF_WIDTH;
@@ -554,19 +568,20 @@ export function TrackScene() {
 
   return (
     <>
-      <color attach="background" args={[HAZE]} />
-      <fog attach="fog" args={[HAZE, 240, 760]} />
-      <DriveSky />
+      <color attach="background" args={[look.haze]} />
+      <fog attach="fog" args={[look.haze, look.fog[0], look.fog[1]]} />
+      <DriveSky cover={look.cover} dull={look.dull} />
+      {(weather === 'rain' || weather === 'snow') && <Precip kind={weather} />}
       <Env intensity={0.8} kind="sky" />
-      <hemisphereLight args={['#eaf4ff', '#5d6b45', 1.15]} />
-      <directionalLight position={[120, 180, 60]} intensity={2.3} color="#fff6e6" />
+      <hemisphereLight args={['#eaf4ff', look.snowy ? '#c9d0d8' : '#5d6b45', 1.15 + look.dull * 0.25]} />
+      <directionalLight position={[120, 180, 60]} intensity={2.3 * (1 - look.dull * 0.6)} color="#fff6e6" />
       {/* Ferne Wiese bis zum Horizont (Nebel verdeckt die Kante) */}
       {/* Zuerst gezeichnet und ohne Tiefe: das Gelände liegt immer darüber, auch wo es tiefer liegt (See, Senken) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} renderOrder={-2} raycast={() => null}>
         <planeGeometry args={[6000, 6000]} />
         <meshLambertMaterial color="#5f8a4a" depthWrite={false} />
       </mesh>
-      <DriveScenery world={world} />
+      <DriveScenery world={world} snowy={look.snowy} wet={road.cls === 'wet'} season={season} />
       <primitive object={fx.group} />
       {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} clock={() => sim.current.raceT} />}
       {rivals.map((r, k) => (

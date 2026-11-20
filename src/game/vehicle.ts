@@ -365,9 +365,9 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const loadR = Math.max(0.15 * weight, staticR + transfer + down * (1 - spec.aeroFront));
   // Reifen je Untergrund (Serienreifen 1); Rallyefahrwerk hilft auf losem Untergrund und Schnee
   const cls = surface.cls ?? 'dry';
-  const tireK = (spec.tireGrip?.[cls] ?? 1) * (cls === 'loose' || cls === 'snow' ? spec.looseGrip ?? 1 : 1);
-  const muF = spec.muFront * surface.grip * tireK;
-  const muR = spec.muRear * surface.grip * tireK;
+  const gripK = surfaceGrip(spec, surface);
+  const muF = spec.muFront * gripK;
+  const muR = spec.muRear * gripK;
 
   // --- Getriebe (Automatik) und Drehzahl
   const wheelRpm = (s.vx / spec.wheelRadius) * (60 / (2 * Math.PI));
@@ -565,6 +565,12 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   s.rollV += (w * w * (rollTarget - s.roll) - 2 * spec.suspDamping * w * s.rollV) * dt;
   s.pitch += s.pitchV * dt;
   s.roll += s.rollV * dt;
+}
+
+/** Wirksame Haftung auf diesem Untergrund (Oberfläche × Reifen × Rallyefahrwerk) relativ zum trockenen Asphalt. */
+export function surfaceGrip(spec: Pick<VehicleSpec, 'tireGrip' | 'looseGrip'>, surface: Pick<Surface, 'grip' | 'cls'>) {
+  const cls = surface.cls ?? 'dry';
+  return surface.grip * (spec.tireGrip?.[cls] ?? 1) * (cls === 'loose' || cls === 'snow' ? spec.looseGrip ?? 1 : 1);
 }
 
 /** Geschwindigkeit in km/h (vorwärts positiv). */

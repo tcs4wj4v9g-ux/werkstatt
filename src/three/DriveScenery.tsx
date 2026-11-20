@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber';
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import type { Season } from '../game/grip';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { forestAt, LAKE, PAD, TRACK_WIDTH, WORKSHOP, type DriveWorld } from './driveWorld';
@@ -429,7 +430,7 @@ function build(w: DriveWorld) {
   return { rubber, tyres, ads, leitpfosten, land, kerbRed, kerbWhite, standGeo, water, w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
 }
 
-export function DriveScenery({ world }: { world: DriveWorld }) {
+export function DriveScenery({ world, snowy = false, wet = false, season = 'summer' }: { world: DriveWorld; snowy?: boolean; wet?: boolean; season?: Season }) {
   const b = useMemo(() => {
     let x = built.get(world.id);
     if (!x) built.set(world.id, (x = build(world)));
@@ -472,6 +473,22 @@ export function DriveScenery({ world }: { world: DriveWorld }) {
     [],
   );
   const postGeo = useMemo(() => new THREE.BoxGeometry(0.12, 0.7, 0.12), []);
+  // Witterung und Jahreszeit: Schnee auf Wiesen und Bäumen, nasse (dunklere) Straße, Herbstlaub, kahler Winter
+  const snowMat = useMemo(() => {
+    const t = grassDetailTexture().clone();
+    t.repeat.set(TILE / 6, TILE / 6);
+    t.needsUpdate = true;
+    return new THREE.MeshLambertMaterial({ map: t, color: '#f3f6fa' });
+  }, []);
+  useEffect(() => {
+    for (const t of b.tiles) for (const l of t.levels) (l.object as THREE.Mesh).material = snowy ? snowMat : b.groundMat;
+    const own = world.roadKind;
+    mats.road.color.set(own === 'gravel' ? '#b39c7c' : own === 'mud' ? '#6e5a44' : own === 'snow' ? '#e9edf2' : snowy ? '#8d939a' : wet ? '#35383d' : '#4f5257');
+    mats.shoulder.color.set(snowy ? '#e4e8ee' : own === 'mud' ? '#5a4a38' : '#7b7466');
+    mats.leafy.color.set(snowy ? '#e6ece8' : season === 'autumn' ? '#ffb46a' : season === 'winter' ? '#a8987e' : season === 'spring' ? '#d8ffc8' : '#ffffff');
+    mats.conif.color.set(snowy ? '#cfdcd4' : '#ffffff');
+    mats.trunk.color.set(snowy ? '#6a5640' : '#5a4430');
+  }, [b, snowy, wet, season, world, mats, snowMat]);
   const leitGeo = useMemo(() => ({ post: new THREE.BoxGeometry(0.12, 1.0, 0.1).translate(0, 0.5, 0), band: new THREE.BoxGeometry(0.125, 0.22, 0.105).translate(0, 0.78, 0) }), []);
   return (
     <>

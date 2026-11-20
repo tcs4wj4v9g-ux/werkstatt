@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { marketLabel } from '../game/market';
 import { dayClock, dayLeft, useGame } from '../game/store';
+import { WEATHER_ICON, weatherLabel, weatherOf } from '../game/grip';
 import { GFX_LABEL, useGfx, type GfxLevel } from '../three/gfx';
 import { CoopChip } from './CoopUI';
 import { ChatButton } from './Chat';
@@ -119,7 +120,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <CoopChip />
       <ChatButton />
       <div className="daychip" title={marketLabel(index)}>
-        Tag {day} <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
+        Tag {day} <span data-testid="weather" title={weatherLabel(day)}>{WEATHER_ICON[weatherOf(day)]}</span> <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
       <SkipDay />
       <AutoDayToggle />

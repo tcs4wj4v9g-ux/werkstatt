@@ -85,3 +85,23 @@ export const roadOf = (w: Weather): 'dry' | 'wet' | 'snow' => (w === 'rain' ? 'w
 
 /** Kurzer Text für die Anzeige, z. B. „❄️ Winter · Schnee“. */
 export const weatherLabel = (day: number) => `${WEATHER_ICON[weatherOf(day)]} ${SEASON_NAMES[seasonOf(day)]} · ${WEATHER_NAMES[weatherOf(day)]}`;
+
+/** Zustand der Fahrbahn: Haftung (vor dem Reifen), Rollwiderstand und Untergrundklasse. */
+export interface RoadCond {
+  grip: number;
+  drag: number;
+  cls: GroundClass;
+}
+
+/** Fahrbahn bei diesem Wetter. Rallyepisten (`own`) haben ihren eigenen Belag; Schneefall macht Schotter zusätzlich glatter. */
+export function roadCond(weather: Weather, own?: RoadCond | null): RoadCond {
+  if (own) return weather === 'snow' && own.cls === 'loose' ? { ...own, grip: own.grip * 0.85 } : weather === 'rain' && own.cls === 'loose' ? { ...own, grip: own.grip * 0.92 } : own;
+  const r = roadOf(weather);
+  return { grip: ROAD_GRIP[r], drag: r === 'snow' ? 0.01 : 0, cls: r };
+}
+
+/** Abseits der Fahrbahn (Wiese, Kies, Feld) bei diesem Wetter: im Schnee noch glatter, im Regen etwas. */
+export function offRoadCond(base: { grip: number; drag: number }, weather: Weather): RoadCond {
+  if (weather === 'snow') return { grip: base.grip * 0.8, drag: base.drag + 0.02, cls: 'snow' };
+  return { grip: base.grip * (weather === 'rain' ? 0.88 : 1), drag: base.drag, cls: 'loose' };
+}

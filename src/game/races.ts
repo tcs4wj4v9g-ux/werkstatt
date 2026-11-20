@@ -16,7 +16,8 @@ import { createCar } from './market';
 import { performance } from './performance';
 import { driveBlocker } from './repair';
 import type { CarInstance } from './types';
-import { initialState, stepVehicle, vehicleSpec, type DriveInput, type VehicleSpec, type VehicleState } from './vehicle';
+import { initialState, stepVehicle, surfaceGrip, vehicleSpec, type DriveInput, type Surface, type VehicleSpec, type VehicleState } from './vehicle';
+import { roadCond, weatherOf, type RoadCond } from './grip';
 
 export type RaceClass = 'c150' | 'c250' | 'c400' | 'open';
 export const RACE_CLASSES: Record<RaceClass, { name: string; ps: number; gold: number; fee: number }> = {
@@ -241,7 +242,7 @@ export interface AiTrack {
  * Eingaben eines Computerfahrers für einen Schritt: schaut voraus, lenkt zur Ideallinie (plus seitlichem Versatz
  * `offset` zum Überholen), plant das Tempo so, dass er vor Kurven rechtzeitig bremst. Aktualisiert `ai.near`/`ai.prog`.
  */
-export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: AiTrack, skill: AiSkill, offset = 0, assist = true): DriveInput {
+export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: AiTrack, skill: AiSkill, offset = 0, assist = true, road?: Pick<Surface, 'grip' | 'cls'>): DriveInput {
   const n = w.samples.length;
   const q = w.nearest(st.x, st.z, ai.near);
   let d = q.i - ai.near;
@@ -255,8 +256,10 @@ export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: 
   let diff = Math.atan2(-(tz - st.z), tx - st.x) - st.heading;
   diff = Math.atan2(Math.sin(diff), Math.cos(diff));
   // Tempoplan: jede Kurve voraus erlaubt v = √(a_quer / Krümmung); bremsen erst, wenn der Bremsweg dorthin knapp wird
-  const aLat = spec.muFront * 9.81 * skill.lat;
-  const aBrake = Math.min(spec.muFront, spec.brakeForce / (spec.mass * 9.81)) * 9.81 * skill.brake;
+  // Glatte Fahrbahn (Regen, Schnee, Schotter): Kurven und Bremspunkte nach der tatsächlichen Haftung
+  const g = road ? surfaceGrip(spec, road) : 1;
+  const aLat = spec.muFront * g * 9.81 * skill.lat;
+  const aBrake = Math.min(spec.muFront * g, spec.brakeForce / (spec.mass * 9.81)) * 9.81 * skill.brake;
   let vt = 80;
   for (let k = 2; k < 160; k++) {
     const c = Math.abs(w.samples[(ai.near + k) % n].curv);
@@ -269,14 +272,14 @@ export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: 
 }
 
 /** Fährt die Strecke allein mit einem Computerfahrer; Zeit in Sekunden (oder Infinity, wenn er nicht ankommt). */
-export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true, skill: AiSkill = REFERENCE_SKILL) {
+export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true, skill: AiSkill = REFERENCE_SKILL, road?: RoadCond) {
   const p0 = w.samples[course.start];
   const st = initialState(p0.x - p0.nx * 1.8, p0.z - p0.nz * 1.8, Math.atan2(-p0.tz, p0.tx));
   const ai = { near: course.start, prog: 0 };
-  const flat = { grade: 0, grip: 1, drag: 0 };
+  const flat: Surface = road ? { grade: 0, ...road } : { grade: 0, grip: 1, drag: 0 };
   const dt = 1 / 60;
   for (let t = 0; t < 900; t += dt) {
-    const input = aiInput(spec, st, w, ai, skill, 0, assist);
+    const input = aiInput(spec, st, w, ai, skill, 0, assist, road);
     if (ai.prog >= course.length) return t;
     stepVehicle(spec, st, input, flat, dt);
   }
@@ -302,11 +305,15 @@ function referenceSpec(cls: RaceClass) {
 
 const targetCache = new Map<string, { gold: number; silver: number; bronze: number }>();
 /** Sollzeiten (s) für Gold, Silber, Bronze. */
-export function raceTargets(race: Pick<Race, 'course' | 'cls'>) {
-  const key = race.course + race.cls;
+export function raceTargets(race: Pick<Race, 'course' | 'cls'> & { day?: number }) {
+  // Wetter am Renntag (Regen, Schnee) bzw. eigener Belag der Rallyepiste: die Sollzeiten gelten für diese Fahrbahn
+  const c = courseOf(race.course);
+  const road = race.day ? roadCond(weatherOf(race.day), worldFor(c.world).road) : worldFor(c.world).road ?? undefined;
+  const wet = road && (road.cls !== 'dry' || road.grip !== 1) ? road : undefined;
+  const key = race.course + race.cls + (wet ? `${wet.cls}${wet.grip.toFixed(2)}` : '');
   let t = targetCache.get(key);
   if (!t) {
-    const ref = aiTime(referenceSpec(race.cls), courseOf(race.course));
+    const ref = aiTime(referenceSpec(race.cls), c, undefined, true, REFERENCE_SKILL, wet);
     t = { gold: Math.round(ref * 1.02 * 10) / 10, silver: Math.round(ref * 1.1 * 10) / 10, bronze: Math.round(ref * 1.2 * 10) / 10 };
     targetCache.set(key, t);
   }

@@ -1,5 +1,6 @@
 // Bilder der Fahrwelten in voller Grafik (kein Test): Land und alle Rundkurse, je Verfolger-Ansicht an mehreren Stellen.
 //   GK_TAG=vorher node e2e/strecken.cjs [land eifel motodrom hafen ardennen]
+//   GK_DAY=35 …  → Wetter dieses Spieltags (Jahreszeit, Regen, Schnee, Nebel)
 const { chromium } = require('playwright');
 const S = process.env.GK_OUT || __dirname + '/out'; const URL = (process.env.GK_URL || 'http://localhost:4173/?test').replace('?test', '?gfx=' + (process.env.GK_GFX || 'medium'));
 const TAG = process.env.GK_TAG || 'strecke';
@@ -14,14 +15,14 @@ const WORLDS = process.argv.slice(2).length ? process.argv.slice(2) : ['land', '
   await p.getByText('Neues Spiel').click(); await p.getByText("Los geht's").click(); await p.waitForTimeout(1500);
   const model = process.env.GK_CAR || 'bavaria_335_coupe';
   for (const w of WORLDS) {
-    await p.evaluate(([w, model]) => {
+    await p.evaluate(([w, model, day]) => {
       const g = window.__gk; const L = window.__gkLib; const s = g.getState(); const cars = [...s.cars];
       const c = L.createCar(model, [], Math.random, { year: 2010 }); for (const z of Object.values(c.zones)) { z.dirt = 0; z.rust = 0; if ('shine' in z) z.shine = 1; }
-      c.fluids.oil.level = 4; cars[0] = c; g.setState({ cars, screen: 'garage', race: null });
+      c.fluids.oil.level = 4; cars[0] = c; g.setState({ cars, screen: 'garage', race: null, ...(day ? { day } : {}) });
       const st = g.getState();
       if (w === 'land') st.startDrive(0);
       else { st.enterCoopRace(0, 'bild', w, Date.now() + 2000); }
-    }, [w, model]);
+    }, [w, model, Number(process.env.GK_DAY || 0)]);
     await p.waitForTimeout(4500);
     await p.addStyleTag({ content: '.ui{opacity:0 !important}' }).catch(() => {});
     await p.screenshot({ path: `${S}/${TAG}-${w}-start.png` }); console.log('ok: Bild', w, 'start');
