@@ -407,3 +407,34 @@ describe('Gelände an der Straße', () => {
     expect(worst).toBeLessThan(0.02);
   });
 });
+
+describe('Rückwärtsgang (Wählhebel D/R)', () => {
+  it('R im Stand: Gas fährt rückwärts (begrenzt), Umschalten auf D erst bei fast stehendem Auto, Bremse hält', () => {
+    const sp = mk('bavaria_330');
+    const s = initialState(0, 0, 0);
+    const step = (input: Partial<DriveInput>, n: number) => {
+      for (let i = 0; i < n; i++) stepVehicle(sp, s, { steer: 0, throttle: 0, brake: 0, reverse: false, ...input }, flat, 1 / 60);
+    };
+    step({ reverse: true, throttle: 1 }, 240);
+    expect(s.gear).toBe(-1);
+    expect(s.vx).toBeLessThan(-4);
+    expect(s.vx).toBeGreaterThan(-6.5);
+    expect(s.x).toBeLessThan(-5);
+    // D anwählen bei Rückwärtsfahrt: bleibt R, bis man abgebremst hat
+    step({ reverse: false }, 5);
+    expect(s.gear).toBe(-1);
+    step({ reverse: false, brake: 1 }, 120);
+    expect(s.gear).toBe(1);
+    expect(Math.abs(s.vx)).toBeLessThan(0.5);
+    // in R mit Bremse stehen bleiben (rollt nicht weg), dann vorwärts mit D
+    step({ reverse: true, brake: 1 }, 60);
+    expect(s.gear).toBe(-1);
+    expect(Math.abs(s.vx)).toBeLessThan(0.1);
+    step({ reverse: false, throttle: 1 }, 120);
+    expect(s.gear).toBeGreaterThanOrEqual(1);
+    expect(s.vx).toBeGreaterThan(5);
+    // Mit Tempo vorwärts R anwählen: nichts passiert, bis das Auto steht
+    step({ reverse: true }, 10);
+    expect(s.gear).toBeGreaterThanOrEqual(1);
+  });
+});

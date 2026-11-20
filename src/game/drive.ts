@@ -3,7 +3,7 @@ import { create } from 'zustand';
 // Eingaben und Telemetrie der Probefahrt. Bewusst getrennt vom Spielstand:
 // Eingaben ändern sich pro Frame und werden nie gespeichert.
 /** steer: +1 = voll links, −1 = voll rechts; throttle/brake 0..1; assist: ESP an (Standard) oder aus (Driften). */
-export const driveInput = { steer: 0, throttle: 0, brake: 0, handbrake: false, assist: true };
+export const driveInput = { steer: 0, throttle: 0, brake: 0, handbrake: false, assist: true, reverse: false };
 
 /** Ab wann die Probefahrt als gefahren zählt (s Spielzeit). Beendet wird sie durch Anhalten auf dem Werkstatt-Vorplatz. */
 export const DRIVE_MIN = 45;

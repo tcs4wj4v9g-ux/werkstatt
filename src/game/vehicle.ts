@@ -140,6 +140,11 @@ export interface DriveInput {
   steer: number;
   /** Handbremse: blockiert die Hinterräder (Drift einleiten, Wenden). */
   handbrake?: boolean;
+  /**
+   * Wählhebel (Spieler): true = R, false = D. Der Gang wechselt, sobald das Auto (fast) steht; Gas fährt dann rückwärts.
+   * Fehlt das Feld (Computerfahrer), gilt die alte Automatik: im Stand mit Bremse → R, mit Gas → 1.
+   */
+  reverse?: boolean;
 }
 
 /** Umgebung an der aktuellen Stelle. */
@@ -373,7 +378,13 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const wheelRpm = (s.vx / spec.wheelRadius) * (60 / (2 * Math.PI));
   if (s.shiftTimer > 0) s.shiftTimer -= dt;
   const stopped = Math.abs(s.vx) < 0.6;
-  if (input.brake > 0.1 && stopped && input.throttle < 0.05 && s.gear >= 1) s.gear = -1;
+  const lever = input.reverse !== undefined;
+  if (lever) {
+    // Wählhebel: einlegen erst bei (fast) stehendem Auto – vorher bremst man ab
+    const slow = Math.abs(s.vx) < 1.5;
+    if (input.reverse && s.gear >= 0 && slow) s.gear = -1;
+    else if (!input.reverse && s.gear === -1 && slow) s.gear = 1;
+  } else if (input.brake > 0.1 && stopped && input.throttle < 0.05 && s.gear >= 1) s.gear = -1;
   else if (input.throttle > 0.1 && s.gear === -1 && stopped) s.gear = 1;
   if (s.gear >= 1 && s.shiftTimer <= 0) {
     const rpmIn = (g: number) => Math.abs(wheelRpm * ratio(spec, g));
@@ -443,7 +454,7 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
 
   // --- Bremse mit ABS (immer aktiv): höchstens bis zur Haftgrenze, mit Seitenreserve für die Kurve
   const dir = s.vx >= 0 ? 1 : -1;
-  if (input.brake > 0 && !(s.gear === -1 && stopped)) {
+  if (input.brake > 0 && (lever || !(s.gear === -1 && stopped))) {
     const total = spec.brakeForce * input.brake;
     // ABS lässt beim Einlenken Seitenführung übrig (wie ein echtes ABS: lenkfähig bleiben ist sein Zweck) – je mehr
     // gelenkt wird, desto mehr Haftung bleibt für die Kurve: voll gelenkt etwa zwei Drittel vorn, gut die Hälfte hinten

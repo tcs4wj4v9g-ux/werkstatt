@@ -156,6 +156,7 @@ export function TrackScene() {
     (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec, spin: spinVis.current };
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     driveInput.handbrake = false;
+    driveInput.reverse = false;
     s.respawn = useDriveHud.getState().respawn;
     if (course) {
       s.near = mySlot ? mySlot.near : course.start;

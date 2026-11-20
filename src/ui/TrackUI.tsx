@@ -353,6 +353,30 @@ function DriftHud({ race, hud }: { race: Race; hud: ReturnType<typeof useDriveHu
   );
 }
 
+/** Wählhebel D/R: tippen schaltet um; eingelegt wird, sobald das Auto (fast) steht. */
+function GearLever() {
+  const [rev, setRev] = useState(false);
+  // Jede Fahrt beginnt in D
+  useEffect(() => {
+    driveInput.reverse = false;
+  }, []);
+  return (
+    <button
+      className={`pedal gearsel${rev ? ' rev' : ''}`}
+      data-testid="gearsel"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        restart();
+        driveInput.reverse = !driveInput.reverse;
+        setRev(driveInput.reverse);
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <span className={rev ? '' : 'on'}>D</span> <span className={rev ? 'on' : ''}>R</span>
+    </button>
+  );
+}
+
 export function TrackUI() {
   const hud = useDriveHud();
   const finishDrive = useGame((s) => s.finishDrive);
@@ -421,6 +445,7 @@ export function TrackUI() {
       </div>
       <div className="drive right">
         <div className="pedals">
+          <GearLever />
           <Hold className="hand" testid="handbrake" on={() => (driveInput.handbrake = true)} off={() => (driveInput.handbrake = false)}>HAND­BREMSE</Hold>
         </div>
         {/* Bremse wie Gas als federnder Schieberegler: fein dosierbar, Loslassen = keine Bremse */}
