@@ -230,7 +230,7 @@ begin
   if w is null then return jsonb_build_object('ok', false, 'reason', 'code_unbekannt'); end if;
   if exists (select 1 from gk_members where workshop_id = w and user_id = v) then return jsonb_build_object('ok', true, 'id', w); end if;
   select count(*) into n from gk_members where workshop_id = w;
-  if n >= 4 then return jsonb_build_object('ok', false, 'reason', 'voll'); end if;
+  if n >= 8 then return jsonb_build_object('ok', false, 'reason', 'voll'); end if;
   if (select count(*) from gk_members where user_id = v) >= 5 then return jsonb_build_object('ok', false, 'reason', 'zu_viele_werkstaetten'); end if;
   insert into gk_members(workshop_id, user_id, name) values (w, v, left(coalesce(nullif(trim(p_player), ''), 'Spieler ' || (n + 1)), 24));
   return jsonb_build_object('ok', true, 'id', w);
