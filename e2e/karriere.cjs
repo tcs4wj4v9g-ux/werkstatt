@@ -180,7 +180,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const held = await G(() => ({ t: window.__gkDrive.sim.raceT, v: window.__gkDrive.sim.vx }));
   expect(held.t < 0 && Math.abs(held.v) < 0.1, 'Countdown: das Auto steht noch (' + held.t.toFixed(1) + ' s)');
   await G(() => { const d = window.__gkDrive; d.sim.autopilot = 24; d.sim.timeScale = 3; });
-  for (let i = 0; i < 160 && (await G(() => window.__gk.getState().panel)) !== 'raceResult'; i++) await p.waitForTimeout(500);
+  for (let i = 0; i < 320 && (await G(() => window.__gk.getState().panel)) !== 'raceResult'; i++) await p.waitForTimeout(500);
   const rr = await G(() => { const s = window.__gk.getState(); return { r: s.raceResult, money: s.money, best: s.career.raceBest }; });
   expect(rr.r && rr.r.time > 20 && Object.values(rr.best).length >= 1, 'Ziel erreicht: ' + (rr.r && rr.r.time) + ' s, Medaille ' + (rr.r && rr.r.medal) + ', ausgezahlt ' + (rr.r && rr.r.payout));
   expect(raceFee > 0 && rr.money === m0 - raceFee + rr.r.payout, 'Konto: Startgeld ' + raceFee + ' € abgezogen, Preisgeld ' + rr.r.payout + ' € gutgeschrieben');

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { raceClock, raceForDay, raceTargets } from '../game/races';
-import { driveWorld, FARMS, LAKE, PAD, WORKSHOP } from '../three/driveWorld';
+import { courseOf, raceClock, raceForDay, raceTargets } from '../game/races';
+import { FARMS, LAKE, PAD, WORKSHOP, type DriveWorld } from '../three/driveWorld';
+import { worldFor } from '../three/circuits';
 import { CAMERA_LABEL, DRIVE_MIN, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
 import { DEFECTS } from '../game/data/defects';
 import { activeDefects } from '../game/repair';
@@ -87,10 +88,10 @@ function Spring({ axis, testid, className, onChange, label }: { axis: 'x' | 'y';
 
 /** Gezeichnete Karte der ganzen Gegend (einmal, 0,75 px je Meter), Norden = −z oben. */
 const MAP_K = 0.75;
-let mapImage: HTMLCanvasElement | null = null;
-function worldMap() {
-  if (mapImage) return mapImage;
-  const w = driveWorld();
+const mapImages = new Map<string, HTMLCanvasElement>();
+function worldMap(w: DriveWorld) {
+  const cached = mapImages.get(w.id);
+  if (cached) return cached;
   const E = w.extent;
   const size = Math.round(2 * E * MAP_K);
   const c = document.createElement('canvas');
@@ -108,7 +109,12 @@ function worldMap() {
       else continue;
       g.fillRect(X(x), X(z), 8 * MAP_K + 0.5, 8 * MAP_K + 0.5);
     }
-  // See
+  if (w.water) {
+    g.fillStyle = '#4f86b0';
+    g.fillRect(X(w.water.x - w.water.w / 2), X(w.water.z - w.water.d / 2), w.water.w * MAP_K, w.water.d * MAP_K);
+  }
+  // See und Testgelände (nur in der Landschaft)
+  if (w.id === 'land') {
   g.fillStyle = '#4f86b0';
   g.beginPath();
   g.ellipse(X(LAKE.x), X(LAKE.z), LAKE.rx * MAP_K, LAKE.rz * MAP_K, 0, 0, Math.PI * 2);
@@ -116,6 +122,7 @@ function worldMap() {
   // Testgelände
   g.fillStyle = '#5d6066';
   g.fillRect(X(PAD.minX), X(PAD.minZ), (PAD.maxX - PAD.minX) * MAP_K, (PAD.maxZ - PAD.minZ) * MAP_K);
+  }
   // Feldwege
   g.strokeStyle = '#d8c79e';
   g.lineWidth = 4 * MAP_K * 1.6;
@@ -126,9 +133,9 @@ function worldMap() {
     g.stroke();
   }
   // Straßen: Rand und Belag
-  for (const [col, wd] of [['#f4f1e6', 11], ['#55585e', 7.5]] as const) {
+  for (const [col, extra] of [['#f4f1e6', 4], ['#55585e', 0.5]] as const) {
     g.strokeStyle = col;
-    g.lineWidth = wd * MAP_K * 1.4;
+    g.lineWidth = (w.roadWidth + extra) * MAP_K * 1.4;
     g.beginPath();
     w.samples.forEach((p, i) => (i ? g.lineTo(X(p.x), X(p.z)) : g.moveTo(X(p.x), X(p.z))));
     g.closePath();
@@ -143,12 +150,14 @@ function worldMap() {
     g.fillRect((-h.w / 2) * MAP_K, (-h.d / 2) * MAP_K, h.w * MAP_K, h.d * MAP_K);
     g.restore();
   }
-  g.fillStyle = '#ff7a1a';
-  g.fillRect(X(WORKSHOP.x - WORKSHOP.w / 2), X(WORKSHOP.z - WORKSHOP.d / 2), WORKSHOP.w * MAP_K, WORKSHOP.d * MAP_K);
-  mapImage = c;
+  if (w.id === 'land') {
+    g.fillStyle = '#ff7a1a';
+    g.fillRect(X(WORKSHOP.x - WORKSHOP.w / 2), X(WORKSHOP.z - WORKSHOP.d / 2), WORKSHOP.w * MAP_K, WORKSHOP.d * MAP_K);
+  }
+  mapImages.set(w.id, c);
   return c;
 }
-const LABELS: [string, number, number][] = [
+const LAND_LABELS: [string, number, number][] = [
   ['Grünbach', 0, 0],
   ['Werkstatt', WORKSHOP.x, WORKSHOP.z - 14],
   ['Testgelände', (PAD.minX + PAD.maxX) / 2, (PAD.minZ + PAD.maxZ) / 2],
@@ -157,8 +166,9 @@ const LABELS: [string, number, number][] = [
 ];
 
 /** Minikarte oben links: Fahrtrichtung zeigt nach oben, Umkreis gut 250 m. */
-function MiniMap() {
+function MiniMap({ world }: { world: DriveWorld }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const labels: [string, number, number][] = world.id === 'land' ? LAND_LABELS : [['Start · Ziel', world.start.x, world.start.z]];
   const { px, pz, ph } = useDriveHud();
   useEffect(() => {
     const c = ref.current;
@@ -167,8 +177,8 @@ function MiniMap() {
     const S = 170;
     if (c.width !== S * dpr) c.width = c.height = S * dpr;
     const g = c.getContext('2d')!;
-    const img = worldMap();
-    const E = driveWorld().extent;
+    const img = worldMap(world);
+    const E = world.extent;
     const zoom = 0.36; // Bildschirmpunkte je Meter
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, S, S);
@@ -187,7 +197,7 @@ function MiniMap() {
     g.font = '600 10px system-ui, sans-serif';
     g.textAlign = 'center';
     const rot = ph - Math.PI / 2;
-    for (const [t, x, z] of LABELS) {
+    for (const [t, x, z] of labels) {
       const dx = (x - px) * zoom;
       const dz = (z - pz) * zoom;
       const sx = S / 2 + dx * Math.cos(rot) - dz * Math.sin(rot);
@@ -210,7 +220,7 @@ function MiniMap() {
     g.closePath();
     g.fill();
     g.stroke();
-  }, [px, pz, ph]);
+  }, [px, pz, ph, world]);
   return <canvas ref={ref} className="minimap" data-testid="minimap" style={{ width: 170, height: 170 }} />;
 }
 
@@ -275,7 +285,10 @@ function RaceHud() {
       )}
       <div className="race-hud" data-testid="race-hud">
         <div className="race-time">{raceClock(run)}</div>
-        <div className="meta">Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}</div>
+        <div className="meta">
+          {hud.laps > 1 && <b data-testid="lap">Runde {Math.min(hud.laps, Math.floor(hud.cp / (hud.cpTotal / hud.laps)) + 1)}/{hud.laps} · </b>}
+          Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}
+        </div>
         <div className={`race-targets ${medal ?? 'none'}`}>
           🥇 {raceClock(t.gold)} · 🥈 {raceClock(t.silver)} · 🥉 {raceClock(t.bronze)}
         </div>
@@ -290,6 +303,8 @@ export function TrackUI() {
   const finishRace = useGame((s) => s.finishRace);
   const racing = useGame((s) => !!s.race);
   const raceTitle = useGame((s) => (s.race ? raceForDay(s.day)?.title : null));
+  const worldId = useGame((s) => (s.race ? courseOf(raceForDay(s.day)?.course ?? 'ost').world : 'land'));
+  const world = worldFor(worldId);
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
   const [esp, setEspState] = useState(driveInput.assist);
@@ -310,7 +325,7 @@ export function TrackUI() {
         <button className="btn" data-testid="respawn" onClick={() => hud.set({ respawn: hud.respawn + 1 })}>{racing ? '↺ Letzter Kontrollpunkt' : '↺ Auf die Straße'}</button>
         {!racing && <div className="money" data-testid="drive-time">⏱ {clock(hud.elapsed)}</div>}
       </div>
-      <MiniMap />
+      <MiniMap world={world} />
       {racing && <RaceHud />}
       <div className="speedo">
         <Gauge />

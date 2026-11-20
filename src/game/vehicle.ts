@@ -52,6 +52,16 @@ export interface VehicleSpec {
   /** Schräglaufwinkel, bei dem die Reifen am stärksten führen (rad) – Ziel der Lenkhilfe. */
   peakSlip: number;
   dragArea: number;
+  /**
+   * Abtrieb: Auftriebsbeiwert × Stirnfläche (m², positiv = Abtrieb) und Anteil vorn. Abtrieb wächst mit v², drückt die
+   * Reifen auf die Straße und erlaubt schnellere Kurven bei hohem Tempo – Serienautos fast null, Sportwagen und Flügel mehr.
+   */
+  clA: number;
+  aeroFront: number;
+  /** Anteil der Querlastübertragung an der Vorderachse (Wankabstützung): mehr vorn = mehr Untersteuern. */
+  rollFront: number;
+  /** Spurweite (m) für die Querlastübertragung. */
+  track: number;
   rollRes: number;
   /** Federung: Eigenfrequenz (Hz) und Dämpfung der Aufbaubewegung – Sportfahrwerk straffer. */
   suspFreq: number;
@@ -130,6 +140,8 @@ export interface Surface {
 }
 
 const G = 9.81;
+/** Lastempfindlichkeit der Reifen: Haftbeiwert sinkt um diesen Anteil je zusätzlicher statischer Radlast. */
+const LOAD_SENS = 0.12;
 const RHO = 1.2;
 
 /** Typische Übersetzungen: ältere Autos fünf, neuere sechs Gänge; Diesel länger übersetzt. */
@@ -170,7 +182,16 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
   const wheelRadius = 0.31 + 0.0127 * (car.visual?.rimSize ?? 0);
   // Höchstgeschwindigkeit aus Leistung und Luftwiderstand; die Achse ist so übersetzt, dass sie im letzten Gang
   // knapp vor der Abregeldrehzahl erreicht wird.
-  const dragArea = (model.body === 'box' || model.body === 'classic' || model.body === 'wagon' ? 0.74 : model.cls === 'sport' ? 0.62 : 0.68) * (car.visual?.spoiler === 3 ? 1.04 : 1);
+  const spoiler = car.visual?.spoiler ?? 0;
+  const dragArea = (model.body === 'box' || model.body === 'classic' || model.body === 'wagon' ? 0.74 : model.cls === 'sport' ? 0.62 : 0.68) * (spoiler === 3 ? 1.1 : spoiler === 2 ? 1.04 : spoiler === 1 ? 1.015 : 1);
+  // Abtrieb: Serienlimousinen leicht Auftrieb (≈ 0), Sportwagen etwas Abtrieb, Mittelmotor-Supersportler deutlich;
+  // Spoilerlippe, Entenbürzel und Heckflügel legen hinten zu (der Flügel am meisten), Verbreiterungen mit Schürzen etwas vorn
+  const midEngine = car.modelId === 'veloce_stradale' || car.modelId === 'veloce_gt';
+  const baseClA = midEngine ? 0.8 : model.cls === 'sport' ? 0.3 : model.cls === 'luxury' ? 0.08 : -0.04;
+  const wingClA = spoiler === 3 ? 0.9 : spoiler === 2 ? 0.3 : spoiler === 1 ? 0.12 : 0;
+  const flareClA = car.visual?.flares ? 0.08 : 0;
+  const clA = baseClA + wingClA + flareClA;
+  const aeroFront = clA > 0.05 ? Math.max(0.25, Math.min(0.5, (Math.max(0, baseClA) * 0.45 + flareClA * 0.8 + wingClA * 0.1) / clA)) : 0.45;
   const vmax = Math.cbrt((Math.max(30, p.ps) * 735.5 * 0.82) / (0.5 * RHO * dragArea));
   const final = (redline * 0.97 * 2 * Math.PI * wheelRadius) / (60 * Math.max(10, vmax) * gears[gears.length - 1]);
   const susp = SUSP[car.visual?.suspension ?? 'stock'] ?? SUSP.stock;
@@ -224,7 +245,11 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
     steerMax: 0.62,
     peakSlip: PEAK_K * (mu / 19),
     dragArea,
-    rollRes: 0.013,
+    clA,
+    aeroFront,
+    // Serienabstimmung vorn steifer (gutmütiges Untersteuern), Sportfahrwerk ausgeglichener, Fronttriebler vorn mehr
+    rollFront: (drive === 'FWD' ? 0.6 : 0.56) - (susp === SUSP.stock ? 0 : susp === SUSP.coilover ? 0.06 : 0.03),
+    track: 1.5 + (body.width - 0.9) * 0.8 + (car.visual?.flares ? 0.06 : 0),    rollRes: 0.013,
     suspFreq: susp.freq,
     suspDamping: susp.damp,
     diesel,
@@ -309,8 +334,12 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   // --- Radlasten mit Gewichtsverlagerung (längs aus der letzten Beschleunigung)
   const weight = spec.mass * G * Math.cos(surface.grade);
   const transfer = (spec.mass * s.ax * spec.cgHeight) / L;
-  const loadF = Math.max(0.15 * weight, (weight * spec.b) / L - transfer);
-  const loadR = Math.max(0.15 * weight, (weight * spec.a) / L + transfer);
+  // Abtrieb (wächst mit dem Quadrat der Geschwindigkeit; Auftrieb entlastet entsprechend)
+  const down = 0.5 * RHO * spec.clA * s.vx * s.vx;
+  const staticF = (weight * spec.b) / L;
+  const staticR = (weight * spec.a) / L;
+  const loadF = Math.max(0.15 * weight, staticF - transfer + down * spec.aeroFront);
+  const loadR = Math.max(0.15 * weight, staticR + transfer + down * (1 - spec.aeroFront));
   const muF = spec.muFront * surface.grip;
   const muR = spec.muRear * surface.grip;
 
@@ -368,8 +397,18 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   let fxF = driveForce * shareF;
   let fxR = driveForce * (1 - shareF);
 
-  const capF = muF * loadF;
-  const capR = muR * loadR;
+  // Haftung je Achse aus den beiden Radlasten: Reifen sind lastempfindlich (doppelte Last ≠ doppelte Haftung).
+  // Die Querlastübertragung in der Kurve belastet das kurvenäußere Rad und kostet damit Achshaftung – je nachdem,
+  // welche Achse mehr Wankmoment trägt (Wankabstützung), schiebt das Auto oder kommt das Heck.
+  const latTransfer = (spec.mass * Math.abs(s.ay) * spec.cgHeight) / spec.track;
+  const axleGrip = (mu: number, load: number, staticLoad: number, share: number) => {
+    const d = Math.min(load / 2, latTransfer * share);
+    const ref = staticLoad / 2;
+    const wheel = (fz: number) => mu * fz * Math.max(0.55, 1 - LOAD_SENS * (fz / ref - 1));
+    return wheel(load / 2 + d) + wheel(load / 2 - d);
+  };
+  const capF = axleGrip(muF, loadF, staticF, spec.rollFront);
+  const capR = axleGrip(muR, loadR, staticR, 1 - spec.rollFront);
   // Seitenkraft, die die Kurve gerade braucht (aus der letzten Querbeschleunigung), bleibt jeder Achse vorbehalten
   const needF = spec.mass * Math.abs(s.ay) * (spec.b / L);
   const needR = spec.mass * Math.abs(s.ay) * (spec.a / L);
@@ -404,8 +443,9 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const latF = Math.sqrt(Math.max(0, capF * capF - fxF * fxF)) * (1 - Math.min(0.5, spinF * 0.8));
   let latR = Math.sqrt(Math.max(0, capR * capR - fxR * fxR)) * (1 - Math.min(0.5, spinR * 0.8));
   if (hand && Math.abs(s.vx) > 0.5) latR = capR * 0.3;
-  let fyF = tire(alphaF, spec.cornerFront, latF);
-  let fyR = tire(alphaR, spec.cornerRear, latR);
+  // Seitensteifigkeit wächst mit der Radlast (unterproportional) – mit Abtrieb lenkt das Auto bei Tempo direkter ein
+  let fyF = tire(alphaF, spec.cornerFront * (loadF / staticF) ** 0.7, latF);
+  let fyR = tire(alphaR, spec.cornerRear * (loadR / staticR) ** 0.7, latR);
   const lowSpeed = Math.min(1, speed / 3);
   fyF *= lowSpeed;
   fyR *= lowSpeed;

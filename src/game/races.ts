@@ -9,7 +9,8 @@
  * Alles hängt nur am Spieltag (fester Zufall) – kein zusätzlicher gemeinsamer Zustand im Koop nötig. Bestzeiten und
  * ausgezahltes Preisgeld liegen in `career` (gemeinsam).
  */
-import { driveWorld, type DriveWorld } from '../three/driveWorld';
+import { type DriveWorld } from '../three/driveWorld';
+import { CIRCUITS, worldFor, type CircuitId, type WorldId } from '../three/circuits';
 import { createCar } from './market';
 import { performance } from './performance';
 import { driveBlocker } from './repair';
@@ -28,19 +29,24 @@ const OPEN_REF_PS = 600;
 /** Reifen der Klasse: stärkere Klassen fahren breitere Sportreifen (mehr Haftung). */
 const REF_GRIP: Record<RaceClass, number> = { c150: 1, c250: 1.04, c400: 1.1, open: 1.16 };
 
-export type CourseId = 'runde' | 'ost' | 'west';
+export type CourseId = 'runde' | 'ost' | 'west' | CircuitId;
 export interface Course {
   id: CourseId;
   name: string;
   desc: string;
   /** Preisgeld-Faktor (lange Strecke zahlt mehr). */
   pay: number;
-  /** Start- und Zielpunkt auf der Straße (Index in `driveWorld().samples`), Länge in Punkten (2 m). */
+  /** Welt (Landschaft oder Rennstrecke), Runden (Rundkurse) */
+  world: WorldId;
+  laps: number;
+  /** Start- und Zielpunkt auf der Straße (Index in den Straßenpunkten der Welt), Länge in Punkten (2 m), alle Runden zusammen. */
   start: number;
   length: number;
 }
+/** Runden je Rennstrecke (Renndistanz ≈ 3–6 km). */
+const LAPS: Record<CircuitId, number> = { eifel: 1, motodrom: 2, hafen: 2, ardennen: 1 };
 
-const COURSE_DEF: Record<CourseId, { name: string; desc: string; pay: number; from: [number, number]; to: [number, number] | null }> = {
+const COURSE_DEF: Record<'runde' | 'ost' | 'west', { name: string; desc: string; pay: number; from: [number, number]; to: [number, number] | null }> = {
   runde: { name: 'Große Runde um Grünbach', desc: 'Die ganze Acht: Ostschleife über die Hügel, durch den Ort, Westschleife und zurück zur Werkstatt.', pay: 1.4, from: [70, 0], to: null },
   ost: { name: 'Bergsprint Ost', desc: 'Von der Werkstatt über die Hügel der Ostschleife bis zur Einfahrt nach Grünbach.', pay: 1, from: [70, 0], to: [6, 120] },
   west: { name: 'Waldsprint West', desc: 'Aus Grünbach hinaus durch den Wald der Westschleife bis zur Ortseinfahrt West.', pay: 1, from: [-6, -130], to: [-180, 10] },
@@ -49,7 +55,7 @@ const COURSE_DEF: Record<CourseId, { name: string; desc: string; pay: number; fr
 let courses: Record<CourseId, Course> | null = null;
 export function courseOf(id: CourseId): Course {
   if (!courses) {
-    const w = driveWorld();
+    const w = worldFor('land');
     const n = w.samples.length;
     const idx = ([x, z]: [number, number]) => {
       let best = Infinity;
@@ -64,13 +70,21 @@ export function courseOf(id: CourseId): Course {
       return bi;
     };
     courses = Object.fromEntries(
-      (Object.keys(COURSE_DEF) as CourseId[]).map((k) => {
+      (Object.keys(COURSE_DEF) as ('runde' | 'ost' | 'west')[]).map((k) => {
         const d = COURSE_DEF[k];
         const start = idx(d.from);
         const length = d.to ? (idx(d.to) - start + n) % n : n;
-        return [k, { id: k, name: d.name, desc: d.desc, pay: d.pay, start, length }];
+        return [k, { id: k, name: d.name, desc: d.desc, pay: d.pay, world: 'land' as WorldId, laps: 1, start, length }];
       }),
     ) as Record<CourseId, Course>;
+    // Rennstrecken: Start und Ziel an der Start-Ziel-Geraden, Preisgeld nach Renndistanz
+    for (const id of Object.keys(CIRCUITS) as CircuitId[]) {
+      const cw = worldFor(id);
+      const c = CIRCUITS[id];
+      const laps = LAPS[id];
+      const km = (cw.length * laps) / 1000;
+      courses[id] = { id, name: c.name, desc: `${c.desc} Vorbild: ${c.like}. ${laps > 1 ? `${laps} Runden` : '1 Runde'}.`, pay: Math.round(Math.min(2.2, Math.max(1.3, km / 2.6)) * 10) / 10, world: id, laps, start: 0, length: cw.samples.length * laps };
+    }
   }
   return courses[id];
 }
@@ -102,7 +116,8 @@ function seeded(seed: number) {
 export function raceForDay(day: number): Race | null {
   if (day % 3 === 0) return null;
   const r = seeded(day + 17);
-  const course = (['ost', 'west', 'runde', 'ost', 'west'] as const)[Math.floor(r() * 5)];
+  // Anfangs nur die Strecken rund um Grünbach, ab Tag 4 auch die Rennstrecken
+  const course = (day < 4 ? (['ost', 'west', 'runde'] as const) : (['ost', 'west', 'runde', 'eifel', 'motodrom', 'hafen', 'ardennen', 'eifel', 'motodrom', 'hafen', 'ardennen'] as const))[Math.floor(r() * (day < 4 ? 3 : 11))];
   // Die ersten Tage eher kleine Klassen, später alle
   const pool: RaceClass[] = day < 4 ? ['c150', 'c250'] : ['c150', 'c250', 'c250', 'c400', 'c400', 'open'];
   const cls = pool[Math.floor(r() * pool.length)];
@@ -137,7 +152,7 @@ export function raceBlocker(car: CarInstance, race: Race): string | null {
  * Fährt die Strecke mit einem einfachen, aber zügigen Fahrer (schaut voraus, bremst vor Kurven, lenkt analog).
  * Liefert die Zeit in Sekunden (oder Infinity, wenn er nicht ankommt).
  */
-export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = driveWorld(), assist = true) {
+export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true) {
   const n = w.samples.length;
   const p0 = w.samples[course.start];
   const st = initialState(p0.x - p0.nx * 1.8, p0.z - p0.nz * 1.8, Math.atan2(-p0.tz, p0.tx));
