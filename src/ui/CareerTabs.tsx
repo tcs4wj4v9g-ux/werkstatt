@@ -1,5 +1,5 @@
 import { CarStatsCard } from './CarStatsCard';
-import { courseOf, MEDAL_LABEL, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
+import { courseOf, MEDAL_LABEL, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
 import { duration, todayOf } from '../game/playtime';
 import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
@@ -234,7 +234,7 @@ export function RacesTab() {
         <div className="shop-row col" data-testid="race-today">
           <b>Heute: {race.title}</b>
           <div className="meta">{courseOf(race.course).desc} · {((courseOf(race.course).length * 2) / 1000).toFixed(1)} km</div>
-          <RaceTargets race={race} />
+          {race.kind === 'time' ? <RaceTargets race={race} /> : <RaceField race={race} />}
           <div className="meta">
             Startgeld {eur(race.fee)}
             {best !== undefined && <> · deine Bestzeit {raceClock(best)}</>}
@@ -262,10 +262,28 @@ export function RacesTab() {
         <div key={r.id} className="shop-row">
           <div>
             <b>Tag {r.day}: {r.title}</b>
-            <div className="meta">Gold {eur(r.prize.gold)} · Silber {eur(r.prize.silver)} · Bronze {eur(r.prize.bronze)} · Startgeld {eur(r.fee)}</div>
+            <div className="meta">
+              {r.kind === 'grid' ? `Gegen 5 Gegner · Platz 1 ${eur(r.prize.gold)} · Platz 2 ${eur(r.prize.silver)} · Platz 3 ${eur(r.prize.bronze)}` : `Gold ${eur(r.prize.gold)} · Silber ${eur(r.prize.silver)} · Bronze ${eur(r.prize.bronze)}`} · Startgeld {eur(r.fee)}
+            </div>
           </div>
         </div>
       ))}
+    </>
+  );
+}
+
+/** Rennen gegen Gegner: Preisgeld nach Platz und das Starterfeld. */
+function RaceField({ race }: { race: Race }) {
+  return (
+    <>
+      <div className="race-table">
+        <span>🏆 Platz 1 → {eur(race.prize.gold)}</span>
+        <span>🥈 Platz 2 → {eur(race.prize.silver)}</span>
+        <span>🥉 Platz 3 → {eur(race.prize.bronze)}</span>
+      </div>
+      <div className="meta" data-testid="race-field">
+        Gegner: {race.opponents.map((o) => `${o.name} (${CAR_MODELS[o.modelId].name})`).join(' · ')}. Du startest von Platz {PLAYER_GRID + 1}.
+      </div>
     </>
   );
 }
@@ -291,9 +309,25 @@ export function RaceResultModal() {
     <Modal title="Ergebnis Zeitrennen" onClose={() => s.setPanel(null)}>
       <p className="meta">{r.title} · {r.car}</p>
       <p className="bigline" data-testid="race-time">Zeit {raceClock(r.time)}{r.improved ? ' – neue Bestzeit!' : ''}</p>
-      <p className={`bigline ${r.medal ? 'good' : 'bad'}`} data-testid="race-medal">
-        {r.medal ? `${MEDAL_LABEL[r.medal]} – Preisgeld ${eur(r.prize)}` : `Keine Medaille (Bronze unter ${raceClock(r.targets.bronze)})`}
-      </p>
+      {r.place !== null ? (
+        <p className={`bigline ${r.place <= 3 ? 'good' : 'bad'}`} data-testid="race-medal">
+          {r.place === 1 ? '🏆 Sieg!' : `Platz ${r.place} von ${r.table?.length ?? 6}`}
+          {r.place <= 3 ? ` – Preisgeld ${eur(r.prize)}` : ' – kein Preisgeld (nur Platz 1–3)'}
+        </p>
+      ) : (
+        <p className={`bigline ${r.medal ? 'good' : 'bad'}`} data-testid="race-medal">
+          {r.medal ? `${MEDAL_LABEL[r.medal]} – Preisgeld ${eur(r.prize)}` : `Keine Medaille (Bronze unter ${raceClock(r.targets.bronze)})`}
+        </p>
+      )}
+      {r.table && (
+        <div className="race-results" data-testid="race-results">
+          {r.table.map((row, i) => (
+            <div key={row.name} className={`race-row${row.you ? ' you' : ''}`}>
+              <b>{i + 1}.</b> <span>{row.name}</span> <span className="meta">{row.car}</span> <span>{raceClock(row.time)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <p className="meta" data-testid="race-payout">
         {r.payout > 0 ? `Ausgezahlt: ${eur(r.payout)}` : r.medal ? 'Diese Medaille wurde für das heutige Rennen schon ausgezahlt.' : 'Kein Preisgeld.'} · Bestzeit heute {raceClock(r.best)}
       </p>

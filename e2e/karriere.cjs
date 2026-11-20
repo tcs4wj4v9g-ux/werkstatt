@@ -188,6 +188,23 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.screenshot({ path: S + '/rennen-ergebnis.png' });
   await G(() => window.__gk.getState().setPanel(null));
 
+  // ---------- Rennen gegen Gegner: Startaufstellung, Platz im Rennen, Endstand mit sechs Fahrern ----------
+  const gday = await G(() => { const L = window.__gkLib; const g = window.__gk; const s = g.getState(); let d = s.day + 1; while (!(L.raceForDay(d) && L.raceForDay(d).kind === 'grid')) d++; const cars = [...s.cars]; const c = L.createCar('renard_twingle', [], Math.random); c.fluids.oil.level = 4; cars[0] = c; g.setState({ day: d, cars, money: Math.max(s.money, 20000), panel: 'computer' }); return { d, title: L.raceForDay(d).title }; });
+  await p.waitForTimeout(400);
+  await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
+  expect(/Gegner: .+Du startest von Platz 4/.test(await p.getByTestId('race-field').textContent()), 'Starterfeld im Rennen-Reiter: ' + gday.title);
+  await p.getByTestId('race-start-0').click(); await p.waitForTimeout(1500);
+  await G(() => { const d = window.__gkDrive; d.sim.autopilot = 26; d.sim.timeScale = 3; });
+  await p.waitForTimeout(4000);
+  expect(/^P[1-6]\/6$/.test((await p.getByTestId('race-place').textContent()).trim()), 'Platz im Rennen angezeigt: ' + (await p.getByTestId('race-place').textContent()));
+  for (let i = 0; i < 400 && (await G(() => window.__gk.getState().panel)) !== 'raceResult'; i++) await p.waitForTimeout(500);
+  const gr = await G(() => window.__gk.getState().raceResult);
+  expect(gr && gr.place >= 1 && gr.table && gr.table.length === 6 && gr.table.filter((r) => !r.you).every((r) => r.time > 10), 'Endstand: Platz ' + (gr && gr.place) + ' von 6 – ' + (gr && gr.table.map((r) => r.name + ' ' + r.time).join(', ')));
+  expect((gr.place <= 3) === (gr.prize > 0), 'Preisgeld nur für Platz 1–3 (' + gr.prize + ' €)');
+  expect(await p.getByTestId('race-results').isVisible(), 'Ergebnistabelle sichtbar');
+  await p.screenshot({ path: S + '/rennen-gegner.png' });
+  await G(() => window.__gk.getState().setPanel(null));
+
   // Speichern und Laden: alles bleibt
   const before = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.money, a: s.achieved, c: s.career, u: s.upgrades, cars: s.cars.map((c) => c && c.uid), dyno: s.cars[11] && s.cars[11].dyno, meet: s.meet && s.meet.result && s.meet.result.place }); });
   await p.reload(); await p.waitForTimeout(3000);

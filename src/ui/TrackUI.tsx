@@ -284,14 +284,23 @@ function RaceHud() {
         <div className="countdown" data-testid="countdown">{hud.raceT < 0 ? Math.ceil(-hud.raceT) : 'LOS!'}</div>
       )}
       <div className="race-hud" data-testid="race-hud">
+        {race.kind === 'grid' && hud.field > 0 && (
+          <div className="race-place" data-testid="race-place">
+            P{hud.place}<span>/{hud.field}</span>
+          </div>
+        )}
         <div className="race-time">{raceClock(run)}</div>
         <div className="meta">
           {hud.laps > 1 && <b data-testid="lap">Runde {Math.min(hud.laps, Math.floor(hud.cp / (hud.cpTotal / hud.laps)) + 1)}/{hud.laps} · </b>}
           Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}
         </div>
-        <div className={`race-targets ${medal ?? 'none'}`}>
-          🥇 {raceClock(t.gold)} · 🥈 {raceClock(t.silver)} · 🥉 {raceClock(t.bronze)}
-        </div>
+        {race.kind === 'time' ? (
+          <div className={`race-targets ${medal ?? 'none'}`}>
+            🥇 {raceClock(t.gold)} · 🥈 {raceClock(t.silver)} · 🥉 {raceClock(t.bronze)}
+          </div>
+        ) : (
+          <div className="race-targets">Sieg: {race.prize.gold.toLocaleString('de-DE')} €</div>
+        )}
       </div>
     </>
   );

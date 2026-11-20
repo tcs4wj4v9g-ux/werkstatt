@@ -33,6 +33,9 @@ interface DriveHud {
   /** Runden der Strecke (Rundkurse). */
   laps: number;
   racing: boolean;
+  /** Rennen gegen Gegner: aktueller Platz und Teilnehmerzahl. */
+  place: number;
+  field: number;
   /** Lage für die Minikarte: Position (m) und Kurs (rad). */
   px: number;
   pz: number;
@@ -64,6 +67,8 @@ export const useDriveHud = create<DriveHud>((set) => ({
   cpTotal: 0,
   laps: 1,
   racing: false,
+  place: 0,
+  field: 0,
   px: 0,
   pz: 0,
   ph: 0,

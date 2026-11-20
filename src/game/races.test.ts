@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createCar } from './market';
 import { performance } from './performance';
-import { aiTime, courseOf, medalFor, payoutFor, raceBlocker, raceForDay, raceTargets, upcomingRaces, RACE_CLASSES } from './races';
+import { aiTime, courseOf, medalFor, opponentSpec, payoutFor, raceBlocker, raceForDay, raceTargets, upcomingRaces, RACE_CLASSES } from './races';
+import { CAR_MODELS } from './data/cars';
 import { vehicleSpec } from './vehicle';
 
 const fresh = (id: string) => {
@@ -62,5 +63,31 @@ describe('Zeitrennen', () => {
     const gold = payoutFor(race, t.gold - 0.1, bronze.prize);
     expect(gold.payout).toBe(race.prize.gold - race.prize.bronze);
     expect(payoutFor(race, t.gold - 0.5, race.prize.gold).payout).toBe(0);
+  });
+
+  it('Rennen gegen Gegner: etwa jedes zweite, fünf Gegner mit passenden Autos, fest je Tag', () => {
+    const all = upcomingRaces(1, 40);
+    const grid = all.filter((r) => r.kind === 'grid');
+    expect(grid.length).toBeGreaterThan(10);
+    expect(grid.length).toBeLessThan(30);
+    for (const r of grid.slice(0, 6)) {
+      expect(r.opponents.length).toBe(5);
+      expect(new Set(r.opponents.map((o) => o.name)).size).toBe(5);
+      for (const o of r.opponents) expect(CAR_MODELS[o.modelId]).toBeTruthy();
+      expect(raceForDay(r.day)).toEqual(r);
+      expect(r.title).toMatch(/^Rennen /);
+    }
+  });
+
+  it('Gegner: der Schnellste fährt etwa auf Gold-Niveau, der Langsamste deutlich langsamer; Preisgeld nach Platz', () => {
+    const r = upcomingRaces(1, 40).find((x) => x.kind === 'grid' && x.course === 'ost') ?? upcomingRaces(1, 40).find((x) => x.kind === 'grid')!;
+    const times = r.opponents.map((o) => aiTime(opponentSpec(r.cls, o), courseOf(r.course), undefined, true, o.skill));
+    const gold = raceTargets(r).gold;
+    expect(Math.min(...times) / gold).toBeGreaterThan(0.95);
+    expect(Math.min(...times) / gold).toBeLessThan(1.04);
+    expect(Math.max(...times)).toBeGreaterThan(Math.min(...times) * 1.04);
+    expect(payoutFor(r, 999, 0, 1).payout).toBe(r.prize.gold);
+    expect(payoutFor(r, 1, 0, 4).payout).toBe(0);
+    expect(payoutFor(r, 999, r.prize.bronze, 2).payout).toBe(r.prize.silver - r.prize.bronze);
   });
 });
