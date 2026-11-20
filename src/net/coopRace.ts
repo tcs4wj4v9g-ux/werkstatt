@@ -10,11 +10,12 @@
 import { create } from 'zustand';
 import { courseOf, type CourseId } from '../game/races';
 import { worldFor } from '../three/circuits';
+import { syncClock, syncedNow } from './coop';
 
 export interface Lobby {
   id: string;
   course: CourseId;
-  /** Startzeit (ms, Uhr des Ausschreibenden) – null, solange noch Teilnehmer dazukommen. */
+  /** Startzeit (ms, Server-Uhr – siehe `syncedNow`) – null, solange noch Teilnehmer dazukommen. */
   startAt: number | null;
 }
 export interface Join {
@@ -79,6 +80,8 @@ const newId = () => Math.random().toString(36).slice(2, 10);
 /** Strecke schon vorab berechnen (beim Ausschreiben/Mitfahren), damit der Wechsel zum Start schnell geht. */
 function prepare(course: CourseId) {
   setTimeout(() => worldFor(courseOf(course).world), 50);
+  // Uhr mit dem Server abgleichen (gemeinsamer Start auch bei verstellten Geräteuhren)
+  void syncClock();
 }
 /** Rennen ausschreiben und selbst mit Auto `bay` teilnehmen. */
 export function hostRace(course: CourseId, bay: number, car: { modelId: string; color: string; name: string }) {
@@ -95,7 +98,7 @@ export function joinRace(id: string, bay: number, car: { modelId: string; color:
 export const START_LEAD_MS = 10000;
 export function startCoopRace() {
   const l = useCoopRace.getState().lobby;
-  if (l && l.startAt === null) useCoopRace.setState({ lobby: { ...l, startAt: Date.now() + START_LEAD_MS } });
+  if (l && l.startAt === null) useCoopRace.setState({ lobby: { ...l, startAt: syncedNow() + START_LEAD_MS } });
 }
 /** Aussteigen bzw. Ausschreibung zurückziehen. */
 export function leaveCoopRace() {

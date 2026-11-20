@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { remotePlayers, useCoop } from '../net/coop';
+import { remotePlayers, syncedNow, useCoop } from '../net/coop';
 import { coopRaceOut, participantsOf } from '../net/coopRace';
 import { textTexture } from './textures';
 import { aiInput, courseOf, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
@@ -261,7 +261,7 @@ export function TrackScene() {
       driveInput.brake = s.vx > s.autopilot + 4 ? 0.5 : 0;
     }
     // Countdown: Auto steht (Gas geben geht – die Drehzahl steigt), los geht es bei null
-    if (coop) s.raceT = s.done ? s.raceT : (Date.now() - coop.startAt) / 1000;
+    if (coop) s.raceT = s.done ? s.raceT : (syncedNow() - coop.startAt) / 1000;
     else if (course && !s.done) s.raceT += dt;
     const held = course && s.raceT < 0;
     stepVehicle(spec, s, held ? { ...driveInput, brake: 0, handbrake: false } : driveInput, { grade, ...surface }, dt);

@@ -4,7 +4,7 @@ import { isFleet } from '../game/data/workshop';
 import { COURSE_IDS, courseOf, raceClock, type CourseId } from '../game/races';
 import { driveBlocker } from '../game/repair';
 import { useGame } from '../game/store';
-import { useCoop } from '../net/coop';
+import { syncedNow, useCoop } from '../net/coop';
 import { coopRaceOut, hostRace, joinRace, leaveCoopRace, lobbiesOf, participantsOf, startCoopRace, useCoopRace, type RaceMember } from '../net/coopRace';
 
 /** Im Koop: Rennen gegeneinander ausschreiben, mitfahren, starten (Reiter „Rennen“ am Computer). */
@@ -98,7 +98,7 @@ export function CoopRaceWatcher() {
           announced.add(lobby.id);
           g.say(`${host.name} schreibt ein Koop-Rennen aus (${courseOf(lobby.course).name}) – mitfahren am Computer unter „Rennen“.`);
         }
-        if (mine.join?.id === lobby.id && lobby.startAt && !entered.has(lobby.id) && Date.now() < lobby.startAt + 15000 && !g.race && (g.screen === 'garage' || g.screen === 'market')) {
+        if (mine.join?.id === lobby.id && lobby.startAt && !entered.has(lobby.id) && syncedNow() < lobby.startAt + 15000 && !g.race && (g.screen === 'garage' || g.screen === 'market')) {
           entered.add(lobby.id);
           g.enterCoopRace(mine.bay, lobby.id, lobby.course, lobby.startAt);
         }

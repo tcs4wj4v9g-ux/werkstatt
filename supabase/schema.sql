@@ -494,6 +494,11 @@ begin
   return jsonb_build_object('ok', true, 'tools', gk_tools_json(p_ws), 'toolsRev', w.tools_rev + 1);
 end $$;
 
+-- Server-Uhr (ms) für den gemeinsamen Start von Koop-Rennen: jedes Gerät misst damit den Abstand seiner eigenen Uhr.
+create or replace function gk_now() returns double precision language sql volatile as $$
+  select extract(epoch from clock_timestamp()) * 1000;
+$$;
+
 -- ---------------------------------------------------------------- Rechte
 
 revoke all on all tables in schema public from anon, authenticated;
@@ -503,4 +508,4 @@ revoke all on function gk_create_workshop(text, text, jsonb), gk_join_workshop(t
   gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text), gk_sell_tool(uuid, uuid) from public, anon;
 grant execute on function gk_create_workshop(text, text, jsonb), gk_join_workshop(text, text), gk_my_workshops(), gk_set_invite(uuid, boolean, boolean), gk_rename_player(uuid, text),
   gk_get_state(uuid), gk_sync(uuid, bigint, bigint, jsonb), gk_commit(uuid, uuid, bigint, jsonb, text, jsonb), gk_ledger_list(uuid, int),
-  gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text), gk_sell_tool(uuid, uuid) to authenticated;
+  gk_take_tool(uuid, uuid), gk_return_tool(uuid, uuid, text), gk_buy_tool(uuid, text, text), gk_sell_tool(uuid, uuid), gk_now() to authenticated;

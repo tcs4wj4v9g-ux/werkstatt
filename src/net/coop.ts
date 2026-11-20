@@ -148,11 +148,55 @@ const text = (reason: string) => TEXT[reason] ?? `Server: ${reason}`;
 const SID = Math.random().toString(36).slice(2, 10);
 let startedAt = 0;
 let foreignSeen = 0;
-/** Ein zweites Fenster mit meinem Konto arbeitet in derselben Werkstatt: hier pausieren (nicht gleich beim Öffnen). */
+let foreignFirst = 0;
+let foreignWarned = false;
+/**
+ * Hinweis auf ein zweites Fenster mit meinem Konto. Es wird NICHT mehr pausiert (das gab Fehlalarme ohne offene Tabs);
+ * erst nach mehreren Anzeichen innerhalb einer Minute erscheint einmalig ein Hinweis.
+ */
 function foreignSession() {
-  if (performance.now() - startedAt < 4000 || useCoop.getState().elsewhere) return;
+  const now = performance.now();
+  if (now - startedAt < 4000) return;
+  if (now - foreignFirst > 60_000) {
+    foreignFirst = now;
+    foreignSeen = 0;
+  }
   foreignSeen++;
-  useCoop.setState({ elsewhere: true });
+  if (foreignSeen >= 5 && !foreignWarned) {
+    foreignWarned = true;
+    useGame.getState().say('Hinweis: Deine Koop-Werkstatt scheint noch in einem anderen Fenster oder auf einem anderen Gerät mit deinem Konto offen zu sein. Falls ja, dort schließen – sonst überschreiben sich die Stände.', true);
+  }
+}
+/**
+ * Gemeinsame Uhr für Koop-Rennen: Abstand der eigenen Uhr zur Server-Uhr (ms). Gemessen wie bei der Internet-Zeit:
+ * mehrere Anfragen, die mit der kürzesten Laufzeit zählt (Fehler höchstens die halbe Laufzeit). Ohne `gk_now` auf dem
+ * Server bleibt es bei 0 (dann gilt die Geräteuhr).
+ */
+let serverOffset = 0;
+export let serverClock = false;
+export const syncedNow = () => Date.now() + serverOffset;
+export async function syncClock() {
+  const samples: { offset: number; rtt: number }[] = [];
+  for (let i = 0; i < 5; i++) {
+    const t0 = Date.now();
+    try {
+      const server = Number(await rpc('gk_now', {}));
+      const t1 = Date.now();
+      if (Number.isFinite(server)) samples.push({ offset: server - (t0 + t1) / 2, rtt: t1 - t0 });
+    } catch {
+      return;
+    }
+  }
+  const best = bestOffset(samples);
+  if (best !== null) {
+    serverOffset = best;
+    serverClock = true;
+  }
+}
+/** Abstand aus Messungen: die mit der kürzesten Laufzeit. */
+export function bestOffset(samples: { offset: number; rtt: number }[]) {
+  if (!samples.length) return null;
+  return samples.reduce((a, b) => (b.rtt < a.rtt ? b : a)).offset;
 }
 /** Ist außer mir gerade jemand online? */
 const othersOnline = () => {
@@ -545,6 +589,7 @@ let unsub: (() => void) | null = null;
 function start(ws: string) {
   localStorage.setItem(SESSION_KEY, ws);
   useCoop.setState({ status: 'online', ws, error: null, elsewhere: false });
+  void syncClock();
   startedAt = performance.now();
   foreignSeen = 0;
   lastSync = performance.now();
@@ -733,4 +778,4 @@ export const openBox = (box: string) => {
   useGame.getState().setPanel('cabinet');
 };
 
-if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, useAway, playHere, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };
+if (typeof window !== 'undefined') (window as any).__gkCoop = { useCoop, useChat, useAway, playHere, syncClock, syncedNow, sendChat, remotePlayers, takeTool, returnTool, buyTool, sellTool, openBox, leave, state: () => ({ rev, dirty, busy, inflight: !!inflight, lastReject, realtime: channel?.state ?? 'aus' }) };

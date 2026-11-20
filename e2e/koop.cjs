@@ -317,6 +317,11 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(await until(A, (u) => !window.__gkCoop.useAway.getState().uids.includes(u), uid0, 20000), 'Nach der Probefahrt steht es wieder da');
 
   // ---------- Koop-Rennen gegeneinander: ausschreiben, mitfahren, gemeinsamer Start, Ergebnis bei beiden ----------
+  // Gemeinsame Uhr: Spieler 2 hat eine um 5 s vorgehende Geräteuhr – nach dem Abgleich mit dem Server stimmen beide überein
+  await G(B, () => { const real = Date.now.bind(Date); Date.now = () => real() + 5000; });
+  await G(A, () => window.__gkCoop.syncClock()); await G(B, () => window.__gkCoop.syncClock());
+  const skew = await G(B, () => window.__gkCoop.syncedNow()) - (await G(A, () => window.__gkCoop.syncedNow()));
+  expect(Math.abs(skew) < 600, 'Verstellte Geräteuhr wird über die Server-Uhr ausgeglichen (Rest ' + Math.round(skew) + ' ms)');
   await G(A, () => { const g = window.__gk; const L = window.__gkLib; const cars = [...g.getState().cars]; for (const i of [2, 3]) { const c = L.createCar('renard_twingle', [], Math.random); c.fluids.oil.level = 4; cars[i] = c; } g.setState({ cars }); });
   await both(A, B);
   await G(A, () => window.__gk.getState().setPanel('computer', -77)); await A.waitForTimeout(500);

@@ -315,3 +315,12 @@ test('Arbeitszeit: zählt die Zeit zwischen Lebenszeichen, nicht untätig, nicht
   m = await play(b);
   assert.ok(m.today >= 9 && m.today <= 12 && m.play >= idle + 9, 'heute neu: ' + JSON.stringify(m));
 });
+
+test('Server-Uhr für Koop-Rennen: gk_now liefert die Zeit in ms', async () => {
+  const { a } = await workshop();
+  const t0 = Date.now();
+  const now = Number(await a.rpc('gk_now'));
+  assert.ok(Math.abs(now - t0) < 5000, 'Server- und Testuhr liegen nah beieinander: ' + (now - t0));
+  const later = Number(await a.rpc('gk_now'));
+  assert.ok(later >= now);
+});
