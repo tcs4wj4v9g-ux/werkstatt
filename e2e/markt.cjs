@@ -136,7 +136,8 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.evaluate(() => window.__gk.getState().setPanel(null)); await p.waitForTimeout(200);
   await p.getByTestId('skipday').click(); await p.waitForTimeout(200);
   const still = await p.evaluate(() => window.__gk.getState().day);
-  await p.getByTestId('skipday').click(); await p.waitForTimeout(300);
+  await p.getByTestId('skipday').click();
+  for (let i = 0; i < 30 && (await p.evaluate(() => window.__gk.getState().day)) !== day0 + 2; i++) await p.waitForTimeout(100);
   expect(still === day0 + 1 && (await p.evaluate(() => window.__gk.getState().day)) === day0 + 2, 'Tag überspringen: erstes Tippen fragt nach, zweites beginnt sofort den nächsten Tag');
   await p.evaluate(() => { window.__gkLib.dayClock.ms = 0; window.__gk.getState().setPanel(null); });
 
