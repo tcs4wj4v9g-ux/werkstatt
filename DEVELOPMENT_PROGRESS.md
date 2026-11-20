@@ -862,3 +862,14 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - Neues Teil **Überrollkäfig** (Drift & Rallye, 1.600 €, rein optisch): Hauptbügel, A-Säulen-, Dach- und Türstreben, Diagonale. Die Rohre folgen der Innenseite der Kabine.
 - Im Cockpit sind die Scheiben von innen fast klar (vorher stark getönt).
 - Sportsitze und Haubenhutze waren schon sichtbar.
+
+## Unfallschäden
+
+- Einschläge bei Probefahrt und Rennen werden während der Fahrt gesammelt (`game/crash.ts`) und beim Ende auf das Auto übertragen, auch bei abgebrochener Fahrt. Erfasst werden Leitplanke (Geschwindigkeit zur Planke hin), Bäume und Häuser sowie Berührungen mit Gegnern bzw. Mitspielern.
+- **Beulen** (`ZoneState.dent`) ab 3 m/s Aufprallgeschwindigkeit, je Bereich (Front, Heck, links, rechts):
+  - Darstellung: Die Karosserie wird weich eingedrückt, in der Mitte der Delle ist der Lack bis auf die Grundierung abgeschabt.
+  - Wert: Abzug „Unfallschaden“.
+  - Akte: zeigt „Beulen %“.
+- **Technik** ab 8,5 m/s: vorn der Kühler, an einer vorderen Ecke Querlenker oder Spurstange, hinten der Endtopf. Das Bauteil wird defekt (unbekannt, also prüfen).
+- **Reparatur** in der Lackierkabine mit dem Schleifer: ausbeulen, spachteln, schleifen und grundieren (40 € Material), danach lackieren. Lackieren geht erst, wenn die Beule weg ist.
+- In der Fahrt erscheint der Hinweis „💥 Unfallschaden“ bzw. „– auch Technik prüfen“.

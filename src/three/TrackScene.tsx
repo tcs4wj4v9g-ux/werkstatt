@@ -14,6 +14,7 @@ import { soundProfile } from '../game/diagnosis';
 import { useGame } from '../game/store';
 import { initialState, stepVehicle, surfaceGrip, vehicleSpec, type VehicleState } from '../game/vehicle';
 import { offRoadCond, roadCond, seasonOf, weatherOf } from '../game/grip';
+import { crashNow, newCrash, recordImpact } from '../game/crash';
 import { CarModel } from './CarModel';
 import { CarShadow, DriveSky, HAZE, Precip } from './DriveSky';
 import { DriveScenery } from './DriveScenery';
@@ -153,10 +154,13 @@ export function TrackScene() {
     camera.far = 800;
     camera.updateProjectionMatrix();
     camPos.current.set(s.x - Math.cos(s.heading) * 7, s.y + 2.6, s.z + Math.sin(s.heading) * 7);
-    (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec, spin: spinVis.current };
+    (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec, spin: spinVis.current, crash: crashNow };
     driveInput.steer = driveInput.throttle = driveInput.brake = 0;
     driveInput.handbrake = false;
     driveInput.reverse = false;
+    // Neues Schadensprotokoll für diese Fahrt
+    crashNow.log = newCrash();
+    useDriveHud.getState().set({ damage: 0 });
     s.respawn = useDriveHud.getState().respawn;
     if (course) {
       s.near = mySlot ? mySlot.near : course.start;
@@ -339,9 +343,12 @@ export function TrackScene() {
           g.rotation.set(0, r.st.heading, 0);
         }
       });
-      if (collideAll(bodies) > 1.5 && s.bump <= 0) {
+      const coopHit = collideAll(bodies);
+      if (coopHit > 1.5 && s.bump <= 0) {
         roadAudio.hit('bump');
         s.bump = 0.5;
+        const o = nearestOther(s, bodies.slice(1).map((b) => b.st));
+        if (o) crashHit(s, o.wx, o.wz, coopHit);
       }
     }
 
@@ -387,6 +394,8 @@ export function TrackScene() {
       if (hit > 1.5 && s.bump <= 0) {
         roadAudio.hit('bump');
         s.bump = 0.5;
+        const o = nearestOther(s, npcs.map((c) => c.st));
+        if (o) crashHit(s, o.wx, o.wz, hit);
       }
       // Gegner zeichnen
       npcs.forEach((c, k) => {
@@ -405,6 +414,15 @@ export function TrackScene() {
     const hitRail = (p.railL && after.lateral > limit) || (p.railR && after.lateral < -limit);
     if (hitRail) {
       const side = after.lateral > 0 ? 1 : -1;
+      // Aufprall auf die Planke: Geschwindigkeitsanteil zur Planke hin (Welt), nur beim ersten Kontakt werten
+      if (s.bump <= 0) {
+        const ch = Math.cos(s.heading);
+        const shh = Math.sin(s.heading);
+        const wvx = s.vx * ch - s.vy * shh;
+        const wvz = -(s.vx * shh + s.vy * ch);
+        const vIn = wvx * p.nx * side + wvz * p.nz * side;
+        if (vIn > 0) crashHit(s, p.nx * side, p.nz * side, vIn);
+      }
       const push = after.lateral - side * limit;
       s.x -= p.nx * push;
       s.z -= p.nz * push;
@@ -450,6 +468,7 @@ export function TrackScene() {
           if (s.bump <= 0 && -vn > 1.5) {
             roadAudio.hit('bump');
             s.bump = 0.6;
+            crashHit(s, -nx, -nz, -vn);
           }
         }
       }
@@ -727,6 +746,31 @@ function archText(label: string) {
   let t = archTex.get(label);
   if (!t) archTex.set(label, (t = textTexture(label, { bg: '#1b1c1f', fg: '#ffffff', w: 512, h: 96, font: 56 })));
   return t;
+}
+
+/** Einschlag ins Schadensprotokoll: Richtung (Welt) vom Auto zum Hindernis, Aufprallgeschwindigkeit. */
+function crashHit(s: { heading: number }, wx: number, wz: number, v: number) {
+  const l = Math.hypot(wx, wz) || 1;
+  const c = Math.cos(s.heading);
+  const sn = Math.sin(s.heading);
+  // Fahrzeug-x nach vorn = Welt (cos, −sin), Fahrzeug-y nach links = Welt (−sin, −cos)
+  const lx = (wx * c - wz * sn) / l;
+  const ly = (-wx * sn - wz * c) / l;
+  const zone = recordImpact(crashNow.log, lx, ly, v);
+  if (zone) useDriveHud.getState().set({ damage: crashNow.log.worst });
+}
+/** Richtung zum nächsten anderen Auto (für Berührungen im Rennen). */
+function nearestOther(s: { x: number; z: number }, others: { x: number; z: number }[]) {
+  let best: { x: number; z: number } | null = null;
+  let d0 = Infinity;
+  for (const o of others) {
+    const d = (o.x - s.x) ** 2 + (o.z - s.z) ** 2;
+    if (d < d0 && d > 1e-6) {
+      d0 = d;
+      best = o;
+    }
+  }
+  return best ? { wx: best.x - s.x, wz: best.z - s.z } : null;
 }
 
 /** Startplatz g (0 = vorne links): Reihen zu zweit, 9 m Abstand, versetzt hinter der Startlinie. */

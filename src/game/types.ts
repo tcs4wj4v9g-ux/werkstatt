@@ -366,6 +366,8 @@ export interface ZoneState {
   rust: number;
   /** Neue Lackfarbe dieses Bereichs, solange nicht das ganze Auto lackiert ist. */
   paint?: string;
+  /** Beule (Unfallschaden) 0 … 1 – ausbeulen in der Lackierkabine (Schleifer), danach lackieren. */
+  dent?: number;
 }
 
 /** Tuningwunsch eines Kunden: ein bestimmtes Tuningteil, ein Optikteil oder eine Leistungssteigerung. */

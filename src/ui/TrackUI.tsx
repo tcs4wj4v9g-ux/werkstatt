@@ -439,6 +439,7 @@ export function TrackUI() {
         {hud.tooShort && <div className="bad" data-testid="too-short">Noch keine {DRIVE_MIN} s gefahren – dreh noch eine Runde</div>}
         {lamps.length > 0 && <div className="lamps">{lamps.map((l) => <span key={l}>{l}</span>)}</div>}
         {hud.drift > 0 && <div className="good" data-testid="drift">Drift {Math.round(hud.drift)}°</div>}
+        {hud.damage > 0 && <div className="bad" data-testid="damage">💥 Unfallschaden{hud.damage >= 8.5 ? ' – auch Technik prüfen' : ''}</div>}
       </div>
       <div className="drive left">
         <Spring axis="x" testid="steer" className="steer" onChange={(v) => (driveInput.steer = steerCurve(v))} label={<span>◀ ▶</span>} />
