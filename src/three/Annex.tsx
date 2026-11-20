@@ -158,15 +158,17 @@ export function Annex() {
           </mesh>
           {/* Außenwände: Rückwand, Stirnwand, Front mit geschlossenem Rolltor */}
           {/* Rückwand mit offener Seite zur Motorenbau-Nische */}
-          {[[h2.minZ, NICHE.minZ], [NICHE.maxZ, h2.maxZ]].map(([a, b]) => (
+          {[[h2.minZ, NICHE.minZ], [NICHE.maxZ, h2.maxZ]].filter(([a, b]) => b - a > 0.05).map(([a, b]) => (
             <group key={a}>
               <Box p={[ROOM.maxX + 0.1, H / 2, (a + b) / 2]} s={[0.2, H, b - a]} c="#e4e1d8" r={0.95} />
               <Box p={[ROOM.maxX - 0.005, 0.6, (a + b) / 2]} s={[0.01, 1.2, b - a]} c="#3f4a57" />
               <Box p={[ROOM.maxX - 0.008, 1.22, (a + b) / 2]} s={[0.012, 0.06, b - a]} c="#ff7a1a" />
             </group>
           ))}
+          {/* Reicht die Nische über das Ende von Halle 2 hinaus: Außenwand neben der Nische */}
+          {h2.minZ > NICHE.minZ && <Box p={[ROOM.maxX + 0.1, H / 2, (NICHE.minZ + h2.minZ) / 2]} s={[0.2, H, h2.minZ - NICHE.minZ]} c="#e4e1d8" r={0.95} />}
           <Niche floor={tex.floor} />
-          <Box p={[CX, H / 2, h2.minZ - 0.1]} s={[W + 0.4, H, 0.2]} c="#e4e1d8" r={0.95} />
+          <Box p={[CX - 0.1, H / 2, h2.minZ - 0.1]} s={[W + 0.2, H, 0.2]} c="#e4e1d8" r={0.95} />
           <Box p={[ROOM.minX - 0.1, H / 2, cz2]} s={[0.2, H, d2]} c="#e4e1d8" r={0.95} />
           {lifts.map((s) => (
             <group key={s.id}>
@@ -188,14 +190,14 @@ export function Annex() {
           ))}
           <Sign text={center ? 'PERFORMANCE-CENTER' : 'HALLE 2'} p={[ROOM.minX + 0.03, 2.8, cz2]} rot={[0, Math.PI / 2, 0]} size={[3.2, 0.5]} />
           {/* Einrichtung der Nische an deren Rückwand: Werkzeugwagen (wie der Werkzeugschrank), Terminal (Teile, Markt, Aufträge); Teileregal in der Halle */}
-          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('halle2') : setPanel('cabinet'))} position={[10.25, 0, -8.0]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
+          <Interactable id="h2_tools" label="Werkzeugwagen Halle 2" onUse={() => (coopActive() ? openBox('halle2') : setPanel('cabinet'))} position={[11.85, 0, -8.3]} halo={[0.76, 1.1, 1.16]} haloPos={[0, 0.55, 0]}>
             <Box p={[0, 0.5, 0]} s={[0.7, 1.0, 1.1]} c="#b3261e" m={0.4} r={0.5} />
             <Box p={[0, 1.03, 0]} s={[0.74, 0.06, 1.14]} c="#2a2c30" m={0.5} />
             {[0.25, 0.5, 0.75].map((y) => (
               <Box key={y} p={[-0.355, y, 0]} s={[0.01, 0.02, 0.9]} c="#c9ccd1" m={0.9} r={0.3} />
             ))}
           </Interactable>
-          <Interactable id="h2_computer" label="Terminal – Teile, Markt, Aufträge" onUse={() => setPanel('computer')} position={[10.4, 0, -8.95]} halo={[0.5, 1.5, 0.7]} haloPos={[0, 0.75, 0]}>
+          <Interactable id="h2_computer" label="Terminal – Teile, Markt, Aufträge" onUse={() => setPanel('computer')} position={[12.0, 0, -10.3]} halo={[0.5, 1.5, 0.7]} haloPos={[0, 0.75, 0]}>
             <Box p={[0, 0.5, 0]} s={[0.4, 1.0, 0.5]} c="#3f4650" m={0.5} />
             <mesh position={[-0.21, 1.15, 0]} rotation={[0, -Math.PI / 2, -0.25]}>
               <planeGeometry args={[0.45, 0.3]} />

@@ -18,7 +18,7 @@ import { DECO, decoMaterials } from './workshopDecor';
 
 export const CRANE_POS: V3 = [3.1, 0, 1.45];
 /** Zweiter Kran in der Nische von Halle 2 (sobald der Motorheber gekauft ist), wie in der Stammhalle 2 m vor dem Ständer. */
-export const CRANE2_POS: V3 = [8.0, 0, -7.85];
+export const CRANE2_POS: V3 = [8.7, 0, -8.5];
 /** An welchem Kran der Motor hängt (nur Anzeige): an dem, dessen Fenster zuletzt offen war. */
 export const useCraneSite = create<{ hall2: boolean }>(() => ({ hall2: false }));
 const craneBox = (p: V3): Box => ({ minX: p[0] - 0.5, maxX: p[0] + 0.5, minZ: p[2] - 0.38, maxZ: p[2] + 0.38 });

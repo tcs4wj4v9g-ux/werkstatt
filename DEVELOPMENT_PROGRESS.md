@@ -758,3 +758,21 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Beim Zieleinlauf entsteht der Endstand: Gegner im Ziel mit ihrer Zeit, die übrigen werden aus ihrem Schnitt hochgerechnet.
 - **Oberfläche:** Im Rennen-Reiter stehen Starterfeld und Preisgeld nach Platz. Das Ergebnisfenster zeigt Platz und Tabelle aller sechs Fahrer.
 - Tests: `races.test.ts` (Anteil der Gegnerrennen, Feld fest je Tag, Spitzenfahrer auf Gold-Niveau, Preisgeld nach Platz), `karriere.cjs` (Starterfeld, Platz im Rennen, Endstand mit sechs Fahrern, Preisgeld nur für 1–3).
+
+## Lenken beim Bremsen, mehr Kurvenhaftung mit Tuning, Werkzeugkasten, größere Motorenbau-Nische
+
+- **Lenken beim Bremsen:** Das ABS hält jetzt Seitenführung je nach Lenkeinschlag zurück, voll gelenkt etwa zwei Drittel vorn und gut die Hälfte hinten. Vorher richtete es sich nur nach der Kurve, die schon gefahren wurde, und die ist beim Einlenken null.
+  - Vorher: Vollbremsung plus voller Lenkeinschlag ergab 1° Kursänderung in 1 s.
+  - Jetzt: 17–19°, und das Auto wird trotzdem deutlich langsamer.
+- **Mehr Kurvenhaftung, Tuning wirkt stärker:**
+  - Grundhaftung 1,0 statt 0,93 (etwas großzügiger als real, wie in Rennspielen). Felgengröße +3 % je Stufe, Verbreiterung +4 %.
+  - Fahrwerk: Federn +3 %, Sportfahrwerk +7 %, Gewinde +12 %.
+  - Der Heckflügel bringt einen Frontsplitter mit (35 % des Flügelabtriebs vorn): mehr Kurvenspeed, ohne dass das Auto bei Tempo nur schiebt.
+  - Beispiel bei 160 km/h: Serien-330 0,97 g (Radius 186 m), 330 mit Gewinde und Flügel 1,11 g (152 m).
+- **Lenkung:** Die Kennlinie des Schiebereglers ist direkter (Exponent 1,15 statt 1,35), die Lenkrate liegt bei 6/s.
+- **Werkzeugkasten:** „Nehmen“/„Ablegen“ und „Verkaufen“ stehen jetzt untereinander, Name und Hinweis behalten ihren Platz (zwei Zeilen, dann gekürzt). Die Kaufknöpfe bilden ein Raster mit dem Preis in der zweiten Zeile.
+- **Motorenbau-Nische:** 5,8 × 5,6 m statt 4,2 × 3,8 m.
+  - Der Motorständer steht frei mit mindestens 1,4 m Platz auf jeder Seite, der Kran davor.
+  - Werkzeugwagen, Terminal und Spezialschrank stehen an der Rückwand.
+  - Liegt die Nische über das Ende der kurzen Halle 2 hinaus, schließt eine eigene Wand sie ab. Der Laufbereich ist sauber getrennt (Nische und Öffnung).
+- Tests: Lenken beim Bremsen (≥ 10° in 1 s, trotzdem langsamer), Tuning bringt bei 160 km/h mehr als 10 % Querbeschleunigung. Rundgang um den Ständer geprüft (Skript), Werkzeugkasten in Bildern angesehen.
