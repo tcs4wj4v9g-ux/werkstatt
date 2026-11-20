@@ -58,7 +58,8 @@ function terrainTile(w: DriveWorld, heights: Float32Array, fine: number, cx: num
     // PlaneGeometry: Zeilen von -z nach +z nach dem Drehen? Lage aus den Koordinaten selbst bestimmen
     const ix = Math.round(((pos.getX(i) + TILE / 2) / TILE) * seg);
     const iz = Math.round(((pos.getZ(i) + TILE / 2) / TILE) * seg);
-    const h = heights[iz * k * (fine + 1) + ix * k];
+    // Grobe Detailstufen (weiter weg) etwas tiefer: ihr weites Gitter würde sonst über eingeschnittene Straßen ragen
+    const h = heights[iz * k * (fine + 1) + ix * k] - (k >= 8 ? 1.4 : k >= 4 ? 0.7 : 0);
     pos.setY(i, h);
     groundColor(pos.getX(i) + cx, pos.getZ(i) + cz, h, c, w).toArray(colors, i * 3);
   }

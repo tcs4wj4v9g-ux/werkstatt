@@ -222,6 +222,15 @@ export function driveWorld(): DriveWorld {
       const bed = lakeY - 0.35 - 2.4 * Math.max(0, 1 - k * k);
       h = k < 1 ? bed : bed + (Math.max(h, lakeY + 0.2) - bed) * THREE.MathUtils.smoothstep(k, 1, 1.45);
     }
+    // Die Fahrbahn bleibt immer frei: Neben dem Testgelände und dem Vorplatz wird das Gelände auf deren (mittlere) Höhe
+    // angeglichen – dort, wo die Straße tiefer liegt, darf es nicht über die Fahrbahn ragen (sonst versinkt das Auto
+    // optisch im Gras). Erst eine Gitterweite des Geländes (gut 5 m) hinter dem Bankett steigt es als Böschung an (1:1,7),
+    // sonst zieht die Dreiecksfläche zwischen zwei Gitterpunkten die Böschung in den Fahrbahnrand.
+    const r = roadNear(x, z, 20);
+    if (r) {
+      const lim = samples[r.i].y - 0.1 + Math.max(0, r.d - (ROAD_WIDTH / 2 + 6.5)) * 0.6;
+      if (h > lim) h = lim;
+    }
     return h;
   };
   const groundRaw = (x: number, z: number) => {
