@@ -14,6 +14,7 @@ import { soundProfile } from '../game/diagnosis';
 import { useGame } from '../game/store';
 import { initialState, stepVehicle, vehicleSpec, type VehicleState } from '../game/vehicle';
 import { CarModel } from './CarModel';
+import { CarShadow, DriveSky, HAZE } from './DriveSky';
 import { DriveScenery } from './DriveScenery';
 import { LAKE } from './driveWorld';
 import { worldFor } from './circuits';
@@ -31,7 +32,6 @@ const SKID_GRAVEL = new THREE.Color('#6b5d48');
 const SKID_GRASS = new THREE.Color('#3f4a26');
 const SMOKE = new THREE.Color('#f2f2f2');
 const DUST = new THREE.Color('#b9a27c');
-const SKY = '#a9cbea';
 
 /**
  * Probefahrt: Fahrphysik (`game/vehicle.ts`) in der offenen Landschaft (`driveWorld.ts`): Landstraßen, Ort, Testgelände,
@@ -554,11 +554,12 @@ export function TrackScene() {
 
   return (
     <>
-      <color attach="background" args={[SKY]} />
-      <fog attach="fog" args={[SKY, 220, 720]} />
+      <color attach="background" args={[HAZE]} />
+      <fog attach="fog" args={[HAZE, 240, 760]} />
+      <DriveSky />
       <Env intensity={0.8} kind="sky" />
       <hemisphereLight args={['#eaf4ff', '#5d6b45', 1.15]} />
-      <directionalLight position={[120, 180, 60]} intensity={2.1} />
+      <directionalLight position={[120, 180, 60]} intensity={2.3} color="#fff6e6" />
       {/* Ferne Wiese bis zum Horizont (Nebel verdeckt die Kante) */}
       {/* Zuerst gezeichnet und ohne Tiefe: das Gelände liegt immer darüber, auch wo es tiefer liegt (See, Senken) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]} renderOrder={-2} raycast={() => null}>
@@ -567,18 +568,21 @@ export function TrackScene() {
       </mesh>
       <DriveScenery world={world} />
       <primitive object={fx.group} />
-      {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} />}
+      {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} clock={() => sim.current.raceT} />}
       {rivals.map((r, k) => (
         <group key={r.id} ref={(g) => void (rivalRefs.current[k] = g)} visible={false}>
+          <CarShadow />
           <CarModel body={CAR_MODELS[r.look.modelId].body} color={r.join.color} modelId={r.look.modelId} car={r.look} lod="simple" />
         </group>
       ))}
       {npcs.map((c, k) => (
         <group key={k} ref={(g) => void (npcRefs.current[k] = g)}>
+          <CarShadow />
           <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
         </group>
       ))}
       <group ref={group}>
+        <CarShadow />
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}
           <CarModel body={CAR_MODELS[car.modelId].body} color={car.color} steer={steerVis} spin={spinVis} modelId={car.modelId} car={car} lod="simple" />
@@ -593,7 +597,14 @@ export function TrackScene() {
 }
 
 /** Start- und Zielbogen über der Straße, Kontrollpunkte als Pfostenpaare mit Fahnen. */
-function RaceMarks({ w, start, length, laps }: { w: DriveWorld; start: number; length: number; laps: number }) {
+function RaceMarks({ w, start, length, laps, clock }: { w: DriveWorld; start: number; length: number; laps: number; clock: () => number }) {
+  // Startampel: fünf Lampenpaare am Startbogen gehen im Countdown nacheinander rot an und beim Start alle aus
+  const lamps = useRef<THREE.MeshBasicMaterial[]>([]);
+  useFrame(() => {
+    const t = clock();
+    const on = t < 0 ? Math.min(5, Math.floor(((t + 3) / 3) * 5) + 1) : 0;
+    lamps.current.forEach((m, k) => m.color.set(k < on ? '#ff2a1a' : '#2a0c0a'));
+  });
   const ROAD_WIDTH = w.roadWidth;
   const n = w.samples.length;
   const arch = (i: number, label: string, color: string) => {
@@ -614,6 +625,22 @@ function RaceMarks({ w, start, length, laps }: { w: DriveWorld; start: number; l
           <boxGeometry args={[0.5, 0.9, ROAD_WIDTH + 2]} />
           <meshLambertMaterial color="#1b1c1f" />
         </mesh>
+        {label.startsWith('START') && (
+          <group position={[-0.3, 4.35, 0]}>
+            <mesh raycast={() => null}>
+              <boxGeometry args={[0.25, 0.75, 3.4]} />
+              <meshLambertMaterial color="#111215" />
+            </mesh>
+            {[0, 1, 2, 3, 4].map((k) =>
+              [-0.17, 0.17].map((y) => (
+                <mesh key={`${k}${y}`} position={[-0.13, y, -1.36 + k * 0.68]} rotation={[0, -Math.PI / 2, 0]} raycast={() => null}>
+                  <circleGeometry args={[0.14, 14]} />
+                  <meshBasicMaterial ref={(m) => void (m && (lamps.current[k] = m))} color="#2a0c0a" />
+                </mesh>
+              )),
+            )}
+          </group>
+        )}
         {[-0.26, 0.26].map((x) => (
           <mesh key={x} position={[x, 5.3, 0]} rotation={[0, x < 0 ? -Math.PI / 2 : Math.PI / 2, 0]} raycast={() => null}>
             <planeGeometry args={[ROAD_WIDTH + 1.6, 0.7]} />
@@ -625,8 +652,24 @@ function RaceMarks({ w, start, length, laps }: { w: DriveWorld; start: number; l
   };
   const end = (start + length) % n;
   const lap = length / laps;
+  const slots = Array.from({ length: 6 }, (_, g) => gridSlot(w, { start }, g));
   return (
     <>
+      {/* Startaufstellung: weiße Winkel je Startplatz */}
+      {slots.map((g, k) => (
+        <group key={'g' + k} position={[g.x, w.samples[g.near].y + 0.04, g.z]} rotation={[0, g.heading, 0]}>
+          <mesh position={[2.6, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+            <planeGeometry args={[0.2, 2.6]} />
+            <meshBasicMaterial color="#efefea" />
+          </mesh>
+          {[-1.2, 1.2].map((z) => (
+            <mesh key={z} position={[2.0, 0, z]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+              <planeGeometry args={[1.2, 0.18]} />
+              <meshBasicMaterial color="#efefea" />
+            </mesh>
+          ))}
+        </group>
+      ))}
       {arch(start, end === start ? 'START · ZIEL' : 'START', '#c8501e')}
       {end !== start && arch(end, 'ZIEL', '#1e7a3c')}
       {Array.from({ length: RACE_CP - 1 }, (_, k) => {
