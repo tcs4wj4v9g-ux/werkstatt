@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { marketLabel } from '../game/market';
 import { dayClock, dayLeft, useGame } from '../game/store';
+import { WEATHER_ICON, weatherLabel, weatherOf } from '../game/grip';
 import { GFX_LABEL, useGfx, type GfxLevel } from '../three/gfx';
 import { CoopChip } from './CoopUI';
 import { ChatButton } from './Chat';
@@ -38,7 +39,7 @@ export function Toast() {
   return <div className={`toast ${toast.bad ? 'bad' : ''}`}>{toast.text}</div>;
 }
 
-/** Restzeit des Spieltags (der Tag wechselt danach automatisch). */
+/** Restzeit des Spieltags (nur bei automatischem Ablauf; der Tag wechselt danach von selbst). */
 function DayClock() {
   const started = useGame((s) => s.dayStartedAt);
   const [, tick] = useState(0);
@@ -49,6 +50,34 @@ function DayClock() {
   if (!dayClock.ms) return null;
   const sec = Math.ceil(dayLeft({ dayStartedAt: started }) / 1000);
   return <span data-testid="dayclock">🕒 {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span>;
+}
+
+/** Tagesablauf umschalten: von Hand (Standard) oder automatisch nach drei Minuten. Gilt nur auf diesem Gerät. */
+function AutoDayToggle() {
+  const [, tick] = useState(0);
+  // Stand jede Sekunde neu lesen (die Einstellung kann sich auch anderswo ändern, z. B. in Tests)
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const on = dayClock.auto;
+  const setOn = () => tick((n) => n + 1);
+  const setStarted = useGame.setState;
+  return (
+    <button
+      className={`btn ghost${on ? ' active' : ''}`}
+      data-testid="autoday"
+      title={on ? 'Der Tag endet nach drei Minuten von selbst' : 'Der Tag endet nur, wenn du ihn beendest'}
+      onClick={() => {
+        dayClock.setAuto(!on);
+        setOn();
+        // Beim Einschalten beginnt die Uhr jetzt (sonst wäre der Tag sofort vorbei)
+        if (!on) setStarted({ dayStartedAt: Date.now() });
+      }}
+    >
+      {on ? '⏱ Auto' : '✋ Manuell'}
+    </button>
+  );
 }
 
 /** Tag sofort beenden (zweimal tippen, damit es nicht aus Versehen passiert). Der Tag endet sonst nach drei Minuten von selbst. */
@@ -91,9 +120,10 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <CoopChip />
       <ChatButton />
       <div className="daychip" title={marketLabel(index)}>
-        Tag {day} <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
+        Tag {day} <span data-testid="weather" title={weatherLabel(day)}>{WEATHER_ICON[weatherOf(day)]}</span> <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
       <SkipDay />
+      <AutoDayToggle />
       <button className="btn ghost" data-testid="sound" aria-label="Ton ein/aus" onClick={() => setSound(!sound)}>{sound ? '🔊' : '🔇'}</button>
       <button className="btn ghost" onClick={() => setPanel('help')}>? Hilfe</button>
       <div className="money" data-testid="money">{eur(money)}</div>

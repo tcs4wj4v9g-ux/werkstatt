@@ -11,7 +11,7 @@ export interface VisualPart {
   value: VisualTune[keyof VisualTune];
   name: string;
   price: number;
-  group: 'Felgen' | 'Fahrwerk' | 'Karosserie' | 'Lack & Folie' | 'Licht' | 'Innenraum' | 'Auspuffblenden';
+  group: 'Felgen' | 'Fahrwerk' | 'Reifen' | 'Antrieb' | 'Drift & Rallye' | 'Karosserie' | 'Lack & Folie' | 'Licht' | 'Innenraum' | 'Auspuffblenden';
   desc: string;
 }
 
@@ -31,6 +31,19 @@ export const VISUAL_PARTS: VisualPart[] = [
   P('susp:springs', 'suspension', 'springs', 'Tieferlegungsfedern −3 cm', 380, 'Fahrwerk', 'Etwas tiefer, etwas straffer'),
   P('susp:sport', 'suspension', 'sport', 'Sportfahrwerk −4 cm', 1100, 'Fahrwerk', 'Straffere Dämpfer – deutlich agiler'),
   P('susp:coilover', 'suspension', 'coilover', 'Gewindefahrwerk (höhenverstellbar)', 2200, 'Fahrwerk', 'Höhe −2 bis −7 cm einstellbar, sehr agil'),
+  P('susp:rally', 'suspension', 'rally', 'Rallyefahrwerk +4 cm', 1900, 'Fahrwerk', 'Höher, lange Federwege – schluckt Schotter, Matsch und Schnee'),
+  // Reifen: ein Satz für alle vier Räder. Haftung je Untergrund (trocken, nass, Schnee, Schotter) siehe grip.ts
+  P('tires:sport', 'tires', 'sport', 'Sportreifen', 640, 'Reifen', 'Mehr Grip auf trockener Straße, etwas weniger bei Nässe'),
+  P('tires:semislick', 'tires', 'semislick', 'Semi-Slicks', 1180, 'Reifen', 'Sehr viel Grip im Trockenen – im Regen und Schnee tückisch'),
+  P('tires:drift', 'tires', 'drift', 'Driftreifen (harte Mischung)', 520, 'Reifen', 'Weniger Grip, das Heck kommt leicht und rutscht gleichmäßig'),
+  P('tires:winter', 'tires', 'winter', 'Winterreifen', 560, 'Reifen', 'Lamellenprofil: viel besser auf Schnee und Nässe'),
+  P('tires:gravel', 'tires', 'gravel', 'Schotterreifen (Rallye)', 780, 'Reifen', 'Grobes Profil für Schotter und Matsch, auf Asphalt schwächer'),
+  P('tires:spikes', 'tires', 'spikes', 'Spikereifen (Rallye)', 990, 'Reifen', 'Beißen sich in Schnee und Eis – auf Asphalt schlecht'),
+  P('diff:lsd', 'diff', 'lsd', 'Sperrdifferential', 1450, 'Antrieb', 'Lamellensperre: mehr Traktion aus der Kurve, Drifts lassen sich mit Gas halten'),
+  P('diff:welded', 'diff', 'welded', 'Differential verschweißt', 150, 'Antrieb', 'Beide Räder starr verbunden: driftet sehr leicht, rangiert ruppig, schiebt in engen Kurven'),
+  P('steerkit', 'steerKit', true, 'Lenkwinkel-Kit', 1250, 'Drift & Rallye', 'Mehr Radeinschlag – größere Driftwinkel möglich'),
+  P('hbrake', 'hbrake', true, 'Hydraulische Handbremse', 480, 'Drift & Rallye', 'Hebel am Mitteltunnel: blockiert die Hinterräder schlagartig'),
+  P('skid', 'skid', true, 'Unterfahrschutz', 540, 'Drift & Rallye', 'Aluplatte unter Motor und Getriebe – gleitet über Schotter, Matsch und Schnee'),
   P('front:1', 'front', 1, 'Frontstoßstange Sport', 690, 'Karosserie', 'Große Lufteinlässe, Splitter'),
   P('front:2', 'front', 2, 'Frontstoßstange Rennsport', 990, 'Karosserie', 'Tiefer Frontsplitter, offene Einlässe'),
   P('rear:1', 'rear', 1, 'Heckschürze mit Diffusor', 620, 'Karosserie', 'Diffusor mit Finnen'),
@@ -64,6 +77,6 @@ export function mountedId(visual: VisualTune | undefined, field: keyof VisualTun
   return VISUAL_PARTS.find((p) => p.field === field && p.value === v)?.id ?? null;
 }
 
-/** Tieferlegung in cm je Fahrwerk (Gewinde: frei einstellbar 2…7). */
+/** Tieferlegung in cm je Fahrwerk (Gewinde: frei einstellbar 2…7; Rallyefahrwerk höher: −4). */
 export const dropOf = (v: VisualTune | undefined) =>
-  !v?.suspension || v.suspension === 'stock' ? 0 : v.suspension === 'springs' ? 3 : v.suspension === 'sport' ? 4 : Math.min(7, Math.max(2, v.drop ?? 5));
+  !v?.suspension || v.suspension === 'stock' ? 0 : v.suspension === 'rally' ? -4 : v.suspension === 'springs' ? 3 : v.suspension === 'sport' ? 4 : Math.min(7, Math.max(2, v.drop ?? 5));

@@ -16,7 +16,8 @@ import { createCar } from './market';
 import { performance } from './performance';
 import { driveBlocker } from './repair';
 import type { CarInstance } from './types';
-import { initialState, stepVehicle, vehicleSpec, type DriveInput, type VehicleSpec, type VehicleState } from './vehicle';
+import { initialState, stepVehicle, surfaceGrip, vehicleSpec, type DriveInput, type Surface, type VehicleSpec, type VehicleState } from './vehicle';
+import { roadCond, weatherOf, type RoadCond } from './grip';
 
 export type RaceClass = 'c150' | 'c250' | 'c400' | 'open';
 export const RACE_CLASSES: Record<RaceClass, { name: string; ps: number; gold: number; fee: number }> = {
@@ -32,7 +33,7 @@ const REF_GRIP: Record<RaceClass, number> = { c150: 1, c250: 1.04, c400: 1.1, op
 
 export type CourseId = 'runde' | 'ost' | 'west' | CircuitId;
 /** Alle Strecken (Auswahl für Koop-Rennen). */
-export const COURSE_IDS: CourseId[] = ['ost', 'west', 'runde', 'eifel', 'motodrom', 'hafen', 'ardennen'];
+export const COURSE_IDS: CourseId[] = ['ost', 'west', 'runde', 'eifel', 'motodrom', 'hafen', 'ardennen', 'seenland', 'schneewald', 'matschtal'];
 export interface Course {
   id: CourseId;
   name: string;
@@ -47,7 +48,7 @@ export interface Course {
   length: number;
 }
 /** Runden je Rennstrecke (Renndistanz ≈ 3–6 km). */
-const LAPS: Record<CircuitId, number> = { eifel: 1, motodrom: 2, hafen: 2, ardennen: 1 };
+const LAPS: Record<CircuitId, number> = { eifel: 1, motodrom: 2, hafen: 2, ardennen: 1, seenland: 1, schneewald: 1, matschtal: 1 };
 
 const COURSE_DEF: Record<'runde' | 'ost' | 'west', { name: string; desc: string; pay: number; from: [number, number]; to: [number, number] | null }> = {
   runde: { name: 'Große Runde um Grünbach', desc: 'Die ganze Acht: Ostschleife über die Hügel, durch den Ort, Westschleife und zurück zur Werkstatt.', pay: 1.4, from: [70, 0], to: null },
@@ -102,8 +103,10 @@ export interface Race {
   /**
    * 'time': Zeitrennen allein gegen die Uhr (Medaillen nach Sollzeit).
    * 'grid': Rennen gegen Gegner – Preisgeld für Platz 1, 2, 3 (in `prize` als gold/silver/bronze).
+   * 'rally': Rallye – Zeitfahren allein auf einer Rallyepiste (Schotter, Schnee, Matsch), Medaillen nach Sollzeit.
+   * 'drift': Driftwertung – Punkte für Driftwinkel × Tempo mit Kombo, Medaillen nach Punkten (`driftTargets`).
    */
-  kind: 'time' | 'grid';
+  kind: 'time' | 'grid' | 'rally' | 'drift';
   /** Preisgeld je Medaille bzw. Platz 1–3. */
   prize: { gold: number; silver: number; bronze: number };
   /** Gegner (nur bei 'grid'). */
@@ -171,9 +174,9 @@ function seeded(seed: number) {
   };
 }
 
-/** Rennen des Tages (an jedem dritten Tag keins: dann ist Fahrzeugtreffen). */
+/** Rennen des Tages. An jedem dritten Tag (Fahrzeugtreffen) abwechselnd eine Rallye oder ein Driftwettbewerb. */
 export function raceForDay(day: number): Race | null {
-  if (day % 3 === 0) return null;
+  if (day % 3 === 0) return day > 0 ? specialRace(day, day % 6 === 3 ? 'rally' : 'drift') : null;
   const r = seeded(day + 17);
   // Anfangs nur die Strecken rund um Grünbach, ab Tag 4 auch die Rennstrecken
   const course = (day < 4 ? (['ost', 'west', 'runde'] as const) : (['ost', 'west', 'runde', 'eifel', 'motodrom', 'hafen', 'ardennen', 'eifel', 'motodrom', 'hafen', 'ardennen'] as const))[Math.floor(r() * (day < 4 ? 3 : 11))];
@@ -203,6 +206,87 @@ export function raceForDay(day: number): Race | null {
     prize: { gold, silver: Math.round((gold * share[0]) / 50) * 50, bronze: Math.round((gold * share[1]) / 50) * 50 },
     opponents,
   };
+}
+
+/** Rallyepisten und Driftstrecken (breit, mit Haarnadeln und weiten Bögen). */
+export const RALLY_COURSES: CourseId[] = ['seenland', 'schneewald', 'matschtal'];
+export const DRIFT_COURSES: CourseId[] = ['motodrom', 'ardennen'];
+
+/** Rallye bzw. Driftwettbewerb des Tages (fester Zufall je Tag; allein gegen Uhr bzw. Punkte). */
+function specialRace(day: number, kind: 'rally' | 'drift'): Race {
+  const r = seeded(day + 4711);
+  const pool = kind === 'rally' ? RALLY_COURSES : DRIFT_COURSES;
+  const course = pool[Math.floor(r() * pool.length)];
+  const cls = (['c150', 'c250', 'c250', 'c400', 'open'] as RaceClass[])[Math.floor(r() * (day < 7 ? 3 : 5))];
+  const c = RACE_CLASSES[cls];
+  const gold = Math.round((c.gold * courseOf(course).pay * (kind === 'rally' ? 1.1 : 1)) / 50) * 50;
+  return {
+    id: `${kind}-${day}`,
+    day,
+    course,
+    cls,
+    kind,
+    title: `${kind === 'rally' ? 'Rallye' : 'Driftwettbewerb'} ${courseOf(course).name.replace(/^Rallye /, '')} – ${c.name}`,
+    fee: c.fee,
+    prize: { gold, silver: Math.round((gold * 0.55) / 50) * 50, bronze: Math.round((gold * 0.25) / 50) * 50 },
+    opponents: [],
+  };
+}
+
+/**
+ * Driftpunkte: je Sekunde Driftwinkel (Grad) × Tempo (km/h) / 100, mal Kombo. Die Kombo wächst alle 2,5 s ununterbrochenen
+ * Driftens um 0,5 (bis ×4); eine Kette endet nach 1,2 s ohne Drift und wird gutgeschrieben. Wer dabei von der Fahrbahn
+ * abkommt oder anstößt, verliert die laufende Kette.
+ */
+export const DRIFT = { minAngle: 10, maxAngle: 100, minKmh: 25, comboStep: 2.5, comboMax: 4, gap: 1.2 };
+export interface DriftScore {
+  /** gutgeschriebene Punkte, laufende Kette, Kombo, Zeit in der Kette und seit dem letzten Drift */
+  banked: number;
+  chain: number;
+  combo: number;
+  chainT: number;
+  idle: number;
+  /** größter Winkel und beste Kette (Anzeige) */
+  best: number;
+  lost: number;
+}
+export const newDriftScore = (): DriftScore => ({ banked: 0, chain: 0, combo: 1, chainT: 0, idle: 99, best: 0, lost: 0 });
+/** Einen Zeitschritt werten. `clean` = auf der Fahrbahn und ohne Anstoßen. Liefert true, wenn gerade gedriftet wird. */
+export function driftStep(d: DriftScore, angleDeg: number, kmh: number, clean: boolean, dt: number) {
+  if (!clean) {
+    if (d.chain > 0) d.lost += d.chain;
+    d.chain = 0;
+    d.combo = 1;
+    d.chainT = 0;
+    d.idle = 99;
+    return false;
+  }
+  const on = angleDeg >= DRIFT.minAngle && angleDeg <= DRIFT.maxAngle && kmh >= DRIFT.minKmh;
+  if (on) {
+    d.idle = 0;
+    d.chainT += dt;
+    d.combo = Math.min(DRIFT.comboMax, 1 + Math.floor(d.chainT / DRIFT.comboStep) * 0.5);
+    d.chain += ((angleDeg * kmh) / 100) * d.combo * dt;
+  } else {
+    d.idle += dt;
+    if (d.idle > DRIFT.gap && d.chain > 0) {
+      d.banked += d.chain;
+      d.best = Math.max(d.best, d.chain);
+      d.chain = 0;
+      d.combo = 1;
+      d.chainT = 0;
+    }
+  }
+  return on;
+}
+/** Endstand: gutgeschriebene Punkte plus die noch laufende Kette. */
+export const driftTotal = (d: DriftScore) => Math.round(d.banked + d.chain);
+
+/** Punkteziele im Driftwettbewerb: nach Streckenlänge (Punkte je Meter). */
+export function driftTargets(race: Pick<Race, 'course'>) {
+  const m = courseOf(race.course).length * 2;
+  const r = (k: number) => Math.round((m * k) / 100) * 100;
+  return { gold: r(1.6), silver: r(1.0), bronze: r(0.5) };
 }
 
 /** Die nächsten Rennen ab heute (zur Vorschau). */
@@ -241,7 +325,7 @@ export interface AiTrack {
  * Eingaben eines Computerfahrers für einen Schritt: schaut voraus, lenkt zur Ideallinie (plus seitlichem Versatz
  * `offset` zum Überholen), plant das Tempo so, dass er vor Kurven rechtzeitig bremst. Aktualisiert `ai.near`/`ai.prog`.
  */
-export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: AiTrack, skill: AiSkill, offset = 0, assist = true): DriveInput {
+export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: AiTrack, skill: AiSkill, offset = 0, assist = true, road?: Pick<Surface, 'grip' | 'cls'>): DriveInput {
   const n = w.samples.length;
   const q = w.nearest(st.x, st.z, ai.near);
   let d = q.i - ai.near;
@@ -255,8 +339,10 @@ export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: 
   let diff = Math.atan2(-(tz - st.z), tx - st.x) - st.heading;
   diff = Math.atan2(Math.sin(diff), Math.cos(diff));
   // Tempoplan: jede Kurve voraus erlaubt v = √(a_quer / Krümmung); bremsen erst, wenn der Bremsweg dorthin knapp wird
-  const aLat = spec.muFront * 9.81 * skill.lat;
-  const aBrake = Math.min(spec.muFront, spec.brakeForce / (spec.mass * 9.81)) * 9.81 * skill.brake;
+  // Glatte Fahrbahn (Regen, Schnee, Schotter): Kurven und Bremspunkte nach der tatsächlichen Haftung
+  const g = road ? surfaceGrip(spec, road) : 1;
+  const aLat = spec.muFront * g * 9.81 * skill.lat;
+  const aBrake = Math.min(spec.muFront * g, spec.brakeForce / (spec.mass * 9.81)) * 9.81 * skill.brake;
   let vt = 80;
   for (let k = 2; k < 160; k++) {
     const c = Math.abs(w.samples[(ai.near + k) % n].curv);
@@ -269,14 +355,14 @@ export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: 
 }
 
 /** Fährt die Strecke allein mit einem Computerfahrer; Zeit in Sekunden (oder Infinity, wenn er nicht ankommt). */
-export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true, skill: AiSkill = REFERENCE_SKILL) {
+export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true, skill: AiSkill = REFERENCE_SKILL, road?: RoadCond) {
   const p0 = w.samples[course.start];
   const st = initialState(p0.x - p0.nx * 1.8, p0.z - p0.nz * 1.8, Math.atan2(-p0.tz, p0.tx));
   const ai = { near: course.start, prog: 0 };
-  const flat = { grade: 0, grip: 1, drag: 0 };
+  const flat: Surface = road ? { grade: 0, ...road } : { grade: 0, grip: 1, drag: 0 };
   const dt = 1 / 60;
   for (let t = 0; t < 900; t += dt) {
-    const input = aiInput(spec, st, w, ai, skill, 0, assist);
+    const input = aiInput(spec, st, w, ai, skill, 0, assist, road);
     if (ai.prog >= course.length) return t;
     stepVehicle(spec, st, input, flat, dt);
   }
@@ -302,11 +388,15 @@ function referenceSpec(cls: RaceClass) {
 
 const targetCache = new Map<string, { gold: number; silver: number; bronze: number }>();
 /** Sollzeiten (s) für Gold, Silber, Bronze. */
-export function raceTargets(race: Pick<Race, 'course' | 'cls'>) {
-  const key = race.course + race.cls;
+export function raceTargets(race: Pick<Race, 'course' | 'cls'> & { day?: number }) {
+  // Wetter am Renntag (Regen, Schnee) bzw. eigener Belag der Rallyepiste: die Sollzeiten gelten für diese Fahrbahn
+  const c = courseOf(race.course);
+  const road = race.day ? roadCond(weatherOf(race.day), worldFor(c.world).road) : worldFor(c.world).road ?? undefined;
+  const wet = road && (road.cls !== 'dry' || road.grip !== 1) ? road : undefined;
+  const key = race.course + race.cls + (wet ? `${wet.cls}${wet.grip.toFixed(2)}` : '');
   let t = targetCache.get(key);
   if (!t) {
-    const ref = aiTime(referenceSpec(race.cls), courseOf(race.course));
+    const ref = aiTime(referenceSpec(race.cls), c, undefined, true, REFERENCE_SKILL, wet);
     t = { gold: Math.round(ref * 1.02 * 10) / 10, silver: Math.round(ref * 1.1 * 10) / 10, bronze: Math.round(ref * 1.2 * 10) / 10 };
     targetCache.set(key, t);
   }
@@ -315,6 +405,10 @@ export function raceTargets(race: Pick<Race, 'course' | 'cls'>) {
 
 export type Medal = 'gold' | 'silver' | 'bronze' | null;
 export const MEDAL_LABEL: Record<Exclude<Medal, null>, string> = { gold: '🥇 Gold', silver: '🥈 Silber', bronze: '🥉 Bronze' };
+export function driftMedal(race: Pick<Race, 'course'>, points: number): Medal {
+  const t = driftTargets(race);
+  return points >= t.gold ? 'gold' : points >= t.silver ? 'silver' : points >= t.bronze ? 'bronze' : null;
+}
 export function medalFor(race: Race, time: number): Medal {
   const t = raceTargets(race);
   return time <= t.gold ? 'gold' : time <= t.silver ? 'silver' : time <= t.bronze ? 'bronze' : null;
@@ -324,8 +418,8 @@ export function medalFor(race: Race, time: number): Medal {
  * Auszahlung für eine gefahrene Zeit: Preisgeld der erreichten Medaille abzüglich dessen, was für dieses Rennen schon
  * ausgezahlt wurde (Verbesserung zahlt die Differenz, mehrfaches Fahren derselben Medaille nichts).
  */
-export function payoutFor(race: Race, time: number, alreadyPaid: number, place?: number) {
-  const medal = race.kind === 'grid' ? placeMedal(place ?? 99) : medalFor(race, time);
+export function payoutFor(race: Race, time: number, alreadyPaid: number, place?: number, points?: number) {
+  const medal = race.kind === 'grid' ? placeMedal(place ?? 99) : race.kind === 'drift' ? driftMedal(race, points ?? 0) : medalFor(race, time);
   const prize = medal ? race.prize[medal] : 0;
   return { medal, prize, payout: Math.max(0, prize - alreadyPaid) };
 }

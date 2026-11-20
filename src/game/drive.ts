@@ -47,6 +47,11 @@ interface DriveHud {
   wheelspin: boolean;
   /** Gefahrene Strecke dieser Probefahrt (m). */
   distance: number;
+  /** Driftwettbewerb: gutgeschriebene Punkte, laufende Kette, Kombo, zuletzt verlorene Kette (Anzeige). */
+  driftPts: number;
+  driftChain: number;
+  driftCombo: number;
+  driftLost: number;
   camera: DriveCamera;
   set(p: Partial<DriveHud>): void;
 }
@@ -75,6 +80,10 @@ export const useDriveHud = create<DriveHud>((set) => ({
   offTrack: false,
   wheelspin: false,
   distance: 0,
+  driftPts: 0,
+  driftChain: 0,
+  driftCombo: 1,
+  driftLost: 0,
   camera: 'chase',
   set: (p) => set(p),
 }));

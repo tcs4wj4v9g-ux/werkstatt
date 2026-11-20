@@ -82,7 +82,7 @@ function key(car: CarInstance) {
     .map(([id, c]) => `${id}:${c.variant ?? ''}:${c.condition}:${c.installed ? 1 : 0}`)
     .sort()
     .join(',');
-  return JSON.stringify([car.modelId, car.year, car.motor?.engineId, car.motor?.turboKit, car.ecu, car.visual?.suspension, car.visual?.rimSize, car.visual?.flares, car.visual?.spoiler, car.visual?.hood, car.swap, comps]);
+  return JSON.stringify([car.modelId, car.year, car.motor?.engineId, car.motor?.turboKit, car.ecu, car.visual?.suspension, car.visual?.tires, car.visual?.diff, car.visual?.steerKit, car.visual?.rimSize, car.visual?.flares, car.visual?.spoiler, car.visual?.hood, car.swap, comps]);
 }
 
 export function carStats(car: CarInstance): CarStats {

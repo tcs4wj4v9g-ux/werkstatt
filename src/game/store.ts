@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { courseOf, payoutFor, raceBlocker, raceForDay, raceTargets, type CourseId, type Medal } from './races';
+import { courseOf, driftTargets, payoutFor, raceBlocker, raceForDay, raceTargets, type CourseId, type Medal } from './races';
 import { emptyPlayTime, type PlayTime } from './playtime';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
@@ -167,7 +167,7 @@ export interface GameState {
   /** Koop-Rennen gegeneinander betreten (Startzeit vom Ausschreibenden, kein Startgeld, kein Preisgeld). */
   enterCoopRace(bay: number, lobby: string, course: CourseId, startAt: number): void;
   /** Rennen beendet: Zeit in s (oder null = abgebrochen). Zahlt Preisgeld bzw. die Verbesserung aus. */
-  finishRace(time: number | null, grid?: { place: number; table: RaceRow[] }): void;
+  finishRace(time: number | null, grid?: { place: number; table: RaceRow[] }, points?: number): void;
   finishDrive(completed: boolean): void;
   haggle(bay: number): void;
   sell(bay: number): void;
@@ -335,7 +335,39 @@ const describe = (o: Observation, quiet: string) =>
     .join(' ') || quiet;
 
 /** Länge eines Spieltags in Echtzeit. Im Testmodus (`?test`) kein Warten. */
-export const dayClock = { ms: typeof location !== 'undefined' && new URLSearchParams(location.search).has('test') ? 0 : 3 * 60_000 };
+const AUTO_DAY_KEY = 'gk-autoday';
+const readAutoDay = () => {
+  try {
+    return localStorage.getItem(AUTO_DAY_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+/**
+ * Spieltag: Standard ist wieder „von Hand“ – der Tag endet erst, wenn man „⏭ Tag“ bzw. „Feierabend“ drückt.
+ * Wer will, schaltet den automatischen Ablauf ein (`setAuto`, Einstellung nur auf diesem Gerät): dann endet der Tag
+ * nach `len` (drei Minuten). `ms` ist die wirksame Tageslänge (0 = kein Zeitlimit). Im Testmodus (`?test`) ist `len` 0.
+ */
+export const dayClock = {
+  len: typeof location !== 'undefined' && new URLSearchParams(location.search).has('test') ? 0 : 3 * 60_000,
+  auto: typeof localStorage !== 'undefined' ? readAutoDay() : false,
+  get ms() {
+    return this.auto ? this.len : 0;
+  },
+  /** Für Tests: feste Tageslänge setzen (> 0 schaltet den Ablauf ein, 0 aus) – ohne die Einstellung zu speichern. */
+  set ms(v: number) {
+    this.len = v;
+    this.auto = v > 0;
+  },
+  setAuto(on: boolean) {
+    this.auto = on;
+    try {
+      localStorage.setItem(AUTO_DAY_KEY, on ? '1' : '0');
+    } catch {
+      /* privater Modus: gilt dann nur bis zum Neuladen */
+    }
+  },
+};
 /** Wie lange es noch bis zum Feierabend dauert (ms). */
 /** Ergebnis des letzten Zeitrennens (für das Ergebnisfenster). */
 export interface RaceResult {
@@ -353,6 +385,8 @@ export interface RaceResult {
   table: RaceRow[] | null;
   /** Koop-Rennen: Kennung (der Endstand wird live aus den Lagen der Mitspieler gelesen). */
   coop?: string;
+  /** Driftwettbewerb: erreichte Punkte (dann sind `best` und `targets` Punkte statt Sekunden). */
+  points?: number;
 }
 export interface RaceRow {
   name: string;
@@ -1039,7 +1073,7 @@ export const useGame = create<GameState>()(
           set({ cars, race: { id: `koop-${lobby}`, bay, coop: { lobby, course, startAt } }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
         },
 
-        finishRace: (time, grid) => {
+        finishRace: (time, grid, points) => {
           const s = get();
           const run = s.race;
           // Koop-Rennen: nur Zeit und Platz (live aus den Lagen der Mitspieler), kein Geld
@@ -1070,9 +1104,13 @@ export const useGame = create<GameState>()(
           }
           const current = s.cars[run.bay];
           const paid = (s.career.racePaid ?? {})[race.id] ?? 0;
-          const { medal, prize, payout } = payoutFor(race, time, paid, grid?.place);
+          const drift = race.kind === 'drift';
+          const pts = drift ? Math.max(0, Math.round(points ?? 0)) : 0;
+          const { medal, prize, payout } = payoutFor(race, time, paid, grid?.place, pts);
           const before = (s.career.raceBest ?? {})[race.id];
-          const best = before === undefined ? time : Math.min(before, time);
+          // Drift: Bestwert sind die meisten Punkte; sonst die kürzeste Zeit
+          const score = drift ? pts : time;
+          const best = before === undefined ? score : drift ? Math.max(before, score) : Math.min(before, score);
           // Nur die letzten Rennen merken (die Liste soll nicht endlos wachsen)
           const keep = (m: Record<string, number>, v: number) => Object.fromEntries([...Object.entries(m).filter(([k]) => k !== race.id).slice(-11), [race.id, v]]);
           const career = {
@@ -1096,7 +1134,7 @@ export const useGame = create<GameState>()(
             race: null,
             screen: 'garage',
             panel: 'raceResult',
-            raceResult: { title: race.title, time, best, medal, payout, prize, targets: raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && time < before, place: grid?.place ?? null, table: grid?.table ?? null },
+            raceResult: { title: race.title, time, best, medal, payout, prize, targets: drift ? driftTargets(race) : raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && (drift ? score > before : score < before), place: grid?.place ?? null, table: grid?.table ?? null, ...(drift ? { points: pts } : {}) },
           });
         },
 

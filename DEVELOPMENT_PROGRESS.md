@@ -822,3 +822,22 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Land:** Leitpfosten alle 50 m, sattere Wiese.
 - **Bäume:** Nadelbäume aus drei Etagen, Farbe je Baum. Laubkronen feiner facettiert.
 - `e2e/strecken.cjs` nimmt Bilder aller Fahrwelten in voller Grafik auf (Vorher-Nachher-Vergleich).
+
+## Drift, Rallye, Wetter, neue Teile, Tagesablauf von Hand
+
+- **Tagesablauf:** Standard ist wieder „von Hand“. Der Tag endet erst mit „⏭ Tag“ oder „Feierabend“. Der Knopf „✋ Manuell / ⏱ Auto“ in der Kopfleiste schaltet den automatischen Ablauf (drei Minuten) ein. Die Einstellung gilt je Gerät (`localStorage` `gk-autoday`). Im Koop schaltet nur das führende Gerät um, und nur, wenn dort „Auto“ gewählt ist.
+- **Neue Teile an der Tuning-Werkbank** (bestellen, montieren, wieder abbauen wie die Optikteile, im Koop mit abgeglichen):
+  - **Reifen:** Sport, Semi-Slicks, Drift (harte Mischung), Winter, Schotter, Spikes. Die Haftung je Untergrund (trocken, nass, Schnee, lose) steht in `game/grip.ts`.
+  - **Differential:** Sperre (mehr Traktion, Drift mit Gas dosierbar) und verschweißt (driftet leicht, schiebt in engen langsamen Kurven).
+  - **Drift & Rallye:** Lenkwinkel-Kit (mehr Einschlag, größere Driftwinkel), hydraulische Handbremse, Unterfahrschutz (weniger Rollwiderstand auf losem Untergrund).
+  - **Fahrwerk:** Rallyefahrwerk (+4 cm, mehr Haftung auf losem Untergrund und Schnee).
+- **Fahrphysik** (`vehicle.ts`): Die Fahrbahn hat eine Untergrundklasse, `surfaceGrip` = Oberfläche × Reifen × Rallyefahrwerk. Das Differential wirkt auf die Antriebskraft und auf den Seitenführungsverlust durchdrehender Räder. Ohne neue Teile und auf trockenem Asphalt ist alles wie bisher (Test).
+- **Jahreszeiten und Wetter:** 40 Tage je Jahr, je zehn Tage Frühling, Sommer, Herbst und Winter. Das Wetter (Sonne, Wolken, Regen, Nebel, Schnee) steht fest je Tag und ist damit im Koop überall gleich.
+  - Nasser Asphalt hat 78 % Haftung, Schnee 50 %. Die Sollzeiten der Rennen und die Computerfahrer richten sich danach.
+  - Optik: grauer Himmel, Regen- bzw. Schneefall, kürzere Sicht, nasse oder verschneite Landschaft, Herbstlaub.
+  - Das Wettersymbol steht in der Kopfleiste, das Wetter auch im Rennen-Reiter.
+- **Rallye:** drei Pisten ohne Leitplanken, mit Strohballen in den Kurven. Rallye Seenland (Schotter, Vorbild Finnland), Rallye Schneewald (Schnee, Vorbild Schweden), Rallye Matschtal (Matsch, Vorbild Wales). Zeitfahren mit Medaillen. Die Pisten stehen auch für Koop-Rennen zur Auswahl.
+- **Driftwettbewerb:** Punkte = Driftwinkel × Tempo / 100 je Sekunde, mal Kombo (alle 2,5 s +0,5, bis ×4). Die Kette wird nach 1,2 s ohne Drift gutgeschrieben. Wer von der Fahrbahn abkommt oder anstößt, verliert die laufende Kette. Medaillen nach Punkten (nach Streckenlänge). Das ESP ist im Wettbewerb aus.
+- **Rennkalender:** An jedem dritten Tag, an dem bisher kein Rennen war, gibt es abwechselnd eine Rallye oder einen Driftwettbewerb. Die übrigen Rennen bleiben unverändert.
+- **Freier Driftmodus:** In der Probefahrt mit ESP aus zählen Driftpunkte, zum Üben.
+- Tests: `grip.test.ts` (Reifen je Untergrund, Drift-Teile, Wetter), Rallye und Drift in `races.test.ts`, `karriere.cjs` (Teile montieren, Rallye, Driftwettbewerb), `markt.cjs` (Tagesablauf, freier Driftmodus).

@@ -205,6 +205,58 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.screenshot({ path: S + '/rennen-gegner.png' });
   await G(() => window.__gk.getState().setPanel(null));
 
+  // ---------- Neue Teile an der Tuning-Werkbank: Schotterreifen, Sperrdifferential, Rallyefahrwerk ----------
+  await G(() => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; const c = window.__gkLib.createCar('audy_a4_b5', [], Math.random, { year: 2000 }); for (const k of Object.keys(c.components)) c.components[k].condition = 'ok'; c.fluids.oil.level = 4; cars[0] = c; g.setState({ cars, money: Math.max(s.money, 40000) }); g.getState().setPanel('tuning', 0); });
+  await p.waitForTimeout(500);
+  for (const grp of ['Reifen', 'Antrieb', 'Fahrwerk']) await p.locator('.modal summary', { hasText: new RegExp('^' + grp + '$') }).click();
+  for (const id of ['tires:gravel', 'diff:lsd', 'susp:rally']) await p.getByTestId('buy-' + id).click();
+  await p.waitForTimeout(300);
+  for (const id of ['tires:gravel', 'diff:lsd', 'susp:rally']) { await p.getByTestId('mount-' + id).click(); await p.waitForTimeout(200); }
+  const vis = await G(() => window.__gk.getState().cars[0].visual);
+  expect(vis.tires === 'gravel' && vis.diff === 'lsd' && vis.suspension === 'rally', 'Tuning-Werkbank: Schotterreifen, Sperrdifferential und Rallyefahrwerk montiert');
+  await p.screenshot({ path: S + '/tuning-rallye.png' });
+  await G(() => window.__gk.getState().setPanel(null));
+
+  // ---------- Rallye (jeder sechste Tag ab Tag 3): Schotter/Schnee/Matsch, allein gegen die Uhr ----------
+  const rday = await G(() => { const L = window.__gkLib; const g = window.__gk; const s = g.getState(); let d = s.day + 1; while (!(L.raceForDay(d) && L.raceForDay(d).kind === 'rally')) d++; g.setState({ day: d, panel: 'computer', money: Math.max(s.money, 40000) }); return L.raceForDay(d).title; });
+  await p.waitForTimeout(400);
+  await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
+  expect(/^Heute: Rallye /.test(await p.getByTestId('race-today').locator('b').first().textContent()), 'Rallye am Computer: ' + rday);
+  await p.getByTestId('race-start-0').click(); await p.waitForTimeout(1500);
+  const rworld = await G(() => { const d = window.__gkDrive; d.sim.autopilot = 20; d.sim.timeScale = 3; return window.__gk.getState().screen; });
+  expect(rworld === 'track' && (await p.getByTestId('race-hud').isVisible()), 'Rallye läuft');
+  for (let i = 0; i < 400 && (await G(() => window.__gk.getState().panel)) !== 'raceResult'; i++) await p.waitForTimeout(500);
+  const rr2 = await G(() => window.__gk.getState().raceResult);
+  expect(rr2 && rr2.time > 30 && rr2.points === undefined && (await p.getByTestId('race-medal').isVisible()), 'Rallye im Ziel: ' + (rr2 && rr2.time) + ' s, Medaille ' + (rr2 && rr2.medal));
+  await p.screenshot({ path: S + '/rallye-ergebnis.png' });
+  await G(() => window.__gk.getState().setPanel(null));
+
+  // ---------- Driftwettbewerb: ESP ist aus, Punkte mit Kombo, Medaille nach Punkten ----------
+  const dday = await G(() => { const L = window.__gkLib; const g = window.__gk; const s = g.getState(); let d = s.day + 1; while (!(L.raceForDay(d) && L.raceForDay(d).kind === 'drift')) d++; const cars = [...s.cars]; const c = L.createCar('bavaria_316_compact', [], Math.random, { year: 2005 }); for (const k of Object.keys(c.components)) c.components[k].condition = 'ok'; c.fluids.oil.level = 4; c.visual = { tires: 'drift', diff: 'welded', steerKit: true }; cars[0] = c; g.setState({ day: d, cars, panel: 'computer', money: Math.max(s.money, 40000) }); return L.raceForDay(d).title; });
+  await p.waitForTimeout(400);
+  await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
+  expect((await p.getByTestId('drift-targets').count()) === 1, 'Driftwettbewerb am Computer mit Punktezielen: ' + dday);
+  await p.getByTestId('race-start-0').click(); await p.waitForTimeout(1500);
+  expect((await p.getByTestId('esp').textContent()).includes('ESP aus') && (await p.getByTestId('drift-score').isVisible()), 'Im Driftwettbewerb ist ESP aus, Punkteanzeige sichtbar');
+  // echter Drift: nach dem Start Vollgas mit Einschlag und Handbremse (Hecktriebler mit verschweißtem Differential)
+  await p.waitForTimeout(3500);
+  // erst auf Tempo kommen (Autopilot), dann selbst: Einschlag, Handbremse, Vollgas
+  await G(() => { window.__gkDrive.sim.autopilot = 18; });
+  for (let i = 0; i < 40 && (await G(() => window.__gkDrive.sim.vx)) < 15; i++) await p.waitForTimeout(250);
+  await G(() => { const d = window.__gkDrive; d.sim.autopilot = 0; const i = d.input; i.throttle = 1; i.steer = 1; i.handbrake = true; });
+  await p.waitForTimeout(400);
+  await G(() => { const i = window.__gkDrive.input; i.handbrake = false; i.steer = 0.4; });
+  let chainSeen = 0;
+  for (let i = 0; i < 20; i++) { await p.waitForTimeout(100); chainSeen = Math.max(chainSeen, await G(() => window.__gkDrive.sim.drift.chain + window.__gkDrive.sim.drift.banked + window.__gkDrive.sim.drift.lost)); }
+  expect(chainSeen > 0, 'Drift erkannt und gewertet (' + Math.round(chainSeen) + ' Punkte inkl. verlorener Kette)');
+  await G(() => { const d = window.__gkDrive; const i = d.input; i.throttle = 0; i.steer = 0; d.sim.drift.banked += 4000; d.sim.autopilot = 24; d.sim.timeScale = 3; });
+  for (let i = 0; i < 400 && (await G(() => window.__gk.getState().panel)) !== 'raceResult'; i++) await p.waitForTimeout(500);
+  const dr = await G(() => window.__gk.getState().raceResult);
+  expect(dr && dr.points >= 4000 && /Driftpunkte/.test(await p.getByTestId('race-time').textContent()), 'Driftwettbewerb gewertet: ' + (dr && dr.points) + ' Punkte, Medaille ' + (dr && dr.medal) + ', Preisgeld ' + (dr && dr.prize));
+  expect((await G(() => window.__gk.getState().career.raceBest[window.__gkLib.raceForDay(window.__gk.getState().day).id])) === dr.points, 'Bestwertung gespeichert (Punkte)');
+  await p.screenshot({ path: S + '/drift-ergebnis.png' });
+  await G(() => window.__gk.getState().setPanel(null));
+
   // Speichern und Laden: alles bleibt
   const before = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.money, a: s.achieved, c: s.career, u: s.upgrades, cars: s.cars.map((c) => c && c.uid), dyno: s.cars[11] && s.cars[11].dyno, meet: s.meet && s.meet.result && s.meet.result.place }); });
   await p.reload(); await p.waitForTimeout(3000);

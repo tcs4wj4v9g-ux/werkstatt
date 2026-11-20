@@ -5,6 +5,7 @@
  * Alles wird einmal beim Betreten erzeugt und bleibt im Speicher (Zwischenspeicher über Probefahrten hinweg).
  * Abfragen für die Fahrphysik: nächster Straßenpunkt (mit lokaler Suche), Bodenhöhe, Hindernisse.
  */
+import type { RoadCond } from '../game/grip';
 import * as THREE from 'three';
 
 export const ROAD_WIDTH = 7;
@@ -102,6 +103,10 @@ export interface Obstacle {
 }
 
 export interface DriveWorld {
+  /** Eigener Fahrbahnbelag (Rallyepiste: Schotter, Matsch, Schnee); fehlt = Asphalt, dessen Zustand vom Wetter abhängt. */
+  road?: RoadCond | null;
+  /** Aussehen der eigenen Fahrbahn (Rallye). */
+  roadKind?: 'gravel' | 'mud' | 'snow';
   /** 'land' = offene Landschaft der Probefahrt; sonst eine Rennstrecke (`circuits.ts`). */
   id: string;
   name: string;
