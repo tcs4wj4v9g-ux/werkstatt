@@ -138,7 +138,7 @@ const TEXT: Record<string, string> = {
   letztes_exemplar: 'Das ist das letzte Exemplar dieser Art in der Werkstatt – das behältst du lieber.',
   traegt_anderer: 'Dieses Werkzeug trägt gerade ein Mitspieler.',
   code_unbekannt: 'Diesen Einladungscode gibt es nicht (oder die Einladung ist geschlossen).',
-  voll: 'Diese Werkstatt hat schon vier Mitglieder.',
+  voll: 'Diese Werkstatt hat schon acht Mitglieder.',
   zu_viele_werkstaetten: 'Du bist schon in fünf Werkstätten.',
   kein_mitglied: 'Du bist kein Mitglied dieser Werkstatt.',
   anonym_aus: 'Der Server lässt noch keine Anmeldung zu: Im Supabase-Projekt muss „Allow anonymous sign-ins“ eingeschaltet sein.',

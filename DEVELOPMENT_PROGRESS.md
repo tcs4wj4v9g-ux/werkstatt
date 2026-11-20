@@ -806,3 +806,8 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Ohne `gk_now` auf dem Server gilt weiter die Geräteuhr.
 - **Schema:** neue Funktion `gk_now()`, im Supabase-SQL-Editor ausführen.
 - Tests: SQL-Test `gk_now`, Logiktest für die Auswahl der Messung, `koop.cjs`: Spieler 2 hat eine um 5 s vorgehende Uhr, nach dem Abgleich bleibt ein Rest von unter 0,6 s; das Rennen läuft trotzdem gemeinsam.
+
+## Koop: bis zu acht Mitglieder
+
+- `gk_join_workshop` lässt bis zu 8 statt 4 Mitglieder zu. Hintergrund: Geht die automatische Anmeldung eines Geräts verloren, tritt man mit einer neuen Kennung wieder bei, und der alte Eintrag bleibt als offline stehen.
+- Schema-Änderung: neue Fassung von `gk_join_workshop`, im Supabase-SQL-Editor ausführen.

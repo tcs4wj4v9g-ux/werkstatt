@@ -58,12 +58,12 @@ test('Tabellen sind gesperrt, Zugriff nur für Mitglieder', async () => {
   await assert.rejects(anon.rpc('gk_my_workshops').then((r) => anon.rpc('gk_create_workshop', 'x', 'y', state())), /nicht_angemeldet/);
 });
 
-test('Höchstens vier Mitglieder; Beitritt ist wiederholbar', async () => {
+test('Höchstens acht Mitglieder; Beitritt ist wiederholbar', async () => {
   const { b, ws, code } = await workshop();
   assert.equal((await b.rpc('gk_join_workshop', code, 'Ben')).id, ws);
-  for (const n of ['C', 'D']) assert.equal((await (await player()).rpc('gk_join_workshop', code, n)).ok, true);
-  assert.equal((await (await player()).rpc('gk_join_workshop', code, 'E')).reason, 'voll');
-  assert.deepEqual((await b.rpc('gk_my_workshops'))[0].members, ['Anna', 'Ben', 'C', 'D']);
+  for (const n of ['C', 'D', 'E', 'F', 'G', 'H']) assert.equal((await (await player()).rpc('gk_join_workshop', code, n)).ok, true);
+  assert.equal((await (await player()).rpc('gk_join_workshop', code, 'I')).reason, 'voll');
+  assert.deepEqual((await b.rpc('gk_my_workshops'))[0].members, ['Anna', 'Ben', 'C', 'D', 'E', 'F', 'G', 'H']);
 });
 
 test('Werkstatt besteht unabhängig vom Gründer weiter', async () => {
