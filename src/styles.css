@@ -301,3 +301,8 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
 .race-hud .race-targets { font-size: 13px; opacity: 0.9; font-variant-numeric: tabular-nums; }
 .race-hud .race-targets.none { color: #ff8a7a; }
 .race-table { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0; font-weight: 600; }
+.race-hud .race-place { font-size: 40px; font-weight: 900; line-height: 1; color: #ffb347; }
+.race-hud .race-place span { font-size: 20px; opacity: 0.8; }
+.race-results { display: grid; gap: 4px; margin: 8px 0; }
+.race-row { display: grid; grid-template-columns: 28px 1fr 1fr auto; gap: 8px; padding: 4px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); font-variant-numeric: tabular-nums; }
+.race-row.you { background: rgba(255, 122, 26, 0.25); font-weight: 700; }

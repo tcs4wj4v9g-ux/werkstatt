@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { textTexture } from './textures';
-import { courseOf, raceForDay } from '../game/races';
+import { aiInput, courseOf, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
+import { createCar } from '../game/market';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
@@ -9,7 +10,7 @@ import { activeDefects } from '../game/repair';
 import { engineAudio, roadAudio } from '../game/audio';
 import { soundProfile } from '../game/diagnosis';
 import { useGame } from '../game/store';
-import { initialState, stepVehicle, vehicleSpec } from '../game/vehicle';
+import { initialState, stepVehicle, vehicleSpec, type VehicleState } from '../game/vehicle';
 import { CarModel } from './CarModel';
 import { DriveScenery } from './DriveScenery';
 import { LAKE } from './driveWorld';
@@ -58,12 +59,47 @@ export function TrackScene() {
   }, [car]);
   const n = world.samples.length;
   const startAt = course ? world.samples[course.start] : null;
-  const sim = useRef(Object.assign(startAt ? initialState(startAt.x - startAt.nx * 1.8, startAt.z - startAt.nz * 1.8, Math.atan2(-startAt.tz, startAt.tx)) : initialState(world.start.x, world.start.z, world.start.heading), {
+  // Rennen gegen Gegner: Startaufstellung zu zweit nebeneinander, der Spieler in der Mitte des Feldes
+  const grid = race?.kind === 'grid' && course;
+  const mySlot = grid ? gridSlot(world, course, PLAYER_GRID) : null;
+  const npcs = useMemo(
+    () =>
+      grid
+        ? race!.opponents.map((o, i) => {
+            const slot = gridSlot(world, course!, i < PLAYER_GRID ? i : i + 1);
+            const look = createCar(o.modelId, [], () => 0.5, {});
+            look.color = o.color;
+            return { o, spec: opponentSpec(race!.cls, o), look, st: initialState(slot.x, slot.z, slot.heading), ai: { near: slot.near, prog: slot.prog }, offset: 0, finished: null as number | null };
+          })
+        : [],
+    [race, course, world],
+  );
+  const npcRefs = useRef<(THREE.Group | null)[]>([]);
+  const sim = useRef(Object.assign(mySlot ? initialState(mySlot.x, mySlot.z, mySlot.heading) : startAt ? initialState(startAt.x - startAt.nx * 1.8, startAt.z - startAt.nz * 1.8, Math.atan2(-startAt.tz, startAt.tx)) : initialState(world.start.x, world.start.z, world.start.heading), {
     raceT: -3,
     cp: 0,
     cpAt: null as null | { x: number; z: number; heading: number; near: number; progress: number }, camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
+
+  /** Aktueller Platz des Spielers: Gegner im Ziel oder mit mehr Fortschritt liegen vorn. */
+  const placeNow = () => {
+    const s = sim.current;
+    return 1 + npcs.filter((c) => c.finished !== null || c.ai.prog > s.progress).length;
+  };
+  /** Endstand bei Zieleinlauf des Spielers: Gegner im Ziel mit ihrer Zeit, die übrigen hochgerechnet. */
+  const standings = (time: number) => {
+    const s = sim.current;
+    const rows = [
+      { name: 'Du', car: CAR_MODELS[car.modelId].name, time, you: true },
+      ...npcs.map((c) => {
+        const left = Math.max(0, course!.length - c.ai.prog) * 2;
+        const avg = Math.max(5, (Math.max(1, c.ai.prog) * 2) / Math.max(1, s.raceT));
+        return { name: c.o.name, car: CAR_MODELS[c.o.modelId].name, time: Math.round((c.finished ?? s.raceT + left / avg) * 100) / 100, you: false };
+      }),
+    ].sort((a, b) => a.time - b.time);
+    return { place: rows.findIndex((r) => r.you) + 1, table: rows };
+  };
 
   useEffect(() => {
     const s = sim.current;
@@ -77,8 +113,8 @@ export function TrackScene() {
     driveInput.handbrake = false;
     s.respawn = useDriveHud.getState().respawn;
     if (course) {
-      s.near = course.start;
-      s.progress = 0;
+      s.near = mySlot ? mySlot.near : course.start;
+      s.progress = mySlot ? mySlot.prog : 0;
     }
     useDriveHud.getState().set({ speed: 0, rpm: spec.idle, redline: spec.redline, gear: 1, elapsed: 0, home: 0, away: false, tooShort: false, drift: 0, offTrack: false, distance: 0, raceT: -3, cp: 0, cpTotal: RACE_CP * (course?.laps ?? 1), laps: course?.laps ?? 1, racing: !!course });
     const keys: Record<string, boolean> = {};
@@ -217,11 +253,89 @@ export function TrackScene() {
           s.done = true;
           const time = s.raceT;
           roadAudio.hit('clunk');
-          setTimeout(() => finishRace(Math.round(time * 100) / 100), 1200);
+          setTimeout(() => finishRace(Math.round(time * 100) / 100, grid ? standings(time) : undefined), 1200);
         }
       }
     }
     s.v = s.vx;
+
+    // --- Gegner: fahren mit derselben Physik, überholen langsamere Autos, berühren sich (Abstoßen)
+    if (grid) {
+      const cars = [{ st: s as VehicleState, prog: s.progress }, ...npcs.map((c) => ({ st: c.st, prog: c.ai.prog }))];
+      npcs.forEach((c, k) => {
+        if (s.raceT < 0) return;
+        // Wer ist knapp vor mir auf ähnlicher Linie? Dann auf die freie Seite ausweichen (und zurück, wenn frei)
+        const me = c.st;
+        const q = world.nearest(me.x, me.z, c.ai.near);
+        let want = 0;
+        for (let j = 0; j < cars.length; j++) {
+          if (j === k + 1) continue;
+          const o = cars[j];
+          const ahead = (o.prog - c.ai.prog) * 2;
+          if (ahead < 2 || ahead > 22) continue;
+          const oq = world.nearest(o.st.x, o.st.z, c.ai.near);
+          if (Math.abs(oq.lateral - q.lateral) > 2.6) continue;
+          if (me.vx < o.st.vx - 0.5) continue;
+          const side = world.roadWidth / 2 - 1.4;
+          want = oq.lateral > 0 ? -side : side;
+        }
+        c.offset += Math.max(-dt * 2.5, Math.min(dt * 2.5, want - c.offset));
+        const input = aiInput(c.spec, me, world, c.ai, c.o.skill, c.offset);
+        const on = Math.abs(q.lateral) < world.roadWidth / 2 + 0.9;
+        stepVehicle(c.spec, me, input, on ? { grade: 0, grip: 1, drag: 0 } : { grade: 0, ...world.surface(me.x, me.z) }, dt);
+        // Leitplanke
+        const p = world.samples[q.i];
+        const lim = world.railOffset - HALF_WIDTH;
+        if (Math.abs(q.lateral) > lim) {
+          const push = q.lateral - Math.sign(q.lateral) * lim;
+          me.x -= p.nx * push;
+          me.z -= p.nz * push;
+          me.vy *= 0.3;
+          me.vx *= 0.98;
+        }
+        if (c.finished === null && c.ai.prog >= course!.length) c.finished = s.raceT;
+      });
+      if (s.raceT < 0) for (const c of npcs) Object.assign(c.st, { vx: 0, vy: 0, yawRate: 0 });
+      // Berührungen: Autos als Kreise (r 1,15 m), auseinanderschieben und Geschwindigkeit längs der Verbindung austauschen
+      for (let a = 0; a < cars.length; a++)
+        for (let b = a + 1; b < cars.length; b++) {
+          const A = cars[a].st;
+          const B = cars[b].st;
+          const dx = B.x - A.x;
+          const dz = B.z - A.z;
+          const d = Math.hypot(dx, dz);
+          if (d > 2.3 || d < 1e-3) continue;
+          const nx = dx / d;
+          const nz = dz / d;
+          const push = (2.3 - d) / 2;
+          A.x -= nx * push;
+          A.z -= nz * push;
+          B.x += nx * push;
+          B.z += nz * push;
+          const va = toWorld(A);
+          const vb = toWorld(B);
+          const rel = (vb.x - va.x) * nx + (vb.z - va.z) * nz;
+          if (rel < 0) {
+            const j = -rel * 0.6;
+            fromWorld(A, va.x - nx * j, va.z - nz * j);
+            fromWorld(B, vb.x + nx * j, vb.z + nz * j);
+            A.yawRate += (Math.random() - 0.5) * 0.4 * Math.min(1, -rel / 5);
+            B.yawRate += (Math.random() - 0.5) * 0.4 * Math.min(1, -rel / 5);
+            if (a === 0 && s.bump <= 0 && -rel > 1.5) {
+              roadAudio.hit('bump');
+              s.bump = 0.5;
+            }
+          }
+        }
+      // Gegner zeichnen
+      npcs.forEach((c, k) => {
+        const g = npcRefs.current[k];
+        if (!g) return;
+        const st = c.st;
+        g.position.set(st.x, height(st.x, st.z), st.z);
+        g.rotation.set(0, st.heading, 0);
+      });
+    }
 
     // --- Leitplanken: Wagen bleibt davor, verliert Tempo
     const after = world.nearest(s.x, s.z, s.near);
@@ -394,7 +508,7 @@ export function TrackScene() {
     if (s.hud > 0.08) {
       s.hud = 0;
       const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp });
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp, place: grid ? placeNow() : 0, field: grid ? npcs.length + 1 : 0 });
     }
   });
 
@@ -414,6 +528,11 @@ export function TrackScene() {
       <DriveScenery world={world} />
       <primitive object={fx.group} />
       {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} />}
+      {npcs.map((c, k) => (
+        <group key={k} ref={(g) => void (npcRefs.current[k] = g)}>
+          <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
+        </group>
+      ))}
       <group ref={group}>
         <group ref={body}>
           {/* Motorraum bleibt bei geschlossener Haube weg (lod simple) – spart Zeichenaufrufe auf dem iPad */}
@@ -488,4 +607,27 @@ function archText(label: string) {
   let t = archTex.get(label);
   if (!t) archTex.set(label, (t = textTexture(label, { bg: '#1b1c1f', fg: '#ffffff', w: 512, h: 96, font: 56 })));
   return t;
+}
+
+/** Startplatz g (0 = vorne links): Reihen zu zweit, 9 m Abstand, versetzt hinter der Startlinie. */
+function gridSlot(w: DriveWorld, course: { start: number }, g: number) {
+  const n = w.samples.length;
+  const back = 4 + Math.floor(g / 2) * 9 + (g % 2) * 3;
+  const steps = Math.round(back / 2);
+  const idx = (course.start - steps + n) % n;
+  const p = w.samples[idx];
+  const lat = (g % 2 === 0 ? 1 : -1) * Math.min(2.3, w.roadWidth / 4);
+  return { x: p.x + p.nx * lat, z: p.z + p.nz * lat, heading: Math.atan2(-p.tz, p.tx), near: idx, prog: -steps };
+}
+/** Geschwindigkeit eines Autos in Weltkoordinaten (x, z) bzw. zurück ins Fahrzeug. */
+function toWorld(v: VehicleState) {
+  const c = Math.cos(v.heading);
+  const sn = Math.sin(v.heading);
+  return { x: v.vx * c - v.vy * sn, z: -(v.vx * sn + v.vy * c) };
+}
+function fromWorld(v: VehicleState, wx: number, wz: number) {
+  const c = Math.cos(v.heading);
+  const sn = Math.sin(v.heading);
+  v.vx = wx * c - wz * sn;
+  v.vy = -(wx * sn + wz * c);
 }

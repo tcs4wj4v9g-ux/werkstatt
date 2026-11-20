@@ -740,3 +740,21 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Ausstattung: Kerbs in den Kurven, Kiesbetten außen (Haftung 0,45, starker Rollwiderstand), Leitplanken rundum, Tribünen und Boxengebäude an der Start-Ziel-Geraden, Wald drumherum.
 - **Rennen:** Ab Tag 4 stehen auch die Rennstrecken im Kalender. Das Preisgeld richtet sich nach der Renndistanz (×1,3 bis ×2,2), Gold also bis über 50.000 €. Kontrollpunkte gibt es je Runde, die Anzeige zeigt „Runde x/y“. Die Minikarte zeigt die Strecke.
 - Tests: `circuits.test.ts` (Länge, keine Überschneidung, Radien, Steigung, Computerfahrer kommt an; auf dem Motodrom zählt Leistung mehr als im Hafen). Dazu die bestehenden Physik-, Renn- und Browser-Tests.
+
+## Rennen gegen Gegner (NPCs)
+
+- **Rennkalender:** Etwa jedes zweite Rennen ist ein Rennen gegen fünf Gegner (`Race.kind === 'grid'`), sonst ein Zeitrennen. Gegner, Autos und Farben folgen festem Zufall aus dem Spieltag (gleich im Koop).
+  - Preisgeld: Platz 1 = 115 % des Gold-Preisgelds der Klasse und Strecke, Platz 2 = 45 %, Platz 3 = 20 %.
+  - Je Tag wird die beste Platzierung einmal ausgezahlt, eine Verbesserung zahlt die Differenz.
+- **Gegner (`Opponent`):** Name, Auto der Klasse (fürs Aussehen) und Physik des Klassen-Referenzautos mit eigener Motorleistung (92–100 % der Grenze).
+  - Das Fahrkönnen ist ein Tempo-Anteil (0,90–0,985), der jede Zielgeschwindigkeit skaliert. So ist das Feld eindeutig abgestuft; der Schnellste fährt etwa auf Gold-Niveau.
+- **KI (`aiInput`):** gemeinsamer Fahrer für Sollzeiten und Gegner. Er schaut voraus, plant das Tempo nach Kurvengrenze und Bremsweg und lenkt zur Linie plus seitlichem Versatz.
+  - Überholen: Ist ein Auto 2–22 m voraus auf ähnlicher Linie und langsamer, weicht der Gegner auf die freie Seite aus und kehrt danach zurück.
+- **Rennszene:**
+  - Startaufstellung zu zweit versetzt, der Spieler startet von Platz 4.
+  - Die Gegner fahren mit derselben Fahrphysik, die Leitplanke hält sie auf.
+  - Berührungen zwischen Autos: Kreise mit 1,15 m Radius, auseinanderschieben, Geschwindigkeit längs der Verbindung austauschen, leichter Dreh.
+  - Live-Position „P3/6“ in der Anzeige.
+  - Beim Zieleinlauf entsteht der Endstand: Gegner im Ziel mit ihrer Zeit, die übrigen werden aus ihrem Schnitt hochgerechnet.
+- **Oberfläche:** Im Rennen-Reiter stehen Starterfeld und Preisgeld nach Platz. Das Ergebnisfenster zeigt Platz und Tabelle aller sechs Fahrer.
+- Tests: `races.test.ts` (Anteil der Gegnerrennen, Feld fest je Tag, Spitzenfahrer auf Gold-Niveau, Preisgeld nach Platz), `karriere.cjs` (Starterfeld, Platz im Rennen, Endstand mit sechs Fahrern, Preisgeld nur für 1–3).

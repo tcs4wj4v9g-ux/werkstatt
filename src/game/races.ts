@@ -11,11 +11,12 @@
  */
 import { type DriveWorld } from '../three/driveWorld';
 import { CIRCUITS, worldFor, type CircuitId, type WorldId } from '../three/circuits';
+import { CAR_MODELS } from './data/cars';
 import { createCar } from './market';
 import { performance } from './performance';
 import { driveBlocker } from './repair';
 import type { CarInstance } from './types';
-import { initialState, stepVehicle, vehicleSpec, type VehicleSpec } from './vehicle';
+import { initialState, stepVehicle, vehicleSpec, type DriveInput, type VehicleSpec, type VehicleState } from './vehicle';
 
 export type RaceClass = 'c150' | 'c250' | 'c400' | 'open';
 export const RACE_CLASSES: Record<RaceClass, { name: string; ps: number; gold: number; fee: number }> = {
@@ -96,9 +97,65 @@ export interface Race {
   cls: RaceClass;
   title: string;
   fee: number;
-  /** Preisgeld je Medaille. */
+  /**
+   * 'time': Zeitrennen allein gegen die Uhr (Medaillen nach Sollzeit).
+   * 'grid': Rennen gegen Gegner – Preisgeld für Platz 1, 2, 3 (in `prize` als gold/silver/bronze).
+   */
+  kind: 'time' | 'grid';
+  /** Preisgeld je Medaille bzw. Platz 1–3. */
   prize: { gold: number; silver: number; bronze: number };
+  /** Gegner (nur bei 'grid'). */
+  opponents: Opponent[];
 }
+
+/** Computergegner: Name, Auto (Aussehen), Motorleistung (Anteil der Klassengrenze), Fahrkönnen. */
+export interface Opponent {
+  name: string;
+  modelId: string;
+  color: string;
+  power: number;
+  skill: AiSkill;
+}
+/** Startplatz des Spielers (0 = erste Reihe links) bei 6 Autos. */
+export const PLAYER_GRID = 3;
+const NAMES = ['Kalle Brandt', 'Mia Sommer', 'Jens „Turbo“ Kowalski', 'Ayla Demir', 'Rüdiger Moll', 'Lena Vogt', 'Tobi Graf', 'Svenja Kraus', 'Dragan Petrović', 'Hanne Lindqvist', 'Paolo Ricci', 'Ole Hansen', 'Frieda Kühn', 'Mehmet Yıldız'];
+/** Fahrkönnen und Leistung der fünf Gegner – vom Spitzenfahrer (etwa Gold-Niveau) bis zum Nachzügler. */
+const FIELD: { skill: AiSkill; power: number }[] = [
+  { skill: { lat: 0.86, brake: 0.73, pace: 0.985 }, power: 1 },
+  { skill: { lat: 0.86, brake: 0.73, pace: 0.965 }, power: 0.98 },
+  { skill: { lat: 0.86, brake: 0.73, pace: 0.945 }, power: 0.96 },
+  { skill: { lat: 0.86, brake: 0.73, pace: 0.925 }, power: 0.94 },
+  { skill: { lat: 0.86, brake: 0.73, pace: 0.9 }, power: 0.92 },
+];
+const PAINT = ['#c8231e', '#1f4fa8', '#f2c200', '#1b1c1f', '#e8e8e8', '#2f8f4e', '#ff7a1a', '#6b2d8f'];
+
+/** Autos, die zur Klasse passen (Serienleistung bis zur Grenze, nicht viel schwächer) – nur fürs Aussehen der Gegner. */
+const classModels = new Map<RaceClass, string[]>();
+function modelsFor(cls: RaceClass) {
+  let list = classModels.get(cls);
+  if (!list) {
+    const lim = cls === 'open' ? 9999 : RACE_CLASSES[cls].ps;
+    const lo = cls === 'open' ? 380 : lim * 0.55;
+    list = Object.keys(CAR_MODELS).filter((id) => {
+      const m = CAR_MODELS[id];
+      if (m.collector) return false;
+      const ps = performance(createCar(id, [], () => 0.5)).ps;
+      return ps <= lim && ps >= lo;
+    });
+    if (!list.length) list = ['bavaria_330'];
+    classModels.set(cls, list);
+  }
+  return list;
+}
+
+/** Physik eines Gegners: Referenzauto der Klasse mit seiner Motorleistung. */
+export function opponentSpec(cls: RaceClass, o: Opponent): VehicleSpec {
+  const ref = referenceSpec(cls);
+  return { ...ref, torque: ref.torque.map((p) => ({ rpm: p.rpm, nm: p.nm * o.power })) };
+}
+
+/** Platz → Preisgeld-Stufe (gold/silver/bronze) bei Rennen gegen Gegner. */
+export const placeMedal = (place: number): Medal => (place === 1 ? 'gold' : place === 2 ? 'silver' : place === 3 ? 'bronze' : null);
 
 /** Fester Zufall aus dem Spieltag (gleiches Rennen auf allen Geräten im Koop). */
 function seeded(seed: number) {
@@ -122,15 +179,27 @@ export function raceForDay(day: number): Race | null {
   const pool: RaceClass[] = day < 4 ? ['c150', 'c250'] : ['c150', 'c250', 'c250', 'c400', 'c400', 'open'];
   const cls = pool[Math.floor(r() * pool.length)];
   const c = RACE_CLASSES[cls];
-  const gold = Math.round((c.gold * courseOf(course).pay) / 50) * 50;
+  // Etwa jedes zweite Rennen gegen Gegner (Preisgeld für die ersten drei, Sieg zahlt etwas mehr als Gold)
+  const kind: Race['kind'] = r() < 0.5 ? 'grid' : 'time';
+  const base = Math.round((c.gold * courseOf(course).pay) / 50) * 50;
+  const gold = kind === 'grid' ? Math.round((base * 1.15) / 50) * 50 : base;
+  const share = kind === 'grid' ? [0.45, 0.2] : [0.55, 0.25];
+  const names = [...NAMES].sort(() => r() - 0.5).slice(0, FIELD.length);
+  const models = modelsFor(cls);
+  const opponents: Opponent[] =
+    kind === 'grid'
+      ? FIELD.map((f, i) => ({ name: names[i], modelId: models[Math.floor(r() * models.length)], color: PAINT[Math.floor(r() * PAINT.length)], power: f.power, skill: f.skill }))
+      : [];
   return {
     id: `rennen-${day}`,
     day,
     course,
     cls,
-    title: `Zeitrennen ${courseOf(course).name} – ${c.name}`,
+    kind,
+    title: `${kind === 'grid' ? 'Rennen' : 'Zeitrennen'} ${courseOf(course).name} – ${c.name}`,
     fee: c.fee,
-    prize: { gold, silver: Math.round((gold * 0.55) / 50) * 50, bronze: Math.round((gold * 0.25) / 50) * 50 },
+    prize: { gold, silver: Math.round((gold * share[0]) / 50) * 50, bronze: Math.round((gold * share[1]) / 50) * 50 },
+    opponents,
   };
 }
 
@@ -152,37 +221,62 @@ export function raceBlocker(car: CarInstance, race: Race): string | null {
  * Fährt die Strecke mit einem einfachen, aber zügigen Fahrer (schaut voraus, bremst vor Kurven, lenkt analog).
  * Liefert die Zeit in Sekunden (oder Infinity, wenn er nicht ankommt).
  */
-export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true) {
+/** Fahrkönnen eines Computerfahrers: genutzte Querbeschleunigung und Verzögerung (Anteil der Grenze). */
+export interface AiSkill {
+  lat: number;
+  brake: number;
+  /** Tempo-Anteil (1 = so schnell wie es geht): langsamere Fahrer fahren überall etwas vorsichtiger. */
+  pace?: number;
+}
+export const REFERENCE_SKILL: AiSkill = { lat: 0.88, brake: 0.75 };
+/** Lage eines Computerfahrers auf der Strecke (nächster Straßenpunkt, Fortschritt in Punkten). */
+export interface AiTrack {
+  near: number;
+  prog: number;
+}
+
+/**
+ * Eingaben eines Computerfahrers für einen Schritt: schaut voraus, lenkt zur Ideallinie (plus seitlichem Versatz
+ * `offset` zum Überholen), plant das Tempo so, dass er vor Kurven rechtzeitig bremst. Aktualisiert `ai.near`/`ai.prog`.
+ */
+export function aiInput(spec: VehicleSpec, st: VehicleState, w: DriveWorld, ai: AiTrack, skill: AiSkill, offset = 0, assist = true): DriveInput {
   const n = w.samples.length;
+  const q = w.nearest(st.x, st.z, ai.near);
+  let d = q.i - ai.near;
+  if (d > n / 2) d -= n;
+  if (d < -n / 2) d += n;
+  if (Math.abs(d) <= 40) ai.prog += d;
+  ai.near = q.i;
+  const tg = w.samples[(ai.near + Math.round(8 + st.vx * 0.5)) % n];
+  const tx = tg.x + tg.nx * offset;
+  const tz = tg.z + tg.nz * offset;
+  let diff = Math.atan2(-(tz - st.z), tx - st.x) - st.heading;
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  // Tempoplan: jede Kurve voraus erlaubt v = √(a_quer / Krümmung); bremsen erst, wenn der Bremsweg dorthin knapp wird
+  const aLat = spec.muFront * 9.81 * skill.lat;
+  const aBrake = Math.min(spec.muFront, spec.brakeForce / (spec.mass * 9.81)) * 9.81 * skill.brake;
+  let vt = 80;
+  for (let k = 2; k < 160; k++) {
+    const c = Math.abs(w.samples[(ai.near + k) % n].curv);
+    const vc = Math.sqrt(aLat / Math.max(1e-4, c));
+    vt = Math.min(vt, Math.sqrt(vc * vc + 2 * aBrake * Math.max(0, k * 2 - 4)));
+  }
+  vt *= skill.pace ?? 1;
+  const steer = Math.max(-1, Math.min(1, diff * 3 - (q.lateral - offset) * 0.04));
+  return { steer, throttle: st.vx < vt - 0.5 ? 1 : st.vx < vt ? 0.4 : 0, brake: st.vx > vt + 1.5 ? 1 : 0, assist };
+}
+
+/** Fährt die Strecke allein mit einem Computerfahrer; Zeit in Sekunden (oder Infinity, wenn er nicht ankommt). */
+export function aiTime(spec: VehicleSpec, course: Course, w: DriveWorld = worldFor(course.world), assist = true, skill: AiSkill = REFERENCE_SKILL) {
   const p0 = w.samples[course.start];
   const st = initialState(p0.x - p0.nx * 1.8, p0.z - p0.nz * 1.8, Math.atan2(-p0.tz, p0.tx));
-  let near = course.start;
-  let prog = 0;
+  const ai = { near: course.start, prog: 0 };
   const flat = { grade: 0, grip: 1, drag: 0 };
   const dt = 1 / 60;
-  // Grenzen des Autos: Querbeschleunigung etwas unter der Haftgrenze, Verzögerung mit Reserve
-  const aLat = spec.muFront * 9.81 * 0.88;
-  const aBrake = Math.min(spec.muFront, spec.brakeForce / (spec.mass * 9.81)) * 9.81 * 0.75;
-  for (let t = 0; t < 600; t += dt) {
-    const q = w.nearest(st.x, st.z, near);
-    let d = q.i - near;
-    if (d > n / 2) d -= n;
-    if (d < -n / 2) d += n;
-    prog += d;
-    near = q.i;
-    if (prog >= course.length) return t;
-    const tg = w.samples[(near + Math.round(8 + st.vx * 0.5)) % n];
-    let diff = Math.atan2(-(tg.z - st.z), tg.x - st.x) - st.heading;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-    // Tempoplan: jede Kurve voraus erlaubt v = √(a_quer / Krümmung); bremsen erst, wenn der Bremsweg dorthin knapp wird
-    let vt = 80;
-    for (let k = 2; k < 160; k++) {
-      const c = Math.abs(w.samples[(near + k) % n].curv);
-      const vc = Math.sqrt(aLat / Math.max(1e-4, c));
-      vt = Math.min(vt, Math.sqrt(vc * vc + 2 * aBrake * Math.max(0, k * 2 - 4)));
-    }
-    const steer = Math.max(-1, Math.min(1, diff * 3 - q.lateral * 0.04));
-    stepVehicle(spec, st, { steer, throttle: st.vx < vt - 0.5 ? 1 : st.vx < vt ? 0.4 : 0, brake: st.vx > vt + 1.5 ? 1 : 0, assist }, flat, dt);
+  for (let t = 0; t < 900; t += dt) {
+    const input = aiInput(spec, st, w, ai, skill, 0, assist);
+    if (ai.prog >= course.length) return t;
+    stepVehicle(spec, st, input, flat, dt);
   }
   return Infinity;
 }
@@ -228,8 +322,8 @@ export function medalFor(race: Race, time: number): Medal {
  * Auszahlung für eine gefahrene Zeit: Preisgeld der erreichten Medaille abzüglich dessen, was für dieses Rennen schon
  * ausgezahlt wurde (Verbesserung zahlt die Differenz, mehrfaches Fahren derselben Medaille nichts).
  */
-export function payoutFor(race: Race, time: number, alreadyPaid: number) {
-  const medal = medalFor(race, time);
+export function payoutFor(race: Race, time: number, alreadyPaid: number, place?: number) {
+  const medal = race.kind === 'grid' ? placeMedal(place ?? 99) : medalFor(race, time);
   const prize = medal ? race.prize[medal] : 0;
   return { medal, prize, payout: Math.max(0, prize - alreadyPaid) };
 }

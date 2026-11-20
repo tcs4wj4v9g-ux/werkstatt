@@ -165,7 +165,7 @@ export interface GameState {
   /** Mit diesem Auto beim heutigen Zeitrennen starten (Startgeld wird fällig). */
   startRace(bay: number): void;
   /** Rennen beendet: Zeit in s (oder null = abgebrochen). Zahlt Preisgeld bzw. die Verbesserung aus. */
-  finishRace(time: number | null): void;
+  finishRace(time: number | null, grid?: { place: number; table: RaceRow[] }): void;
   finishDrive(completed: boolean): void;
   haggle(bay: number): void;
   sell(bay: number): void;
@@ -346,6 +346,15 @@ export interface RaceResult {
   payout: number;
   targets: { gold: number; silver: number; bronze: number };
   improved: boolean;
+  /** Rennen gegen Gegner: Platz und Endstand. */
+  place: number | null;
+  table: RaceRow[] | null;
+}
+export interface RaceRow {
+  name: string;
+  car: string;
+  time: number;
+  you: boolean;
 }
 export const dayLeft = (s: Pick<GameState, 'dayStartedAt'>) => Math.max(0, (s.dayStartedAt ?? 0) + dayClock.ms - Date.now());
 
@@ -1014,7 +1023,7 @@ export const useGame = create<GameState>()(
           set({ cars, money: s.money - race.fee, race: { id: race.id, bay }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
         },
 
-        finishRace: (time) => {
+        finishRace: (time, grid) => {
           const s = get();
           const race = raceForDay(s.day);
           const run = s.race;
@@ -1024,7 +1033,7 @@ export const useGame = create<GameState>()(
           }
           const current = s.cars[run.bay];
           const paid = (s.career.racePaid ?? {})[race.id] ?? 0;
-          const { medal, prize, payout } = payoutFor(race, time, paid);
+          const { medal, prize, payout } = payoutFor(race, time, paid, grid?.place);
           const before = (s.career.raceBest ?? {})[race.id];
           const best = before === undefined ? time : Math.min(before, time);
           // Nur die letzten Rennen merken (die Liste soll nicht endlos wachsen)
@@ -1050,7 +1059,7 @@ export const useGame = create<GameState>()(
             race: null,
             screen: 'garage',
             panel: 'raceResult',
-            raceResult: { title: race.title, time, best, medal, payout, prize, targets: raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && time < before },
+            raceResult: { title: race.title, time, best, medal, payout, prize, targets: raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && time < before, place: grid?.place ?? null, table: grid?.table ?? null },
           });
         },
 
