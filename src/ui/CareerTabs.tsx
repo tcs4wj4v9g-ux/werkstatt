@@ -1,4 +1,6 @@
 import { CarStatsCard } from './CarStatsCard';
+import { CoopRacePanel, CoopRaceTable } from './CoopRaceUI';
+import { leaveCoopRace } from '../net/coopRace';
 import { courseOf, MEDAL_LABEL, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
 import { duration, todayOf } from '../game/playtime';
 import { useEffect } from 'react';
@@ -229,6 +231,7 @@ export function RacesTab() {
         und Bronze – fährst du später eine bessere Medaille, wird die Differenz nachgezahlt. Jeder Versuch kostet Startgeld. Tuning bis an die
         Klassengrenze, Reifen und Fahrwerk machen den Unterschied. Gegner auf der Strecke folgen später.
       </p>
+      <CoopRacePanel />
       {!race && <p className="bigline">Heute ist kein Rennen – heute ist Fahrzeugtreffen (unter „Wettbewerbe“).</p>}
       {race && (
         <div className="shop-row col" data-testid="race-today">
@@ -305,6 +308,21 @@ export function RaceResultModal() {
   const r = s.raceResult;
   if (!r) return null;
   const race = raceForDay(s.day);
+  if (r.coop) {
+    const close = () => {
+      leaveCoopRace();
+      s.setPanel(null);
+    };
+    return (
+      <Modal title="Ergebnis Koop-Rennen" onClose={close}>
+        <p className="meta">{r.title} · {r.car}</p>
+        <p className="bigline" data-testid="race-time">Deine Zeit {raceClock(r.time)}</p>
+        <CoopRaceTable lobby={r.coop} />
+        <p className="meta">Die Tabelle füllt sich, sobald die anderen im Ziel sind.</p>
+        <button className="btn primary" onClick={close}>Zur Werkstatt</button>
+      </Modal>
+    );
+  }
   return (
     <Modal title="Ergebnis Zeitrennen" onClose={() => s.setPanel(null)}>
       <p className="meta">{r.title} · {r.car}</p>

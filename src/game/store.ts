@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { courseOf, payoutFor, raceBlocker, raceForDay, raceTargets, type Medal } from './races';
+import { courseOf, payoutFor, raceBlocker, raceForDay, raceTargets, type CourseId, type Medal } from './races';
 import { emptyPlayTime, type PlayTime } from './playtime';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
@@ -125,7 +125,7 @@ export interface GameState {
   lastSale: { title: string; price: number; profit: number; lines?: { label: string; amount: number }[] } | null;
   driveReport: string[] | null;
   /** Laufendes Zeitrennen (nur auf diesem Gerät) und Ergebnis des letzten. */
-  race: { id: string; bay: number } | null;
+  race: { id: string; bay: number; coop?: { lobby: string; course: CourseId; startAt: number } } | null;
   raceResult: RaceResult | null;
 
   newGame(): void;
@@ -164,6 +164,8 @@ export interface GameState {
   startDrive(bay: number): void;
   /** Mit diesem Auto beim heutigen Zeitrennen starten (Startgeld wird fällig). */
   startRace(bay: number): void;
+  /** Koop-Rennen gegeneinander betreten (Startzeit vom Ausschreibenden, kein Startgeld, kein Preisgeld). */
+  enterCoopRace(bay: number, lobby: string, course: CourseId, startAt: number): void;
   /** Rennen beendet: Zeit in s (oder null = abgebrochen). Zahlt Preisgeld bzw. die Verbesserung aus. */
   finishRace(time: number | null, grid?: { place: number; table: RaceRow[] }): void;
   finishDrive(completed: boolean): void;
@@ -349,6 +351,8 @@ export interface RaceResult {
   /** Rennen gegen Gegner: Platz und Endstand. */
   place: number | null;
   table: RaceRow[] | null;
+  /** Koop-Rennen: Kennung (der Endstand wird live aus den Lagen der Mitspieler gelesen). */
+  coop?: string;
 }
 export interface RaceRow {
   name: string;
@@ -1023,10 +1027,43 @@ export const useGame = create<GameState>()(
           set({ cars, money: s.money - race.fee, race: { id: race.id, bay }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
         },
 
+        enterCoopRace: (bay, lobby, course, startAt) => {
+          const s = get();
+          const car = s.cars[bay];
+          if (!car) return;
+          const blocker = repair.driveBlocker(car);
+          if (blocker) return s.say(blocker, true);
+          stopEngine();
+          const cars = [...s.cars];
+          cars[bay] = { ...car, hoodOpen: false };
+          set({ cars, race: { id: `koop-${lobby}`, bay, coop: { lobby, course, startAt } }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
+        },
+
         finishRace: (time, grid) => {
           const s = get();
-          const race = raceForDay(s.day);
           const run = s.race;
+          // Koop-Rennen: nur Zeit und Platz (live aus den Lagen der Mitspieler), kein Geld
+          if (run?.coop) {
+            if (time === null) {
+              set({ race: null, screen: 'garage' });
+              return s.say('Koop-Rennen verlassen.');
+            }
+            const current = s.cars[run.bay];
+            const cars = [...s.cars];
+            if (current) {
+              const car = clone(current);
+              for (const z of Object.values(car.zones)) z.dirt = Math.min(1, z.dirt + 0.08);
+              cars[run.bay] = car;
+            }
+            return set({
+              cars,
+              race: null,
+              screen: 'garage',
+              panel: 'raceResult',
+              raceResult: { title: `Koop-Rennen ${courseOf(run.coop.course).name}`, time, best: time, medal: null, payout: 0, prize: 0, targets: { gold: 0, silver: 0, bronze: 0 }, car: current ? CAR_MODELS[current.modelId].name : '', improved: false, place: null, table: null, coop: run.coop.lobby },
+            });
+          }
+          const race = raceForDay(s.day);
           if (!run || !race || run.id !== race.id || time === null) {
             set({ race: null, screen: 'garage' });
             return s.say('Rennen abgebrochen – das Startgeld ist weg.');

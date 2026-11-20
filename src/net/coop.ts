@@ -1,4 +1,5 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
+import { coopRaceOut, useCoopRace, type Join, type Lobby, type RaceCar } from './coopRace';
 import { isActive } from '../game/playtime';
 import { create } from 'zustand';
 import { TOOL_MAP } from '../game/data/tools';
@@ -44,6 +45,10 @@ export interface Presence {
   idle?: boolean;
   /** Letzte Chatnachricht (bleibt ~30 s in der Lage, damit sie auch ohne Realtime über den Abgleich ankommt). */
   chat?: ChatLine | null;
+  /** Koop-Rennen: ausgeschrieben, Teilnahme, eigene Fahrzeuglage im Rennen (`coopRace.ts`). */
+  lobby?: Lobby | null;
+  join?: Join | null;
+  rr?: RaceCar | null;
 }
 export interface ChatLine {
   id: string;
@@ -214,7 +219,14 @@ function presence(): Presence {
   const car = g.screen === 'track' ? g.cars[g.driveBay]?.uid : g.screen === 'garage' && near >= 0 ? g.cars[near]?.uid : null;
   const r = (v: number) => Math.round(v * 100) / 100;
   const chat = myChat && Date.now() - myChat.at < 30_000 ? myChat : null;
-  return { x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, sid: SID, idle: !isActive(), ...(chat ? { chat } : {}) };
+  const race = useCoopRace.getState();
+  return {
+    x: r(player.x), z: r(player.z), yaw: r(player.yaw), pitch: r(player.pitch), tool: g.tool, scene: g.screen, place: place.at, car: car ?? null, sid: SID, idle: !isActive(),
+    ...(chat ? { chat } : {}),
+    ...(race.lobby ? { lobby: race.lobby } : {}),
+    ...(race.join ? { join: race.join } : {}),
+    ...(coopRaceOut.car ? { rr: coopRaceOut.car } : {}),
+  };
 }
 
 // ---------------------------------------------------------------- Chat
