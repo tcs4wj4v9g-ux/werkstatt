@@ -10,6 +10,7 @@ import { engineOf } from './data/components';
 import { performance, powerCurve } from './performance';
 import { activeDefects } from './repair';
 import type { CarInstance } from './types';
+import { TIRE_GRIP, type GroundClass } from './grip';
 import { BODY_SPECS } from '../three/carGeometry';
 
 export type Drivetrain = 'FWD' | 'RWD' | 'AWD';
@@ -67,6 +68,18 @@ export interface VehicleSpec {
   suspFreq: number;
   suspDamping: number;
   diesel: boolean;
+  /** Reifen: Haftungsfaktor je Untergrundklasse (siehe grip.ts). */
+  tireGrip: Record<GroundClass, number>;
+  /** Rallyefahrwerk: mehr Haftung auf losem Untergrund und Schnee (Federweg). */
+  looseGrip: number;
+  /** Unterfahrschutz: Anteil des Rollwiderstands auf losem Untergrund (1 = ohne). */
+  roughDrag: number;
+  /** Differential der angetriebenen Achse. */
+  diff: 'stock' | 'lsd' | 'welded';
+  /** Größter Driftwinkel, den die Drift-Hilfe zulässt (rad) – mit Lenkwinkel-Kit größer. */
+  maxDrift: number;
+  /** Hydraulische Handbremse: Hinterräder führen beim Ziehen fast gar nicht mehr. */
+  hydroBrake: boolean;
   /** Spürbare Defekte und Verschleiß. */
   faults: Faults;
 }
@@ -137,6 +150,8 @@ export interface Surface {
   grip: number;
   /** zusätzlicher Rollwiderstand (Wiese, Schotter). */
   drag: number;
+  /** Untergrundklasse für den Reifen (trocken, nass, Schnee, lose); fehlt = trockener Asphalt. */
+  cls?: GroundClass;
 }
 
 const G = 9.81;
@@ -157,6 +172,8 @@ const SUSP: Record<string, { freq: number; damp: number; grip: number }> = {
   springs: { freq: 1.5, damp: 0.36, grip: 1.03 },
   sport: { freq: 1.75, damp: 0.45, grip: 1.07 },
   coilover: { freq: 2.0, damp: 0.55, grip: 1.12 },
+  // Rallyefahrwerk: weich mit langem Federweg – auf Asphalt etwas schwammig, auf losem Untergrund im Vorteil (looseGrip)
+  rally: { freq: 1.35, damp: 0.42, grip: 0.99 },
 };
 
 export function vehicleSpec(car: CarInstance): VehicleSpec {
@@ -242,7 +259,7 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
     cornerRear: mass * G * (a / wheelbase) * 23 * susp.grip,
     brakeForce: mass * G * 1.05 * (faults.weakBrakes ? 0.45 : 1) * (model.cls === 'budget' ? 0.95 : 1.05),
     brakeBiasFront: 0.7,
-    steerMax: 0.62,
+    steerMax: car.visual?.steerKit ? 0.85 : 0.62,
     peakSlip: PEAK_K * (mu / 19),
     dragArea,
     clA,
@@ -253,6 +270,12 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
     suspFreq: susp.freq,
     suspDamping: susp.damp,
     diesel,
+    tireGrip: TIRE_GRIP[car.visual?.tires ?? 'stock'] ?? TIRE_GRIP.stock,
+    looseGrip: car.visual?.suspension === 'rally' ? 1.12 : 1,
+    roughDrag: car.visual?.skid ? 0.7 : 1,
+    diff: car.visual?.diff ?? 'stock',
+    maxDrift: car.visual?.steerKit ? 1.05 : 0.87,
+    hydroBrake: !!car.visual?.hbrake,
     faults,
   };
 }
@@ -340,8 +363,11 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const staticR = (weight * spec.a) / L;
   const loadF = Math.max(0.15 * weight, staticF - transfer + down * spec.aeroFront);
   const loadR = Math.max(0.15 * weight, staticR + transfer + down * (1 - spec.aeroFront));
-  const muF = spec.muFront * surface.grip;
-  const muR = spec.muRear * surface.grip;
+  // Reifen je Untergrund (Serienreifen 1); Rallyefahrwerk hilft auf losem Untergrund und Schnee
+  const cls = surface.cls ?? 'dry';
+  const tireK = (spec.tireGrip?.[cls] ?? 1) * (cls === 'loose' || cls === 'snow' ? spec.looseGrip ?? 1 : 1);
+  const muF = spec.muFront * surface.grip * tireK;
+  const muR = spec.muRear * surface.grip * tireK;
 
   // --- Getriebe (Automatik) und Drehzahl
   const wheelRpm = (s.vx / spec.wheelRadius) * (60 / (2 * Math.PI));
@@ -409,6 +435,8 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   };
   const capF = axleGrip(muF, loadF, staticF, spec.rollFront);
   const capR = axleGrip(muR, loadR, staticR, 1 - spec.rollFront);
+  // Differential: Sperre bzw. verschweißt bringt mehr Antriebskraft auf die Straße (kein einzelnes Rad dreht leer durch)
+  const diffTraction = spec.diff === 'welded' ? 1.06 : spec.diff === 'lsd' ? 1.04 : 1;
   // Seitenkraft, die die Kurve gerade braucht (aus der letzten Querbeschleunigung), bleibt jeder Achse vorbehalten
   const needF = spec.mass * Math.abs(s.ay) * (spec.b / L);
   const needR = spec.mass * Math.abs(s.ay) * (spec.a / L);
@@ -432,22 +460,27 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   }
   if (assist) {
     // Antriebsschlupfregelung (Teil des ESP): Antriebskraft höchstens bis zur Haftgrenze (keine durchdrehenden Räder)
-    if (fxF > 0) fxF = Math.min(fxF, capF * 0.97);
-    if (fxR > 0) fxR = Math.min(fxR, Math.sqrt(Math.max(0, capR * capR - needR * needR)) * 0.97);
+    if (fxF > 0) fxF = Math.min(fxF, capF * 0.97 * (shareF > 0 ? diffTraction : 1));
+    if (fxR > 0) fxR = Math.min(fxR, Math.sqrt(Math.max(0, capR * capR - needR * needR)) * 0.97 * (shareF < 1 ? diffTraction : 1));
   }
-  const spinF = Math.max(0, Math.abs(fxF) - capF) / Math.max(1, capF);
-  const spinR = Math.max(0, Math.abs(fxR) - capR) / Math.max(1, capR);
-  fxF = Math.sign(fxF) * Math.min(Math.abs(fxF), capF);
-  fxR = Math.sign(fxR) * Math.min(Math.abs(fxR), capR);
+  const driveCapF = capF * (shareF > 0 && fxF > 0 ? diffTraction : 1);
+  const driveCapR = capR * (shareF < 1 && fxR > 0 ? diffTraction : 1);
+  const spinF = Math.max(0, Math.abs(fxF) - driveCapF) / Math.max(1, capF);
+  const spinR = Math.max(0, Math.abs(fxR) - driveCapR) / Math.max(1, capR);
+  fxF = Math.sign(fxF) * Math.min(Math.abs(fxF), driveCapF);
+  fxR = Math.sign(fxR) * Math.min(Math.abs(fxR), driveCapR);
 
   // --- Seitenkräfte über Schräglaufwinkel; bei kleinem Tempo gedämpft (sonst springt der Winkel)
   const vxs = Math.max(Math.abs(s.vx), 2.5);
   const alphaF = Math.atan2(s.vy + spec.a * s.yawRate, vxs) - wheel * Math.sign(s.vx || 1);
   const alphaR = Math.atan2(s.vy - spec.b * s.yawRate, vxs);
   // Reibungskreis: Längskraft nimmt Seitenführung weg (Gas im Heckantrieb → Heck kommt); durchdrehende Räder führen schlechter
-  const latF = Math.sqrt(Math.max(0, capF * capF - fxF * fxF)) * (1 - Math.min(0.5, spinF * 0.8));
-  let latR = Math.sqrt(Math.max(0, capR * capR - fxR * fxR)) * (1 - Math.min(0.5, spinR * 0.8));
-  if (hand && Math.abs(s.vx) > 0.5) latR = capR * 0.3;
+  // Differential im Drift: Sperre hält den Seitenführungsverlust gleichmäßig (Drift mit Gas dosierbar), verschweißt
+  // lässt beide Räder gemeinsam durchdrehen – das Heck kommt früher und bleibt draußen
+  const [spinK, spinMax] = spec.diff === 'welded' ? [1.0, 0.62] : spec.diff === 'lsd' ? [0.65, 0.45] : [0.8, 0.5];
+  const latF = Math.sqrt(Math.max(0, capF * capF - fxF * fxF)) * (1 - Math.min(shareF > 0 ? spinMax : 0.5, spinF * (shareF > 0 ? spinK : 0.8)));
+  let latR = Math.sqrt(Math.max(0, capR * capR - fxR * fxR)) * (1 - Math.min(shareF < 1 ? spinMax : 0.5, spinR * (shareF < 1 ? spinK : 0.8)));
+  if (hand && Math.abs(s.vx) > 0.5) latR = capR * (spec.hydroBrake ? 0.15 : 0.3);
   // Seitensteifigkeit wächst mit der Radlast (unterproportional) – mit Abtrieb lenkt das Auto bei Tempo direkter ein
   let fyF = tire(alphaF, spec.cornerFront * (loadF / staticF) ** 0.7, latF);
   let fyR = tire(alphaR, spec.cornerRear * (loadR / staticR) ** 0.7, latR);
@@ -460,7 +493,7 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
 
   // --- Widerstände: Luft, Rollen, Oberfläche, Steigung
   const drag = 0.5 * RHO * spec.dragArea * s.vx * Math.abs(s.vx);
-  const rolling = (spec.rollRes + surface.drag) * spec.mass * G * Math.sign(s.vx) * Math.min(1, Math.abs(s.vx) * 2);
+  const rolling = (spec.rollRes + surface.drag * (cls === 'loose' || cls === 'snow' ? spec.roughDrag ?? 1 : 1)) * spec.mass * G * Math.sign(s.vx) * Math.min(1, Math.abs(s.vx) * 2);
   const slope = spec.mass * G * Math.sin(surface.grade);
 
   // --- Bewegungsgleichungen
@@ -495,10 +528,13 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
       const into = Math.sign(excess) === -Math.sign(slipAngle);
       const k = Math.max(0, Math.min(1, (Math.abs(slipAngle) - 0.35) / 0.4));
       if (into && k > 0) yawMoment -= excess * spec.yawInertia * 4 * k;
-      const maxDrift = 0.87;
+      const maxDrift = spec.maxDrift ?? 0.87;
       if (Math.abs(slipAngle) > maxDrift) yawMoment += (slipAngle - Math.sign(slipAngle) * maxDrift) * spec.mass * 30 * Math.sign(s.vx);
     }
   }
+  // Verschweißtes Differential: in engen, langsamen Kurven radieren die Antriebsräder und schieben das Auto geradeaus
+  // (sofern sie nicht ohnehin durchdrehen)
+  if (spec.diff === 'welded' && speed < 14 && s.wheelspin < 0.3) yawMoment -= s.yawRate * spec.yawInertia * 1.6 * (1 - speed / 14);
   s.yawRate += (yawMoment / spec.yawInertia) * dt;
   // Bei kleinem Tempo nur rollen, nicht driften; Stillstand ohne Gas bleibt stehen
   if (speed < 1.5) {

@@ -189,6 +189,7 @@ export function JunkPanel() {
 
 const FIELDS: { field: keyof VisualTune; label: string }[] = [
   { field: 'rim', label: 'Felgen' }, { field: 'rimSize', label: 'Felgengröße' }, { field: 'rimColor', label: 'Felgenfarbe' }, { field: 'suspension', label: 'Fahrwerk' },
+  { field: 'tires', label: 'Reifen' }, { field: 'diff', label: 'Differential' }, { field: 'steerKit', label: 'Lenkwinkel-Kit' }, { field: 'hbrake', label: 'Handbremse' }, { field: 'skid', label: 'Unterfahrschutz' },
   { field: 'front', label: 'Frontstoßstange' }, { field: 'rear', label: 'Heckschürze' }, { field: 'skirts', label: 'Seitenschweller' }, { field: 'spoiler', label: 'Spoiler' },
   { field: 'hood', label: 'Motorhaube' }, { field: 'flares', label: 'Verbreiterungen' }, { field: 'finish', label: 'Lackart' }, { field: 'wrap', label: 'Folie' },
   { field: 'lamps', label: 'Rückleuchten' }, { field: 'tips', label: 'Endrohre' }, { field: 'seats', label: 'Sitze' }, { field: 'wheel', label: 'Lenkrad' },
@@ -248,7 +249,7 @@ export function TuningPanel() {
         <button className="btn" onClick={() => s.fitTurboKit(slot)}>Turbo-Nachrüstsatz vorbereiten (Halter, Ölleitungen)</button>
       )}
       <p className="meta">Mechanische Tuningteile (Turbolader, Sportluftfilter, Sportauspuff, Ladeluftkühler, Kraftstoffpumpe, Einspritzdüsen, Kolben, Nockenwellen, Fächerkrümmer) baust du wie ein Ersatzteil ein: Serienteil ausbauen, beim Einbau das Tuningteil wählen.</p>
-      <h4>Optik</h4>
+      <h4>Optik, Fahrwerk, Reifen und Antrieb</h4>
       {FIELDS.map(({ field, label }) => {
         const mounted = mountedId(car.visual, field);
         const avail = VISUAL_PARTS.filter((v) => v.field === field && (s.visualStock[v.id] ?? 0) > 0 && v.id !== mounted);
@@ -274,8 +275,8 @@ export function TuningPanel() {
           <input type="range" min={2} max={7} step={1} value={dropOf(car.visual)} onChange={(e) => s.setDrop(slot, Number(e.target.value))} />
         </label>
       )}
-      <h4>Optik bestellen</h4>
-      {(['Felgen', 'Fahrwerk', 'Karosserie', 'Lack & Folie', 'Licht', 'Auspuffblenden', 'Innenraum'] as const).map((g) => (
+      <h4>Teile bestellen (Optik, Fahrwerk, Reifen, Antrieb, Drift und Rallye)</h4>
+      {(['Felgen', 'Fahrwerk', 'Reifen', 'Antrieb', 'Drift & Rallye', 'Karosserie', 'Lack & Folie', 'Licht', 'Auspuffblenden', 'Innenraum'] as const).map((g) => (
         <details key={g}>
           <summary>{g}</summary>
           {VISUAL_PARTS.filter((v) => v.group === g).map((v) => (

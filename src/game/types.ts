@@ -250,7 +250,17 @@ export interface VisualTune {
   /** Tieferlegung in Zentimetern (0 = Serie). */
   drop?: number;
   /** Fahrwerk: Serie, Tieferlegungsfedern, Sportfahrwerk, Gewindefahrwerk. */
-  suspension?: 'stock' | 'springs' | 'sport' | 'coilover';
+  suspension?: 'stock' | 'springs' | 'sport' | 'coilover' | 'rally';
+  /** Reifen (Serie = Sommerreifen). Haftung je Untergrund siehe `grip.ts`. */
+  tires?: 'stock' | 'sport' | 'semislick' | 'drift' | 'winter' | 'gravel' | 'spikes';
+  /** Differential: Serie, Sperrdifferential (Lamellensperre), verschweißt (starr – Drift). */
+  diff?: 'stock' | 'lsd' | 'welded';
+  /** Lenkwinkel-Kit (Drift): deutlich mehr Radeinschlag. */
+  steerKit?: boolean;
+  /** Hydraulische Handbremse (Drift, Rallye): blockiert die Hinterräder schlagartig. */
+  hbrake?: boolean;
+  /** Unterfahrschutz (Rallye): Aluplatte unter Motor und Getriebe – gleitet über Schotter, Matsch und Schnee. */
+  skid?: boolean;
   front?: number;
   rear?: number;
   skirts?: boolean;
