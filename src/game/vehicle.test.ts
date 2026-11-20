@@ -389,3 +389,21 @@ describe('ABS: lenkfähig beim Bremsen', () => {
     }
   });
 });
+
+describe('Gelände an der Straße', () => {
+  it('Wiese ragt nirgends über Fahrbahn und Bankett (auch neben Testgelände und Vorplatz)', () => {
+    const w = driveWorld();
+    let worst = -Infinity;
+    for (const p of w.samples) {
+      if (p.crossing) continue;
+      // bis eine Gitterweite des Geländes (5 m) hinter dem Bankett höchstens auf Fahrbahnhöhe
+      for (const lat of [-9.5, -7, -4.4, -2, 0, 2, 4.4, 7, 9.5]) {
+        const x = p.x + p.nx * lat;
+        const z = p.z + p.nz * lat;
+        if (w.onPad(x, z)) continue;
+        worst = Math.max(worst, w.ground(x, z) - p.y);
+      }
+    }
+    expect(worst).toBeLessThan(0.02);
+  });
+});
