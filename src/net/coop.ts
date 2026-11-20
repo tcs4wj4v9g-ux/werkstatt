@@ -6,7 +6,7 @@ import { TOOL_MAP } from '../game/data/tools';
 import { CAR_MODELS } from '../game/data/cars';
 import { defsOf } from '../game/data/components';
 import { saveGate } from '../game/saveGate';
-import { normalizeCar, useGame } from '../game/store';
+import { normalizeCar, removedEngines, restoreNoEngine, useGame } from '../game/store';
 import { SLOT_COUNT } from '../game/data/workshop';
 import { refreshJunk } from '../game/junkyard';
 import type { ToolId } from '../game/types';
@@ -431,6 +431,14 @@ function loadState(s: any, entering: boolean) {
  * Sonst stürzt die Ansicht beim ersten Zugriff auf das fehlende Teil ab. Läuft beim Beitreten und nach jedem Abgleich.
  */
 function fixOldCars() {
+  // Ausgebauter Motor, der beim Abgleich als „Werksmotor“ ankam: wieder ausbauen (vor der Ergänzung fehlender Teile,
+  // sonst würden die Motorteile des ausgebauten Motors neu ergänzt)
+  const g = useGame.getState();
+  const removed = removedEngines(g);
+  if (g.cars.some((c) => restoreNoEngine(c, removed) !== c)) {
+    useGame.setState({ cars: g.cars.map((c) => restoreNoEngine(c, removed)) });
+    dirty = true;
+  }
   const old = (c: any) => !!c && !c.bare && !!c.components && (!c.components.wheel_rl || !c.components.clutch || defsOf(c).some((d) => !c.components[d.id]));
   const st = useGame.getState();
   if (![...st.cars, ...st.listings.map((l) => l.car), ...st.waiting, ...st.auctions.map((a) => a.car), ...st.jobs.map((j) => j.car)].some(old)) return;

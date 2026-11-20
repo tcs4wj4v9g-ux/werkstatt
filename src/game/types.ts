@@ -299,6 +299,11 @@ export interface CarInstance {
   swap?: { from: string; parts: PartId[] };
   /** Kennung des ausgebauten Motors (Kran, Ständer oder Lager), damit Akte und Teileshop ihn weiter kennen. */
   motorOut?: string;
+  /**
+   * Motor ausgebaut (gleichbedeutend mit `motor: null`). Der Koop-Abgleich kennt kein `null` in Objekten (fehlend = null),
+   * deshalb trägt dieses Merkmal den Ausbau zuverlässig zu allen Geräten (siehe `restoreNoEngine`).
+   */
+  noEngine?: boolean;
   ecu?: EcuTune;
   visual?: VisualTune;
   uid: string;

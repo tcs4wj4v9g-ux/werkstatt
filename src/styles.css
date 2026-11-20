@@ -120,7 +120,7 @@ h4 { margin-top: 12px; margin-bottom: 4px; font-size: 12px; text-transform: uppe
 .pedal { font: inherit; font-weight: 800; color: #fff; border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 22px; background: rgba(20, 22, 26, 0.55); touch-action: none; }
 .pedal:active { background: rgba(255, 255, 255, 0.35); }
 .pedal.brake { width: 104px; height: 84px; background: rgba(179, 38, 30, 0.6); }
-.pedal.hand { width: 104px; height: 56px; font-size: 13px; background: rgba(120, 90, 20, 0.6); }
+.pedal.hand { width: 96px; height: 96px; font-size: 13px; background: rgba(120, 90, 20, 0.6); }
 .pedals { display: flex; flex-direction: column; gap: 10px; }
 /* Federnde Schieberegler: Lenkung (breit, links), Gas (schmal, rechts) */
 .spring { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 24px; background: rgba(20, 22, 26, 0.5); border: 2px solid rgba(255, 255, 255, 0.35); }
@@ -135,6 +135,9 @@ h4 { margin-top: 12px; margin-bottom: 4px; font-size: 12px; text-transform: uppe
 .spring.gas .fill { position: absolute; left: 8px; right: 8px; bottom: 0; border-radius: 20px; background: rgba(34, 139, 70, 0.55); transition: height 0.14s ease-out; pointer-events: none; }
 .spring.gas.held .fill { transition: none; }
 .spring.gas .knob { left: 8px; right: 8px; height: 56px; transform: translateY(50%); font-size: 15px; background: rgba(34, 160, 80, 0.9); }
+/* Bremsregler: wie Gas, in Rot */
+.spring.gas.brake .fill { background: rgba(179, 38, 30, 0.55); }
+.spring.gas.brake .knob { background: rgba(200, 45, 35, 0.92); font-size: 12px; }
 
 .rotate { display: none; position: absolute; inset: 0; z-index: 99; background: #121418; align-items: center; justify-content: center; flex-direction: column; font-size: 20px; font-weight: 700; text-align: center; padding: 30px; }
 .rotate div { font-size: 70px; }

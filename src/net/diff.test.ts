@@ -135,3 +135,42 @@ describe('Chat', () => {
     expect(bubbleMs('x'.repeat(160))).toBeGreaterThan(15000);
   });
 });
+
+describe('Ausgebauter Motor im Koop-Abgleich', () => {
+  it('Ausbau kommt beim Partner an (Merkmal noEngine) und der Motor taucht nicht wieder auf', async () => {
+    const { createCar } = await import('../game/market');
+    const { extractEngine, insertEngine } = await import('../game/motor');
+    const { restoreNoEngine, normalizeCar } = await import('../game/store');
+    const { defsOf, hasEngine } = await import('../game/data/components');
+    const car = createCar('audy_urquattro', [], () => 0.5, { year: 1985 });
+    const before = cleanShared({ cars: [car] } as any);
+    const out = structuredClone(car);
+    const unit = extractEngine(out);
+    const after = cleanShared({ cars: [out] } as any);
+    // Schritte über den Server (null in Objekten = fehlt): beim Partner landet motor als „fehlt“
+    const partner = apply(before, diff(before, after));
+    const pc = (partner as any).cars[0];
+    expect(pc.motor).toBeUndefined();
+    expect(pc.noEngine).toBe(true);
+    // Ohne Reparatur hielte das Spiel das für den Werksmotor – mit Reparatur wieder motorlos, keine Motorteile ergänzt
+    expect(hasEngine(pc)).toBe(true);
+    const fixed = restoreNoEngine(pc);
+    expect(fixed.motor).toBeNull();
+    expect(Object.keys(fixed.components).some((id) => unit.components[id])).toBe(false);
+    expect(normalizeCar(fixed)!.motor).toBeNull();
+    expect(defsOf(fixed).every((d) => !d.engine)).toBe(true);
+    // Spielstand, der schon kaputt ist (alte Version: kein Merkmal, Motorteile neu ergänzt): Vermerk motorOut bzw. der Motor
+    // liegt am Ständer/im Lager → ebenfalls wieder ohne Motor
+    const broken = normalizeCar({ ...pc, noEngine: undefined, motorOut: unit.motor.uid } as any)!;
+    expect(broken.motor).toBeUndefined();
+    expect(restoreNoEngine(broken).motor).toBeNull();
+    const junk = normalizeCar({ ...pc, noEngine: undefined } as any)!;
+    expect(restoreNoEngine(junk)).toBe(junk);
+    expect(restoreNoEngine(junk, [unit]).motor).toBeNull();
+    // Wieder eingebaut: Merkmal weg, Reparatur greift nicht
+    const back = structuredClone(out);
+    insertEngine(back, unit, [], 5);
+    expect(back.noEngine).toBeUndefined();
+    expect(restoreNoEngine(back)).toBe(back);
+  });
+});
