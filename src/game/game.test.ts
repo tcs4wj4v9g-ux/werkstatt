@@ -1378,3 +1378,11 @@ describe('Arbeitszeit', () => {
     expect(duration(20)).toBe('unter 1 min');
   });
 });
+
+describe('Gemeinsame Uhr (Koop-Rennen)', () => {
+  it('nimmt die Messung mit der kürzesten Laufzeit', async () => {
+    const { bestOffset } = await import('../net/coop');
+    expect(bestOffset([])).toBeNull();
+    expect(bestOffset([{ offset: 900, rtt: 400 }, { offset: 1200, rtt: 40 }, { offset: 700, rtt: 900 }])).toBe(1200);
+  });
+});

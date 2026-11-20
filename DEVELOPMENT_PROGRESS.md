@@ -796,3 +796,13 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - **Ergebnis:** Tabelle live aus den Lagen; wer noch fährt, steht mit „fährt noch …“ da. Kein Startgeld, kein Preisgeld (gemeinsames Konto).
   - Grenze: Die Startzeit ist die Uhr des Ausschreibenden. Gehen die Uhren der Geräte stark auseinander, startet ein Gerät entsprechend früher oder später (Geräte mit Netzzeit liegen meist unter einer Sekunde auseinander).
 - Tests: `carCollision.test.ts`, `koop.cjs` (Ausschreibung sehen, mitfahren, Start, beide auf der Strecke, Platzanzeige, beide im Ziel, gemeinsamer Endstand).
+
+## Koop: kein Pausieren wegen „woanders offen“, gemeinsame Server-Uhr für Rennen
+
+- **„Werkstatt läuft woanders“:** Gab Fehlalarme, obwohl keine Safari-Tabs offen waren. Das Spiel pausiert nicht mehr. Erst nach fünf Anzeichen innerhalb einer Minute (eigene Änderungen oder Positionsmeldungen aus einem fremden Fenster) erscheint einmal ein Hinweis.
+- **Gleicher Start für alle im Koop-Rennen:**
+  - Die Startzeit gilt jetzt in Server-Zeit. Jedes Gerät misst den Abstand seiner Uhr zum Server wie bei der Internet-Zeit: fünf Anfragen an `gk_now`, die mit der kürzesten Laufzeit zählt.
+  - Gemessen wird beim Öffnen der Werkstatt sowie beim Ausschreiben und Mitfahren. `syncedNow()` ersetzt `Date.now()` für Startzeit, Countdown und Rennuhr.
+  - Ohne `gk_now` auf dem Server gilt weiter die Geräteuhr.
+- **Schema:** neue Funktion `gk_now()`, im Supabase-SQL-Editor ausführen.
+- Tests: SQL-Test `gk_now`, Logiktest für die Auswahl der Messung, `koop.cjs`: Spieler 2 hat eine um 5 s vorgehende Uhr, nach dem Abgleich bleibt ein Rest von unter 0,6 s; das Rennen läuft trotzdem gemeinsam.
