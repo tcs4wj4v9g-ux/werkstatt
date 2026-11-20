@@ -811,3 +811,14 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 
 - `gk_join_workshop` lässt bis zu 8 statt 4 Mitglieder zu. Hintergrund: Geht die automatische Anmeldung eines Geräts verloren, tritt man mit einer neuen Kennung wieder bei, und der alte Eintrag bleibt als offline stehen.
 - Schema-Änderung: neue Fassung von `gk_join_workshop`, im Supabase-SQL-Editor ausführen.
+
+## Echte Modellnamen und bessere Grafik der Fahrwelten
+
+- **Namen:** Alle Autos tragen jetzt echte Marken- und Modellnamen, z. B. Tanaka Piccolo 1.4 → Volkswagen Golf IV 1.4, Nordwind 245 → Volvo V70 2.0 (P80), Veloce Stradale → Ferrari 458 Italia, Kaiser 600 → Mercedes-Maybach S 580, BMV → BMW. Kennungen, Werte, Motoren und Aussehen bleiben gleich, ebenso Spielstände. Das BMW-Gesicht (Doppelniere) hängt jetzt an der Kennung statt an der Marke.
+- **Recherche-Grundlage:** In Rennspielen wie Gran Turismo machen vor allem Lack mit Klarlack und Spiegelung, Kontaktschatten, Himmel und Licht sowie die Streckenausstattung den Eindruck aus: Randsteine, Kiesbetten, Reifenstapel, Banden, Gummiabrieb, Startaufstellung. Klarlack und Spiegelung gab es schon. Ergänzt wurde der Rest, mit wenigen Zeichenaufrufen fürs iPad.
+- **Himmel** (`DriveSky.tsx`): Verlauf vom Dunst am Horizont zum Blau, Sonnenhof und ziehende Haufenwolken, alles in einem kleinen Shader. Nebel in Dunstfarbe.
+- **Kontaktschatten** unter dem eigenen Auto, den Gegnern und den Mitspielern.
+- **Rennstrecken:** Gummiabrieb auf der Ideallinie, die in Kurven zum Scheitelpunkt wandert. Reifenstapel mit rot-weißem Band außen in den Kurven, Werbebanden an den Geraden. Startampel am Startbogen: fünf Lampenpaare im Countdown, beim Start aus. Weiße Startplatz-Winkel.
+- **Land:** Leitpfosten alle 50 m, sattere Wiese.
+- **Bäume:** Nadelbäume aus drei Etagen, Farbe je Baum. Laubkronen feiner facettiert.
+- `e2e/strecken.cjs` nimmt Bilder aller Fahrwelten in voller Grafik auf (Vorher-Nachher-Vergleich).

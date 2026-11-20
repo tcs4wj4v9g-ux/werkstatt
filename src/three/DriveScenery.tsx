@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { forestAt, LAKE, PAD, TRACK_WIDTH, WORKSHOP, type DriveWorld } from './driveWorld';
-import { doorTexture, grassDetailTexture, mountainTexture, roadTexture, textTexture } from './textures';
+import { adBoardTexture, doorTexture, grassDetailTexture, mountainTexture, roadTexture, rubberTexture, textTexture, tyreWallTexture } from './textures';
 
 /**
  * Darstellung der Probefahrt-Landschaft. Rechenaufwand fürs iPad klein gehalten:
@@ -92,6 +92,77 @@ function band(w: DriveWorld, a: number, b: number, lift: number, keep: (i: numbe
   return g;
 }
 
+
+/** Seitliche Lage der Ideallinie je Streckenpunkt: in Kurven zur Innenseite (Scheitelpunkt), geglättet. */
+function racingLine(w: DriveWorld) {
+  const s = w.samples;
+  const n = s.length;
+  const raw = s.map((p, i) => {
+    const a = s[(i - 12 + n) % n];
+    const b = s[(i + 12) % n];
+    // Pfeilhöhe der Sehne: positiv zur Innenseite der Kurve (in Richtung der Normale)
+    return ((a.x + b.x) / 2 - p.x) * p.nx + ((a.z + b.z) / 2 - p.z) * p.nz;
+  });
+  const lim = w.roadWidth / 2 - 1.6;
+  return raw.map((_, i) => {
+    let sum = 0;
+    for (let k = -8; k <= 8; k++) sum += raw[(i + k + n) % n];
+    return Math.max(-lim, Math.min(lim, (sum / 17) * 0.55));
+  });
+}
+
+/** Flaches Band mit veränderlicher Mitte (Ideallinie, Gummiabrieb). u quer 0…1, v längs. */
+function ribbon(w: DriveWorld, mid: (i: number) => number, half: number, lift: number) {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const s = w.samples;
+  const n = s.length;
+  for (let i = 0; i <= n; i++) {
+    const p = s[i % n];
+    const c = mid(i % n);
+    pos.push(p.x + p.nx * (c - half), p.y + lift, p.z + p.nz * (c - half), p.x + p.nx * (c + half), p.y + lift, p.z + p.nz * (c + half));
+    uv.push(0, i / 8, 1, i / 8);
+  }
+  const idx: number[] = [];
+  for (let i = 0; i < n; i++) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+
+/** Senkrechte Wand entlang der Strecke (Reifenstapel, Werbebanden) im Abstand `off` (Vorzeichen = Seite). u läuft mit der Strecke (Meter / uLen). */
+function wallBand(w: DriveWorld, off: (i: number) => number, y0: number, y1: number, keep: (i: number) => boolean, uLen: number) {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const s = w.samples;
+  const n = s.length;
+  let v = 0;
+  for (let i = 0; i < n; i++) {
+    if (!keep(i) || !keep((i + 1) % n)) continue;
+    const o = off(i);
+    // Rückseite einer Wand links herum zeigen: Reihenfolge so, dass die Schrift von der Fahrbahn aus lesbar ist
+    const flip = o < 0;
+    for (const [r, k] of [[s[i], i], [s[(i + 1) % n], i + 1]] as const) {
+      const x = r.x + r.nx * o;
+      const z = r.z + r.nz * o;
+      pos.push(x, r.y + y0, z, x, r.y + y1, z);
+      const u = (flip ? -1 : 1) * (k * 2) / uLen;
+      uv.push(u, 0, u, 1);
+    }
+    idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
+    v += 4;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Leitplanke: Pfosten alle 4 m (Instanzen) und das Profilband. */
 function rails(w: DriveWorld) {
   const s = w.samples;
@@ -163,7 +234,7 @@ function build(w: DriveWorld) {
   const grass = grassDetailTexture().clone();
   grass.repeat.set(TILE / 4, TILE / 4);
   grass.needsUpdate = true;
-  const groundMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: grass, color: '#ffffff' });
+  const groundMat = new THREE.MeshLambertMaterial({ vertexColors: true, map: grass, color: '#d6e3c4' });
   for (let cx = -w.extent + TILE / 2; cx < w.extent; cx += TILE)
     for (let cz = -w.extent + TILE / 2; cz < w.extent; cz += TILE) {
       const lod = new THREE.LOD();
@@ -190,23 +261,56 @@ function build(w: DriveWorld) {
   };
   const kerbRed = land ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 0)));
   const kerbWhite = land ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 1)));
+  // Rennstrecke: Gummiabrieb auf der Ideallinie, Reifenstapel außen in den Kurven, Werbebanden an den Geraden
+  let rubber: THREE.BufferGeometry | null = null;
+  let tyres: THREE.BufferGeometry | null = null;
+  let ads: THREE.BufferGeometry | null = null;
+  let leitpfosten: THREE.Matrix4[] = [];
+  if (!land) {
+    const line = racingLine(w);
+    rubber = ribbon(w, (i) => line[i], 1.25, 0.028);
+    const n = w.samples.length;
+    // Kurvenaußenseite: der Ideallinie entgegengesetzt; Reifenstapel kurz vor der Planke
+    const bend = (i: number) => Math.abs(line[i]) > 1.2;
+    const near = (i: number, f: (j: number) => boolean) => {
+      for (let k = -10; k <= 10; k += 2) if (f((i + k + n) % n)) return true;
+      return false;
+    };
+    const tyreOff = w.railOffset - 0.55;
+    tyres = mergeGeometries([1, -1].map((sd) => wallBand(w, () => sd * tyreOff, 0, 0.82, (i) => near(i, (j) => bend(j) && Math.sign(line[j]) === -sd), 2)));
+    const straight = (i: number) => !near(i, bend) && Math.floor(w.samples[i].s / 120) % 2 === 0;
+    ads = mergeGeometries([1, -1].map((sd) => wallBand(w, () => sd * (w.railOffset + 0.9), 0.15, 1.15, straight, 32)));
+  } else {
+    // Landstraße: Leitpfosten alle 50 m beidseits (weiß mit schwarzem Band)
+    leitpfosten = w.samples.flatMap((p, i) => {
+      if (p.town || p.crossing || i % 25 !== 0) return [];
+      return [1, -1].map((sd) => {
+        const d = ROAD_WIDTH / 2 + 1.1;
+        return new THREE.Matrix4().compose(new THREE.Vector3(p.x + p.nx * sd * d, p.y, p.z + p.nz * sd * d), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-p.tz, p.tx)), new THREE.Vector3(1, 1, 1));
+      });
+    });
+  }
   const rail = rails(w);
   // Bäume: Nadelbaum (Kegel) und Laubbaum (Kugel), Stamm gemeinsam
-  const cone = new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0);
-  const crown = new THREE.IcosahedronGeometry(1, 0);
+  // Nadelbaum aus drei gestaffelten Kegeln (wirkt wie Astetagen), Laubbaum als grob facettierte Kugel
+  const cone = mergeGeometries([new THREE.ConeGeometry(1, 0.55, 7).translate(0, 0.275, 0), new THREE.ConeGeometry(0.78, 0.5, 7).translate(0, 0.52, 0), new THREE.ConeGeometry(0.52, 0.45, 7).translate(0, 0.775, 0)]);
+  const crown = new THREE.IcosahedronGeometry(1, 1);
   const trunk = new THREE.CylinderGeometry(0.16, 0.22, 1, 4, 1, true).translate(0, 0.5, 0);
   // Bäume in Blöcken von ~410 m: Blöcke außerhalb des Blickfelds werden gar nicht gezeichnet
   const CHUNK = 410;
-  const chunks = new Map<string, { conif: THREE.Matrix4[]; leafy: THREE.Matrix4[]; trunks: THREE.Matrix4[]; leafColors: THREE.Color[] }>();
+  const chunks = new Map<string, { conif: THREE.Matrix4[]; leafy: THREE.Matrix4[]; trunks: THREE.Matrix4[]; leafColors: THREE.Color[]; conifColors: THREE.Color[] }>();
   const q = new THREE.Quaternion();
   for (const t of w.trees) {
     const ck = Math.floor(t.x / CHUNK) + ',' + Math.floor(t.z / CHUNK);
-    if (!chunks.has(ck)) chunks.set(ck, { conif: [], leafy: [], trunks: [], leafColors: [] });
-    const { conif, leafy, trunks, leafColors } = chunks.get(ck)!;
+    if (!chunks.has(ck)) chunks.set(ck, { conif: [], leafy: [], trunks: [], leafColors: [], conifColors: [] });
+    const { conif, leafy, trunks, leafColors, conifColors } = chunks.get(ck)!;
     const y = w.ground(t.x, t.z);
     const rot = q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), (t.x * 13 + t.z * 7) % 6.28);
     trunks.push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, y - 0.2, t.z), rot, new THREE.Vector3(1, t.kind ? t.h * 0.45 : t.h * 0.3, 1)));
-    if (t.kind === 0) conif.push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, y + t.h * 0.18, t.z), rot, new THREE.Vector3(t.h * 0.24, t.h * 0.86, t.h * 0.24)));
+    if (t.kind === 0) {
+      conif.push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, y + t.h * 0.18, t.z), rot, new THREE.Vector3(t.h * 0.26, t.h * 0.86, t.h * 0.26)));
+      conifColors.push(new THREE.Color().setHSL(0.3 + ((t.x * 0.29) % 0.04), 0.38, 0.17 + ((t.z * 0.11) % 0.06)));
+    }
     else {
       leafy.push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, y + t.h * 0.62, t.z), rot, new THREE.Vector3(t.h * 0.34, t.h * 0.3, t.h * 0.34)));
       leafColors.push(new THREE.Color().setHSL(0.24 + ((t.x * 0.37) % 0.06), 0.45, 0.28 + ((t.z * 0.13) % 0.08)));
@@ -322,7 +426,7 @@ function build(w: DriveWorld) {
   }
   const standGeo = standParts.length ? new Map(['#2f5fa8', '#d0d4d8', '#e8ecef', '#8d949b'].map((c) => [c, mergeGeometries(standParts.filter((p) => p.color === c).map((p) => p.geo))])) : new Map();
   const water = w.water ? new THREE.PlaneGeometry(w.water.w, w.water.d).rotateX(-Math.PI / 2).translate(w.water.x, w.water.y, w.water.z) : null;
-  return { land, kerbRed, kerbWhite, standGeo, water, w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
+  return { rubber, tyres, ads, leitpfosten, land, kerbRed, kerbWhite, standGeo, water, w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
 }
 
 export function DriveScenery({ world }: { world: DriveWorld }) {
@@ -338,7 +442,7 @@ export function DriveScenery({ world }: { world: DriveWorld }) {
       line: new THREE.MeshBasicMaterial({ color: '#e9e9e4', side: THREE.DoubleSide }),
       rail: new THREE.MeshLambertMaterial({ color: '#c6ccd2', side: THREE.DoubleSide }),
       post: new THREE.MeshLambertMaterial({ color: '#8d949b' }),
-      conif: new THREE.MeshLambertMaterial({ color: '#2c4a2a' }),
+      conif: new THREE.MeshLambertMaterial({ color: '#ffffff' }),
       leafy: new THREE.MeshLambertMaterial({ color: '#ffffff' }),
       trunk: new THREE.MeshLambertMaterial({ color: '#5a4430' }),
       wall: new THREE.MeshLambertMaterial({ color: '#ffffff' }),
@@ -358,11 +462,17 @@ export function DriveScenery({ world }: { world: DriveWorld }) {
       cone: new THREE.MeshLambertMaterial({ color: '#ff7a1a' }),
       bale: new THREE.MeshLambertMaterial({ color: '#d9bd6a' }),
       kerbRed: new THREE.MeshLambertMaterial({ color: '#c8231e', side: THREE.DoubleSide }),
+      rubber: new THREE.MeshBasicMaterial({ color: '#0a0a0b', alphaMap: rubberTexture(), transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }),
+      tyres: new THREE.MeshLambertMaterial({ map: (() => { const t = tyreWallTexture(); return t; })(), side: THREE.DoubleSide }),
+      ads: new THREE.MeshLambertMaterial({ map: adBoardTexture(), side: THREE.DoubleSide, emissive: '#ffffff', emissiveIntensity: 0.15, emissiveMap: adBoardTexture() }),
+      leit: new THREE.MeshLambertMaterial({ color: '#f2f2ee' }),
+      leitBand: new THREE.MeshBasicMaterial({ color: '#141414' }),
       kerbWhite: new THREE.MeshLambertMaterial({ color: '#f2f2f2', side: THREE.DoubleSide }),
     }),
     [],
   );
   const postGeo = useMemo(() => new THREE.BoxGeometry(0.12, 0.7, 0.12), []);
+  const leitGeo = useMemo(() => ({ post: new THREE.BoxGeometry(0.12, 1.0, 0.1).translate(0, 0.5, 0), band: new THREE.BoxGeometry(0.125, 0.22, 0.105).translate(0, 0.78, 0) }), []);
   return (
     <>
       {b.tiles.map((t, i) => (
@@ -386,6 +496,15 @@ export function DriveScenery({ world }: { world: DriveWorld }) {
           <Sign x={PAD.minX + 6} y={b.w.padY} z={PAD.minZ + 2} rot={0} kind="pad" />
         </>
       )}
+      {b.rubber && <mesh geometry={b.rubber} material={mats.rubber} renderOrder={1} raycast={() => null} />}
+      {b.tyres && <mesh geometry={b.tyres} material={mats.tyres} raycast={() => null} />}
+      {b.ads && <mesh geometry={b.ads} material={mats.ads} raycast={() => null} />}
+      {b.leitpfosten.length > 0 && (
+        <>
+          <Instances geometry={leitGeo.post} material={mats.leit} matrices={b.leitpfosten} />
+          <Instances geometry={leitGeo.band} material={mats.leitBand} matrices={b.leitpfosten} />
+        </>
+      )}
       {b.kerbRed && <mesh geometry={b.kerbRed} material={mats.kerbRed} raycast={() => null} />}
       {b.kerbWhite && <mesh geometry={b.kerbWhite} material={mats.kerbWhite} raycast={() => null} />}
       {[...b.standGeo.entries()].map(([c, g]) => (
@@ -399,7 +518,7 @@ export function DriveScenery({ world }: { world: DriveWorld }) {
       {b.chunks.map((c, i) => (
         <group key={i}>
           <Instances geometry={b.trunk} material={mats.trunk} matrices={c.trunks} cull />
-          {c.conif.length > 0 && <Instances geometry={b.cone} material={mats.conif} matrices={c.conif} cull />}
+          {c.conif.length > 0 && <Instances geometry={b.cone} material={mats.conif} matrices={c.conif} colors={c.conifColors} cull />}
           {c.leafy.length > 0 && <Instances geometry={b.crown} material={mats.leafy} matrices={c.leafy} colors={c.leafColors} cull />}
         </group>
       ))}

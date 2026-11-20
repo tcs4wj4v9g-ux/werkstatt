@@ -334,3 +334,80 @@ export function roadTexture() {
   t.anisotropy = 8;
   return t;
 }
+
+/** Reifenstapel von der Seite: drei Reihen Altreifen, oben ein rot-weißes Förderband (wie an echten Rennstrecken). */
+export function tyreWallTexture() {
+  const t = canvasTexture('tyrewall', [256, 128], (g, w, h) => {
+    g.fillStyle = '#121214';
+    g.fillRect(0, 0, w, h);
+    const belt = 22;
+    for (let x = 0; x < w; x += 64) {
+      g.fillStyle = (x / 64) % 2 ? '#d22a22' : '#f1f1ee';
+      g.fillRect(x, 0, 64, belt);
+    }
+    const rows = 3;
+    const rh = (h - belt) / rows;
+    for (let r = 0; r < rows; r++)
+      for (let x = (r % 2) * 16; x < w + 32; x += 32) {
+        const y = belt + r * rh;
+        const grd = g.createLinearGradient(0, y, 0, y + rh);
+        grd.addColorStop(0, '#2b2c30');
+        grd.addColorStop(0.5, '#1a1b1e');
+        grd.addColorStop(1, '#0b0b0c');
+        g.fillStyle = grd;
+        g.beginPath();
+        g.roundRect(x - 15, y + 1.5, 30, rh - 3, 6);
+        g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.06)';
+        g.fillRect(x - 12, y + 4, 24, 2);
+      }
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Werbebanden: vier erfundene Werbeflächen nebeneinander (Werkstatt, Öl, Reifen, Zündkerzen). */
+export function adBoardTexture() {
+  const ads: [string, string, string][] = [
+    ['GARAGE KINGS', '#16181d', '#ff7a1a'],
+    ['VOLLGAS ÖL', '#f2c200', '#141414'],
+    ['GRIP REIFEN', '#1d3f8f', '#ffffff'],
+    ['FUNKE ZÜNDKERZEN', '#c8231e', '#ffffff'],
+  ];
+  const t = canvasTexture('adboards', [2048, 128], (g, w, h) => {
+    const pw = w / ads.length;
+    ads.forEach(([text, bg, fg], i) => {
+      g.fillStyle = bg;
+      g.fillRect(i * pw, 0, pw, h);
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      g.fillRect(i * pw, 0, pw, 10);
+      g.fillStyle = fg;
+      g.font = `900 ${text.length > 13 ? 58 : 70}px sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(text, i * pw + pw / 2, h / 2 + 4, pw - 30);
+      g.fillStyle = '#0c0d10';
+      g.fillRect(i * pw, 0, 4, h);
+    });
+  });
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Quer über die Fahrspur: dunkler Gummiabrieb, zu den Rändern weich auslaufend (als Alpha). */
+export function rubberTexture() {
+  const t = canvasTexture('rubber', [64, 64], (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, w, 0);
+    grd.addColorStop(0, '#000');
+    grd.addColorStop(0.25, '#9a9a9a');
+    grd.addColorStop(0.4, '#c8c8c8');
+    grd.addColorStop(0.5, '#8a8a8a');
+    grd.addColorStop(0.6, '#c8c8c8');
+    grd.addColorStop(0.75, '#9a9a9a');
+    grd.addColorStop(1, '#000');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, w, h);
+  });
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
