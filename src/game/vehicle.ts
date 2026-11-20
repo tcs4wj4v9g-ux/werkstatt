@@ -154,9 +154,9 @@ function gearsFor(year: number, cls: string, diesel: boolean) {
 /** Wie stark ein Fahrwerkstuning die Federung strafft und die Haftung hebt. */
 const SUSP: Record<string, { freq: number; damp: number; grip: number }> = {
   stock: { freq: 1.25, damp: 0.32, grip: 1 },
-  springs: { freq: 1.5, damp: 0.36, grip: 1.02 },
-  sport: { freq: 1.75, damp: 0.45, grip: 1.05 },
-  coilover: { freq: 2.0, damp: 0.55, grip: 1.08 },
+  springs: { freq: 1.5, damp: 0.36, grip: 1.03 },
+  sport: { freq: 1.75, damp: 0.45, grip: 1.07 },
+  coilover: { freq: 2.0, damp: 0.55, grip: 1.12 },
 };
 
 export function vehicleSpec(car: CarInstance): VehicleSpec {
@@ -191,7 +191,7 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
   const wingClA = spoiler === 3 ? 0.9 : spoiler === 2 ? 0.3 : spoiler === 1 ? 0.12 : 0;
   const flareClA = car.visual?.flares ? 0.08 : 0;
   const clA = baseClA + wingClA + flareClA;
-  const aeroFront = clA > 0.05 ? Math.max(0.25, Math.min(0.5, (Math.max(0, baseClA) * 0.45 + flareClA * 0.8 + wingClA * 0.1) / clA)) : 0.45;
+  const aeroFront = clA > 0.05 ? Math.max(0.25, Math.min(0.5, (Math.max(0, baseClA) * 0.45 + flareClA * 0.8 + wingClA * 0.35) / clA)) : 0.45;
   const vmax = Math.cbrt((Math.max(30, p.ps) * 735.5 * 0.82) / (0.5 * RHO * dragArea));
   const final = (redline * 0.97 * 2 * Math.PI * wheelRadius) / (60 * Math.max(10, vmax) * gears[gears.length - 1]);
   const susp = SUSP[car.visual?.suspension ?? 'stock'] ?? SUSP.stock;
@@ -200,10 +200,10 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
   const tireR = defects.includes('tires_rear') ? 0.78 : 1;
   // Starke Autos fahren ab Werk breitere Reifen
   const wide = 1 + Math.min(0.2, Math.max(0, (p.powerToWeight - 120) / 1400));
-  // Reifentechnik nach Baujahr: ältere Autos haften weniger (Grundhaftung guter Straßenreifen ~0,93)
+  // Reifentechnik nach Baujahr: ältere Autos haften weniger (Grundhaftung guter Straßenreifen ~1,0 – etwas großzügiger als im echten Leben, wie in Rennspielen)
   const year = car.year ?? 2005;
   const era = year < 1975 ? 0.86 : year < 1990 ? 0.91 : year < 2005 ? 0.96 : 1;
-  const mu = 0.93 * era * wide * (1 + 0.025 * (car.visual?.rimSize ?? 0)) * (car.visual?.flares ? 1.03 : 1) * susp.grip * (model.cls === 'sport' || model.cls === 'luxury' ? 1.06 : 1);
+  const mu = 1.0 * era * wide * (1 + 0.03 * (car.visual?.rimSize ?? 0)) * (car.visual?.flares ? 1.04 : 1) * susp.grip * (model.cls === 'sport' || model.cls === 'luxury' ? 1.06 : 1);
   const has = (id: string) => defects.includes(id);
   const out = p.output;
   const clutchRisk = out.risks.find((r) => r.id === 'clutch');
@@ -312,7 +312,7 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   // Vorderräder nahe am besten Schräglaufwinkel, gemessen an der Richtung, in die sich die Vorderachse gerade bewegt.
   // Voller Ausschlag heißt damit bei jedem Tempo: so eng wie die Reifen es hergeben. Rutscht das Auto quer,
   // richten sich die Räder von selbst in Fahrtrichtung aus (Gegenlenken), lenken lässt sich trotzdem in beide Richtungen.
-  const rate = 5;
+  const rate = 6;
   s.steer += Math.max(-rate * dt, Math.min(rate * dt, input.steer - s.steer));
   const vxa = Math.max(0.5, Math.abs(s.vx));
   const lock = spec.steerMax / (1 + Math.max(0, vxa - 6) / 30);
@@ -417,8 +417,13 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   const dir = s.vx >= 0 ? 1 : -1;
   if (input.brake > 0 && !(s.gear === -1 && stopped)) {
     const total = spec.brakeForce * input.brake;
-    fxF -= dir * Math.min(total * spec.brakeBiasFront, Math.sqrt(Math.max(0, capF * capF - needF * needF)) * 0.98);
-    fxR -= dir * Math.min(total * (1 - spec.brakeBiasFront), Math.sqrt(Math.max(0, capR * capR - needR * needR * 1.3)) * 0.97);
+    // ABS lässt beim Einlenken Seitenführung übrig (wie ein echtes ABS: lenkfähig bleiben ist sein Zweck) – je mehr
+    // gelenkt wird, desto mehr Haftung bleibt für die Kurve: voll gelenkt etwa zwei Drittel vorn, gut die Hälfte hinten
+    const steerNeed = Math.min(1, Math.abs(s.steer) * 1.15);
+    const resF = Math.max(needF, capF * 0.68 * steerNeed);
+    const resR = Math.max(needR * 1.15, capR * 0.55 * steerNeed);
+    fxF -= dir * Math.min(total * spec.brakeBiasFront, Math.sqrt(Math.max(0, capF * capF - resF * resF)) * 0.98);
+    fxR -= dir * Math.min(total * (1 - spec.brakeBiasFront), Math.sqrt(Math.max(0, capR * capR - resR * resR)) * 0.97);
   }
   // Handbremse: Hinterräder blockieren – sie bremsen mit der vollen Gleitreibung und führen kaum noch seitlich
   if (hand && Math.abs(s.vx) > 0.5) {

@@ -225,7 +225,7 @@ function MiniMap({ world }: { world: DriveWorld }) {
 }
 
 /** Lenkung: feinfühlig um die Mitte (Kennlinie), voller Ausschlag an den Enden. +1 = links für die Physik. */
-const steerCurve = (x: number) => -Math.sign(x) * Math.abs(x) ** 1.35;
+const steerCurve = (x: number) => -Math.sign(x) * Math.abs(x) ** 1.15;
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
 /** Drehzahlmesser mit rotem Bereich, darin Tempo und Gang. */

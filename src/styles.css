@@ -162,7 +162,12 @@ h3.small { font-size: 15px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tool-card { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; }
 .tool-card.has { border-color: var(--accent); background: rgba(255, 122, 26, 0.1); }
-.tool-card .ico { font-size: 24px; width: 30px; text-align: center; }
+.tool-card .ico { font-size: 24px; width: 30px; text-align: center; flex: none; }
+.tool-card .grow { min-width: 0; }
+.tool-card .grow .meta { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Knöpfe untereinander, damit Name und Hinweis daneben Platz behalten (auch mit „Verkaufen“) */
+.tool-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.tool-actions .btn { white-space: nowrap; }
 .grow { flex: 1; min-width: 0; }
 .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
 .price { font-weight: 800; color: #ffd23f; white-space: nowrap; margin-left: auto; }
@@ -306,3 +311,6 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
 .race-results { display: grid; gap: 4px; margin: 8px 0; }
 .race-row { display: grid; grid-template-columns: 28px 1fr 1fr auto; gap: 8px; padding: 4px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); font-variant-numeric: tabular-nums; }
 .race-row.you { background: rgba(255, 122, 26, 0.25); font-weight: 700; }
+.tool-actions .btn.small { padding: 5px 8px; font-size: 12px; }
+.buy-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.buy-tools .btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; white-space: nowrap; }

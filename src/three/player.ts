@@ -13,7 +13,7 @@ export const PASSAGE = { minX: -2.9, maxX: 1.4, height: 2.5 };
 /** Halle 2: mit dem Performance-Center um eine Bühne verlängert. */
 export const hall2 = (center: boolean) => ({ minX: ROOM.minX, maxX: ROOM.maxX, minZ: center ? -16.4 : -11.0, maxZ: ROOM.minZ });
 /** Offene Nische hinter Halle 2 (Motorenbau): Motorständer 2, Kran 2, Spezialwerkzeug. Zur Halle hin ganz offen. */
-export const NICHE = { minX: ROOM.maxX, maxX: 10.6, minZ: -10.8, maxZ: -7.0 };
+export const NICHE = { minX: ROOM.maxX, maxX: 12.2, minZ: -12.6, maxZ: -7.0 };
 export const SHOWROOM = { minX: ROOM.minX, maxX: ROOM.maxX, minZ: ROOM.maxZ, maxZ: 14.6 };
 /** Schrottplatz: eigener Ort, mit dem Lieferwagen erreichbar. */
 export const JUNK = { minX: -78, maxX: -51, minZ: -12, maxZ: 12 };
@@ -186,7 +186,7 @@ function siteBoxes(): Box[] {
     if (s.kind !== 'lift' || s.id < 10 || !(s.needs === 'loc_pro' ? site.pro : site.center)) continue;
     out.push(box(0, s.z - 1.5, 0.3, 0.36), box(0, s.z + 1.5, 0.3, 0.36));
   }
-  if (site.pro) out.push(box(10.35, -9.8, 0.5, 0.9), box(10.25, -8.0, 0.7, 1.1), box(10.4, -8.95, 0.4, 0.5), box(5.95, -6.3, 0.45, 1.0), box(5.9, 1.3, 0.6, 0.5));
+  if (site.pro) out.push(box(11.95, -11.6, 0.5, 0.9), box(11.85, -8.3, 0.7, 1.1), box(12.0, -10.3, 0.4, 0.5), box(5.95, -6.3, 0.45, 1.0), box(5.9, 1.3, 0.6, 0.5));
   else out.push(box(-3.4, -5.2, 0.8, 0.6)); // Unterstellböcke vor der geschlossenen Seitenwand
   if (site.center) out.push(box(5.8, -13.6, 0.6, 0.8));
   if (site.hq) out.push(box(5.6, 6.6, 1.0, 1.6));
@@ -241,7 +241,9 @@ function inBounds(x: number, z: number) {
   if (site.pro) {
     const h = hall2(site.center);
     if (inX && z > h.minZ + RADIUS && z < h.maxZ - RADIUS) return true;
-    if (x > ROOM.minX + RADIUS && x < NICHE.maxX - RADIUS && z > NICHE.minZ + RADIUS && z < NICHE.maxZ - RADIUS) return true;
+    // Nische selbst und die Öffnung in der Hallenrückwand (nur dort, wo die Halle daneben liegt)
+    if (x > NICHE.minX + RADIUS && x < NICHE.maxX - RADIUS && z > NICHE.minZ + RADIUS && z < NICHE.maxZ - RADIUS) return true;
+    if (x > ROOM.minX + RADIUS && x <= NICHE.minX + RADIUS && z > Math.max(NICHE.minZ, h.minZ) + RADIUS && z < NICHE.maxZ - RADIUS) return true;
     if (inPassage && Math.abs(z - ROOM.minZ) <= RADIUS + 0.02) return true;
   }
   if (site.hq) {

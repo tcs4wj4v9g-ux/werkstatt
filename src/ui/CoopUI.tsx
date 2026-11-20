@@ -213,8 +213,10 @@ export function CoopCabinet() {
               <b>{TOOL_MAP[t.type].name}</b>
               <div className="meta">{TOOL_MAP[t.type].hint}</div>
             </div>
-            <button className="btn primary" disabled={mine.length >= MAX_CARRIED} onClick={() => void takeTool(t)}>Nehmen</button>
-            {canSell(t) && <button className="btn" data-testid={`sell-${t.type}`} onClick={() => void sellTool(t)}>Verkaufen · {eur(sellPrice(t.type)!)}</button>}
+            <div className="tool-actions">
+              <button className="btn primary" disabled={mine.length >= MAX_CARRIED} onClick={() => void takeTool(t)}>Nehmen</button>
+              {canSell(t) && <button className="btn small" data-testid={`sell-${t.type}`} onClick={() => void sellTool(t)}>Verkaufen {eur(sellPrice(t.type)!)}</button>}
+            </div>
           </div>
         ))}
       </div>
@@ -229,18 +231,21 @@ export function CoopCabinet() {
               <b>{TOOL_MAP[t.type].name}</b>
               <div className="meta">gehört in: {BOXES[t.home]?.name ?? t.home}</div>
             </div>
-            <button className="btn" onClick={() => void returnTool(t, box)}>Hier ablegen</button>
-            {canSell(t) && <button className="btn" data-testid={`sell-mine-${t.type}`} onClick={() => void sellTool(t)}>Verkaufen · {eur(sellPrice(t.type)!)}</button>}
+            <div className="tool-actions">
+              <button className="btn" onClick={() => void returnTool(t, box)}>Hier ablegen</button>
+              {canSell(t) && <button className="btn small" data-testid={`sell-mine-${t.type}`} onClick={() => void sellTool(t)}>Verkaufen {eur(sellPrice(t.type)!)}</button>}
+            </div>
           </div>
         ))}
       </div>
       {!box.startsWith('spezial') && (
         <>
           <h4>Weiteres Exemplar für diese Kiste kaufen</h4>
-          <div className="row wrap">
+          <div className="buy-tools">
             {CABINET_TOOLS.filter((t) => TOOL_PRICE[t.id]).map((t) => (
               <button key={t.id} className="btn" disabled={g.money < TOOL_PRICE[t.id]! || here.length >= BOXES[box].cap} onClick={() => void buyTool(t.id, box)}>
-                {t.icon} {t.short} · {eur(TOOL_PRICE[t.id]!)}
+                <span>{t.icon} {t.short}</span>
+                <span className="meta">{eur(TOOL_PRICE[t.id]!)}</span>
               </button>
             ))}
           </div>

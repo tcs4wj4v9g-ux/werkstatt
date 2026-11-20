@@ -239,6 +239,36 @@ describe('Fahrbarkeit: nicht dauernd ausbrechen, Driften nur mit Absicht', () =>
     }
   });
 
+  it('Lenken beim Bremsen: ABS lässt Seitenführung übrig – das Auto biegt deutlich ab und wird trotzdem langsamer', () => {
+    for (const id of ['bavaria_330', 'renard_twingle']) {
+      const sp = mk(id);
+      const s = initialState(0, 0, 0);
+      s.vx = 90 / 3.6;
+      s.gear = 4;
+      for (let i = 0; i < 60; i++) stepVehicle(sp, s, { steer: 1, throttle: 0, brake: 1 }, flat, 1 / 60);
+      expect(s.heading * 57.3, `${id} Kursänderung in 1 s`).toBeGreaterThan(10);
+      expect(s.vx * 3.6, `${id} Tempo nach 1 s`).toBeLessThan(75);
+    }
+  });
+
+  it('Fahrwerk und Aerotuning machen das Auto in schnellen Kurven deutlich schneller', () => {
+    const lat = (sp: ReturnType<typeof mk>, kmh: number) => {
+      const q = initialState(0, 0, 0);
+      q.vx = kmh / 3.6;
+      q.gear = 4;
+      let ay = 0;
+      for (let i = 0; i < 240; i++) {
+        stepVehicle(sp, q, { steer: 1, throttle: q.vx < kmh / 3.6 ? 0.7 : 0, brake: 0 }, flat, 1 / 60);
+        if (i > 150) ay = Math.max(ay, Math.abs(q.ay));
+      }
+      return ay / 9.81;
+    };
+    const stock = mk('bavaria_330');
+    const tuned = mk('bavaria_330', [], (c) => (c.visual = { ...(c.visual ?? {}), suspension: 'coilover', spoiler: 3 } as never));
+    expect(lat(tuned, 160) / lat(stock, 160)).toBeGreaterThan(1.1);
+    expect(lat(tuned, 160)).toBeGreaterThan(lat(tuned, 60));
+  });
+
   it('Handbremse dreht das Auto ein (Wenden, Drift einleiten)', () => {
     const sp = mk('renard_twingle');
     const s = initialState(0, 0, 0);
