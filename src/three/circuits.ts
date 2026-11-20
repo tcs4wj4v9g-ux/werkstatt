@@ -7,11 +7,18 @@
  *  - Motodrom Kurpfalz: lange Geraden, Haarnadel, Stadionteil mit Tribünen (wie das alte Hockenheim)
  *  - Hafenkurs Monte Azzurro: eng, Leitplanken direkt am Rand, Haarnadel, am Hafenbecken (wie Monaco)
  *  - Ardennenring: schnell, steiler Anstieg nach der Senke, lange Gerade, schnelle Bögen (wie Spa)
+ * Rallyepisten (ohne Leitplanken, eigener Belag – rutschiger als Asphalt, aber fahrbar):
+ *  - Rallye Seenland: Schotter, schnelle Kuppen durch Kiefernwald (wie die Rallye Finnland)
+ *  - Rallye Schneewald: festgefahrener Schnee zwischen Schneewällen (wie die Rallye Schweden)
+ *  - Rallye Matschtal: enger, schlammiger Waldweg (wie die Wales Rally GB)
  */
 import * as THREE from 'three';
 import { driveWorld, mulberry, type DriveWorld, type Obstacle, type RoadSample } from './driveWorld';
 
-export type CircuitId = 'eifel' | 'motodrom' | 'hafen' | 'ardennen';
+export type CircuitId = 'eifel' | 'motodrom' | 'hafen' | 'ardennen' | RallyId;
+/** Rallyepisten: Schotter (Vorbild Finnland), Schnee (Vorbild Schweden), Matsch (Vorbild Wales). */
+export type RallyId = 'seenland' | 'schneewald' | 'matschtal';
+export const RALLY_IDS: RallyId[] = ['seenland', 'schneewald', 'matschtal'];
 export type WorldId = 'land' | CircuitId;
 
 interface CircuitDef {
@@ -30,7 +37,16 @@ interface CircuitDef {
   trees: number;
   /** Hafenbecken (Wasser) neben der Strecke. */
   water?: { x: number; z: number; w: number; d: number };
+  /** Rallyepiste: Belag der Fahrbahn (keine Leitplanken, keine Randsteine). */
+  surface?: 'gravel' | 'mud' | 'snow';
 }
+
+/** Belag der Rallyepisten: Haftung (vor dem Reifen), Rollwiderstand, Untergrundklasse. */
+export const RALLY_ROAD = {
+  gravel: { grip: 0.74, drag: 0.02, cls: 'loose' as const },
+  mud: { grip: 0.62, drag: 0.045, cls: 'loose' as const },
+  snow: { grip: 0.52, drag: 0.015, cls: 'snow' as const },
+};
 
 export const CIRCUITS: Record<CircuitId, CircuitDef> = {
   eifel: {
@@ -89,6 +105,48 @@ export const CIRCUITS: Record<CircuitId, CircuitDef> = {
     runoff: 10,
     trees: 0.9,
   },
+  seenland: {
+    name: 'Rallye Seenland',
+    like: 'Rallye Finnland',
+    desc: 'Schotterpiste durch Kiefernwald: schnelle Kuppen, weite Bögen und eine enge Kehre am See.',
+    route: [
+      [0, 0, 0], [160, 6, -40], [300, 14, -20], [420, 8, -120], [460, 18, -280], [380, 26, -420], [240, 20, -470], [120, 10, -400],
+      [60, 16, -300], [-60, 24, -330], [-200, 16, -260], [-260, 8, -120], [-180, 4, -40], [-80, 0, 10],
+    ],
+    scale: 1.3,
+    roadWidth: 8,
+    runoff: 7,
+    trees: 1.2,
+    surface: 'gravel',
+  },
+  schneewald: {
+    name: 'Rallye Schneewald',
+    like: 'Rallye Schweden',
+    desc: 'Festgefahrener Schnee zwischen Schneewällen: glatt, aber mit Winter- oder Spikereifen erstaunlich schnell.',
+    route: [
+      [0, 0, 0], [200, 2, 30], [360, 6, -40], [400, 10, -200], [320, 14, -330], [180, 10, -300], [100, 6, -380], [-40, 8, -420],
+      [-180, 6, -330], [-220, 2, -180], [-150, 0, -70],
+    ],
+    scale: 1.3,
+    roadWidth: 8.5,
+    runoff: 7,
+    trees: 1,
+    surface: 'snow',
+  },
+  matschtal: {
+    name: 'Rallye Matschtal',
+    like: 'Wales Rally GB',
+    desc: 'Enger, schlammiger Waldweg mit Anstiegen und Kehren – wer zu schnell kommt, rutscht ins Unterholz.',
+    route: [
+      [0, 0, 0], [110, 4, -60], [160, 12, -170], [100, 20, -260], [0, 26, -240], [-60, 22, -330], [-170, 14, -300], [-230, 8, -190],
+      [-180, 4, -80], [-90, 0, -30],
+    ],
+    scale: 1.9,
+    roadWidth: 7.5,
+    runoff: 7,
+    trees: 1.3,
+    surface: 'mud',
+  },
 };
 
 const STEP = 2;
@@ -107,7 +165,7 @@ export function circuitWorld(id: CircuitId): DriveWorld {
     const a = pts[(i + n - 1) % n];
     const b = pts[(i + 1) % n];
     const l = Math.hypot(b.x - a.x, b.z - a.z) || 1;
-    return { x: p.x, y: p.y, z: p.z, tx: (b.x - a.x) / l, tz: (b.z - a.z) / l, nx: (b.z - a.z) / l, nz: -(b.x - a.x) / l, curv: 0, railL: true, railR: true, s: i * STEP, town: false, crossing: false };
+    return { x: p.x, y: p.y, z: p.z, tx: (b.x - a.x) / l, tz: (b.z - a.z) / l, nx: (b.z - a.z) / l, nz: -(b.x - a.x) / l, curv: 0, railL: !def.surface, railR: !def.surface, s: i * STEP, town: false, crossing: false };
   });
   for (let i = 0; i < n; i++) {
     const a = samples[(i + n - 4) % n];
@@ -159,7 +217,7 @@ export function circuitWorld(id: CircuitId): DriveWorld {
     let c = 0;
     for (let k = -12; k <= 12; k += 3) c = Math.max(c, Math.abs(samples[(near.i + k + n) % n].curv) * Math.sign(samples[(near.i + k + n) % n].curv || 1));
     const outside = Math.sign(lat) === -Math.sign(p.curv);
-    return near.d > half + 1.2 && near.d < railOffset - 0.5 && outside && Math.abs(p.curv) > 1 / 160;
+    return !def.surface && near.d > half + 1.2 && near.d < railOffset - 0.5 && outside && Math.abs(p.curv) > 1 / 160;
   };
 
   // Bäume außerhalb der Leitplanken, Tribünen und Boxengebäude an der Start-Ziel-Geraden
@@ -173,7 +231,7 @@ export function circuitWorld(id: CircuitId): DriveWorld {
       const jx = x + (rng() - 0.5) * 10;
       const jz = z + (rng() - 0.5) * 10;
       const near = roadNear(jx, jz, 60);
-      if (near && near.d < railOffset + 10) continue;
+      if (near && near.d < (def.surface ? half + 5 : railOffset + 10)) continue;
       if (!near && rng() > 0.25) continue;
       const forest = Math.sin(jx * 0.012 + 1) * Math.cos(jz * 0.01 - 0.5) + 0.3;
       if (rng() > def.trees * Math.max(0.05, forest)) continue;
@@ -185,12 +243,12 @@ export function circuitWorld(id: CircuitId): DriveWorld {
   const stands: DriveWorld['stands'] = [];
   const houses: DriveWorld['houses'] = [];
   // Tribünen links und rechts der Start-Ziel-Geraden (hinter der Leitplanke), Boxengebäude gegenüber
-  for (const k of [-60, 0, 60]) {
+  for (const k of def.surface ? [0] : [-60, 0, 60]) {
     const p = samples[(k / STEP + n) % n];
     stands.push({ x: p.x + p.nx * (railOffset + 7), z: p.z + p.nz * (railOffset + 7), rot: Math.atan2(-p.tz, p.tx), len: 54 });
   }
   const pit = samples[(n - 10) % n];
-  houses.push({ x: pit.x - pit.nx * (railOffset + 12), z: pit.z - pit.nz * (railOffset + 12), rot: Math.atan2(-pit.tz, pit.tx), w: 90, d: 14, h: 7, color: '#eceef0' });
+  if (!def.surface) houses.push({ x: pit.x - pit.nx * (railOffset + 12), z: pit.z - pit.nz * (railOffset + 12), rot: Math.atan2(-pit.tz, pit.tx), w: 90, d: 14, h: 7, color: '#eceef0' });
   // Hafenkurs: Häuserzeilen an der Bergseite
   if (id === 'hafen') {
     samples.forEach((p, i) => {
@@ -216,8 +274,20 @@ export function circuitWorld(id: CircuitId): DriveWorld {
 
   const extent = Math.max(Math.abs(box.minX), Math.abs(box.maxX), Math.abs(box.minZ), Math.abs(box.maxZ));
   const water = def.water ? { ...def.water, y: mean - 3 } : null;
+  // Rallye: Strohballen außen in den Kurven (Zuschauer- und Baumschutz)
+  const bales: DriveWorld['bales'] = [];
+  if (def.surface)
+    for (let i = 0; i < n; i += 3) {
+      const p = samples[i];
+      if (Math.abs(p.curv) < 1 / 70) continue;
+      const side = -Math.sign(p.curv);
+      bales.push({ x: p.x + p.nx * side * (half + 2.2), z: p.z + p.nz * side * (half + 2.2), rot: Math.atan2(-p.tz, p.tx) + Math.PI / 2 });
+    }
+  bales.forEach((b) => addObstacle({ x: b.x, z: b.z, r: 0.75 }));
   const world: DriveWorld = {
     id,
+    road: def.surface ? RALLY_ROAD[def.surface] : null,
+    roadKind: def.surface,
     name: def.name,
     roadWidth: def.roadWidth,
     railOffset,
@@ -264,7 +334,7 @@ export function circuitWorld(id: CircuitId): DriveWorld {
     apron: { minX: 1e6, maxX: 1e6 + 1, minZ: 1e6, maxZ: 1e6 + 1 },
     apronY: 0,
     trees,
-    bales: [],
+    bales,
     houses,
     lamps: [],
     signs: [],

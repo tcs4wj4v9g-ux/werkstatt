@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { leaveCoopRace } from '../net/coopRace';
-import { courseOf, raceClock, raceForDay, raceTargets } from '../game/races';
+import { courseOf, driftTargets, raceClock, raceForDay, raceTargets, type Race } from '../game/races';
 import { FARMS, LAKE, PAD, WORKSHOP, type DriveWorld } from '../three/driveWorld';
 import { worldFor } from '../three/circuits';
 import { CAMERA_LABEL, DRIVE_MIN, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
@@ -317,13 +317,37 @@ function RaceHud() {
           {hud.laps > 1 && <b data-testid="lap">Runde {Math.min(hud.laps, Math.floor(hud.cp / (hud.cpTotal / hud.laps)) + 1)}/{hud.laps} · </b>}
           Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}
         </div>
-        {race.kind === 'time' ? (
+        {race.kind === 'drift' ? (
+          <DriftHud race={race} hud={hud} />
+        ) : race.kind === 'time' || race.kind === 'rally' ? (
           <div className={`race-targets ${medal ?? 'none'}`}>
             🥇 {raceClock(t.gold)} · 🥈 {raceClock(t.silver)} · 🥉 {raceClock(t.bronze)}
           </div>
         ) : (
           <div className="race-targets">Sieg: {race.prize.gold.toLocaleString('de-DE')} €</div>
         )}
+      </div>
+    </>
+  );
+}
+
+/** Driftwettbewerb: Punkte, laufende Kette mit Kombo, Ziele. */
+function DriftHud({ race, hud }: { race: Race; hud: ReturnType<typeof useDriveHud.getState> }) {
+  const t = driftTargets(race);
+  const total = hud.driftPts + hud.driftChain;
+  const medal = total >= t.gold ? 'gold' : total >= t.silver ? 'silver' : total >= t.bronze ? 'bronze' : null;
+  return (
+    <>
+      <div className="drift-score" data-testid="drift-score">
+        {hud.driftPts.toLocaleString('de-DE')} <span>Punkte</span>
+      </div>
+      {hud.driftChain > 0 && (
+        <div className="drift-chain" data-testid="drift-chain">
+          +{hud.driftChain.toLocaleString('de-DE')} <b>×{hud.driftCombo.toFixed(1).replace('.', ',')}</b>
+        </div>
+      )}
+      <div className={`race-targets ${medal ?? 'none'}`}>
+        🥇 {t.gold.toLocaleString('de-DE')} · 🥈 {t.silver.toLocaleString('de-DE')} · 🥉 {t.bronze.toLocaleString('de-DE')}
       </div>
     </>
   );
@@ -339,7 +363,14 @@ export function TrackUI() {
   const world = worldFor(worldId);
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
-  const [esp, setEspState] = useState(driveInput.assist);
+  const driftRace = useGame((s) => !!s.race && !s.race.coop && raceForDay(s.day)?.kind === 'drift');
+  const [esp, setEspState] = useState(() => {
+    // Driftwettbewerb: ESP von Anfang an aus (sonst fängt es jeden Drift ab); man kann es wieder einschalten
+    if (driftRace) driveInput.assist = false;
+    return driveInput.assist;
+  });
+  // nach dem Driftwettbewerb wieder mit ESP (Standard) weiterfahren
+  useEffect(() => () => void (driftRace && (driveInput.assist = true)), [driftRace]);
   // ESP aus: Stabilitäts- und Antriebsschlupfregelung abgeschaltet – das Heck darf kommen (ABS bleibt, Drift-Hilfe fängt Dreher ab)
   const setEsp = (on: boolean) => {
     driveInput.assist = on;

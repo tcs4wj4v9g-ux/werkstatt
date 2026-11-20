@@ -1,7 +1,8 @@
 import { CarStatsCard } from './CarStatsCard';
 import { CoopRacePanel, CoopRaceTable } from './CoopRaceUI';
 import { leaveCoopRace } from '../net/coopRace';
-import { courseOf, MEDAL_LABEL, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
+import { courseOf, driftTargets, MEDAL_LABEL, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
+import { weatherLabel } from '../game/grip';
 import { duration, todayOf } from '../game/playtime';
 import { useEffect } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
@@ -229,18 +230,23 @@ export function RacesTab() {
       <p className="meta">
         Zeitrennen auf dem Straßennetz rund um Grünbach: Durch alle Kontrollpunkte bis ins Ziel, die Zeit entscheidet. Preisgeld gibt es für Gold, Silber
         und Bronze – fährst du später eine bessere Medaille, wird die Differenz nachgezahlt. Jeder Versuch kostet Startgeld. Tuning bis an die
-        Klassengrenze, Reifen und Fahrwerk machen den Unterschied. Gegner auf der Strecke folgen später.
+        Klassengrenze, Reifen und Fahrwerk machen den Unterschied. Bei manchen Rennen fährst du gegen Gegner.
+      </p>
+      <p className="meta">
+        Jeder dritte Tag: <b>Rallye</b> auf Schotter, Schnee oder Matsch (Schotter-, Winter- oder Spikereifen und Rallyefahrwerk helfen) oder ein{' '}
+        <b>Driftwettbewerb</b> (Punkte für Driftwinkel × Tempo, lange Ketten erhöhen die Kombo – Driftreifen, Sperre oder verschweißtes Differential
+        und Lenkwinkel-Kit helfen; ESP ist dabei aus). Das Wetter des Tages ({weatherLabel(s.day)}) macht die Straße nass oder glatt.
       </p>
       <CoopRacePanel />
-      {!race && <p className="bigline">Heute ist kein Rennen – heute ist Fahrzeugtreffen (unter „Wettbewerbe“).</p>}
+      {!race && <p className="bigline">Heute ist kein Rennen.</p>}
       {race && (
         <div className="shop-row col" data-testid="race-today">
           <b>Heute: {race.title}</b>
           <div className="meta">{courseOf(race.course).desc} · {((courseOf(race.course).length * 2) / 1000).toFixed(1)} km</div>
-          {race.kind === 'time' ? <RaceTargets race={race} /> : <RaceField race={race} />}
+          {race.kind === 'grid' ? <RaceField race={race} /> : race.kind === 'drift' ? <DriftTargets race={race} /> : <RaceTargets race={race} />}
           <div className="meta">
-            Startgeld {eur(race.fee)}
-            {best !== undefined && <> · deine Bestzeit {raceClock(best)}</>}
+            Startgeld {eur(race.fee)} · Wetter: {weatherLabel(s.day)}
+            {best !== undefined && <> · {race.kind === 'drift' ? `deine Bestwertung ${best.toLocaleString('de-DE')} Punkte` : `deine Bestzeit ${raceClock(best)}`}</>}
             {paid > 0 && <> · schon ausgezahlt {eur(paid)}</>}
           </div>
           {s.cars.map((car, i) => {
@@ -266,7 +272,7 @@ export function RacesTab() {
           <div>
             <b>Tag {r.day}: {r.title}</b>
             <div className="meta">
-              {r.kind === 'grid' ? `Gegen 5 Gegner · Platz 1 ${eur(r.prize.gold)} · Platz 2 ${eur(r.prize.silver)} · Platz 3 ${eur(r.prize.bronze)}` : `Gold ${eur(r.prize.gold)} · Silber ${eur(r.prize.silver)} · Bronze ${eur(r.prize.bronze)}`} · Startgeld {eur(r.fee)}
+              {weatherLabel(r.day)} · {r.kind === 'grid' ? `Gegen 5 Gegner · Platz 1 ${eur(r.prize.gold)} · Platz 2 ${eur(r.prize.silver)} · Platz 3 ${eur(r.prize.bronze)}` : `Gold ${eur(r.prize.gold)} · Silber ${eur(r.prize.silver)} · Bronze ${eur(r.prize.bronze)}`} · Startgeld {eur(r.fee)}
             </div>
           </div>
         </div>
@@ -288,6 +294,18 @@ function RaceField({ race }: { race: Race }) {
         Gegner: {race.opponents.map((o) => `${o.name} (${CAR_MODELS[o.modelId].name})`).join(' · ')}. Du startest von Platz {PLAYER_GRID + 1}.
       </div>
     </>
+  );
+}
+
+/** Driftwettbewerb: Punkteziele für die Medaillen. */
+function DriftTargets({ race }: { race: Race }) {
+  const t = driftTargets(race);
+  return (
+    <div className="race-table" data-testid="drift-targets">
+      <span>🥇 Gold ab {t.gold.toLocaleString('de-DE')} Punkten → {eur(race.prize.gold)}</span>
+      <span>🥈 Silber ab {t.silver.toLocaleString('de-DE')} Punkten → {eur(race.prize.silver)}</span>
+      <span>🥉 Bronze ab {t.bronze.toLocaleString('de-DE')} Punkten → {eur(race.prize.bronze)}</span>
+    </div>
   );
 }
 
@@ -324,10 +342,18 @@ export function RaceResultModal() {
     );
   }
   return (
-    <Modal title="Ergebnis Zeitrennen" onClose={() => s.setPanel(null)}>
+    <Modal title={r.points !== undefined ? 'Ergebnis Driftwettbewerb' : r.title.startsWith('Rallye') ? 'Ergebnis Rallye' : 'Ergebnis Zeitrennen'} onClose={() => s.setPanel(null)}>
       <p className="meta">{r.title} · {r.car}</p>
-      <p className="bigline" data-testid="race-time">Zeit {raceClock(r.time)}{r.improved ? ' – neue Bestzeit!' : ''}</p>
-      {r.place !== null ? (
+      {r.points !== undefined ? (
+        <p className="bigline" data-testid="race-time">{r.points.toLocaleString('de-DE')} Driftpunkte{r.improved ? ' – neue Bestwertung!' : ''} · Zeit {raceClock(r.time)}</p>
+      ) : (
+        <p className="bigline" data-testid="race-time">Zeit {raceClock(r.time)}{r.improved ? ' – neue Bestzeit!' : ''}</p>
+      )}
+      {r.points !== undefined ? (
+        <p className={`bigline ${r.medal ? 'good' : 'bad'}`} data-testid="race-medal">
+          {r.medal ? `${MEDAL_LABEL[r.medal]} – Preisgeld ${eur(r.prize)}` : `Keine Medaille (Bronze ab ${r.targets.bronze.toLocaleString('de-DE')} Punkten)`}
+        </p>
+      ) : r.place !== null ? (
         <p className={`bigline ${r.place <= 3 ? 'good' : 'bad'}`} data-testid="race-medal">
           {r.place === 1 ? '🏆 Sieg!' : `Platz ${r.place} von ${r.table?.length ?? 6}`}
           {r.place <= 3 ? ` – Preisgeld ${eur(r.prize)}` : ' – kein Preisgeld (nur Platz 1–3)'}
@@ -347,7 +373,7 @@ export function RaceResultModal() {
         </div>
       )}
       <p className="meta" data-testid="race-payout">
-        {r.payout > 0 ? `Ausgezahlt: ${eur(r.payout)}` : r.medal ? 'Diese Medaille wurde für das heutige Rennen schon ausgezahlt.' : 'Kein Preisgeld.'} · Bestzeit heute {raceClock(r.best)}
+        {r.payout > 0 ? `Ausgezahlt: ${eur(r.payout)}` : r.medal ? 'Diese Medaille wurde für das heutige Rennen schon ausgezahlt.' : 'Kein Preisgeld.'} · {r.points !== undefined ? `Bestwertung heute ${r.best.toLocaleString('de-DE')} Punkte` : `Bestzeit heute ${raceClock(r.best)}`}
       </p>
       <div className="row">
         {race && s.race === null && s.cars[s.driveBay] && (

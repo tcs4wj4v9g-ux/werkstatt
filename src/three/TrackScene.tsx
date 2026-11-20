@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { remotePlayers, syncedNow, useCoop } from '../net/coop';
 import { coopRaceOut, participantsOf } from '../net/coopRace';
 import { textTexture } from './textures';
-import { aiInput, courseOf, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
+import { aiInput, courseOf, driftStep, driftTotal, newDriftScore, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
 import { createCar } from '../game/market';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -106,6 +106,7 @@ export function TrackScene() {
   const sim = useRef(Object.assign(mySlot ? initialState(mySlot.x, mySlot.z, mySlot.heading) : startAt ? initialState(startAt.x - startAt.nx * 1.8, startAt.z - startAt.nz * 1.8, Math.atan2(-startAt.tz, startAt.tx)) : initialState(world.start.x, world.start.z, world.start.heading), {
     raceT: -3,
     cp: 0,
+    drift: newDriftScore(),
     cpAt: null as null | { x: number; z: number; heading: number; near: number; progress: number }, camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
@@ -297,7 +298,8 @@ export function TrackScene() {
           const time = s.raceT;
           roadAudio.hit('clunk');
           if (coop && coopRaceOut.car) coopRaceOut.car.fin = Math.round(time * 100) / 100;
-          setTimeout(() => finishRace(Math.round(time * 100) / 100, grid ? standings(time) : undefined), 1200);
+          const pts = race?.kind === 'drift' ? driftTotal(s.drift) : undefined;
+          setTimeout(() => finishRace(Math.round(time * 100) / 100, grid ? standings(time) : undefined, pts), 1200);
         }
       }
     }
@@ -558,11 +560,16 @@ export function TrackScene() {
       s.done = true;
       setTimeout(() => finishDrive(true), 500);
     }
+    // Driftwettbewerb: Punkte für Winkel × Tempo, Kombo; von der Fahrbahn abkommen oder anstoßen kostet die laufende Kette
+    if (race?.kind === 'drift' && s.raceT >= 0 && !s.done) {
+      const ang = Math.abs(s.vx) > 3 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
+      driftStep(s.drift, ang, Math.hypot(s.vx, s.vy) * 3.6, onRoad && s.bump < 0.45, dt);
+    }
     s.hud += dt;
     if (s.hud > 0.08) {
       s.hud = 0;
       const drift = Math.abs(s.vx) > 6 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
-      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp, place: grid ? placeNow() : coop ? coopPlace() : 0, field: grid ? npcs.length + 1 : coop ? rivals.length : 0 });
+      useDriveHud.getState().set({ speed: Math.abs(s.vx) * 3.6, rpm: s.rpm, gear: s.gear, elapsed: s.elapsed, home, away: s.away, tooShort: s.tooShort, drift: drift > 12 ? drift : 0, px: s.x, pz: s.z, ph: s.heading, offTrack: !onRoad, wheelspin: s.wheelspin > 0.3 || s.slide > 0.5, distance: s.odometer, raceT: s.raceT, cp: s.cp, place: grid ? placeNow() : coop ? coopPlace() : 0, field: grid ? npcs.length + 1 : coop ? rivals.length : 0, driftPts: Math.round(s.drift.banked), driftChain: Math.round(s.drift.chain), driftCombo: s.drift.combo, driftLost: Math.round(s.drift.lost) });
     }
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCar } from './market';
 import { performance } from './performance';
+import { weatherOf } from './grip';
 import { aiTime, courseOf, medalFor, opponentSpec, payoutFor, raceBlocker, raceForDay, raceTargets, upcomingRaces, RACE_CLASSES } from './races';
 import { CAR_MODELS } from './data/cars';
 import { vehicleSpec } from './vehicle';
@@ -14,7 +15,9 @@ const fresh = (id: string) => {
 
 describe('Zeitrennen', () => {
   it('Rennkalender: zwei von drei Tagen, fest je Tag (gleich auf allen Geräten), nennenswertes Preisgeld', () => {
-    expect(raceForDay(3)).toBeNull();
+    // Jeder dritte Tag: abwechselnd Rallye und Driftwettbewerb
+    expect(raceForDay(3)?.kind).toBe('rally');
+    expect(raceForDay(6)?.kind).toBe('drift');
     expect(raceForDay(4)).toEqual(raceForDay(4));
     const r = upcomingRaces(1, 8);
     expect(r.length).toBe(8);
@@ -89,5 +92,54 @@ describe('Zeitrennen', () => {
     expect(payoutFor(r, 999, 0, 1).payout).toBe(r.prize.gold);
     expect(payoutFor(r, 1, 0, 4).payout).toBe(0);
     expect(payoutFor(r, 999, r.prize.bronze, 2).payout).toBe(r.prize.silver - r.prize.bronze);
+  });
+});
+
+describe('Rallye und Driftwettbewerb', () => {
+  it('Rallye auf einer Rallyepiste, Drift auf breiten Rundkursen; Sollzeiten bzw. Punkteziele steigen', async () => {
+    const { RALLY_COURSES, DRIFT_COURSES, driftTargets } = await import('./races');
+    for (let d = 3; d < 60; d += 3) {
+      const r = raceForDay(d)!;
+      expect(r.kind).toBe(d % 6 === 3 ? 'rally' : 'drift');
+      expect((r.kind === 'rally' ? RALLY_COURSES : DRIFT_COURSES).includes(r.course)).toBe(true);
+      expect(r.prize.gold).toBeGreaterThan(r.prize.silver);
+      if (r.kind === 'drift') {
+        const t = driftTargets(r);
+        expect(t.gold > t.silver && t.silver > t.bronze && t.bronze > 0).toBe(true);
+      }
+    }
+    // Rallye: Sollzeit auf Schotter langsamer als dieselbe Länge auf Asphalt wäre – endlich und plausibel
+    const rally = raceForDay(3)!;
+    const t = raceTargets(rally);
+    expect(Number.isFinite(t.gold) && t.gold > 60).toBe(true);
+  });
+
+  it('Driftpunkte: Winkel × Tempo, Kombo wächst, Kette wird nach einer Pause gutgeschrieben, Anstoßen kostet sie', async () => {
+    const { newDriftScore, driftStep, driftTotal } = await import('./races');
+    const d = newDriftScore();
+    for (let i = 0; i < 600; i++) driftStep(d, 30, 60, true, 1 / 60); // 10 s Drift
+    expect(d.combo).toBe(3);
+    expect(d.chain).toBeGreaterThan(18 * 10);
+    for (let i = 0; i < 90; i++) driftStep(d, 0, 60, true, 1 / 60); // Pause > 1,2 s
+    expect(d.chain).toBe(0);
+    const banked = d.banked;
+    expect(banked).toBeGreaterThan(300);
+    for (let i = 0; i < 120; i++) driftStep(d, 40, 70, true, 1 / 60);
+    driftStep(d, 40, 70, false, 1 / 60); // Leitplanke
+    expect(d.chain).toBe(0);
+    expect(d.lost).toBeGreaterThan(0);
+    expect(driftTotal(d)).toBe(Math.round(banked));
+    // zu langsam oder zu wenig Winkel zählt nicht
+    const e = newDriftScore();
+    driftStep(e, 8, 80, true, 1);
+    driftStep(e, 40, 20, true, 1);
+    expect(e.chain).toBe(0);
+  });
+
+  it('Wetter macht Sollzeiten langsamer (Regentag) als bei Trockenheit', () => {
+    let wet = 0;
+    for (let d = 1; d < 40; d++) if (d % 3 && weatherOf(d) === 'rain') { wet = d; break; }
+    const r = raceForDay(wet)!;
+    expect(raceTargets(r).gold).toBeGreaterThan(raceTargets({ course: r.course, cls: r.cls }).gold);
   });
 });

@@ -22,6 +22,8 @@ const LEVELS: [number, number][] = [
 /** Wiese, Feld, Waldboden: Farbe je Stelle (als Vertexfarbe). */
 function groundColor(x: number, z: number, h: number, out: THREE.Color, w: DriveWorld) {
   // Rennstrecke: gepflegter Rasen, Kiesbetten in den Kurven, Wasser im Hafen dunkel
+  // Rallyepiste: Waldboden mit Moos und Gras, fleckig
+  if (w.roadKind) return out.setRGB(0.2 + Math.sin(x * 0.07) * 0.03, 0.3 + Math.sin(z * 0.05 + x * 0.02) * 0.05, 0.15);
   if (w.id !== 'land') return w.surface(x, z).kind === 'gravel' ? out.setRGB(0.72, 0.66, 0.5) : out.setRGB(0.34 + Math.sin(x * 0.05) * 0.02, 0.54 + Math.sin(z * 0.04) * 0.03, 0.26);
   const forest = forestAt(x, z);
   const field = Math.sin(x * 0.013 + 0.4) * Math.sin(z * 0.017 - 1.1);
@@ -230,6 +232,7 @@ const built = new Map<string, ReturnType<typeof build>>();
 function build(w: DriveWorld) {
   const ROAD_WIDTH = w.roadWidth;
   const land = w.id === 'land';
+  const rally = !!w.roadKind;
   // Gelände-Kacheln mit Detailstufen
   const tiles: THREE.LOD[] = [];
   const grass = grassDetailTexture().clone();
@@ -254,20 +257,21 @@ function build(w: DriveWorld) {
   const dashed = (i: number) => !w.samples[i].crossing && Math.floor(w.samples[i].s / 6) % 2 === 0;
   const road = band(w, -ROAD_WIDTH / 2, ROAD_WIDTH / 2, 0.02, () => true);
   const shoulder = mergeGeometries([band(w, ROAD_WIDTH / 2, ROAD_WIDTH / 2 + 0.9, 0.0, () => true), band(w, -ROAD_WIDTH / 2 - 0.9, -ROAD_WIDTH / 2, 0.0, () => true)]);
-  const lines = mergeGeometries([band(w, ROAD_WIDTH / 2 - 0.35, ROAD_WIDTH / 2 - 0.2, 0.035, notCross), band(w, -ROAD_WIDTH / 2 + 0.2, -ROAD_WIDTH / 2 + 0.35, 0.035, notCross), ...(land ? [band(w, -0.07, 0.07, 0.035, dashed)] : [])]);
+  // Rallyepiste: keine Fahrbahnmarkierung
+  const lines = rally ? new THREE.BufferGeometry() : mergeGeometries([band(w, ROAD_WIDTH / 2 - 0.35, ROAD_WIDTH / 2 - 0.2, 0.035, notCross), band(w, -ROAD_WIDTH / 2 + 0.2, -ROAD_WIDTH / 2 + 0.35, 0.035, notCross), ...(land ? [band(w, -0.07, 0.07, 0.035, dashed)] : [])]);
   // Rennstrecke: rot-weiße Randsteine (Kerbs) in den Kurven, auf beiden Seiten
   const curvy = (i: number) => {
     for (let k = -6; k <= 6; k += 2) if (Math.abs(w.samples[(i + k + w.samples.length) % w.samples.length].curv) > 1 / 140) return true;
     return false;
   };
-  const kerbRed = land ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 0)));
-  const kerbWhite = land ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 1)));
+  const kerbRed = land || rally ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 0)));
+  const kerbWhite = land || rally ? null : mergeGeometries([1, -1].map((sd) => band(w, sd > 0 ? ROAD_WIDTH / 2 : -ROAD_WIDTH / 2 - 1.1, sd > 0 ? ROAD_WIDTH / 2 + 1.1 : -ROAD_WIDTH / 2, 0.03, (i) => curvy(i) && i % 2 === 1)));
   // Rennstrecke: Gummiabrieb auf der Ideallinie, Reifenstapel außen in den Kurven, Werbebanden an den Geraden
   let rubber: THREE.BufferGeometry | null = null;
   let tyres: THREE.BufferGeometry | null = null;
   let ads: THREE.BufferGeometry | null = null;
   let leitpfosten: THREE.Matrix4[] = [];
-  if (!land) {
+  if (!land && !rally) {
     const line = racingLine(w);
     rubber = ribbon(w, (i) => line[i], 1.25, 0.028);
     const n = w.samples.length;
@@ -281,7 +285,7 @@ function build(w: DriveWorld) {
     tyres = mergeGeometries([1, -1].map((sd) => wallBand(w, () => sd * tyreOff, 0, 0.82, (i) => near(i, (j) => bend(j) && Math.sign(line[j]) === -sd), 2)));
     const straight = (i: number) => !near(i, bend) && Math.floor(w.samples[i].s / 120) % 2 === 0;
     ads = mergeGeometries([1, -1].map((sd) => wallBand(w, () => sd * (w.railOffset + 0.9), 0.15, 1.15, straight, 32)));
-  } else {
+  } else if (land) {
     // Landstraße: Leitpfosten alle 50 m beidseits (weiß mit schwarzem Band)
     leitpfosten = w.samples.flatMap((p, i) => {
       if (p.town || p.crossing || i % 25 !== 0) return [];
@@ -522,6 +526,7 @@ export function DriveScenery({ world, snowy = false, wet = false, season = 'summ
           <Instances geometry={leitGeo.band} material={mats.leitBand} matrices={b.leitpfosten} />
         </>
       )}
+      {!b.land && b.baleMats.length > 0 && <Instances geometry={b.baleGeo} material={mats.bale} matrices={b.baleMats} />}
       {b.kerbRed && <mesh geometry={b.kerbRed} material={mats.kerbRed} raycast={() => null} />}
       {b.kerbWhite && <mesh geometry={b.kerbWhite} material={mats.kerbWhite} raycast={() => null} />}
       {[...b.standGeo.entries()].map(([c, g]) => (
