@@ -266,6 +266,19 @@ let toastId = 0;
  * fehlende Bauteile und Felder bekommen sichere Standardwerte, Schrauben
  * aus der Zeit mit nur zwei Zuständen werden umgerechnet.
  */
+/**
+ * Ausgebauter Motor, der beim Koop-Abgleich verloren ging (`motor: null` kam als „fehlt“ = Werksmotor an): Auto wieder
+ * ohne Motor, fälschlich ergänzte Motorteile entfernen. Erkennbar am Merkmal `noEngine` bzw. am Vermerk des
+ * ausgebauten Motors (`motorOut`). Liefert dasselbe Objekt, wenn nichts zu tun ist.
+ */
+export function restoreNoEngine<T extends CarInstance | null>(car: T, removed: EngineUnit[] = []): T {
+  if (!car || car.bare || car.motor !== undefined) return car;
+  // Auch ohne Vermerk (z. B. Schrottplatzauto): sein Werksmotor liegt nachweislich am Kran, auf dem Ständer oder im Lager
+  const out = car.noEngine || car.motorOut || removed.some((u) => u.motor.uid === `${car.uid}-m`);
+  if (!out) return car;
+  return normalizeCar({ ...car, motor: null, noEngine: true }) as T;
+}
+
 export function normalizeCar(car: CarInstance | null): CarInstance | null {
   if (!car) return null;
   const modelId = CAR_MODELS[car.modelId] ? car.modelId : 'bavaria_320';

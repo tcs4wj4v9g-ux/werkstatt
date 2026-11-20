@@ -447,9 +447,12 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
     const total = spec.brakeForce * input.brake;
     // ABS lässt beim Einlenken Seitenführung übrig (wie ein echtes ABS: lenkfähig bleiben ist sein Zweck) – je mehr
     // gelenkt wird, desto mehr Haftung bleibt für die Kurve: voll gelenkt etwa zwei Drittel vorn, gut die Hälfte hinten
-    const steerNeed = Math.min(1, Math.abs(s.steer) * 1.15);
-    const resF = Math.max(needF, capF * 0.68 * steerNeed);
-    const resR = Math.max(needR * 1.15, capR * 0.55 * steerNeed);
+    // Lenkwunsch wirkt schon bei mittlerem Ausschlag deutlich (Kennlinie ^0,7): wer beim Bremsen lenkt, will auch herum;
+    // kleine Korrekturen (Geradeausbremsen) kosten kaum Bremsweg.
+    // Voll gelenkt bleiben vorn rund 85 %, hinten 75 % der Haftung für die Kurve – die Bremse nimmt sich den Rest.
+    const steerNeed = Math.min(1, Math.abs(s.steer) ** 0.7 * 1.3);
+    const resF = Math.max(needF * 1.1, capF * 0.85 * steerNeed);
+    const resR = Math.max(needR * 1.2, capR * 0.75 * steerNeed);
     fxF -= dir * Math.min(total * spec.brakeBiasFront, Math.sqrt(Math.max(0, capF * capF - resF * resF)) * 0.98);
     fxR -= dir * Math.min(total * (1 - spec.brakeBiasFront), Math.sqrt(Math.max(0, capR * capR - resR * resR)) * 0.97);
   }

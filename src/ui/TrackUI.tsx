@@ -42,7 +42,7 @@ function Hold({ on, off, className, children, testid }: { on(): void; off(): voi
 }
 
 /**
- * Schieberegler, der beim Loslassen in die Ruhelage zurückfedert (Lenkung: Mitte, Gas: unten).
+ * Schieberegler, der beim Loslassen in die Ruhelage zurückfedert (Lenkung: Mitte, Gas und Bremse: unten).
  * Der Finger darf beim Ziehen über den Regler hinaus wandern; mehrere Finger gleichzeitig (Lenken + Gas) gehen.
  */
 function Spring({ axis, testid, className, onChange, label }: { axis: 'x' | 'y'; testid: string; className: string; onChange(v: number): void; label?: ReactNode }) {
@@ -422,8 +422,9 @@ export function TrackUI() {
       <div className="drive right">
         <div className="pedals">
           <Hold className="hand" testid="handbrake" on={() => (driveInput.handbrake = true)} off={() => (driveInput.handbrake = false)}>HAND­BREMSE</Hold>
-          <Hold className="brake" testid="brake" on={() => (driveInput.brake = 1)} off={() => (driveInput.brake = 0)}>BREMSE</Hold>
         </div>
+        {/* Bremse wie Gas als federnder Schieberegler: fein dosierbar, Loslassen = keine Bremse */}
+        <Spring axis="y" testid="brake" className="gas brake" onChange={(v) => (driveInput.brake = v)} label="BREMSE" />
         <Spring axis="y" testid="gas" className="gas" onChange={(v) => (driveInput.throttle = v)} label="GAS" />
       </div>
     </>

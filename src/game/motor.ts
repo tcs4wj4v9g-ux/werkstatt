@@ -140,6 +140,7 @@ export function extractEngine(car: CarInstance): EngineUnit {
   }
   const unit: EngineUnit = { motor: { ...motor, history: [...motor.history] }, components, oil: car.fluids.oil.level };
   car.motor = null;
+  car.noEngine = true;
   car.fluids.oil.level = 0;
   car.dyno = undefined;
   car.testDriven = false;
@@ -164,6 +165,7 @@ export function insertEngine(car: CarInstance, unit: EngineUnit, swapParts: Part
   car.dyno = undefined;
   car.testDriven = false;
   delete car.motorOut;
+  delete car.noEngine;
 }
 
 /**
