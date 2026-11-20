@@ -170,7 +170,7 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
   // Gewichtsverteilung: Frontmotor ~55 % vorn, Heckmotor ~40 % vorn, Frontantrieb etwas kopflastiger.
   const rear = REAR_ENGINE.has(model.body);
   const drive = drivetrainOf(car.modelId);
-  // Mittelmotor-Sportwagen (Veloce): Motor vor der Hinterachse, ~42 % vorn
+  // Mittelmotor-Sportwagen (Maserati MC20, Ferrari 458): Motor vor der Hinterachse, ~42 % vorn
   const mid = car.modelId === 'veloce_stradale' || car.modelId === 'veloce_gt';
   const frontShare = rear ? 0.4 : mid ? 0.42 : drive === 'FWD' ? 0.61 : model.cls === 'sport' || model.cls === 'luxury' ? 0.52 : 0.54;
   const a = wheelbase * (1 - frontShare);

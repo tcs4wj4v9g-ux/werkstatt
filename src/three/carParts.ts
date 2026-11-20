@@ -39,7 +39,8 @@ export interface CarLook {
 
 export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: EngineDef, visual?: VisualTune): CarLook {
   const cls = model?.cls ?? 'budget';
-  const brand = model?.brand ?? 'BMV';
+  // BMW-Gesicht (Doppelniere, Doppelscheinwerfer) – an der Kennung, damit das Aussehen nicht vom Anzeigenamen abhängt
+  const bmw = !model || /^(bavaria|bmv)_/.test(model.id);
   const classic = body === 'classic';
   const sport = body === 'sport';
   const lux = cls === 'luxury' || body === 'luxury';
@@ -57,12 +58,12 @@ export function lookOf(model: CarModelDef | undefined, body: BodyStyle, engine: 
   const g82 = body === 'g82';
   const evo2 = body === 'evo2';
   return {
-    rim: g87 || g82 ? 'five' : evo2 ? 'five' : golf2 ? 'classic' : e34 ? 'turbine' : b5 ? 'classic' : quattro ? 'rally' : tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && brand !== 'BMV' ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
-    // BMV: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
-    grille: sport ? 'slot' : classic ? 'classic' : brand === 'BMV' ? 'twin' : lux ? 'tall' : 'wide',
-    lamps: classic ? 'round' : sport ? 'slim' : brand === 'BMV' ? 'twin' : 'block',
+    rim: g87 || g82 ? 'five' : evo2 ? 'five' : golf2 ? 'classic' : e34 ? 'turbine' : b5 ? 'classic' : quattro ? 'rally' : tt || nine2 ? 'double5' : nine ? 'turbine' : mono || tub ? 'steel' : classic || box ? 'classic' : cls === 'budget' && !bmw ? 'steel' : sport ? 'five' : cls === 'sport' || body === 'coupe' ? 'multi' : lux ? 'turbine' : 'double5',
+    // BMW: zweigeteilter Grill; andere Marken: breiter Grill; Oberklasse: hoher Grill; Sportwagen: flacher Lufteinlass.
+    grille: sport ? 'slot' : classic ? 'classic' : bmw ? 'twin' : lux ? 'tall' : 'wide',
+    lamps: classic ? 'round' : sport ? 'slim' : bmw ? 'twin' : 'block',
     chromeBumper: classic,
-    blackBumper: cls === 'budget' && brand !== 'BMV',
+    blackBumper: cls === 'budget' && !bmw,
     chromeTrim: classic || lux || box || tub || tt,
     spoiler: sport || model?.id === 'bavaria_340_ms',
     pipes: engine.cylinders >= 8 ? 4 : engine.cylinders >= 6 ? 2 : 1,

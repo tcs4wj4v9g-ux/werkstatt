@@ -1097,7 +1097,7 @@ describe('Marktfilter', () => {
     expect(f({}).length).toBe(25);
     expect(f({ cls: 'luxury' }).every((l) => CAR_MODELS[l.car.modelId].cls === 'luxury')).toBe(true);
     expect(f({ cls: 'luxury' }).length).toBe(CLASS_TARGETS.luxury);
-    expect(f({ brand: 'Veloce' }).every((l) => CAR_MODELS[l.car.modelId].brand === 'Veloce')).toBe(true);
+    expect(f({ brand: 'Ferrari' }).every((l) => CAR_MODELS[l.car.modelId].brand === 'Ferrari')).toBe(true);
     expect(f({ engine: 'V8' }).every((l) => engineOf(l.car).layout === 'V8')).toBe(true);
     expect(f({ engine: 'diesel' }).every((l) => engineOf(l.car).fuel === 'diesel')).toBe(true);
     expect(f({ engine: 'turbo' }).every((l) => engineOf(l.car).turbo)).toBe(true);
