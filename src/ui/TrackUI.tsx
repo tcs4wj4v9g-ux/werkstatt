@@ -431,6 +431,8 @@ export function TrackUI() {
           <div className="meta">Driftmodus · zum Üben</div>
         </div>
       )}
+      {/* Geschwindigkeitsrahmen: dunkler, leicht verwischter Rand ab ~100 km/h (nur Verlauf, kein teurer Unschärfefilter) */}
+      <div className="speedfx" data-testid="speedfx" style={{ opacity: Math.max(0, Math.min(0.85, (hud.speed - 100) / 140)) }} />
       <MiniMap world={world} />
       {racing && <RaceHud />}
       <div className="speedo">
