@@ -891,3 +891,12 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - Der Knopf „📘 x/11“ in der Kopfleiste öffnet die Liste, der aktuelle Schritt ist markiert. „Hinweis ausblenden“ und „Von vorn beginnen“ sind möglich.
 - In der Werkstatt steht oben links ein Hinweis mit dem nächsten Schritt. Er lässt sich wegtippen und ist im Testmodus ausgeblendet.
 - Der Fortschritt gilt je Gerät (`gk-tutorial`). Im Koop gibt es keine Belohnung (gemeinsames Konto), und Änderungen des Partners zählen nicht.
+
+## iPad-Leistung
+
+- **Fahrwelt je Grafikstufe** (`gfx.ts`: `view`, `trees`, `clouds`, `precip`):
+  - Niedrig: 480 m Sichtweite, halb so viele Bäume (nur Darstellung, als Hindernis bleiben alle), Himmel ohne Wolken-Shader, 45 % Niederschlag, keine Berge am Horizont.
+  - Mittel und Hoch: 760 bzw. 900 m.
+- **Gegner und Mitspieler** ab 14 m Abstand als vereinfachtes Auto (`CarLite.tsx`: Karosserie, Haube und Türen als ein Netz, dazu Kabine, Räder, Rückleuchten, etwa 6 statt rund 70 Zeichenaufrufe). Rennen gegen fünf Gegner in der Startaufstellung: 399 → 275 Zeichenaufrufe, 377k → 281k Dreiecke.
+- **Automatik:** Läuft es lange flüssig (über 52 Bilder/s), wird die vorher abgesenkte Auflösung schrittweise wieder angehoben.
+- **Messskript** `e2e/leistung.cjs`: Zeichenaufrufe, Dreiecke und Bilder/s je Stufe und Welt. Die Bildrate im Container ist nur ein Vergleichswert. Gemessen in der Fahrwelt: Niedrig etwa doppelt so schnell wie Mittel.

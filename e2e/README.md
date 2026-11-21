@@ -56,6 +56,8 @@ GK_TAG=neu GK_VIEWS=halle node e2e/galerie.cjs x      # nur die Halle (gibt auch
 GK_GFX=low GK_VIEWS=karosserie node e2e/galerie.cjs bavaria_330
 ```
 
+Leistung je Grafikstufe messen (Zeichenaufrufe, Dreiecke, Bilder/s): `node e2e/leistung.cjs [land eifel …]`.
+
 Fahrwelten (Land und Rundkurse) in voller Grafik: `GK_TAG=neu node e2e/strecken.cjs [land eifel motodrom hafen ardennen]`.
 
 Hinweis für Tipps auf V-Motoren: Die Zylinderbänke sind um 0,2 rad geneigt (Drehpunkt in 0,62 m Höhe). `motoren.cjs` rechnet Bank-Koordinaten mit `tilt()` um.

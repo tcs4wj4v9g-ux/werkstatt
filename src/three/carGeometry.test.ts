@@ -150,3 +150,20 @@ describe('Innenraum: drehbares Lenkrad und sichtbare Tuningteile', () => {
     }
   });
 });
+
+describe('Vereinfachtes Auto (Gegner in der Ferne)', () => {
+  it('für jede Karosserie: gleiche Abmessungen wie das volle Modell, viel weniger Teile', async () => {
+    const { carLiteGeometry } = await import('./CarLite');
+    for (const body of Object.keys(BODY_SPECS) as (keyof typeof BODY_SPECS)[]) {
+      const g = carLiteGeometry(body);
+      g.body.computeBoundingBox();
+      const full = carGeometry(body, 0).shell;
+      full.computeBoundingBox();
+      const a = g.body.boundingBox!;
+      const b = full.boundingBox!;
+      expect(Math.abs(a.max.x - a.min.x - (b.max.x - b.min.x)), body).toBeLessThan(0.05);
+      expect(a.max.y, body).toBeGreaterThanOrEqual(b.max.y - 0.02);
+      expect(g.tires.getAttribute('position').count).toBeGreaterThan(0);
+    }
+  });
+});

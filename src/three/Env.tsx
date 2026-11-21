@@ -113,7 +113,7 @@ const LOWER: Record<GfxLevel, GfxLevel | null> = { high: 'medium', medium: 'low'
  * zuerst die Auflösung, dann die Grafikstufe gesenkt (nie von selbst wieder erhöht).
  */
 export function Perf() {
-  const acc = useRef({ t: 0, n: 0, slow: 0, warm: 0 });
+  const acc = useRef({ t: 0, n: 0, slow: 0, warm: 0, fast: 0 });
   useFrame((_, dt) => {
     const a = acc.current;
     a.t += dt;
@@ -127,6 +127,13 @@ export function Perf() {
     // Die ersten Sekunden (Laden, Übersetzen der Shader) und Hintergrund-Tabs zählen nicht.
     if (a.warm++ < 3 || document.hidden || !g.auto || TEST_MODE) return;
     a.slow = fps < 27 ? a.slow + 1 : 0;
+    // Läuft es lange flüssig, die zuvor abgesenkte Auflösung schrittweise wieder anheben (die Stufe selbst bleibt)
+    a.fast = fps > 52 ? a.fast + 1 : 0;
+    if (a.fast >= 5 && g.scale < 1) {
+      a.fast = 0;
+      useGfx.setState({ scale: Math.min(1, g.scale + 0.07) });
+      return;
+    }
     if (a.slow < 3) return;
     a.slow = 0;
     a.warm = 1;

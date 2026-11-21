@@ -17,8 +17,10 @@ import { initialState, stepVehicle, surfaceGrip, vehicleSpec, type VehicleState 
 import { offRoadCond, roadCond, seasonOf, weatherOf } from '../game/grip';
 import { crashNow, newCrash, recordImpact } from '../game/crash';
 import { CarModel } from './CarModel';
+import { CarLite } from './CarLite';
 import { CarShadow, DriveSky, HAZE, Precip } from './DriveSky';
 import { DriveScenery } from './DriveScenery';
+import { useGfxSettings } from './gfx';
 import { LAKE } from './driveWorld';
 import { worldFor } from './circuits';
 import { Env } from './Env';
@@ -51,6 +53,8 @@ export function TrackScene() {
   const day = useGame((s) => s.day);
   // Kameraart (Cockpit: Scheiben von innen fast klar)
   const camMode = useDriveHud((h) => h.camera);
+  // Grafikstufe: Sichtweite, Bäume, Wolken, Niederschlag
+  const G = useGfxSettings();
   // Zeitrennen: Strecke und Kontrollpunkte (gleichmäßig verteilt, der letzte ist das Ziel)
   const coop = raceRun?.coop ?? null;
   const race = useMemo(() => (raceRun && !coop ? raceForDay(day) : null), [raceRun, coop, day]);
@@ -160,7 +164,7 @@ export function TrackScene() {
     const s = sim.current;
     s.y = world.ground(s.x, s.z);
     camera.fov = 58;
-    camera.far = 800;
+    camera.far = G.view;
     camera.updateProjectionMatrix();
     camPos.current.set(s.x - Math.cos(s.heading) * 7, s.y + 2.6, s.z + Math.sin(s.heading) * 7);
     (window as any).__gkDrive = { sim: s, samples: world.samples, input: driveInput, spec, spin: spinVis.current, crash: crashNow };
@@ -622,6 +626,15 @@ export function TrackScene() {
       const ang = Math.abs(s.vx) > 3 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
       driftStep(s.drift, ang, Math.hypot(s.vx, s.vy) * 3.6, onRoad && s.bump < 0.45, dt);
     }
+    // Gegner und Mitspieler: ab 14 m Abstand zur Kamera das vereinfachte Auto zeigen
+    for (const g of [...npcRefs.current, ...rivalRefs.current]) {
+      if (!g) continue;
+      const near = g.position.distanceToSquared(camera.position) < LITE_DIST * LITE_DIST;
+      const full = g.getObjectByName('full');
+      const lite = g.getObjectByName('lite');
+      if (full && full.visible !== near) full.visible = near;
+      if (lite && lite.visible === near) lite.visible = !near;
+    }
     s.hud += dt;
     if (s.hud > 0.08) {
       s.hud = 0;
@@ -633,9 +646,10 @@ export function TrackScene() {
   return (
     <>
       <color attach="background" args={[look.haze]} />
-      <fog attach="fog" args={[look.haze, look.fog[0], look.fog[1]]} />
-      <DriveSky cover={look.cover} dull={look.dull} />
-      {(weather === 'rain' || weather === 'snow') && <Precip kind={weather} />}
+      {/* Sichtweite je Grafikstufe: der Nebel endet vor der Fernebene der Kamera */}
+      <fog attach="fog" args={[look.haze, Math.min(look.fog[0], G.view * 0.3), Math.min(look.fog[1], G.view - 30)]} />
+      <DriveSky cover={look.cover} dull={look.dull} radius={G.view * 0.9} clouds={G.clouds} />
+      {(weather === 'rain' || weather === 'snow') && <Precip kind={weather} amount={G.precip} />}
       <Env intensity={0.8} kind="sky" />
       <hemisphereLight args={['#eaf4ff', look.snowy ? '#c9d0d8' : '#5d6b45', 1.15 + look.dull * 0.25]} />
       <directionalLight position={[120, 180, 60]} intensity={2.3 * (1 - look.dull * 0.6)} color="#fff6e6" />
@@ -645,19 +659,30 @@ export function TrackScene() {
         <planeGeometry args={[6000, 6000]} />
         <meshLambertMaterial color="#5f8a4a" depthWrite={false} />
       </mesh>
-      <DriveScenery world={world} snowy={look.snowy} wet={road.cls === 'wet'} season={season} />
+      <DriveScenery world={world} snowy={look.snowy} wet={road.cls === 'wet'} season={season} trees={G.trees} far={G.view} />
       <primitive object={fx.group} />
       {course && <RaceMarks w={world} start={course.start} length={course.length} laps={course.laps} clock={() => sim.current.raceT} />}
       {rivals.map((r, k) => (
         <group key={r.id} ref={(g) => void (rivalRefs.current[k] = g)} visible={false}>
           <CarShadow />
-          <CarModel body={CAR_MODELS[r.look.modelId].body} color={r.join.color} modelId={r.look.modelId} car={r.look} lod="simple" />
+          {/* nah: volles Modell, weiter weg: vereinfachtes Auto (spart viele Zeichenaufrufe) */}
+          <group name="full">
+            <CarModel body={CAR_MODELS[r.look.modelId].body} color={r.join.color} modelId={r.look.modelId} car={r.look} lod="simple" />
+          </group>
+          <group name="lite" visible={false}>
+            <CarLite body={CAR_MODELS[r.look.modelId].body} color={r.join.color} />
+          </group>
         </group>
       ))}
       {npcs.map((c, k) => (
         <group key={k} ref={(g) => void (npcRefs.current[k] = g)}>
           <CarShadow />
-          <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
+          <group name="full">
+            <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
+          </group>
+          <group name="lite" visible={false}>
+            <CarLite body={CAR_MODELS[c.look.modelId].body} color={c.o.color} />
+          </group>
         </group>
       ))}
       <group ref={group}>
@@ -775,6 +800,9 @@ function archText(label: string) {
   if (!t) archTex.set(label, (t = textTexture(label, { bg: '#1b1c1f', fg: '#ffffff', w: 512, h: 96, font: 56 })));
   return t;
 }
+
+/** Abstand (m), ab dem Gegner und Mitspieler als vereinfachtes Auto gezeichnet werden. */
+const LITE_DIST = 14;
 
 /** Einschlag ins Schadensprotokoll: Richtung (Welt) vom Auto zum Hindernis, Aufprallgeschwindigkeit. */
 function crashHit(s: { heading: number }, wx: number, wz: number, v: number) {

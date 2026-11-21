@@ -11,7 +11,7 @@ export const HAZE = '#c9dbea';
  * Himmel wie in Rennspielen: Verlauf vom dunstigen Horizont zum tiefen Blau, heller Hof um die Sonne und ziehende
  * Haufenwolken. Eine Kugel um die Kamera mit einem kleinen Shader (ein Zeichenaufruf, keine Texturen).
  */
-export function DriveSky({ cover = 0, dull = 0 }: { cover?: number; dull?: number }) {
+export function DriveSky({ cover = 0, dull = 0, radius = 700, clouds = true }: { cover?: number; dull?: number; radius?: number; clouds?: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   const mat = useMemo(
     () =>
@@ -23,6 +23,7 @@ export function DriveSky({ cover = 0, dull = 0 }: { cover?: number; dull?: numbe
           uHorizon: { value: new THREE.Color(HAZE) },
           uCover: { value: 0 },
           uDull: { value: 0 },
+          uClouds: { value: 1 },
         },
         vertexShader: /* glsl */ `
           varying vec3 vDir;
@@ -33,7 +34,7 @@ export function DriveSky({ cover = 0, dull = 0 }: { cover?: number; dull?: numbe
         fragmentShader: /* glsl */ `
           precision mediump float;
           varying vec3 vDir;
-          uniform vec3 uSun; uniform float uTime; uniform vec3 uZenith; uniform vec3 uHorizon; uniform float uCover; uniform float uDull;
+          uniform vec3 uSun; uniform float uTime; uniform vec3 uZenith; uniform vec3 uHorizon; uniform float uCover; uniform float uDull; uniform float uClouds;
           float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
           float noise(vec2 p) {
             vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -50,7 +51,8 @@ export function DriveSky({ cover = 0, dull = 0 }: { cover?: number; dull?: numbe
             float s = max(dot(d, uSun), 0.0);
             col += vec3(1.0, 0.93, 0.78) * (pow(s, 8.0) * 0.35 + pow(s, 600.0) * 2.5) * (1.0 - uDull);
             // Wolken auf einer gedachten Ebene über der Landschaft, zum Horizont hin dünner
-            if (d.y > 0.02) {
+            // Wolken (fbm) kosten am meisten – auf niedriger Grafikstufe abgeschaltet
+            if (uClouds > 0.5 && d.y > 0.02) {
               vec2 uv = d.xz / (d.y + 0.08) * 1.4 + vec2(uTime * 0.004, uTime * 0.0015);
               float c = fbm(uv);
               float cover = smoothstep(0.52 - uCover * 0.4, 0.78 - uCover * 0.3, c) * smoothstep(0.02, 0.22, d.y);
@@ -74,10 +76,11 @@ export function DriveSky({ cover = 0, dull = 0 }: { cover?: number; dull?: numbe
     mat.uniforms.uTime.value += dt;
     mat.uniforms.uCover.value = cover;
     mat.uniforms.uDull.value = dull;
+    mat.uniforms.uClouds.value = clouds ? 1 : 0;
   });
   return (
     <mesh ref={ref} material={mat} renderOrder={-3} frustumCulled={false} raycast={() => null}>
-      <sphereGeometry args={[800, 32, 16]} />
+      <sphereGeometry args={[radius, 32, 16]} />
     </mesh>
   );
 }
@@ -115,8 +118,8 @@ export function CarShadow({ length = 4.9, width = 2.3 }: { length?: number; widt
  * Niederschlag um die Kamera: Regen als kurze, schräge Striche, Schnee als langsam taumelnde Flocken.
  * Ein Zeichenaufruf; die Teilchen liegen in einem Kasten um die Kamera und werden unten wieder oben eingesetzt.
  */
-export function Precip({ kind }: { kind: 'rain' | 'snow' }) {
-  const N = kind === 'rain' ? 1400 : 1800;
+export function Precip({ kind, amount = 1 }: { kind: 'rain' | 'snow'; amount?: number }) {
+  const N = Math.round((kind === 'rain' ? 1400 : 1800) * amount);
   const BOX = 36;
   const H = 22;
   const obj = useMemo(() => {
