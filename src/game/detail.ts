@@ -7,6 +7,8 @@ export const BODY_ZONES: ZoneId[] = ['front', 'rear', 'left', 'right', 'top'];
 export const ALL_ZONES: ZoneId[] = [...BODY_ZONES, 'wheels'];
 export const ZONE_NAMES: Record<ZoneId, string> = { front: 'Front & Haube', rear: 'Heck', left: 'linke Seite', right: 'rechte Seite', top: 'Dach & Scheiben', wheels: 'Felgen' };
 export const PAINT_COST = 70;
+/** Material zum Ausbeulen (Spachtel, Schleifmittel) je Bereich. */
+export const DENT_COST = 40;
 export const PAINT_COLORS = ['#1f2a44', '#101114', '#c9ccd1', '#f2f2ee', '#7a1f24', '#1d3fae', '#2f4f3a', '#c8501e', '#e3a81c'];
 
 const fail = (message: string): ActionResult => ({ ok: false, message });
@@ -79,12 +81,19 @@ export function paintAction(car: CarInstance, zone: ZoneId, tool: ToolId, color:
   const name = ZONE_NAMES[zone];
   if (visibleDirt(z) > 0.05 || z.step !== 0) return fail('Das Auto muss sauber und trocken in die Kabine – erst waschen.');
   if (tool === 'sander') {
-    if (z.rust < 0.02) return fail(`${name}: kein Rost zu entfernen.`);
+    const dent = (z.dent ?? 0) > 0.02;
+    if (z.rust < 0.02 && !dent) return fail(`${name}: kein Rost und keine Beule zu bearbeiten.`);
+    // Beule: ausbeulen, spachteln, schleifen (Spachtelmasse kostet Material); Rost: abschleifen – danach grundiert
+    if (dent && money < DENT_COST) return fail(`Spachtel und Schleifmittel kosten ${DENT_COST} € – das Geld reicht nicht.`);
+    const both = dent && z.rust >= 0.02;
     z.rust = 0;
+    z.dent = 0;
     z.shine = 0.1;
     z.paint = '#8a8d91'; // Grundierung
-    return done(`${name}: Rost abgeschliffen und grundiert. Jetzt lackieren.`);
+    const what = both ? 'Beule ausgebeult, gespachtelt und Rost abgeschliffen' : dent ? 'Beule ausgebeult, gespachtelt und geschliffen' : 'Rost abgeschliffen';
+    return dent ? { ok: true, cost: DENT_COST, message: `${name}: ${what}, grundiert (−${DENT_COST} € Material). Jetzt lackieren.` } : done(`${name}: ${what} und grundiert. Jetzt lackieren.`);
   }
+  if ((z.dent ?? 0) > 0.02) return fail(`${name}: erst die Beule mit dem Schleifer ausbeulen und spachteln.`);
   if (z.rust > 0.02) return fail(`${name}: erst den Rost abschleifen.`);
   if (z.paint === color || (!z.paint && car.color === color && z.shine > 0.9)) return fail(`${name} hat diese Farbe schon.`);
   if (money < PAINT_COST) return fail(`Lack für einen Bereich kostet ${PAINT_COST} € – das Geld reicht nicht.`);

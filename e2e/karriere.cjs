@@ -257,6 +257,14 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.screenshot({ path: S + '/drift-ergebnis.png' });
   await G(() => window.__gk.getState().setPanel(null));
 
+  // ---------- Unfallschaden: Einschlag bei der Probefahrt bleibt am Auto (auch bei Abbruch), Akte zeigt Beulen ----------
+  await G(() => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; const c = window.__gkLib.createCar('bavaria_330', [], Math.random, { year: 2005 }); for (const k of Object.keys(c.components)) c.components[k].condition = 'ok'; c.fluids.oil.level = 4; cars[0] = c; g.setState({ cars, panel: null }); g.getState().startDrive(0); });
+  await p.waitForTimeout(2500);
+  await G(() => { const l = window.__gkDrive.crash.log; l.dents.front = 0.6; l.parts.push('radiator'); l.worst = 14; window.__gkDrive.sim.bump = 0; });
+  await p.getByTestId('drive-end').click(); await p.waitForTimeout(1200);
+  const crashed = await G(() => { const c = window.__gk.getState().cars[0]; return { dent: c.zones.front.dent, rad: c.components.radiator.condition }; });
+  expect(crashed.dent > 0.5 && crashed.rad === 'defect', 'Unfallschaden bleibt nach Abbruch am Auto: Beule vorn ' + crashed.dent + ', Kühler ' + crashed.rad);
+
   // Speichern und Laden: alles bleibt
   const before = await G(() => { const s = window.__gk.getState(); return JSON.stringify({ m: s.money, a: s.achieved, c: s.career, u: s.upgrades, cars: s.cars.map((c) => c && c.uid), dyno: s.cars[11] && s.cars[11].dyno, meet: s.meet && s.meet.result && s.meet.result.place }); });
   await p.reload(); await p.waitForTimeout(3000);

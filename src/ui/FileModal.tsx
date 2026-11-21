@@ -1,3 +1,4 @@
+import { dentLevel } from '../game/crash';
 import { CarStatsCard } from './CarStatsCard';
 import { CAR_MODELS } from '../game/data/cars';
 import { SLOTS } from '../game/data/workshop';
@@ -88,7 +89,7 @@ export function FileModal() {
       })}
       <h4>Pflegezustand</h4>
       <div className="meta">
-        Schmutz {Math.round(dirtLevel(car) * 100)} % · Lackglanz {Math.round(shineLevel(car) * 100)} % · Rost {Math.round(rustLevel(car) * 100)} % · Innenraum {Math.round((1 - interiorDirt(car)) * 100)} % sauber
+        Schmutz {Math.round(dirtLevel(car) * 100)} % · Lackglanz {Math.round(shineLevel(car) * 100)} % · Rost {Math.round(rustLevel(car) * 100)} %{dentLevel(car) > 0.01 ? ` · Beulen ${Math.round(dentLevel(car) * 100)} %` : ''} · Innenraum {Math.round((1 - interiorDirt(car)) * 100)} % sauber
       </div>
       <h4>OBD-Fehlerspeicher</h4>
       {car.obdCodes === null && <p className="meta">Noch nicht ausgelesen (OBD-Gerät aus dem Werkzeugschrank).</p>}

@@ -1,3 +1,4 @@
+import { dentLevel } from './crash';
 import { CAR_MODELS, COLLECTOR_MODELS, modelsOfClass, RARE_MODELS } from './data/cars';
 import { defsOf, engineOf, modelEngine } from './data/components';
 import { performance } from './performance';
@@ -345,6 +346,9 @@ export function valuate(car: CarInstance, index = 1): Valuation {
   const deductions: Valuation['deductions'] = activeDefects(car).map((d) => ({ label: DEFECTS[d].name, amount: defectPenalty(car, d), defect: d }));
   if (car.motor === null) deductions.push({ label: 'Kein Motor eingebaut', amount: round50(cleanValue * 0.45) });
   else if (car.motor?.cracked) deductions.push({ label: 'Motorblock gerissen – Motor muss getauscht werden', amount: round50(cleanValue * 0.45) });
+  // Unfallschaden: Beulen an der Karosserie
+  const dents = dentLevel(car);
+  if (dents > 0.02) deductions.push({ label: 'Unfallschaden (Beulen an der Karosserie)', amount: round50(cleanValue * Math.min(0.22, 0.04 + dents * 0.35)) });
   if (!isAssembled(car)) deductions.push({ label: 'Nicht fahrbereit (Teile demontiert)', amount: round50(1500 * costFactor(car)) });
   // Umbau und Tuning: Liebhaber wollen Originalzustand, andere zahlen für saubere Mehrleistung.
   const model = CAR_MODELS[car.modelId];

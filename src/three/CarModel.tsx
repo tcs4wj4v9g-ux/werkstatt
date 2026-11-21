@@ -428,10 +428,38 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
   }
   const c = new THREE.Color();
   const baseColor = new THREE.Color(base);
+  // Beulen: Ursprungsform merken (die Geometrie ist eine eigene Kopie je Auto) und je Bereich eindrücken
+  let orig = geo.userData.orig as Float32Array | undefined;
+  if (!orig) {
+    orig = geo.userData.orig = Float32Array.from(pos.array as Float32Array);
+    geo.userData.origN = Float32Array.from(geo.getAttribute('normal').array as Float32Array);
+  }
+  const dent = (zn: ZoneId) => (car ? car.zones[zn]?.dent ?? 0 : 0);
+  const dF = dent('front');
+  const dR = dent('rear');
+  const dL = dent('left');
+  const dRt = dent('right');
+  const dented = dF + dR + dL + dRt > 0;
+  const wasDented = !!geo.userData.dented;
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i) + offsetX;
-    const y = pos.getY(i) + offsetY;
-    const z = pos.getZ(i) + offsetZ;
+    const x = orig[i * 3] + offsetX;
+    const y = orig[i * 3 + 1] + offsetY;
+    const z = orig[i * 3 + 2] + offsetZ;
+    // Delle: weich und großflächig (niedrige Frequenz), je Bereich gewichtet
+    const n = 0.5 + 0.5 * Math.sin(x * 5.3 + y * 3.1) * Math.sin(y * 4.7 + z * 2.3 + 1.1);
+    let dx = 0;
+    let dz = 0;
+    let hit = 0;
+    if (dented && y < 1.0) {
+      const wF = THREE.MathUtils.smoothstep(x, 0.95, 1.75) * dF;
+      const wR = THREE.MathUtils.smoothstep(-x, 1.3, 2.0) * dR;
+      const along = THREE.MathUtils.smoothstep(x, -1.7, -1.2) * (1 - THREE.MathUtils.smoothstep(x, 0.8, 1.25));
+      const wS = THREE.MathUtils.smoothstep(Math.abs(z), 0.6, 0.82) * along * (z < 0 ? dL : dRt);
+      dx += -wF * 0.06 * (0.5 + 0.5 * n) + wR * 0.055 * (0.5 + 0.5 * n);
+      dz += Math.sign(z) * -wS * 0.035 * (0.35 + 0.65 * n);
+      hit = Math.max(wF, wR, wS) * n;
+    }
+    if (dented || wasDented) pos.setXYZ(i, orig[i * 3] + dx, orig[i * 3 + 1], orig[i * 3 + 2] + dz);
     c.copy(baseColor);
     if (car) {
       const zone = car.zones[zoneAt(x, y, z)];
@@ -448,13 +476,31 @@ function tint(geo: THREE.BufferGeometry, car: CarInstance | undefined, base: str
         const n = 0.5 + 0.5 * Math.sin(x * 9.1 + z * 3.3) * Math.sin(y * 13.7 + x * 2.9);
         if (n + (y < 0.6 ? 0.25 : 0) > 1.05 - zone.rust * 0.95) c.lerp(RUST, 0.85);
       }
+      // Kratzer: feine, schräge Riefen nur in der tiefsten Stelle der Delle (Lack bis auf die Grundierung abgeschabt)
+      if (hit > 0.25) {
+        const sc = Math.sin(x * 47 + y * 29 + z * 11) * Math.sin(x * 13 - y * 41 + z * 7);
+        if (sc > 0.86 - hit * 0.25) c.lerp(SCRATCH, Math.min(0.7, 0.25 + hit * 0.5));
+        else c.multiplyScalar(1 - hit * 0.12);
+      }
       if (zone.step === 2) c.lerp(FOAM, 0.7);
       else c.lerp(DIRT, visibleDirt(zone) * (y < 0.7 ? 0.85 : 0.6));
     }
     attr.setXYZ(i, c.r, c.g, c.b);
   }
   attr.needsUpdate = true;
+  if (dented || wasDented) {
+    pos.needsUpdate = true;
+    // ausgebeult: die ursprünglichen (gestalteten) Normalen zurück, sonst aus der eingedrückten Form neu berechnen
+    if (dented) geo.computeVertexNormals();
+    else {
+      const nrm = geo.getAttribute('normal') as THREE.BufferAttribute;
+      (nrm.array as Float32Array).set(geo.userData.origN as Float32Array);
+      nrm.needsUpdate = true;
+    }
+    geo.userData.dented = dented;
+  }
 }
+const SCRATCH = new THREE.Color('#a7a9ad');
 
 export function CarModel({ body, color, car, handlers, tool = 'hand', lod = 'full', steer, spin, modelId, hoodTap, inside = false }: Props) {
   const G = useGfxSettings();

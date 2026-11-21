@@ -15,6 +15,7 @@ import { DEFECTS } from './data/defects';
 import { FLUID_PRODUCTS } from './data/fluids';
 import { PARTS } from './data/parts';
 import { availableSlots, isJunk, isLift, isShowcase, isStand, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, STAND_SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
+import { applyCrash, crashNow, newCrash } from './crash';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
 import * as fluids from './fluids';
@@ -407,6 +408,24 @@ export interface RaceRow {
   time: number;
   you: boolean;
 }
+/**
+ * Unfallschäden der gerade beendeten Fahrt aufs Auto übertragen (auch bei abgebrochener Fahrt – Beulen bleiben).
+ * Liest und leert das Protokoll der Fahrszene (`crashNow`).
+ */
+function bankCrash(get: () => GameState, set: (p: Partial<GameState>) => void, bay: number) {
+  const log = crashNow.log;
+  crashNow.log = newCrash();
+  const cur = get().cars[bay];
+  if (!cur || cur.bare) return;
+  const car = clone(cur);
+  const msg = applyCrash(car, log);
+  if (!msg) return;
+  const cars = [...get().cars];
+  cars[bay] = car;
+  set({ cars });
+  setTimeout(() => get().say(msg, true), 600);
+}
+
 export const dayLeft = (s: Pick<GameState, 'dayStartedAt'>) => Math.max(0, (s.dayStartedAt ?? 0) + dayClock.ms - Date.now());
 
 export const useGame = create<GameState>()(
@@ -1087,6 +1106,7 @@ export const useGame = create<GameState>()(
         },
 
         finishRace: (time, grid, points) => {
+          bankCrash(get, set, get().race?.bay ?? get().driveBay);
           const s = get();
           const run = s.race;
           // Koop-Rennen: nur Zeit und Platz (live aus den Lagen der Mitspieler), kein Geld
@@ -1152,6 +1172,7 @@ export const useGame = create<GameState>()(
         },
 
         finishDrive: (completed) => {
+          bankCrash(get, set, get().driveBay);
           const s = get();
           const current = s.cars[s.driveBay];
           if (!current || !completed) return set({ screen: 'garage' });

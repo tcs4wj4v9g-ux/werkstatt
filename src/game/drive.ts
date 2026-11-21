@@ -52,6 +52,8 @@ interface DriveHud {
   driftChain: number;
   driftCombo: number;
   driftLost: number;
+  /** Stärkster Einschlag dieser Fahrt (m/s, 0 = kein Schaden) – für den Schadenshinweis. */
+  damage: number;
   camera: DriveCamera;
   set(p: Partial<DriveHud>): void;
 }
@@ -84,6 +86,7 @@ export const useDriveHud = create<DriveHud>((set) => ({
   driftChain: 0,
   driftCombo: 1,
   driftLost: 0,
+  damage: 0,
   camera: 'chase',
   set: (p) => set(p),
 }));
