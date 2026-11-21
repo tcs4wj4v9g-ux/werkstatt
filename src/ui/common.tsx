@@ -1,3 +1,4 @@
+import { TutorialButton } from './TutorialUI';
 import { useEffect, useState, type ReactNode } from 'react';
 import { marketLabel } from '../game/market';
 import { dayClock, dayLeft, useGame } from '../game/store';
@@ -122,6 +123,7 @@ export function TopBar({ title, back }: { title: string; back?: { label: string;
       <div className="daychip" title={marketLabel(index)}>
         Tag {day} <span data-testid="weather" title={weatherLabel(day)}>{WEATHER_ICON[weatherOf(day)]}</span> <DayClock /> · Markt {index >= 1 ? '+' : '−'}{Math.abs(Math.round((index - 1) * 100))} %
       </div>
+      <TutorialButton />
       <SkipDay />
       <AutoDayToggle />
       <button className="btn ghost" data-testid="sound" aria-label="Ton ein/aus" onClick={() => setSound(!sound)}>{sound ? '🔊' : '🔇'}</button>
