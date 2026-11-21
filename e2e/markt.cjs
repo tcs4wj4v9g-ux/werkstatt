@@ -115,6 +115,11 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const brk = await p.evaluate(() => window.__gkDrive.input.brake);
   await p.mouse.up(); await p.waitForTimeout(200);
   expect(brk > 0.3 && brk < 0.7 && (await p.evaluate(() => window.__gkDrive.input.brake)) === 0, 'Bremsregler dosierbar: halb ' + brk.toFixed(2) + ', losgelassen 0');
+  // Rennspiel-Gefühl: Geschwindigkeitsrahmen erst bei hohem Tempo; Gas weg bei hoher Drehzahl mit Sportauspuff knallt
+  expect(Number(await p.getByTestId('speedfx').evaluate((e) => getComputedStyle(e).opacity)) === 0, 'Geschwindigkeitsrahmen bei niedrigem Tempo aus');
+  await p.evaluate(() => { const d = window.__gkDrive; d.sim.vx = 45; d.sim.rpm = d.spec.redline * 0.9; d.sim.lastThrottle = 1; d.input.throttle = 0; });
+  await p.waitForTimeout(600);
+  expect(Number(await p.getByTestId('speedfx').evaluate((e) => getComputedStyle(e).opacity)) > 0.2, 'Geschwindigkeitsrahmen bei hohem Tempo sichtbar');
   // Rückwärtsgang: Wählhebel auf R, Gas → Auto fährt rückwärts, Anzeige „R“; zurück auf D
   await p.getByTestId('respawn').click(); await p.waitForTimeout(400);
   await p.getByTestId('gearsel').dispatchEvent('pointerdown'); await p.waitForTimeout(200);

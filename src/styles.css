@@ -333,7 +333,7 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
 /* Geschwindigkeitsrahmen der Fahrt: Rand dunkel mit feinen Streifen, die zur Mitte ausblenden */
 .speedfx { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s linear;
   background:
-    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.42) 100%),
-    repeating-conic-gradient(from 0deg at 50% 52%, rgba(255, 255, 255, 0.07) 0deg 0.6deg, rgba(255, 255, 255, 0) 0.6deg 7deg);
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 48%, rgba(0, 0, 0, 0.58) 100%),
+    repeating-conic-gradient(from 0deg at 50% 52%, rgba(255, 255, 255, 0.13) 0deg 0.6deg, rgba(255, 255, 255, 0) 0.6deg 7deg);
   -webkit-mask-image: radial-gradient(ellipse at center, transparent 45%, #000 85%);
   mask-image: radial-gradient(ellipse at center, transparent 45%, #000 85%); }
