@@ -900,3 +900,10 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Gegner und Mitspieler** ab 14 m Abstand als vereinfachtes Auto (`CarLite.tsx`: Karosserie, Haube und Türen als ein Netz, dazu Kabine, Räder, Rückleuchten, etwa 6 statt rund 70 Zeichenaufrufe). Rennen gegen fünf Gegner in der Startaufstellung: 399 → 275 Zeichenaufrufe, 377k → 281k Dreiecke.
 - **Automatik:** Läuft es lange flüssig (über 52 Bilder/s), wird die vorher abgesenkte Auflösung schrittweise wieder angehoben.
 - **Messskript** `e2e/leistung.cjs`: Zeichenaufrufe, Dreiecke und Bilder/s je Stufe und Welt. Die Bildrate im Container ist nur ein Vergleichswert. Gemessen in der Fahrwelt: Niedrig etwa doppelt so schnell wie Mittel.
+
+## Koop: Drift-Duell
+
+- Beim Ausschreiben eines Koop-Rennens wählt man „🏁 Rennen“ oder „💨 Drift-Duell“ (`Lobby.mode`).
+- Im Drift-Duell zählt jedes Gerät seine eigenen Driftpunkte (gleiche Wertung wie im Driftwettbewerb, ESP aus) und schickt sie in der Rennlage mit (`RaceCar.pts`). Am Server ändert sich nichts.
+- In der Fahrt sieht man die eigenen Punkte mit Kombo und eine Live-Tabelle aller Teilnehmer, der Platz richtet sich nach Punkten. Ergebnisfenster „Drift-Duell“ mit Endstand nach Punkten.
+- Test in `koop.cjs`: Einladung, gemeinsamer Start, Live-Tabelle beim Mitspieler, Endstand.
