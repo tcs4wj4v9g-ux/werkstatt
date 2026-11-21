@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useCoop } from '../net/coop';
 import { saveGate } from '../game/saveGate';
 import { useGame } from '../game/store';
@@ -29,7 +30,8 @@ export function TutorialButton() {
       <button className="btn ghost" data-testid="tutorial" onClick={() => setOpen(true)}>
         📘 {done.length}/{TUTORIAL.length}
       </button>
-      {open && <TutorialPanel onClose={() => setOpen(false)} />}
+      {/* auf oberster Ebene einhängen – in der Kopfleiste würde das Fenster abgeschnitten */}
+      {open && createPortal(<div className="ui"><TutorialPanel onClose={() => setOpen(false)} /></div>, document.body)}
     </>
   );
 }

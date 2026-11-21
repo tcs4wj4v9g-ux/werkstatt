@@ -883,3 +883,11 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
   - Knirschen auf losem Untergrund und auf Rallyepisten statt Quietschen.
   - Turbo-Abblasen beim Gaswegnehmen über 55 % der Höchstdrehzahl (Turbo bzw. Turbo-Nachrüstung).
   - Fehlzündungen im Schub mit Sportauspuff, Sport-Endtopf oder Fächerkrümmer bzw. ab Kennfeld Stufe 2.
+
+## Aufgabenbuch für Einsteiger
+
+- Elf geführte Schritte (`game/tutorial.ts`): erstes Auto kaufen, Akte lesen, Werkzeug nehmen, Motor starten und hinhören, Bauteil tauschen, Probefahrt, waschen, verkaufen, Kundenauftrag, Tuningteil, Rennen. Jeder Schritt hat eine Kurzanleitung und eine Belohnung von 100–500 €.
+- Erkannt wird jeder Schritt an einer Änderung im Spielstand (vorher → nachher), nicht durch Eingriffe in die Spielaktionen.
+- Der Knopf „📘 x/11“ in der Kopfleiste öffnet die Liste, der aktuelle Schritt ist markiert. „Hinweis ausblenden“ und „Von vorn beginnen“ sind möglich.
+- In der Werkstatt steht oben links ein Hinweis mit dem nächsten Schritt. Er lässt sich wegtippen und ist im Testmodus ausgeblendet.
+- Der Fortschritt gilt je Gerät (`gk-tutorial`). Im Koop gibt es keine Belohnung (gemeinsames Konto), und Änderungen des Partners zählen nicht.
