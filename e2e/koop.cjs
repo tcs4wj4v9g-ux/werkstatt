@@ -342,6 +342,27 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   const rows = async (P) => until(P, () => { const t = document.querySelector('[data-testid="coop-race-results"]'); return !!t && t.querySelectorAll('.race-row').length === 2 && !/fährt noch/.test(t.textContent); }, null, 15000);
   expect(await rows(A) && await rows(B), 'Gemeinsamer Endstand mit beiden Zeiten: ' + (await G(A, () => document.querySelector('[data-testid="coop-race-results"]').textContent)));
   for (const P of [A, B]) await G(P, () => window.__gk.getState().setPanel(null));
+  // ---------- Drift-Duell im Koop: Punkte statt Zeit, live und im Endstand nach Punkten ----------
+  for (const P of [A, B]) await G(P, () => { window.__gkCoopRace && window.__gkCoopRace.leave && window.__gkCoopRace.leave(); });
+  await G(A, () => window.__gk.getState().setPanel('computer', -77)); await A.waitForTimeout(500);
+  await A.getByTestId('coop-mode-drift').click();
+  await A.getByTestId('coop-race-course').selectOption('motodrom');
+  await A.getByTestId('coop-race-host-2').click();
+  await G(B, () => window.__gk.getState().setPanel('computer', -77));
+  expect(await until(B, () => { const l = document.querySelector('[data-testid="coop-lobby"]'); return !!l && /Drift-Duell/.test(l.textContent) && !!document.querySelector('[data-testid="coop-race-join-3"]'); }, null, 15000), 'Spieler 2 sieht die Einladung zum Drift-Duell');
+  await B.getByTestId('coop-race-join-3').click();
+  expect(await until(A, () => { const b = document.querySelector('[data-testid="coop-race-start"]'); return !!b && !b.disabled; }, null, 15000), 'Drift-Duell: Start möglich');
+  await A.getByTestId('coop-race-start').click();
+  expect(await until(A, () => window.__gk.getState().screen === 'track', null, 12000) && await until(B, () => window.__gk.getState().screen === 'track', null, 12000), 'Beide stehen im Drift-Duell am Start');
+  expect(await until(A, () => !!document.querySelector('[data-testid="coop-drift-live"]') && /ESP aus/.test(document.querySelector('[data-testid="esp"]').textContent), null, 12000), 'Live-Punktetabelle sichtbar, ESP aus');
+  await until(A, () => window.__gkDrive.sim.raceT > 0, null, 15000);
+  await G(A, () => { window.__gkDrive.sim.drift.banked += 3000; }); await G(B, () => { window.__gkDrive.sim.drift.banked += 1200; });
+  expect(await until(B, () => { const t = document.querySelector('[data-testid="coop-drift-live"]'); return !!t && /1\. Anna – 3\.000/.test(t.textContent); }, null, 15000), 'Spieler 2 sieht live: Spieler 1 führt mit 3.000 Punkten');
+  for (const P of [A, B]) await G(P, () => { const d = window.__gkDrive; d.sim.autopilot = 24; d.sim.timeScale = 3; });
+  expect(await until(A, () => window.__gk.getState().panel === 'raceResult', null, 150000) && await until(B, () => window.__gk.getState().panel === 'raceResult', null, 150000), 'Beide im Ziel des Drift-Duells');
+  const dres = await G(B, () => { const r = window.__gk.getState().raceResult; return { pts: r.points, txt: (document.querySelector('[data-testid="coop-race-results"]') || {}).textContent }; });
+  expect(dres.pts >= 1200 && /Anna.*3\.0\d\d Punkte.*Du.*1\.\d{3} Punkte/.test(dres.txt), 'Endstand nach Punkten: ' + dres.txt);
+  for (const P of [A, B]) await G(P, () => window.__gk.getState().setPanel(null));
 
   // ---------- Test 7: Wiederbeitritt ----------
   const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools), stand: norm(await G(B, () => window.__gk.getState().cars[15])) };

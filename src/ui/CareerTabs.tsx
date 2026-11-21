@@ -332,10 +332,10 @@ export function RaceResultModal() {
       s.setPanel(null);
     };
     return (
-      <Modal title="Ergebnis Koop-Rennen" onClose={close}>
+      <Modal title={r.points !== undefined ? 'Ergebnis Drift-Duell' : 'Ergebnis Koop-Rennen'} onClose={close}>
         <p className="meta">{r.title} · {r.car}</p>
-        <p className="bigline" data-testid="race-time">Deine Zeit {raceClock(r.time)}</p>
-        <CoopRaceTable lobby={r.coop} />
+        <p className="bigline" data-testid="race-time">{r.points !== undefined ? `Deine Driftpunkte ${r.points.toLocaleString('de-DE')}` : `Deine Zeit ${raceClock(r.time)}`}</p>
+        <CoopRaceTable lobby={r.coop} drift={r.points !== undefined} />
         <p className="meta">Die Tabelle füllt sich, sobald die anderen im Ziel sind.</p>
         <button className="btn primary" onClick={close}>Zur Werkstatt</button>
       </Modal>

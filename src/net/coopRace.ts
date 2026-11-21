@@ -15,6 +15,8 @@ import { syncClock, syncedNow } from './coop';
 export interface Lobby {
   id: string;
   course: CourseId;
+  /** 'drift' = Drift-Duell (Punkte statt Zeit); fehlt = Rennen. */
+  mode?: 'race' | 'drift';
   /** Startzeit (ms, Server-Uhr – siehe `syncedNow`) – null, solange noch Teilnehmer dazukommen. */
   startAt: number | null;
 }
@@ -35,6 +37,8 @@ export interface RaceCar {
   /** Fortschritt in Streckenpunkten (2 m) und Zielzeit (s) oder null. */
   p: number;
   fin: number | null;
+  /** Drift-Duell: bisherige Driftpunkte (gutgeschrieben + laufende Kette). */
+  pts?: number;
 }
 
 /** Eigene Einträge (gehen mit der Lage hinaus). */
@@ -84,9 +88,9 @@ function prepare(course: CourseId) {
   void syncClock();
 }
 /** Rennen ausschreiben und selbst mit Auto `bay` teilnehmen. */
-export function hostRace(course: CourseId, bay: number, car: { modelId: string; color: string; name: string }) {
+export function hostRace(course: CourseId, bay: number, car: { modelId: string; color: string; name: string }, mode: 'race' | 'drift' = 'race') {
   const id = newId();
-  useCoopRace.setState({ lobby: { id, course, startAt: null }, join: { id, modelId: car.modelId, color: car.color, car: car.name }, bay });
+  useCoopRace.setState({ lobby: { id, course, startAt: null, ...(mode === 'drift' ? { mode } : {}) }, join: { id, modelId: car.modelId, color: car.color, car: car.name }, bay });
   prepare(course);
 }
 /** Bei einem ausgeschriebenen Rennen mitfahren. */

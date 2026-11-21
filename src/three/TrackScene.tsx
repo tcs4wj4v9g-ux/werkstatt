@@ -57,6 +57,8 @@ export function TrackScene() {
   const G = useGfxSettings();
   // Zeitrennen: Strecke und Kontrollpunkte (gleichmäßig verteilt, der letzte ist das Ziel)
   const coop = raceRun?.coop ?? null;
+  /** Koop-Drift-Duell: Punkte statt Zeit (jedes Gerät zählt seine eigenen, die Lage trägt sie zu den anderen). */
+  const coopDrift = coop?.mode === 'drift';
   const race = useMemo(() => (raceRun && !coop ? raceForDay(day) : null), [raceRun, coop, day]);
   const course = useMemo(() => (race ? courseOf(race.course) : coop ? courseOf(coop.course) : null), [race, coop]);
   // Koop-Rennen: Teilnehmer (feste Reihenfolge = Startplätze); ich selbst rechne nur mein Auto
@@ -137,7 +139,9 @@ export function TrackScene() {
       if (r.id === me) continue;
       const rr = remotePlayers.get(r.id)?.rr;
       if (!rr || rr.id !== coop?.lobby) continue;
-      if (rr.fin !== null ? !s.done || rr.fin < s.raceT : rr.p > s.progress) ahead++;
+      if (coopDrift) {
+        if ((rr.pts ?? 0) > driftTotal(s.drift)) ahead++;
+      } else if (rr.fin !== null ? !s.done || rr.fin < s.raceT : rr.p > s.progress) ahead++;
     }
     return ahead + 1;
   };
@@ -320,7 +324,7 @@ export function TrackScene() {
           const time = s.raceT;
           roadAudio.hit('clunk');
           if (coop && coopRaceOut.car) coopRaceOut.car.fin = Math.round(time * 100) / 100;
-          const pts = race?.kind === 'drift' ? driftTotal(s.drift) : undefined;
+          const pts = race?.kind === 'drift' || coopDrift ? driftTotal(s.drift) : undefined;
           setTimeout(() => finishRace(Math.round(time * 100) / 100, grid ? standings(time) : undefined, pts), 1200);
         }
       }
@@ -330,7 +334,7 @@ export function TrackScene() {
     // --- Koop-Rennen: eigene Lage hinaus, Autos der Mitspieler aus ihrer Lage (kurz vorausgerechnet), feste Hindernisse
     if (coop) {
       const prev = coopRaceOut.car;
-      coopRaceOut.car = { id: coop.lobby, x: Math.round(s.x * 100) / 100, z: Math.round(s.z * 100) / 100, h: Math.round(s.heading * 1000) / 1000, vx: Math.round(s.vx * 10) / 10, vy: Math.round(s.vy * 10) / 10, yr: Math.round(s.yawRate * 100) / 100, p: s.progress, fin: prev?.id === coop.lobby ? prev.fin : null };
+      coopRaceOut.car = { id: coop.lobby, x: Math.round(s.x * 100) / 100, z: Math.round(s.z * 100) / 100, h: Math.round(s.heading * 1000) / 1000, vx: Math.round(s.vx * 10) / 10, vy: Math.round(s.vy * 10) / 10, yr: Math.round(s.yawRate * 100) / 100, p: s.progress, fin: prev?.id === coop.lobby ? prev.fin : null, ...(coopDrift ? { pts: driftTotal(s.drift) } : {}) };
       const bodies: { st: VehicleState; mass: number; inertia: number; fixed?: boolean }[] = [{ st: s, mass: spec.mass, inertia: spec.yawInertia }];
       rivals.forEach((r, k) => {
         const g = rivalRefs.current[k];
@@ -622,7 +626,7 @@ export function TrackScene() {
     // Driftwettbewerb: Punkte für Winkel × Tempo, Kombo; von der Fahrbahn abkommen oder anstoßen kostet die laufende Kette
     // Freier Driftmodus: in der Probefahrt mit ESP aus zählen ebenfalls Punkte (zum Üben, ohne Preisgeld)
     const freeDrift = !course && !driveInput.assist;
-    if ((race?.kind === 'drift' && s.raceT >= 0 && !s.done) || freeDrift) {
+    if (((race?.kind === 'drift' || coopDrift) && s.raceT >= 0 && !s.done) || freeDrift) {
       const ang = Math.abs(s.vx) > 3 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
       driftStep(s.drift, ang, Math.hypot(s.vx, s.vy) * 3.6, onRoad && s.bump < 0.45, dt);
     }
