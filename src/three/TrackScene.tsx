@@ -17,6 +17,7 @@ import { initialState, stepVehicle, surfaceGrip, vehicleSpec, type VehicleState 
 import { offRoadCond, roadCond, seasonOf, weatherOf } from '../game/grip';
 import { crashNow, newCrash, recordImpact } from '../game/crash';
 import { CarModel } from './CarModel';
+import { CarLite } from './CarLite';
 import { CarShadow, DriveSky, HAZE, Precip } from './DriveSky';
 import { DriveScenery } from './DriveScenery';
 import { useGfxSettings } from './gfx';
@@ -625,6 +626,15 @@ export function TrackScene() {
       const ang = Math.abs(s.vx) > 3 ? Math.abs(Math.atan2(s.vy, Math.abs(s.vx))) * 57.3 : 0;
       driftStep(s.drift, ang, Math.hypot(s.vx, s.vy) * 3.6, onRoad && s.bump < 0.45, dt);
     }
+    // Gegner und Mitspieler: ab 14 m Abstand zur Kamera das vereinfachte Auto zeigen
+    for (const g of [...npcRefs.current, ...rivalRefs.current]) {
+      if (!g) continue;
+      const near = g.position.distanceToSquared(camera.position) < LITE_DIST * LITE_DIST;
+      const full = g.getObjectByName('full');
+      const lite = g.getObjectByName('lite');
+      if (full && full.visible !== near) full.visible = near;
+      if (lite && lite.visible === near) lite.visible = !near;
+    }
     s.hud += dt;
     if (s.hud > 0.08) {
       s.hud = 0;
@@ -655,13 +665,24 @@ export function TrackScene() {
       {rivals.map((r, k) => (
         <group key={r.id} ref={(g) => void (rivalRefs.current[k] = g)} visible={false}>
           <CarShadow />
-          <CarModel body={CAR_MODELS[r.look.modelId].body} color={r.join.color} modelId={r.look.modelId} car={r.look} lod="simple" />
+          {/* nah: volles Modell, weiter weg: vereinfachtes Auto (spart viele Zeichenaufrufe) */}
+          <group name="full">
+            <CarModel body={CAR_MODELS[r.look.modelId].body} color={r.join.color} modelId={r.look.modelId} car={r.look} lod="simple" />
+          </group>
+          <group name="lite" visible={false}>
+            <CarLite body={CAR_MODELS[r.look.modelId].body} color={r.join.color} />
+          </group>
         </group>
       ))}
       {npcs.map((c, k) => (
         <group key={k} ref={(g) => void (npcRefs.current[k] = g)}>
           <CarShadow />
-          <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
+          <group name="full">
+            <CarModel body={CAR_MODELS[c.look.modelId].body} color={c.o.color} modelId={c.look.modelId} car={c.look} lod="simple" />
+          </group>
+          <group name="lite" visible={false}>
+            <CarLite body={CAR_MODELS[c.look.modelId].body} color={c.o.color} />
+          </group>
         </group>
       ))}
       <group ref={group}>
@@ -779,6 +800,9 @@ function archText(label: string) {
   if (!t) archTex.set(label, (t = textTexture(label, { bg: '#1b1c1f', fg: '#ffffff', w: 512, h: 96, font: 56 })));
   return t;
 }
+
+/** Abstand (m), ab dem Gegner und Mitspieler als vereinfachtes Auto gezeichnet werden. */
+const LITE_DIST = 14;
 
 /** Einschlag ins Schadensprotokoll: Richtung (Welt) vom Auto zum Hindernis, Aufprallgeschwindigkeit. */
 function crashHit(s: { heading: number }, wx: number, wz: number, v: number) {
