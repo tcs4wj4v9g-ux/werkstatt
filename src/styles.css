@@ -337,3 +337,8 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
     repeating-conic-gradient(from 0deg at 50% 52%, rgba(255, 255, 255, 0.13) 0deg 0.6deg, rgba(255, 255, 255, 0) 0.6deg 7deg);
   -webkit-mask-image: radial-gradient(ellipse at center, transparent 45%, #000 85%);
   mask-image: radial-gradient(ellipse at center, transparent 45%, #000 85%); }
+
+/* Aufgabenbuch */
+.tut-now { outline: 2px solid #ff7a1a; border-radius: 10px; }
+.tut-hint { position: absolute; left: calc(14px + var(--sal)); top: calc(64px + var(--sat, 0px)); max-width: min(360px, 44vw); display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 14px; background: rgba(20, 22, 26, 0.82); border: 1px solid rgba(255, 122, 26, 0.6); color: #fff; font-size: 13px; z-index: 5; }
+.tut-hint .meta { margin-top: 3px; }

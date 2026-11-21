@@ -1,3 +1,4 @@
+import { TutorialHint } from './TutorialUI';
 import { useEffect, useState } from 'react';
 import { raceForDay } from '../game/races';
 import { engineAudio } from '../game/audio';
@@ -101,6 +102,7 @@ export function GarageUI() {
   return (
     <>
       <TopBar title={kind === 'expo' ? 'Autohaus' : 'Werkstatt'} />
+      <TutorialHint />
 
       {!open && (
         <>

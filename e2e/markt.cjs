@@ -116,6 +116,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.mouse.up(); await p.waitForTimeout(200);
   expect(brk > 0.3 && brk < 0.7 && (await p.evaluate(() => window.__gkDrive.input.brake)) === 0, 'Bremsregler dosierbar: halb ' + brk.toFixed(2) + ', losgelassen 0');
   // Rennspiel-Gefühl: Geschwindigkeitsrahmen erst bei hohem Tempo; Gas weg bei hoher Drehzahl mit Sportauspuff knallt
+  await p.evaluate(() => { const d = window.__gkDrive; d.sim.vx = 0; d.sim.vy = 0; d.input.throttle = 0; }); await p.waitForTimeout(700);
   expect(Number(await p.getByTestId('speedfx').evaluate((e) => getComputedStyle(e).opacity)) === 0, 'Geschwindigkeitsrahmen bei niedrigem Tempo aus');
   await p.evaluate(() => { const d = window.__gkDrive; d.sim.vx = 45; d.sim.rpm = d.spec.redline * 0.9; d.sim.lastThrottle = 1; d.input.throttle = 0; });
   await p.waitForTimeout(600);
@@ -143,6 +144,14 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.getByTestId('esp').click(); await p.waitForTimeout(300);
   expect(await p.getByTestId('free-drift').isVisible(), 'ESP aus: Driftmodus mit Punkteanzeige');
   await p.getByTestId('esp').click(); await p.waitForTimeout(300);
+  // ---------- Aufgabenbuch: Fortschritt in der Kopfleiste, erledigte Schritte abgehakt (Kauf, Probefahrt …) ----------
+  await p.evaluate(() => window.__gk.setState({ screen: 'garage', panel: null })); await p.waitForTimeout(800);
+  const tutTxt = await p.getByTestId('tutorial').textContent();
+  await p.getByTestId('tutorial').click(); await p.waitForTimeout(300);
+  const tutRows = await p.locator('[data-testid^=tut-]').allTextContents();
+  const doneRows = tutRows.filter((t) => t.includes('✅')).length;
+  expect(/📘 [1-9]\d*\/11/.test(tutTxt) && doneRows >= 1 && tutRows.some((t) => t.includes('👉')), 'Aufgabenbuch: ' + tutTxt.trim() + ' – ' + doneRows + ' abgehakt, nächster Schritt mit Anleitung');
+  await p.locator('.modal .close, .modal button[aria-label="Schließen"]').first().click().catch(() => p.keyboard.press('Escape')); await p.waitForTimeout(300);
   // ---------- Feierabend erst nach Ablauf des Spieltags (Timer) ----------
   await p.evaluate(() => { const g = window.__gk; window.__gkLib.dayClock.ms = 180000; g.setState({ dayStartedAt: Date.now(), screen: 'garage', panel: 'computer' }); });
   await p.waitForTimeout(400);
