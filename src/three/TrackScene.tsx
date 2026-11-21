@@ -7,6 +7,7 @@ import { createCar } from '../game/market';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { CAR_MODELS } from '../game/data/cars';
+import { engineOf } from '../game/data/components';
 import { DRIVE_MIN, driveInput, useDriveHud } from '../game/drive';
 import { activeDefects } from '../game/repair';
 import { engineAudio, roadAudio } from '../game/audio';
@@ -84,6 +85,14 @@ export function TrackScene() {
     return { dull, haze, fog, cover: weather === 'sun' ? 0 : weather === 'cloudy' ? 0.6 : 1, snowy: weather === 'snow' || road.cls === 'snow' };
   }, [weather, road]);
   const spec = useMemo(() => vehicleSpec(car), [car]);
+  // Klangeigenschaften für Lastwechsel: Turbo (Abblasen), Sportauspuff bzw. Tuning (Fehlzündungen im Schub, 0…1)
+  const sound = useMemo(() => {
+    const has = (c: string, v: string) => car.components[c]?.installed && car.components[c]?.variant === v;
+    const turbo = engineOf(car).turbo || !!car.motor?.turboKit;
+    const sport = has('downpipe', 'exhaust_sport') || has('muffler', 'muffler_sport') || has('exhaust_manifold', 'manifold_sport');
+    const map = car.ecu?.map ?? 0;
+    return { turbo, pops: sport ? 0.6 + map * 0.2 : map >= 2 ? 0.4 : 0 };
+  }, [car]);
   const fx = useMemo(() => new DriveEffects(), []);
   const body3 = BODY_SPECS[CAR_MODELS[car.modelId].body];
   const smoke = useMemo(() => {
@@ -112,7 +121,7 @@ export function TrackScene() {
     raceT: -3,
     cp: 0,
     drift: newDriftScore(),
-    cpAt: null as null | { x: number; z: number; heading: number; near: number; progress: number }, camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
+    cpAt: null as null | { x: number; z: number; heading: number; near: number; progress: number }, camYaw: undefined as number | undefined, away: false, tooShort: false, v: 0, near: 0, progress: 0, elapsed: 0, done: false, hud: 0, lastGear: 1, bump: 0, lastThrottle: 0, pops: 0, timeScale: 1, autopilot: 0, laySign: 0, respawn: 0 }));
   const camPos = useRef(new THREE.Vector3());
   const smokeRef = useRef<THREE.Mesh>(null);
 
@@ -528,7 +537,18 @@ export function TrackScene() {
 
     // --- Klang: echte Drehzahl und Last, Reifen und Wind; Getriebeschaden kracht beim Schalten
     engineAudio.set(s.rpm, driveInput.throttle);
-    roadAudio.set(onRoad ? Math.max(s.slide, s.wheelspin * 0.8) : 0, Math.abs(s.vx));
+    // loser Untergrund (abseits, Rallyepiste): Knirschen statt Quietschen
+    const looseNow = !onRoad || !!world.roadKind;
+    roadAudio.set(looseNow ? 0 : Math.max(s.slide, s.wheelspin * 0.8), Math.abs(s.vx), looseNow ? Math.min(1, Math.abs(s.vx) / 18) * (0.5 + s.slide * 0.5) : 0);
+    // Gas weg bei hoher Drehzahl: Turbo bläst ab, Sportauspuff bzw. Tuning knallt (Fehlzündungen im Schub)
+    const lift = s.lastThrottle > 0.7 && driveInput.throttle < 0.2 && s.rpm > spec.redline * 0.55;
+    if (lift && sound.turbo) roadAudio.blowoff(Math.min(1, s.rpm / spec.redline));
+    if (lift && sound.pops) s.pops = 0.7;
+    if (s.pops > 0) {
+      s.pops -= dt;
+      if (Math.random() < dt * 9) roadAudio.pop(sound.pops);
+    }
+    s.lastThrottle = driveInput.throttle;
     // Ausgeschlagenes Fahrwerk: Klacken, wenn die Querkraft in der Kurve die Richtung wechselt
     if (spec.faults.play > 0 && Math.abs(s.vx) > 6) {
       const sign = Math.sign(Math.round(s.ay));
@@ -560,6 +580,14 @@ export function TrackScene() {
         camPos.current.lerp(want, Math.min(1, dt * 5));
         camera.position.copy(camPos.current);
         camera.lookAt(s.x + fx * 2.5, s.y + 0.35, s.z + fz * 2.5);
+        // Kamerawackeln: hohes Tempo, unebener Boden, Einschlag – wie die Kamera in Rennspielen
+        const kmhNow = Math.abs(s.vx) * 3.6;
+        const shakeAmp = Math.max(0, kmhNow - 90) / 160 * 0.012 + (onRoad ? 0 : Math.min(1, kmhNow / 50) * 0.01) + Math.max(0, s.bump) * 0.05;
+        if (shakeAmp > 0.0005) {
+          const t = s.t;
+          camera.rotateX((Math.sin(t * 31) * 0.6 + Math.sin(t * 53) * 0.4) * shakeAmp);
+          camera.rotateY((Math.sin(t * 37 + 1) * 0.6 + Math.sin(t * 61) * 0.4) * shakeAmp * 0.6);
+        }
       } else {
         const eye = mode === 'hood' ? new THREE.Vector3(0.75, 1.22, 0) : new THREE.Vector3(-0.32, 1.13, -0.36);
         const look = mode === 'hood' ? new THREE.Vector3(30, 0.6, 0) : new THREE.Vector3(30, 0.5, -0.36);

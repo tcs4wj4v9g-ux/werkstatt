@@ -873,3 +873,13 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - **Technik** ab 8,5 m/s: vorn der Kühler, an einer vorderen Ecke Querlenker oder Spurstange, hinten der Endtopf. Das Bauteil wird defekt (unbekannt, also prüfen).
 - **Reparatur** in der Lackierkabine mit dem Schleifer: ausbeulen, spachteln, schleifen und grundieren (40 € Material), danach lackieren. Lackieren geht erst, wenn die Beule weg ist.
 - In der Fahrt erscheint der Hinweis „💥 Unfallschaden“ bzw. „– auch Technik prüfen“.
+
+## Rennspiel-Gefühl
+
+- **Kamera** (Verfolger): Leichtes Wackeln ab 90 km/h, auf unebenem Boden abseits der Straße und kurz nach einem Einschlag.
+- **Geschwindigkeitsrahmen** ab 100 km/h: dunkler Rand mit feinen Streifen, der zur Mitte ausblendet. Nur ein CSS-Verlauf (iPad-freundlich).
+- **Klang** (`roadAudio`):
+  - Reifenquietschen als Ton (Dreieck mit Vibrato), Tonhöhe und Lautstärke wachsen mit dem Rutschen.
+  - Knirschen auf losem Untergrund und auf Rallyepisten statt Quietschen.
+  - Turbo-Abblasen beim Gaswegnehmen über 55 % der Höchstdrehzahl (Turbo bzw. Turbo-Nachrüstung).
+  - Fehlzündungen im Schub mit Sportauspuff, Sport-Endtopf oder Fächerkrümmer bzw. ab Kennfeld Stufe 2.

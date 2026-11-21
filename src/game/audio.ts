@@ -595,7 +595,7 @@ export const engineAudio = {
  * Fahrgeräusche der Probefahrt: Reifenquietschen beim Rutschen, Fahrtwind mit dem Tempo, Krachen beim Schalten
  * (Getriebeschaden), Klacken ausgeschlagener Fahrwerksteile bei Lastwechseln und ein dumpfer Schlag bei Berührung der Leitplanke.
  */
-let road: { src: AudioBufferSourceNode; tire: GainNode; wind: GainNode } | null = null;
+let road: { src: AudioBufferSourceNode; tire: GainNode; wind: GainNode; gravel: GainNode; squeal: OscillatorNode; squealGain: GainNode; vib: OscillatorNode } | null = null;
 export const roadAudio = {
   start() {
     this.stop();
@@ -604,16 +604,67 @@ export const roadAudio = {
     const src = noise(c);
     const tire = band(c, src, 'bandpass', 1150, 3.5, master);
     const wind = band(c, src, 'lowpass', 520, 0.6, master);
+    // Knirschen auf Schotter, Matsch, Schnee: tiefes, körniges Rauschen
+    const gravel = band(c, src, 'bandpass', 620, 0.9, master);
+    // Reifenquietschen als Ton: Dreieck durch Bandpass, leichtes Vibrato (Gummi springt auf dem Asphalt)
+    const squeal = c.createOscillator();
+    squeal.type = 'triangle';
+    squeal.frequency.value = 900;
+    const vib = c.createOscillator();
+    vib.frequency.value = 23;
+    const vibAmt = c.createGain();
+    vibAmt.gain.value = 35;
+    vib.connect(vibAmt).connect(squeal.frequency);
+    const sqBand = c.createBiquadFilter();
+    sqBand.type = 'bandpass';
+    sqBand.frequency.value = 1100;
+    sqBand.Q.value = 2.2;
+    const squealGain = c.createGain();
+    squealGain.gain.value = 0.0001;
+    squeal.connect(sqBand).connect(squealGain).connect(master);
+    squeal.start();
+    vib.start();
     src.start();
-    road = { src, tire, wind };
+    road = { src, tire, wind, gravel, squeal, squealGain, vib };
   },
-  /** slide 0..1, Tempo in m/s */
-  set(slide: number, speed: number) {
+  /** slide 0..1 (Rutschen auf Asphalt), Tempo in m/s, loose 0..1 (Knirschen auf losem Untergrund) */
+  set(slide: number, speed: number, loose = 0) {
     const c = audio();
     if (!road || !c) return;
     const t = c.currentTime;
-    road.tire.gain.setTargetAtTime(Math.min(1, slide) * 0.09, t, 0.05);
+    const sl = Math.min(1, slide);
+    road.tire.gain.setTargetAtTime(sl * 0.06, t, 0.05);
+    // Ton: je stärker das Rutschen, desto höher und lauter
+    road.squealGain.gain.setTargetAtTime(sl > 0.08 ? sl ** 1.4 * 0.05 : 0.0001, t, 0.06);
+    road.squeal.frequency.setTargetAtTime(760 + sl * 520 + Math.min(40, speed) * 3, t, 0.08);
+    road.gravel.gain.setTargetAtTime(Math.min(1, loose) * 0.11, t, 0.08);
     road.wind.gain.setTargetAtTime(Math.min(1, speed / 55) ** 2 * 0.07, t, 0.2);
+  },
+  /** Turbo bläst beim Gaswegnehmen ab: kurzes, helles Zischen („pssscht“), lauter bei hoher Drehzahl */
+  blowoff(strength: number) {
+    const c = audio();
+    if (!c || !master) return;
+    const t = c.currentTime;
+    const src = noise(c);
+    const g = band(c, src, 'highpass', 2600, 0.7, master);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.07 + strength * 0.07, t + 0.03);
+    g.gain.setTargetAtTime(0.0001, t + 0.12, 0.12);
+    src.start(t);
+    src.stop(t + 0.8);
+  },
+  /** Fehlzündung im Schub (Sportauspuff): kurzer, trockener Knall aus dem Endrohr */
+  pop(strength: number) {
+    const c = audio();
+    if (!c || !master) return;
+    const t = c.currentTime;
+    const src = noise(c);
+    const g = band(c, src, 'bandpass', 320 + Math.random() * 260, 1.1, master);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.18 + strength * 0.2, t + 0.004);
+    g.gain.setTargetAtTime(0.0001, t + 0.01, 0.025);
+    src.start(t);
+    src.stop(t + 0.25);
   },
   /** kurzer Geräuschstoß: Schaltkrachen oder Anprall */
   hit(kind: 'crunch' | 'bump' | 'clunk') {
@@ -631,6 +682,9 @@ export const roadAudio = {
     if (!road) return;
     try {
       road.src.stop();
+      road.squeal.stop();
+      road.vib.stop();
+      road.squealGain.disconnect();
     } catch {
       /* bereits gestoppt */
     }

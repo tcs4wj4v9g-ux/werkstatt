@@ -329,3 +329,11 @@ details summary { cursor: pointer; margin: 6px 0; font-weight: 700; }
 .drift-score span { font-size: 13px; font-weight: 600; opacity: 0.75; }
 .drift-chain { font-size: 20px; font-weight: 800; color: #ffcf5a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .drift-chain b { color: #ff7a1a; margin-left: 4px; }
+
+/* Geschwindigkeitsrahmen der Fahrt: Rand dunkel mit feinen Streifen, die zur Mitte ausblenden */
+.speedfx { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.25s linear;
+  background:
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 48%, rgba(0, 0, 0, 0.58) 100%),
+    repeating-conic-gradient(from 0deg at 50% 52%, rgba(255, 255, 255, 0.13) 0deg 0.6deg, rgba(255, 255, 255, 0) 0.6deg 7deg);
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 45%, #000 85%);
+  mask-image: radial-gradient(ellipse at center, transparent 45%, #000 85%); }
