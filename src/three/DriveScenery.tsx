@@ -435,7 +435,7 @@ function build(w: DriveWorld) {
   return { rubber, tyres, ads, leitpfosten, land, kerbRed, kerbWhite, standGeo, water, w, tiles, road, shoulder, lines, rail, cone, crown, trunk, chunks: [...chunks.values()], box, roof, walls, roofs, wallColors, roofColors, winRows, pole, lampHead, poles, heads, groundMat, pad, marks, cones, coneGeo, gravel, baleGeo, baleMats, lake, fencePosts, fence };
 }
 
-export function DriveScenery({ world, snowy = false, wet = false, season = 'summer' }: { world: DriveWorld; snowy?: boolean; wet?: boolean; season?: Season }) {
+export function DriveScenery({ world, snowy = false, wet = false, season = 'summer', trees = 1, far = 800 }: { world: DriveWorld; snowy?: boolean; wet?: boolean; season?: Season; trees?: number; far?: number }) {
   const b = useMemo(() => {
     let x = built.get(world.id);
     if (!x) built.set(world.id, (x = build(world)));
@@ -478,6 +478,27 @@ export function DriveScenery({ world, snowy = false, wet = false, season = 'summ
     [],
   );
   const postGeo = useMemo(() => new THREE.BoxGeometry(0.12, 0.7, 0.12), []);
+  // Niedrige Grafikstufe: nur ein Teil der Bäume wird gezeichnet (fest nach Lage ausgewählt, Stamm und Krone gemeinsam).
+  // Als Hindernis bleiben alle Bäume bestehen – das ist nur Darstellung.
+  const treeChunks = useMemo(() => {
+    if (trees >= 1) return b.chunks;
+    const keep = (m: THREE.Matrix4) => {
+      const e = m.elements;
+      const h = Math.abs(Math.sin(e[12] * 12.9898 + e[14] * 78.233) * 43758.5453) % 1;
+      return h < trees;
+    };
+    return b.chunks.map((c) => {
+      const conifKeep = c.conif.map(keep);
+      const leafyKeep = c.leafy.map(keep);
+      return {
+        trunks: c.trunks.filter(keep),
+        conif: c.conif.filter((_, i) => conifKeep[i]),
+        conifColors: c.conifColors.filter((_, i) => conifKeep[i]),
+        leafy: c.leafy.filter((_, i) => leafyKeep[i]),
+        leafColors: c.leafColors.filter((_, i) => leafyKeep[i]),
+      };
+    });
+  }, [b, trees]);
   // Witterung und Jahreszeit: Schnee auf Wiesen und Bäumen, nasse (dunklere) Straße, Herbstlaub, kahler Winter
   const snowMat = useMemo(() => {
     const t = grassDetailTexture().clone();
@@ -536,9 +557,10 @@ export function DriveScenery({ world, snowy = false, wet = false, season = 'summ
         </mesh>
       ))}
       {b.water && <mesh geometry={b.water} material={mats.water} raycast={() => null} />}
-      <Mountains />
+      {/* Berge am Horizont liegen bei 680 m – nur mit großer Sichtweite */}
+      {far >= 700 && <Mountains />}
       <Instances geometry={postGeo} material={mats.post} matrices={b.rail.posts} />
-      {b.chunks.map((c, i) => (
+      {treeChunks.map((c, i) => (
         <group key={i}>
           <Instances geometry={b.trunk} material={mats.trunk} matrices={c.trunks} cull />
           {c.conif.length > 0 && <Instances geometry={b.cone} material={mats.conif} matrices={c.conif} colors={c.conifColors} cull />}

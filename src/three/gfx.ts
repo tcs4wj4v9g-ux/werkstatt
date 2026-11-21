@@ -17,12 +17,17 @@ export interface GfxSettings {
   decor: boolean;
   /** Anzahl der Punktlichter in der Halle. */
   lights: number;
+  /** Fahrwelt: Sichtweite (m), Anteil der gezeichneten Bäume, Wolken im Himmel, Menge des Niederschlags (Anteil). */
+  view: number;
+  trees: number;
+  clouds: boolean;
+  precip: number;
 }
 
 export const GFX: Record<GfxLevel, GfxSettings> = {
-  low: { dpr: 1, shadows: false, shadowMap: 512, antialias: false, detail: 0, clearcoat: false, decor: false, lights: 1 },
-  medium: { dpr: 1.5, shadows: true, shadowMap: 1024, antialias: true, detail: 1, clearcoat: true, decor: true, lights: 2 },
-  high: { dpr: 2, shadows: true, shadowMap: 2048, antialias: true, detail: 1, clearcoat: true, decor: true, lights: 4 },
+  low: { dpr: 1, shadows: false, shadowMap: 512, antialias: false, detail: 0, clearcoat: false, decor: false, lights: 1, view: 480, trees: 0.5, clouds: false, precip: 0.45 },
+  medium: { dpr: 1.5, shadows: true, shadowMap: 1024, antialias: true, detail: 1, clearcoat: true, decor: true, lights: 2, view: 760, trees: 1, clouds: true, precip: 1 },
+  high: { dpr: 2, shadows: true, shadowMap: 2048, antialias: true, detail: 1, clearcoat: true, decor: true, lights: 4, view: 900, trees: 1, clouds: true, precip: 1 },
 };
 export const GFX_LABEL: Record<GfxLevel, string> = { low: 'Niedrig', medium: 'Mittel', high: 'Hoch' };
 
