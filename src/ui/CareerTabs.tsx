@@ -1,5 +1,5 @@
 import { CarStatsCard } from './CarStatsCard';
-import { CoopRacePanel, CoopRaceTable } from './CoopRaceUI';
+import { CoopRacePanel, Leaderboard, CoopRaceTable } from './CoopRaceUI';
 import { leaveCoopRace } from '../net/coopRace';
 import { courseOf, driftTargets, MEDAL_LABEL, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
 import { weatherLabel } from '../game/grip';
@@ -238,6 +238,7 @@ export function RacesTab() {
         und Lenkwinkel-Kit helfen; ESP ist dabei aus). Das Wetter des Tages ({weatherLabel(s.day)}) macht die Straße nass oder glatt.
       </p>
       <CoopRacePanel />
+      <Leaderboard />
       {!race && <p className="bigline">Heute ist kein Rennen.</p>}
       {race && (
         <div className="shop-row col" data-testid="race-today">
