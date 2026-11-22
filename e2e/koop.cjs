@@ -359,8 +359,10 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await G(A, () => { window.__gkDrive.sim.drift.banked += 3000; }); await G(B, () => { window.__gkDrive.sim.drift.banked += 1200; });
   expect(await until(B, () => { const t = document.querySelector('[data-testid="coop-drift-live"]'); return !!t && /1\. Anna – 3\.000/.test(t.textContent); }, null, 15000), 'Spieler 2 sieht live: Spieler 1 führt mit 3.000 Punkten');
   for (const P of [A, B]) await G(P, () => { const d = window.__gkDrive; d.sim.autopilot = 24; d.sim.timeScale = 3; });
-  expect(await until(A, () => window.__gk.getState().panel === 'raceResult', null, 150000) && await until(B, () => window.__gk.getState().panel === 'raceResult', null, 150000), 'Beide im Ziel des Drift-Duells');
-  const dres = await G(B, () => { const r = window.__gk.getState().raceResult; return { pts: r.points, txt: (document.querySelector('[data-testid="coop-race-results"]') || {}).textContent }; });
+  // zwei Runden Motodrom – unter Last (drei Durchläufe parallel) dauert das, daher großzügig warten
+  expect(await until(A, () => window.__gk.getState().panel === 'raceResult', null, 300000) && await until(B, () => window.__gk.getState().panel === 'raceResult', null, 300000), 'Beide im Ziel des Drift-Duells');
+  await until(B, () => { const t = document.querySelector('[data-testid="coop-race-results"]'); return !!t && /Anna/.test(t.textContent) && /Du/.test(t.textContent); }, null, 15000);
+  const dres = await G(B, () => { const r = window.__gk.getState().raceResult; return { pts: r ? r.points : 0, txt: (document.querySelector('[data-testid="coop-race-results"]') || {}).textContent || '' }; });
   expect(dres.pts >= 1200 && /Anna.*3\.0\d\d Punkte.*Du.*1\.\d{3} Punkte/.test(dres.txt), 'Endstand nach Punkten: ' + dres.txt);
   for (const P of [A, B]) await G(P, () => window.__gk.getState().setPanel(null));
 
