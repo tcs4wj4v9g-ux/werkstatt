@@ -365,6 +365,9 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   const dres = await G(B, () => { const r = window.__gk.getState().raceResult; return { pts: r ? r.points : 0, txt: (document.querySelector('[data-testid="coop-race-results"]') || {}).textContent || '' }; });
   expect(dres.pts >= 1200 && /Anna.*3\.0\d\d Punkte.*Du.*1\.\d{3} Punkte/.test(dres.txt), 'Endstand nach Punkten: ' + dres.txt);
   for (const P of [A, B]) await G(P, () => window.__gk.getState().setPanel(null));
+  // Gemeinsame Bestenliste: beide Spieler mit ihren Namen, Zeiten (Koop-Rennen) und Driftpunkten (Drift-Duell)
+  const board = await until(B, () => { const b = window.__gk.getState().career.board || {}; const t = b.ost || {}; const d = b['motodrom:drift'] || {}; return Object.keys(t).length === 2 && Object.keys(d).length === 2 ? { t: Object.keys(t), d: d } : null; }, null, 20000);
+  expect(board && board.t.includes('Anna') && board.t.includes('Ben') && board.d.Anna.v >= 3000, 'Gemeinsame Bestenliste bei beiden: ' + JSON.stringify(board));
 
   // ---------- Test 7: Wiederbeitritt ----------
   const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools), stand: norm(await G(B, () => window.__gk.getState().cars[15])) };
