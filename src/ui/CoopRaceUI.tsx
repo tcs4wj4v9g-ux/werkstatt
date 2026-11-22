@@ -13,6 +13,7 @@ export function CoopRacePanel() {
   const g = useGame();
   const mine = useCoopRace();
   const [course, setCourse] = useState<CourseId>('ost');
+  const [mode, setMode] = useState<'race' | 'drift'>('race');
   if (coop.status === 'off') return null;
   const members = coop.members as unknown as RaceMember[];
   const lobbies = lobbiesOf(members, coop.me);
@@ -21,10 +22,14 @@ export function CoopRacePanel() {
   return (
     <div className="shop-row col" data-testid="coop-race">
       <b>🏁 Koop-Rennen gegeneinander</b>
-      <p className="meta">Jeder fährt sein eigenes Auto, ihr seht euch auf der Strecke und könnt euch berühren. Kein Startgeld, kein Preisgeld – es geht um die Ehre.</p>
+      <p className="meta">Jeder fährt sein eigenes Auto, ihr seht euch auf der Strecke und könnt euch berühren. Kein Startgeld, kein Preisgeld – es geht um die Ehre. Im <b>Drift-Duell</b> zählen Driftpunkte statt Zeit (ESP aus).</p>
       {lobbies.length === 0 && !mine.join && (
         <>
           <div className="row wrap">
+            <div className="row" role="group">
+              <button className={`btn ${mode === 'race' ? 'primary' : ''}`} data-testid="coop-mode-race" onClick={() => setMode('race')}>🏁 Rennen</button>
+              <button className={`btn ${mode === 'drift' ? 'primary' : ''}`} data-testid="coop-mode-drift" onClick={() => { setMode('drift'); if (course === 'ost') setCourse('motodrom'); }}>💨 Drift-Duell</button>
+            </div>
             <select data-testid="coop-race-course" value={course} onChange={(e) => setCourse(e.target.value as CourseId)}>
               {COURSE_IDS.map((id) => (
                 <option key={id} value={id}>{courseOf(id).name}{courseOf(id).laps > 1 ? ` (${courseOf(id).laps} Runden)` : ''}</option>
@@ -36,7 +41,7 @@ export function CoopRacePanel() {
             return (
               <div key={i} className="shop-row">
                 <div>{CAR_MODELS[c!.modelId].name}{blocker && <div className="meta bad">{blocker}</div>}</div>
-                <button className="btn primary" data-testid={`coop-race-host-${i}`} disabled={!!blocker} onClick={() => hostRace(course, i, carInfo(i))}>Ausschreiben</button>
+                <button className="btn primary" data-testid={`coop-race-host-${i}`} disabled={!!blocker} onClick={() => hostRace(course, i, carInfo(i), mode)}>Ausschreiben</button>
               </div>
             );
           })}
@@ -49,7 +54,7 @@ export function CoopRacePanel() {
         return (
           <div key={lobby.id} className="coop-lobby" data-testid="coop-lobby">
             <div>
-              <b>{isHost ? 'Dein Rennen' : `${host.name} lädt ein`}: {courseOf(lobby.course).name}</b>
+              <b>{isHost ? (lobby.mode === 'drift' ? 'Dein Drift-Duell' : 'Dein Rennen') : `${host.name} lädt ${lobby.mode === 'drift' ? 'zum Drift-Duell' : 'ein'}`}: {courseOf(lobby.course).name}</b>
               {lobby.startAt && <span className="meta"> · läuft</span>}
             </div>
             <div className="meta" data-testid="coop-lobby-members">
@@ -96,11 +101,11 @@ export function CoopRaceWatcher() {
       for (const { host, lobby } of lobbiesOf(members, c.me)) {
         if (host.id !== c.me && !announced.has(lobby.id) && !lobby.startAt) {
           announced.add(lobby.id);
-          g.say(`${host.name} schreibt ein Koop-Rennen aus (${courseOf(lobby.course).name}) – mitfahren am Computer unter „Rennen“.`);
+          g.say(`${host.name} schreibt ${lobby.mode === 'drift' ? 'ein Drift-Duell' : 'ein Koop-Rennen'} aus (${courseOf(lobby.course).name}) – mitfahren am Computer unter „Rennen“.`);
         }
         if (mine.join?.id === lobby.id && lobby.startAt && !entered.has(lobby.id) && syncedNow() < lobby.startAt + 15000 && !g.race && (g.screen === 'garage' || g.screen === 'market')) {
           entered.add(lobby.id);
-          g.enterCoopRace(mine.bay, lobby.id, lobby.course, lobby.startAt);
+          g.enterCoopRace(mine.bay, lobby.id, lobby.course, lobby.startAt, lobby.mode);
         }
       }
     }, 300);
@@ -110,7 +115,30 @@ export function CoopRaceWatcher() {
 }
 
 /** Endstand eines Koop-Rennens, live aus den Lagen der Mitspieler (wer noch fährt, steht mit Fortschritt da). */
-export function CoopRaceTable({ lobby }: { lobby: string }) {
+/** Drift-Duell live in der Fahrt: alle Teilnehmer nach Punkten. */
+export function CoopDriftLive({ lobby }: { lobby: string }) {
+  const coop = useCoop();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 400);
+    return () => clearInterval(t);
+  }, []);
+  const rows = (coop.members as unknown as RaceMember[])
+    .map((m) => ({ name: m.id === coop.me ? 'Du' : m.name, rr: m.id === coop.me ? coopRaceOut.car : m.presence.rr, you: m.id === coop.me }))
+    .filter((r) => r.rr && r.rr.id === lobby)
+    .sort((a, b) => (b.rr!.pts ?? 0) - (a.rr!.pts ?? 0));
+  return (
+    <div className="meta" data-testid="coop-drift-live">
+      {rows.map((r, i) => (
+        <div key={r.name} className={r.you ? 'good' : ''}>
+          {i + 1}. {r.name} – {(r.rr!.pts ?? 0).toLocaleString('de-DE')}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CoopRaceTable({ lobby, drift = false }: { lobby: string; drift?: boolean }) {
   const coop = useCoop();
   const [, tick] = useState(0);
   useEffect(() => {
@@ -120,12 +148,12 @@ export function CoopRaceTable({ lobby }: { lobby: string }) {
   const rows = (coop.members as unknown as RaceMember[])
     .map((m) => ({ name: m.id === coop.me ? 'Du' : m.name, rr: m.id === coop.me ? coopRaceOut.car : m.presence.rr, you: m.id === coop.me }))
     .filter((r) => r.rr && r.rr.id === lobby)
-    .sort((a, b) => (a.rr!.fin ?? Infinity) - (b.rr!.fin ?? Infinity) || b.rr!.p - a.rr!.p);
+    .sort((a, b) => (drift ? (b.rr!.pts ?? 0) - (a.rr!.pts ?? 0) : (a.rr!.fin ?? Infinity) - (b.rr!.fin ?? Infinity) || b.rr!.p - a.rr!.p));
   return (
     <div className="race-results" data-testid="coop-race-results">
       {rows.map((r, i) => (
         <div key={r.name} className={`race-row${r.you ? ' you' : ''}`}>
-          <b>{i + 1}.</b> <span>{r.name}</span> <span className="meta">{r.rr!.fin === null ? 'fährt noch …' : ''}</span> <span>{r.rr!.fin !== null ? raceClock(r.rr!.fin) : ''}</span>
+          <b>{i + 1}.</b> <span>{r.name}</span> <span className="meta">{r.rr!.fin === null ? 'fährt noch …' : ''}</span> <span>{drift ? `${(r.rr!.pts ?? 0).toLocaleString('de-DE')} Punkte` : r.rr!.fin !== null ? raceClock(r.rr!.fin) : ''}</span>
         </div>
       ))}
     </div>

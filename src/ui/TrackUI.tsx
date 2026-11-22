@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { leaveCoopRace } from '../net/coopRace';
+import { CoopDriftLive } from './CoopRaceUI';
 import { courseOf, driftTargets, raceClock, raceForDay, raceTargets, type Race } from '../game/races';
 import { FARMS, LAKE, PAD, WORKSHOP, type DriveWorld } from '../three/driveWorld';
 import { worldFor } from '../three/circuits';
@@ -291,7 +292,21 @@ function RaceHud() {
             {hud.laps > 1 && <b>Runde {Math.min(hud.laps, Math.floor(hud.cp / (hud.cpTotal / hud.laps)) + 1)}/{hud.laps} · </b>}
             Kontrollpunkt {Math.min(hud.cp, hud.cpTotal)}/{hud.cpTotal}
           </div>
-          <div className="race-targets">Koop-Rennen</div>
+          {coop.mode === 'drift' ? (
+            <>
+              <div className="drift-score" data-testid="drift-score">
+                {(hud.driftPts + hud.driftChain).toLocaleString('de-DE')} <span>Punkte</span>
+              </div>
+              {hud.driftChain > 0 && (
+                <div className="drift-chain">
+                  +{hud.driftChain.toLocaleString('de-DE')} <b>×{hud.driftCombo.toFixed(1).replace('.', ',')}</b>
+                </div>
+              )}
+              <CoopDriftLive lobby={coop.lobby} />
+            </>
+          ) : (
+            <div className="race-targets">Koop-Rennen</div>
+          )}
         </div>
       </>
     );
@@ -387,7 +402,7 @@ export function TrackUI() {
   const world = worldFor(worldId);
   const car = useGame((s) => s.cars[s.driveBay]);
   const lamps = car ? activeDefects(car).map((d) => DEFECTS[d].lamp).filter(Boolean) : [];
-  const driftRace = useGame((s) => !!s.race && !s.race.coop && raceForDay(s.day)?.kind === 'drift');
+  const driftRace = useGame((s) => (!!s.race && !s.race.coop && raceForDay(s.day)?.kind === 'drift') || s.race?.coop?.mode === 'drift');
   const [esp, setEspState] = useState(() => {
     // Driftwettbewerb: ESP von Anfang an aus (sonst fängt es jeden Drift ab); man kann es wieder einschalten
     if (driftRace) driveInput.assist = false;

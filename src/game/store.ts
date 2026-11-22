@@ -126,7 +126,7 @@ export interface GameState {
   lastSale: { title: string; price: number; profit: number; lines?: { label: string; amount: number }[] } | null;
   driveReport: string[] | null;
   /** Laufendes Zeitrennen (nur auf diesem Gerät) und Ergebnis des letzten. */
-  race: { id: string; bay: number; coop?: { lobby: string; course: CourseId; startAt: number } } | null;
+  race: { id: string; bay: number; coop?: { lobby: string; course: CourseId; startAt: number; mode?: 'race' | 'drift' } } | null;
   raceResult: RaceResult | null;
 
   newGame(): void;
@@ -166,7 +166,7 @@ export interface GameState {
   /** Mit diesem Auto beim heutigen Zeitrennen starten (Startgeld wird fällig). */
   startRace(bay: number): void;
   /** Koop-Rennen gegeneinander betreten (Startzeit vom Ausschreibenden, kein Startgeld, kein Preisgeld). */
-  enterCoopRace(bay: number, lobby: string, course: CourseId, startAt: number): void;
+  enterCoopRace(bay: number, lobby: string, course: CourseId, startAt: number, mode?: 'race' | 'drift'): void;
   /** Rennen beendet: Zeit in s (oder null = abgebrochen). Zahlt Preisgeld bzw. die Verbesserung aus. */
   finishRace(time: number | null, grid?: { place: number; table: RaceRow[] }, points?: number): void;
   finishDrive(completed: boolean): void;
@@ -1093,7 +1093,7 @@ export const useGame = create<GameState>()(
           set({ cars, money: s.money - race.fee, race: { id: race.id, bay }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
         },
 
-        enterCoopRace: (bay, lobby, course, startAt) => {
+        enterCoopRace: (bay, lobby, course, startAt, mode) => {
           const s = get();
           const car = s.cars[bay];
           if (!car) return;
@@ -1102,7 +1102,7 @@ export const useGame = create<GameState>()(
           stopEngine();
           const cars = [...s.cars];
           cars[bay] = { ...car, hoodOpen: false };
-          set({ cars, race: { id: `koop-${lobby}`, bay, coop: { lobby, course, startAt } }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
+          set({ cars, race: { id: `koop-${lobby}`, bay, coop: { lobby, course, startAt, ...(mode === 'drift' ? { mode } : {}) } }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
         },
 
         finishRace: (time, grid, points) => {
@@ -1127,7 +1127,7 @@ export const useGame = create<GameState>()(
               race: null,
               screen: 'garage',
               panel: 'raceResult',
-              raceResult: { title: `Koop-Rennen ${courseOf(run.coop.course).name}`, time, best: time, medal: null, payout: 0, prize: 0, targets: { gold: 0, silver: 0, bronze: 0 }, car: current ? CAR_MODELS[current.modelId].name : '', improved: false, place: null, table: null, coop: run.coop.lobby },
+              raceResult: { title: `${run.coop.mode === 'drift' ? 'Koop-Drift-Duell' : 'Koop-Rennen'} ${courseOf(run.coop.course).name}`, time, best: time, medal: null, payout: 0, prize: 0, targets: { gold: 0, silver: 0, bronze: 0 }, car: current ? CAR_MODELS[current.modelId].name : '', improved: false, place: null, table: null, coop: run.coop.lobby, ...(run.coop.mode === 'drift' ? { points: Math.round(points ?? 0) } : {}) },
             });
           }
           const race = raceForDay(s.day);

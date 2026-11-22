@@ -38,3 +38,7 @@ import { engineAudio } from './game/audio';
 import { createCar } from './game/market';
 import { movePlayer } from './three/player';
 (window as any).__gkLib = { raceForDay, soundProfile, createCar, movePlayer, travel, motor, defsOf, defOf, perf: performance, blockersOf, slots: SLOTS, models: CAR_MODELS, stations: stationActions, place, focus: useFocus, dayClock, workPose, REAR_BAY, BODY_SPECS, REAR_ENGINE, beneath };
+
+import { leaveCoopRace } from './net/coopRace';
+// Für Tests: Koop-Rennen verlassen (wie „Zur Werkstatt“ im Ergebnisfenster)
+(window as any).__gkCoopRace = { leave: leaveCoopRace };
