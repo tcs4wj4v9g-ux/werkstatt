@@ -174,3 +174,22 @@ describe('Ausgebauter Motor im Koop-Abgleich', () => {
     expect(restoreNoEngine(back)).toBe(back);
   });
 });
+
+describe('Karriere im Koop-Abgleich', () => {
+  it('feldweise, Bestenliste je Eintrag: Einträge zweier Spieler kollidieren nicht', async () => {
+    const { recordBoard } = await import('../game/board');
+    const { emptyCareer } = await import('../game/career');
+    const base = recordBoard(emptyCareer(), 'ost', false, 100, 'Golf', 1, 'Anna').career;
+    const prev = { career: base } as any;
+    const annaNext = { career: recordBoard(base, 'eifel', false, 200, 'Golf', 2, 'Anna').career } as any;
+    const benNext = { career: { ...recordBoard(base, 'ost', false, 90, 'M4', 2, 'Ben').career, racesWon: 1 } } as any;
+    const pa = diff(prev, annaNext).filter((p) => p.path[0] === 'career');
+    const pb = diff(prev, benNext).filter((p) => p.path[0] === 'career');
+    expect(pa.map((p) => p.path.join('.'))).toEqual(['career.board.eifel|Anna']);
+    expect(pb.map((p) => p.path.join('.')).sort()).toEqual(['career.board.ost|Ben', 'career.racesWon']);
+    // keine gemeinsamen Pfade → beide Änderungen gehen durch; zusammen angewendet sind alle drei Einträge da
+    const merged = apply(apply(prev, pa), pb) as any;
+    expect(Object.keys(merged.career.board).sort()).toEqual(['eifel|Anna', 'ost|Anna', 'ost|Ben']);
+    expect(merged.career.racesWon).toBe(1);
+  });
+});

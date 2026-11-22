@@ -5,7 +5,7 @@ import { COURSE_IDS, courseOf, raceClock, type CourseId } from '../game/races';
 import { driveBlocker } from '../game/repair';
 import { useGame } from '../game/store';
 import { sendChat, syncedNow, useCoop } from '../net/coop';
-import { boardNews, boardRows, boardWho } from '../game/board';
+import { boardNews, boardRows, boardWho, hasBoard, latestKey } from '../game/board';
 import { coopRaceOut, hostRace, joinRace, leaveCoopRace, lobbiesOf, participantsOf, startCoopRace, useCoopRace, type RaceMember } from '../net/coopRace';
 
 /** Im Koop: Rennen gegeneinander ausschreiben, mitfahren, starten (Reiter „Rennen“ am Computer). */
@@ -179,11 +179,7 @@ export function Leaderboard() {
   const board = useGame((s) => s.career.board);
   const coop = useCoop((c) => c.status !== 'off');
   // zuerst die Strecke mit dem jüngsten Eintrag zeigen
-  const latest = () => {
-    let best: { k: string; day: number } | null = null;
-    for (const [k, row] of Object.entries(board ?? {})) for (const e of Object.values(row)) if (!best || e.day >= best.day) best = { k, day: e.day };
-    return best?.k ?? 'ost';
-  };
+  const latest = () => latestKey(board) ?? 'ost';
   const [course, setCourse] = useState<CourseId>(() => latest().split(':')[0] as CourseId);
   const [drift, setDrift] = useState(() => latest().endsWith(':drift'));
   const rows = boardRows(board, course, drift);
@@ -198,7 +194,7 @@ export function Leaderboard() {
         </div>
         <select data-testid="board-course" value={course} onChange={(e) => setCourse(e.target.value as CourseId)}>
           {COURSE_IDS.map((id) => (
-            <option key={id} value={id}>{courseOf(id).name}{board?.[drift ? `${id}:drift` : id] ? ' ●' : ''}</option>
+            <option key={id} value={id}>{courseOf(id).name}{hasBoard(board, id, drift) ? ' ●' : ''}</option>
           ))}
         </select>
       </div>
