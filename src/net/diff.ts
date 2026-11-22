@@ -63,6 +63,15 @@ export function diff(prev: Shared, next: Shared, vers: Record<string, number> = 
     if (same(a, b)) continue;
     if (BY_VERSION.has(key)) out.push({ path: [key], ver: vers[key] ?? 0, after: val(b) });
     else if (PER_ENTRY.has(key) && !nil(a) && !nil(b)) entries([key], a, b, out);
+    else if (key === 'career' && isObj(a) && isObj(b)) {
+      // Karriere feldweise; die Bestenliste sogar je Eintrag (Strecke|Spieler) – zwei Spieler, die gleichzeitig
+      // ein Rennen beenden, kommen sich so nicht in die Quere (sonst würde die zweite Änderung verworfen).
+      for (const f of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        if (same(a[f], b[f])) continue;
+        if (f === 'board' && isObj(a[f]) && isObj(b[f])) entries(['career', 'board'], a[f], b[f], out);
+        else out.push({ path: ['career', f], before: val(a[f]), after: val(b[f]) });
+      }
+    }
     else if (key === 'cars' && Array.isArray(a) && Array.isArray(b) && a.length === b.length) {
       for (let i = 0; i < a.length; i++) {
         const ca = a[i];

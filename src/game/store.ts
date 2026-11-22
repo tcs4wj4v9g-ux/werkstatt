@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { courseOf, driftTargets, payoutFor, raceBlocker, raceForDay, raceTargets, type CourseId, type Medal } from './races';
+import { courseOf, driftTargets, payoutFor, raceBlocker, raceClock, raceForDay, raceTargets, type CourseId, type Medal } from './races';
 import { emptyPlayTime, type PlayTime } from './playtime';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
@@ -16,6 +16,7 @@ import { FLUID_PRODUCTS } from './data/fluids';
 import { PARTS } from './data/parts';
 import { availableSlots, isJunk, isLift, isShowcase, isStand, SHOWROOM_BONUS, SLOT_COUNT, SLOTS, STAND_SLOT, STAND_SLOTS, UPGRADES, type UpgradeId } from './data/workshop';
 import { applyCrash, crashNow, newCrash } from './crash';
+import { boardNews, boardWho, recordBoard } from './board';
 import { createZones, PAINT_COLORS, PAINT_TOOLS, paintAction, WASH_TOOLS, washAction } from './detail';
 import { extraWorkEvent, rollEvents } from './events';
 import * as fluids from './fluids';
@@ -412,6 +413,20 @@ export interface RaceRow {
  * Unfallschäden der gerade beendeten Fahrt aufs Auto übertragen (auch bei abgebrochener Fahrt – Beulen bleiben).
  * Liest und leert das Protokoll der Fahrszene (`crashNow`).
  */
+/** Bestenliste nachtragen; fällt dabei die Bestmarke eines Mitspielers, wird es angesagt (im Koop im Chat). */
+function boardUpdate(career: Career, course: string, drift: boolean, v: number, car: string, day: number): Career {
+  const r = recordBoard(career, course, drift, v, car, day);
+  if (r.beat) {
+    const what = drift ? `${Math.round(v).toLocaleString('de-DE')} Driftpunkten` : `${raceClock(v)}`;
+    const text = `🏆 ${boardWho.name} hat ${r.beat} auf ${courseOf(course as CourseId).name} geschlagen – neue Bestmarke mit ${what}.`;
+    setTimeout(() => {
+      boardNews.on?.(text);
+      useGame.getState().say(text);
+    }, 1500);
+  }
+  return r.career;
+}
+
 function bankCrash(get: () => GameState, set: (p: Partial<GameState>) => void, bay: number) {
   const log = crashNow.log;
   crashNow.log = newCrash();
@@ -1122,8 +1137,11 @@ export const useGame = create<GameState>()(
               for (const z of Object.values(car.zones)) z.dirt = Math.min(1, z.dirt + 0.08);
               cars[run.bay] = car;
             }
+            const cdrift = run.coop.mode === 'drift';
+            const cb = boardUpdate(s.career, run.coop.course, cdrift, cdrift ? points ?? 0 : time, current ? CAR_MODELS[current.modelId].name : '', s.day);
             return set({
               cars,
+              career: cb,
               race: null,
               screen: 'garage',
               panel: 'raceResult',
@@ -1152,6 +1170,7 @@ export const useGame = create<GameState>()(
             racePaid: keep(s.career.racePaid ?? {}, Math.max(paid, prize)),
             racesWon: (s.career.racesWon ?? 0) + (medal === 'gold' && paid < race.prize.gold ? 1 : 0),
           };
+          const careerB = boardUpdate(career, race.course, drift, drift ? pts : time, current ? CAR_MODELS[current.modelId].name : '', s.day);
           const cars = [...s.cars];
           if (current) {
             const car = clone(current);
@@ -1163,7 +1182,7 @@ export const useGame = create<GameState>()(
           set({
             cars,
             money: s.money + payout,
-            career,
+            career: careerB,
             race: null,
             screen: 'garage',
             panel: 'raceResult',

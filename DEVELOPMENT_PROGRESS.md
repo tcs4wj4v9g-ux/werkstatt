@@ -907,3 +907,11 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - Im Drift-Duell zählt jedes Gerät seine eigenen Driftpunkte (gleiche Wertung wie im Driftwettbewerb, ESP aus) und schickt sie in der Rennlage mit (`RaceCar.pts`). Am Server ändert sich nichts.
 - In der Fahrt sieht man die eigenen Punkte mit Kombo und eine Live-Tabelle aller Teilnehmer, der Platz richtet sich nach Punkten. Ergebnisfenster „Drift-Duell“ mit Endstand nach Punkten.
 - Test in `koop.cjs`: Einladung, gemeinsamer Start, Live-Tabelle beim Mitspieler, Endstand.
+
+## Koop: gemeinsame Bestenliste
+
+- Je Strecke die Bestzeit jedes Spielers (Zeitrennen, Rennen gegen Gegner, Rallye, Koop-Rennen) und die meisten Driftpunkte (Driftwettbewerb, Drift-Duell), jeweils mit Auto und Tag (`game/board.ts`, `career.board`).
+- Im Koop steht jeder Spieler unter seinem eigenen Namen, im Einzelspieler als „Du“. Fällt eine fremde Bestmarke, kommt eine Ansage im Koop-Chat.
+- Ansicht am Computer unter „Rennen“ → „🏆 Bestenliste“, umschaltbar zwischen Zeiten und Driftpunkten, Streckenwahl. Zuerst gezeigt wird die Strecke mit dem jüngsten Eintrag.
+- **Abgleich:** Die Karriere wird im Koop jetzt feldweise abgeglichen, die Bestenliste sogar je Eintrag (Schlüssel „Strecke|Spieler“). Vorher wurde die ganze Karriere als ein Feld abgeglichen. Beendeten zwei Spieler fast gleichzeitig ein Rennen, ging die zweite Änderung verloren (auch Bestzeiten und gewonnene Rennen). Die leere Liste wird beim Öffnen der Werkstatt angelegt. Keine Änderung am Server.
+- Tests: `board.test.ts`, `diff.test.ts` (Einträge zweier Spieler kollidieren nicht), `karriere.cjs` (Ansicht), `koop.cjs` (beide Spieler bei beiden Geräten gleich).

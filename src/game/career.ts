@@ -28,9 +28,11 @@ export interface Career {
   raceBest: Record<string, number>;
   racePaid: Record<string, number>;
   racesWon: number;
+  /** Bestenliste je Strecke (siehe board.ts). */
+  board?: import('./board').Board;
 }
 export const emptyCareer = (): Career => ({
-  bestSale: 0, bestProfit: 0, barnSold: 0, auctionsWon: 0, layouts: [], dieselFixed: 0, turboFixed: 0, severeFixed: 0, dynoRuns: 0, cleanSales: 0, competitionsWon: 0, meetsWon: 0, raceBest: {}, racePaid: {}, racesWon: 0,
+  bestSale: 0, bestProfit: 0, barnSold: 0, auctionsWon: 0, layouts: [], dieselFixed: 0, turboFixed: 0, severeFixed: 0, dynoRuns: 0, cleanSales: 0, competitionsWon: 0, meetsWon: 0, raceBest: {}, racePaid: {}, racesWon: 0, board: {},
 });
 
 /** Alles, woran ein Erfolg hängen kann. */

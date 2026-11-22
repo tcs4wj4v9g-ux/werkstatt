@@ -4,7 +4,8 @@ import { isFleet } from '../game/data/workshop';
 import { COURSE_IDS, courseOf, raceClock, type CourseId } from '../game/races';
 import { driveBlocker } from '../game/repair';
 import { useGame } from '../game/store';
-import { syncedNow, useCoop } from '../net/coop';
+import { sendChat, syncedNow, useCoop } from '../net/coop';
+import { boardNews, boardRows, boardWho, hasBoard, latestKey } from '../game/board';
 import { coopRaceOut, hostRace, joinRace, leaveCoopRace, lobbiesOf, participantsOf, startCoopRace, useCoopRace, type RaceMember } from '../net/coopRace';
 
 /** Im Koop: Rennen gegeneinander ausschreiben, mitfahren, starten (Reiter „Rennen“ am Computer). */
@@ -89,6 +90,23 @@ export function CoopRacePanel() {
  * (auch aus der Werkstatt heraus). Neue Ausschreibungen von Mitspielern werden kurz angesagt.
  */
 export function CoopRaceWatcher() {
+  // Bestenliste: im Koop unter dem Koop-Namen eintragen, gefallene Bestmarken im Chat ansagen
+  useEffect(() => {
+    // eigener Spielername aus der Mitgliederliste (useCoop.name ist der Name der Werkstatt)
+    const apply = (c: ReturnType<typeof useCoop.getState>) => {
+      const me = c.status !== 'off' ? (c.members as unknown as RaceMember[]).find((m) => m.id === c.me)?.name : null;
+      boardWho.name = me || 'Du';
+    };
+    apply(useCoop.getState());
+    const off = useCoop.subscribe(apply);
+    boardNews.on = (text) => {
+      if (useCoop.getState().status !== 'off') void sendChat(text);
+    };
+    return () => {
+      off();
+      boardNews.on = null;
+    };
+  }, []);
   useEffect(() => {
     const entered = new Set<string>();
     const announced = new Set<string>();
@@ -156,6 +174,43 @@ export function CoopRaceTable({ lobby, drift = false }: { lobby: string; drift?:
           <b>{i + 1}.</b> <span>{r.name}</span> <span className="meta">{r.rr!.fin === null ? 'fährt noch …' : ''}</span> <span>{drift ? `${(r.rr!.pts ?? 0).toLocaleString('de-DE')} Punkte` : r.rr!.fin !== null ? raceClock(r.rr!.fin) : ''}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Bestenliste je Strecke (Zeiten und Driftpunkte aller Spieler); am Computer unter „Rennen“. */
+export function Leaderboard() {
+  const board = useGame((s) => s.career.board);
+  const coop = useCoop((c) => c.status !== 'off');
+  // zuerst die Strecke mit dem jüngsten Eintrag zeigen
+  const latest = () => latestKey(board) ?? 'ost';
+  const [course, setCourse] = useState<CourseId>(() => latest().split(':')[0] as CourseId);
+  const [drift, setDrift] = useState(() => latest().endsWith(':drift'));
+  const rows = boardRows(board, course, drift);
+  const any = !!board && Object.keys(board).length > 0;
+  return (
+    <div className="shop-row col" data-testid="leaderboard">
+      <b>🏆 Bestenliste{coop ? ' der Werkstatt' : ''}</b>
+      <div className="row wrap">
+        <div className="row" role="group">
+          <button className={`btn ${!drift ? 'primary' : ''}`} onClick={() => setDrift(false)}>⏱ Zeiten</button>
+          <button className={`btn ${drift ? 'primary' : ''}`} data-testid="board-drift" onClick={() => setDrift(true)}>💨 Driftpunkte</button>
+        </div>
+        <select data-testid="board-course" value={course} onChange={(e) => setCourse(e.target.value as CourseId)}>
+          {COURSE_IDS.map((id) => (
+            <option key={id} value={id}>{courseOf(id).name}{hasBoard(board, id, drift) ? ' ●' : ''}</option>
+          ))}
+        </select>
+      </div>
+      {!any && <div className="meta">Noch keine Einträge – fahr ein Rennen, eine Rallye oder einen Driftwettbewerb.</div>}
+      {any && rows.length === 0 && <div className="meta">Auf dieser Strecke noch kein Eintrag ({drift ? 'Driftpunkte' : 'Zeit'}).</div>}
+      <div className="race-results" data-testid="board-rows">
+        {rows.map((r, i) => (
+          <div key={r.name} className={`race-row${r.name === boardWho.name ? ' you' : ''}`}>
+            <b>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}</b> <span>{r.name}</span> <span className="meta">{r.car} · Tag {r.day}</span> <span>{drift ? `${r.v.toLocaleString('de-DE')} P.` : raceClock(r.v)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

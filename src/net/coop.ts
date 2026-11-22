@@ -421,6 +421,12 @@ function loadState(s: any, entering: boolean) {
     });
     dirty = true;
   }
+  // Bestenliste von Anfang an anlegen: legten zwei Spieler sie beim ersten Rennen gleichzeitig an, ginge ein Eintrag verloren
+  const cg = useGame.getState().career;
+  if (cg && !cg.board) {
+    useGame.setState({ career: { ...cg, board: {} } });
+    dirty = true;
+  }
   fixOldCars();
 }
 

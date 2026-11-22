@@ -257,6 +257,15 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.screenshot({ path: S + '/drift-ergebnis.png' });
   await G(() => window.__gk.getState().setPanel(null));
 
+  // ---------- Bestenliste: Zeiten und Driftpunkte der gefahrenen Rennen am Computer unter „Rennen“ ----------
+  await G(() => window.__gk.getState().setPanel('computer')); await p.waitForTimeout(400);
+  await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
+  const boardTimes = await p.getByTestId('board-rows').locator('.race-row').count();
+  await p.getByTestId('board-drift').click(); await p.waitForTimeout(200);
+  const anyDrift = await G(() => Object.keys(window.__gk.getState().career.board || {}).some((k) => k.includes(':drift|')));
+  expect(boardTimes + (await p.getByTestId('board-rows').locator('.race-row').count()) >= 1 && anyDrift, 'Bestenliste mit Einträgen (Zeiten und Driftpunkte): ' + Object.keys(await G(() => window.__gk.getState().career.board)).join(', '));
+  await G(() => window.__gk.getState().setPanel(null));
+
   // ---------- Unfallschaden: Einschlag bei der Probefahrt bleibt am Auto (auch bei Abbruch), Akte zeigt Beulen ----------
   await G(() => { const g = window.__gk; const s = g.getState(); const cars = [...s.cars]; const c = window.__gkLib.createCar('bavaria_330', [], Math.random, { year: 2005 }); for (const k of Object.keys(c.components)) c.components[k].condition = 'ok'; c.fluids.oil.level = 4; cars[0] = c; g.setState({ cars, panel: null }); g.getState().startDrive(0); });
   await p.waitForTimeout(2500);
