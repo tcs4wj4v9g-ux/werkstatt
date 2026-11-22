@@ -262,7 +262,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
   const boardTimes = await p.getByTestId('board-rows').locator('.race-row').count();
   await p.getByTestId('board-drift').click(); await p.waitForTimeout(200);
-  const anyDrift = await G(() => Object.keys(window.__gk.getState().career.board || {}).some((k) => k.endsWith(':drift')));
+  const anyDrift = await G(() => Object.keys(window.__gk.getState().career.board || {}).some((k) => k.includes(':drift|')));
   expect(boardTimes + (await p.getByTestId('board-rows').locator('.race-row').count()) >= 1 && anyDrift, 'Bestenliste mit Einträgen (Zeiten und Driftpunkte): ' + Object.keys(await G(() => window.__gk.getState().career.board)).join(', '));
   await G(() => window.__gk.getState().setPanel(null));
 

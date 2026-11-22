@@ -92,7 +92,11 @@ export function CoopRacePanel() {
 export function CoopRaceWatcher() {
   // Bestenliste: im Koop unter dem Koop-Namen eintragen, gefallene Bestmarken im Chat ansagen
   useEffect(() => {
-    const apply = (c: ReturnType<typeof useCoop.getState>) => void (boardWho.name = c.status !== 'off' && c.name ? c.name : 'Du');
+    // eigener Spielername aus der Mitgliederliste (useCoop.name ist der Name der Werkstatt)
+    const apply = (c: ReturnType<typeof useCoop.getState>) => {
+      const me = c.status !== 'off' ? (c.members as unknown as RaceMember[]).find((m) => m.id === c.me)?.name : null;
+      boardWho.name = me || 'Du';
+    };
     apply(useCoop.getState());
     const off = useCoop.subscribe(apply);
     boardNews.on = (text) => {
