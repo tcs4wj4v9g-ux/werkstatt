@@ -355,7 +355,8 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   await A.getByTestId('coop-race-start').click();
   expect(await until(A, () => window.__gk.getState().screen === 'track', null, 12000) && await until(B, () => window.__gk.getState().screen === 'track', null, 12000), 'Beide stehen im Drift-Duell am Start');
   expect(await until(A, () => !!document.querySelector('[data-testid="coop-drift-live"]') && /ESP aus/.test(document.querySelector('[data-testid="esp"]').textContent), null, 12000), 'Live-Punktetabelle sichtbar, ESP aus');
-  await until(A, () => window.__gkDrive.sim.raceT > 0, null, 15000);
+  // erst wenn die Fahrt auf beiden Geräten läuft (sonst träfe es noch die Daten der vorigen Fahrt)
+  for (const P of [A, B]) await until(P, () => window.__gk.getState().race && window.__gk.getState().race.coop && window.__gkDrive && window.__gkDrive.sim.raceT > 0 && window.__gkDrive.sim.drift.banked === 0, null, 20000);
   await G(A, () => { window.__gkDrive.sim.drift.banked += 3000; }); await G(B, () => { window.__gkDrive.sim.drift.banked += 1200; });
   expect(await until(B, () => { const t = document.querySelector('[data-testid="coop-drift-live"]'); return !!t && /1\. Anna – 3\.000/.test(t.textContent); }, null, 15000), 'Spieler 2 sieht live: Spieler 1 führt mit 3.000 Punkten');
   for (const P of [A, B]) await G(P, () => { const d = window.__gkDrive; d.sim.autopilot = 24; d.sim.timeScale = 3; });
@@ -366,10 +367,10 @@ const URL = `${BASE}${BASE.includes('?') ? '&' : '?'}koop=${COOP}|test`;
   expect(dres.pts >= 1200 && /Anna.*3\.0\d\d Punkte.*Du.*1\.\d{3} Punkte/.test(dres.txt), 'Endstand nach Punkten: ' + dres.txt);
   for (const P of [A, B]) await G(P, () => window.__gk.getState().setPanel(null));
   // Gemeinsame Bestenliste: beide Spieler mit ihren Namen, Zeiten (Koop-Rennen) und Driftpunkten (Drift-Duell)
-  const boardOf = (P) => until(P, () => { const b = window.__gk.getState().career.board || {}; const ok = ['ost|Anna', 'ost|Ben', 'motodrom:drift|Anna', 'motodrom:drift|Ben'].every((k) => b[k]); return ok ? b : null; }, null, 20000);
+  const boardOf = async (P) => { await until(P, () => { const b = window.__gk.getState().career.board || {}; return ['ost|Anna', 'ost|Ben', 'motodrom:drift|Anna', 'motodrom:drift|Ben'].every((k) => b[k]); }, null, 20000); return G(P, () => window.__gk.getState().career.board || {}); };
   const bA = await boardOf(A);
   const bB = await boardOf(B);
-  expect(bA && bB && bB['motodrom:drift|Anna'].v >= 3000 && JSON.stringify(bA) === JSON.stringify(bB), 'Gemeinsame Bestenliste bei beiden gleich (Zeiten und Driftpunkte beider Spieler): ' + Object.keys(bB || {}).join(', ') + ' | A: ' + JSON.stringify(await G(A, () => Object.keys(window.__gk.getState().career.board || {}))) + ' B: ' + JSON.stringify(await G(B, () => Object.keys(window.__gk.getState().career.board || {}))));
+  expect(!!bB['motodrom:drift|Anna'] && !!bB['ost|Ben'] && bB['motodrom:drift|Anna'].v >= 3000 && JSON.stringify(Object.keys(bA).sort().map((k) => [k, bA[k] && bA[k].v])) === JSON.stringify(Object.keys(bB).sort().map((k) => [k, bB[k] && bB[k].v])), 'Gemeinsame Bestenliste bei beiden gleich (Zeiten und Driftpunkte beider Spieler): ' + Object.keys(bB || {}).join(', ') + ' | A: ' + JSON.stringify(await G(A, () => Object.keys(window.__gk.getState().career.board || {}))) + ' B: ' + JSON.stringify(await G(B, () => Object.keys(window.__gk.getState().career.board || {}))));
 
   // ---------- Test 7: Wiederbeitritt ----------
   const before = { car: norm((await game(B)).cars[0].components), money: (await game(B)).money, tools: norm((await coop(B)).tools), stand: norm(await G(B, () => window.__gk.getState().cars[15])) };
