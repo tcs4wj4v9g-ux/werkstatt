@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { courseOf, driftTargets, payoutFor, raceBlocker, raceClock, raceForDay, raceTargets, type CourseId, type Medal } from './races';
+import { courseOf, DIFFICULTY, driftTargets, payoutFor, raceBlocker, raceClock, raceForDay, racePrize, raceTargets, type CourseId, type Difficulty, type Medal } from './races';
 import { emptyPlayTime, type PlayTime } from './playtime';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { gatedStorage, saveGate } from './saveGate';
@@ -127,7 +127,7 @@ export interface GameState {
   lastSale: { title: string; price: number; profit: number; lines?: { label: string; amount: number }[] } | null;
   driveReport: string[] | null;
   /** Laufendes Zeitrennen (nur auf diesem Gerät) und Ergebnis des letzten. */
-  race: { id: string; bay: number; coop?: { lobby: string; course: CourseId; startAt: number; mode?: 'race' | 'drift' } } | null;
+  race: { id: string; bay: number; diff?: Difficulty; coop?: { lobby: string; course: CourseId; startAt: number; mode?: 'race' | 'drift' } } | null;
   raceResult: RaceResult | null;
 
   newGame(): void;
@@ -165,7 +165,8 @@ export interface GameState {
   revEngine(): void;
   startDrive(bay: number): void;
   /** Mit diesem Auto beim heutigen Zeitrennen starten (Startgeld wird fällig). */
-  startRace(bay: number): void;
+  /** Rennen des Tages starten; bei Rennen gegen Gegner mit Schwierigkeitsgrad (Standard Mittel). */
+  startRace(bay: number, diff?: Difficulty): void;
   /** Koop-Rennen gegeneinander betreten (Startzeit vom Ausschreibenden, kein Startgeld, kein Preisgeld). */
   enterCoopRace(bay: number, lobby: string, course: CourseId, startAt: number, mode?: 'race' | 'drift'): void;
   /** Rennen beendet: Zeit in s (oder null = abgebrochen). Zahlt Preisgeld bzw. die Verbesserung aus. */
@@ -1091,7 +1092,7 @@ export const useGame = create<GameState>()(
           set({ cars, driveBay: bay, screen: 'track', panel: null, driveReport: null });
         },
 
-        startRace: (bay) => {
+        startRace: (bay, diff = 'medium') => {
           const s = get();
           const car = s.cars[bay];
           const race = raceForDay(s.day);
@@ -1105,7 +1106,7 @@ export const useGame = create<GameState>()(
           stopEngine();
           const cars = [...s.cars];
           cars[bay] = { ...car, hoodOpen: false };
-          set({ cars, money: s.money - race.fee, race: { id: race.id, bay }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
+          set({ cars, money: s.money - race.fee, race: { id: race.id, bay, ...(race.kind === 'grid' ? { diff } : {}) }, driveBay: bay, screen: 'track', panel: null, driveReport: null, raceResult: null });
         },
 
         enterCoopRace: (bay, lobby, course, startAt, mode) => {
@@ -1157,7 +1158,8 @@ export const useGame = create<GameState>()(
           const paid = (s.career.racePaid ?? {})[race.id] ?? 0;
           const drift = race.kind === 'drift';
           const pts = drift ? Math.max(0, Math.round(points ?? 0)) : 0;
-          const { medal, prize, payout } = payoutFor(race, time, paid, grid?.place, pts);
+          const diff = run.diff ?? 'medium';
+          const { medal, prize, payout } = payoutFor(race, time, paid, grid?.place, pts, diff);
           const before = (s.career.raceBest ?? {})[race.id];
           // Drift: Bestwert sind die meisten Punkte; sonst die kürzeste Zeit
           const score = drift ? pts : time;
@@ -1168,7 +1170,7 @@ export const useGame = create<GameState>()(
             ...s.career,
             raceBest: keep(s.career.raceBest ?? {}, best),
             racePaid: keep(s.career.racePaid ?? {}, Math.max(paid, prize)),
-            racesWon: (s.career.racesWon ?? 0) + (medal === 'gold' && paid < race.prize.gold ? 1 : 0),
+            racesWon: (s.career.racesWon ?? 0) + (medal === 'gold' && paid < racePrize(race, diff).gold ? 1 : 0),
           };
           const careerB = boardUpdate(career, race.course, drift, drift ? pts : time, current ? CAR_MODELS[current.modelId].name : '', s.day);
           const cars = [...s.cars];
@@ -1186,7 +1188,7 @@ export const useGame = create<GameState>()(
             race: null,
             screen: 'garage',
             panel: 'raceResult',
-            raceResult: { title: race.title, time, best, medal, payout, prize, targets: drift ? driftTargets(race) : raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && (drift ? score > before : score < before), place: grid?.place ?? null, table: grid?.table ?? null, ...(drift ? { points: pts } : {}) },
+            raceResult: { title: race.kind === 'grid' ? `${race.title} · ${DIFFICULTY[diff].name}` : race.title, time, best, medal, payout, prize, targets: drift ? driftTargets(race) : raceTargets(race), car: current ? CAR_MODELS[current.modelId].name : '', improved: before !== undefined && (drift ? score > before : score < before), place: grid?.place ?? null, table: grid?.table ?? null, ...(drift ? { points: pts } : {}) },
           });
         },
 

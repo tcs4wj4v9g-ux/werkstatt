@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { remotePlayers, syncedNow, useCoop } from '../net/coop';
 import { coopRaceOut, participantsOf } from '../net/coopRace';
 import { textTexture } from './textures';
-import { aiInput, courseOf, driftStep, driftTotal, newDriftScore, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
+import { aiInput, courseOf, driftStep, driftTotal, newDriftScore, opponentFor, opponentSpec, PLAYER_GRID, raceForDay } from '../game/races';
 import { createCar } from '../game/market';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -59,6 +59,7 @@ export function TrackScene() {
   const coop = raceRun?.coop ?? null;
   /** Koop-Drift-Duell: Punkte statt Zeit (jedes Gerät zählt seine eigenen, die Lage trägt sie zu den anderen). */
   const coopDrift = coop?.mode === 'drift';
+  const diff = raceRun?.diff ?? 'medium';
   const race = useMemo(() => (raceRun && !coop ? raceForDay(day) : null), [raceRun, coop, day]);
   const course = useMemo(() => (race ? courseOf(race.course) : coop ? courseOf(coop.course) : null), [race, coop]);
   // Koop-Rennen: Teilnehmer (feste Reihenfolge = Startplätze); ich selbst rechne nur mein Auto
@@ -117,10 +118,12 @@ export function TrackScene() {
             const slot = gridSlot(world, course!, i < PLAYER_GRID ? i : i + 1);
             const look = createCar(o.modelId, [], () => 0.5, {});
             look.color = o.color;
-            return { o, spec: opponentSpec(race!.cls, o), look, st: initialState(slot.x, slot.z, slot.heading), ai: { near: slot.near, prog: slot.prog }, offset: 0, finished: null as number | null };
+            // Schwierigkeitsgrad: Leistung, Fahrkönnen und Reifen der Gegner
+            const od = opponentFor(o, diff);
+            return { o: od, spec: opponentSpec(race!.cls, od, diff), look, st: initialState(slot.x, slot.z, slot.heading), ai: { near: slot.near, prog: slot.prog }, offset: 0, finished: null as number | null };
           })
         : [],
-    [race, course, world],
+    [race, course, world, diff],
   );
   const npcRefs = useRef<(THREE.Group | null)[]>([]);
   const sim = useRef(Object.assign(mySlot ? initialState(mySlot.x, mySlot.z, mySlot.heading) : startAt ? initialState(startAt.x - startAt.nx * 1.8, startAt.z - startAt.nz * 1.8, Math.atan2(-startAt.tz, startAt.tx)) : initialState(world.start.x, world.start.z, world.start.heading), {
