@@ -134,3 +134,53 @@ describe('Jahreszeiten und Wetter', () => {
     expect(roadOf('rain')).toBe('wet');
   });
 });
+
+describe('Rallye fahrbar, Drift kontrollierbar', () => {
+  it('Hecktriebler ohne ESP schafft Schotter-, Matsch- und Schneepiste mit Gefühl am Gas', async () => {
+    const { worldFor } = await import('../three/circuits');
+    const { surfaceGrip } = await import('./vehicle');
+    for (const wid of ['seenland', 'matschtal', 'schneewald'] as const) {
+      const w = worldFor(wid);
+      const n = w.samples.length;
+      const road: Surface = { grade: 0, ...w.road! };
+      const sp = mk('bavaria_330');
+      const g = surfaceGrip(sp, road);
+      const st = initialState(w.start.x, w.start.z, w.start.heading);
+      let near = 0;
+      let prog = 0;
+      let maxB = 0;
+      for (let t = 0; t < 300 && prog < n; t += 1 / 60) {
+        const q = w.nearest(st.x, st.z, near);
+        let d = q.i - near;
+        if (d > n / 2) d -= n;
+        if (d < -n / 2) d += n;
+        prog += d;
+        near = q.i;
+        const tg = w.samples[(near + Math.round(8 + st.vx * 0.5)) % n];
+        let diff = Math.atan2(-(tg.z - st.z), tg.x - st.x) - st.heading;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        let curv = 0;
+        for (let k = 3; k < 50 + st.vx * 2; k++) curv = Math.max(curv, Math.abs(w.samples[(near + k) % n].curv));
+        const vt = Math.min(45, Math.sqrt((0.8 * g * 9.81) / Math.max(1e-4, curv)));
+        const b = Math.abs(Math.atan2(st.vy, Math.max(0.5, Math.abs(st.vx)))) * 57.3;
+        maxB = Math.max(maxB, b);
+        // wie ein Mensch: Heck kommt → Gas zurück
+        const throttle = st.vx < vt ? (b > 12 ? 0.25 : b > 6 ? 0.6 : 1) : 0;
+        stepVehicle(sp, st, { steer: Math.max(-1, Math.min(1, diff * 3 - q.lateral * 0.04)), throttle, brake: st.vx > vt + 2 ? 1 : 0, assist: false }, road, 1 / 60);
+      }
+      expect(prog, `${wid} Runde geschafft`).toBeGreaterThanOrEqual(n);
+      expect(maxB, `${wid} kein Dreher`).toBeLessThan(35);
+    }
+  });
+
+  it('Drift pendelt sich bei kontrollierbaren Winkeln ein (Asphalt und Schotter), kein Dreher', () => {
+    const setup = { diff: 'welded' as const, tires: 'drift' as const };
+    for (const surf of [dry, gravel]) {
+      const r = drift(mk('bavaria_330', setup), surf);
+      expect(r.avg, `Drift-Setup ${surf.cls}`).toBeGreaterThan(20);
+      expect(r.max, `Drift-Setup ${surf.cls}`).toBeLessThan(48);
+      expect(r.speed).toBeGreaterThan(30);
+      expect(drift(mk('bavaria_330'), surf).max, `Serie ${surf.cls}`).toBeLessThan(48);
+    }
+  });
+});

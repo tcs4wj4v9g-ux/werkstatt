@@ -279,7 +279,7 @@ export function vehicleSpec(car: CarInstance): VehicleSpec {
     looseGrip: car.visual?.suspension === 'rally' ? 1.12 : 1,
     roughDrag: car.visual?.skid ? 0.7 : 1,
     diff: car.visual?.diff ?? 'stock',
-    maxDrift: car.visual?.steerKit ? 1.05 : 0.87,
+    maxDrift: car.visual?.steerKit ? 0.9 : 0.72,
     hydroBrake: !!car.visual?.hbrake,
     faults,
   };
@@ -312,10 +312,10 @@ const ratio = (spec: VehicleSpec, gear: number) => (gear === -1 ? -3.4 : gear ==
 const MF_C = 1.35;
 /** Schräglauf (in Einheiten von C·D/Cα), bei dem die Kraft am größten ist: B·α = tan(π / 2C). */
 const PEAK_K = Math.tan(Math.PI / (2 * MF_C)) * MF_C;
-function tire(alpha: number, stiffness: number, limit: number) {
+function tire(alpha: number, stiffness: number, limit: number, C = MF_C) {
   if (limit <= 0) return 0;
-  const B = stiffness / (MF_C * limit);
-  return -limit * Math.sin(MF_C * Math.atan(B * alpha));
+  const B = stiffness / (C * limit);
+  return -limit * Math.sin(C * Math.atan(B * alpha));
 }
 
 /**
@@ -371,6 +371,7 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   // Reifen je Untergrund (Serienreifen 1); Rallyefahrwerk hilft auf losem Untergrund und Schnee
   const cls = surface.cls ?? 'dry';
   const gripK = surfaceGrip(spec, surface);
+  const looseGround = cls === 'loose' || cls === 'snow';
   const muF = spec.muFront * gripK;
   const muR = spec.muRear * gripK;
 
@@ -491,13 +492,19 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
   // Reibungskreis: Längskraft nimmt Seitenführung weg (Gas im Heckantrieb → Heck kommt); durchdrehende Räder führen schlechter
   // Differential im Drift: Sperre hält den Seitenführungsverlust gleichmäßig (Drift mit Gas dosierbar), verschweißt
   // lässt beide Räder gemeinsam durchdrehen – das Heck kommt früher und bleibt draußen
-  const [spinK, spinMax] = spec.diff === 'welded' ? [1.0, 0.62] : spec.diff === 'lsd' ? [0.65, 0.45] : [0.8, 0.5];
+  const [spinK0, spinMax] = spec.diff === 'welded' ? [1.0, 0.62] : spec.diff === 'lsd' ? [0.65, 0.45] : [0.8, 0.5];
+  // Auf losem Untergrund und Schnee greifen durchdrehende Räder noch seitlich (wühlen sich ein) – Gas heißt dort nicht sofort Dreher
+  const spinK = spinK0 * (looseGround ? 0.55 : 1);
   const latF = Math.sqrt(Math.max(0, capF * capF - fxF * fxF)) * (1 - Math.min(shareF > 0 ? spinMax : 0.5, spinF * (shareF > 0 ? spinK : 0.8)));
   let latR = Math.sqrt(Math.max(0, capR * capR - fxR * fxR)) * (1 - Math.min(shareF < 1 ? spinMax : 0.5, spinR * (shareF < 1 ? spinK : 0.8)));
   if (hand && Math.abs(s.vx) > 0.5) latR = capR * (spec.hydroBrake ? 0.15 : 0.3);
   // Seitensteifigkeit wächst mit der Radlast (unterproportional) – mit Abtrieb lenkt das Auto bei Tempo direkter ein
-  let fyF = tire(alphaF, spec.cornerFront * (loadF / staticF) ** 0.7, latF);
-  let fyR = tire(alphaR, spec.cornerRear * (loadR / staticR) ** 0.7, latR);
+  // Seitensteifigkeit sinkt mit der Haftung (nasse Straße, Schotter, Schnee: der Reifen baut die Kraft weicher auf) – sonst
+  // reißt die Haftung bei wenig Grip schlagartig ab. Auf losem Untergrund fällt die Kraft nach dem Grenzbereich sanfter ab.
+  const stiffK = Math.max(0.5, Math.min(1, gripK)) ** 0.8;
+  const C = looseGround ? 1.18 : MF_C;
+  let fyF = tire(alphaF, spec.cornerFront * (loadF / staticF) ** 0.7 * stiffK, latF, C);
+  let fyR = tire(alphaR, spec.cornerRear * (loadR / staticR) ** 0.7 * stiffK, latR, C);
   const lowSpeed = Math.min(1, speed / 3);
   fyF *= lowSpeed;
   fyR *= lowSpeed;
@@ -540,10 +547,11 @@ function substep(spec: VehicleSpec, s: VehicleState, input: DriveInput, surface:
       // gedämpft (Zurückdrehen nie), ab etwa 50° drückt sie deutlich zurück – ein Dreher braucht schon Absicht.
       const excess = s.yawRate - pathYaw;
       const into = Math.sign(excess) === -Math.sign(slipAngle);
-      const k = Math.max(0, Math.min(1, (Math.abs(slipAngle) - 0.35) / 0.4));
-      if (into && k > 0) yawMoment -= excess * spec.yawInertia * 4 * k;
+      // Drift-Hilfe: dämpft weiteres Eindrehen schon ab etwa 17° und hält den Winkel eher bei 30–45° (kontrollierbar)
+      const k = Math.max(0, Math.min(1, (Math.abs(slipAngle) - 0.28) / 0.32));
+      if (into && k > 0) yawMoment -= excess * spec.yawInertia * 6 * k;
       const maxDrift = spec.maxDrift ?? 0.87;
-      if (Math.abs(slipAngle) > maxDrift) yawMoment += (slipAngle - Math.sign(slipAngle) * maxDrift) * spec.mass * 30 * Math.sign(s.vx);
+      if (Math.abs(slipAngle) > maxDrift) yawMoment += (slipAngle - Math.sign(slipAngle) * maxDrift) * spec.mass * 38 * Math.sign(s.vx);
     }
   }
   // Verschweißtes Differential: in engen, langsamen Kurven radieren die Antriebsräder und schieben das Auto geradeaus

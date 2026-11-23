@@ -925,3 +925,11 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - Auswahl am Computer unter „Rennen“, mit dem Siegpreisgeld je Stufe. Die Wahl gilt auch für „Nochmal“. Das Ergebnis nennt die Stufe.
 - Auszahlung wie bisher je Rennen nur einmal: Wer erst „Leicht“ gewinnt und dann „Schwer“, bekommt die Differenz.
 - **Häufigkeit:** Drei von vier normalen Renntagen sind Rennen gegen Gegner, vorher die Hälfte. Zeitrennen sind seltener. Rallye und Drift an jedem dritten Tag bleiben.
+
+## Rallye fahrbar, Drift kontrollierbar, weniger Kamerawackeln
+
+- **Reifen auf wenig Haftung** (`vehicle.ts`): Die Seitensteifigkeit sinkt mit der Haftung (Exponent 0,8, mindestens 50 %). Auf Schotter, Matsch und Schnee fällt die Kraft nach dem Grenzbereich sanfter ab (Magic-Formula C 1,18 statt 1,35). Vorher riss die Haftung bei wenig Grip schlagartig ab, und die Lenkhilfe zielte über den Grenzbereich hinaus.
+- **Durchdrehende Räder** verlieren auf losem Untergrund und Schnee nur gut die Hälfte der Seitenführung wie auf Asphalt.
+- **Drift-Hilfe:** dämpft ab etwa 16° statt 20° und stärker, größter Winkel 41° (mit Lenkwinkel-Kit 52°) statt 50° bzw. 60°. Drifts pendeln sich bei 30–45° ein statt kurz vor dem Dreher.
+- Nachgemessen mit einem Testfahrer, der beim Ausbrechen Gas zurücknimmt: Hecktriebler ohne ESP schafft alle drei Rallyepisten (vorher Dreher mit 57°). Test in `grip.test.ts`.
+- **Kamerawackeln** dezenter: erst ab 120 km/h und schwach, auf unebenem Boden und bei Einschlägen etwa halb so stark wie vorher.

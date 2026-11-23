@@ -593,7 +593,8 @@ export function TrackScene() {
         camera.lookAt(s.x + fx * 2.5, s.y + 0.35, s.z + fz * 2.5);
         // Kamerawackeln: hohes Tempo, unebener Boden, Einschlag – wie die Kamera in Rennspielen
         const kmhNow = Math.abs(s.vx) * 3.6;
-        const shakeAmp = Math.max(0, kmhNow - 90) / 160 * 0.012 + (onRoad ? 0 : Math.min(1, kmhNow / 50) * 0.01) + Math.max(0, s.bump) * 0.05;
+        // dezent: erst ab 120 km/h und schwach, auf unebenem Boden und bei Einschlägen etwas mehr
+        const shakeAmp = (Math.max(0, kmhNow - 120) / 180) * 0.004 + (onRoad ? 0 : Math.min(1, kmhNow / 50) * 0.005) + Math.max(0, s.bump) * 0.03;
         if (shakeAmp > 0.0005) {
           const t = s.t;
           camera.rotateX((Math.sin(t * 31) * 0.6 + Math.sin(t * 53) * 0.4) * shakeAmp);
