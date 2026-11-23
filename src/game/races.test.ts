@@ -55,7 +55,10 @@ describe('Zeitrennen', () => {
   });
 
   it('Klassengrenze und Auszahlung: zu stark darf nicht starten; Preisgeld nur einmal, Verbesserung zahlt die Differenz', () => {
-    const race = { ...raceForDay(1)!, cls: 'c150' as const };
+    // erstes Zeitrennen (Rennen gegen Gegner sind inzwischen häufiger)
+    let d0 = 1;
+    while (raceForDay(d0)?.kind !== 'time') d0++;
+    const race = { ...raceForDay(d0)!, cls: 'c150' as const };
     expect(raceBlocker(fresh('bmv_m4_g82'), race)).toMatch(/Zu stark/);
     expect(raceBlocker(fresh('renard_twingle'), race)).toBeNull();
     const t = raceTargets(race);
@@ -68,11 +71,11 @@ describe('Zeitrennen', () => {
     expect(payoutFor(race, t.gold - 0.5, race.prize.gold).payout).toBe(0);
   });
 
-  it('Rennen gegen Gegner: etwa jedes zweite, fünf Gegner mit passenden Autos, fest je Tag', () => {
+  it('Rennen gegen Gegner: die meisten Renntage, fünf Gegner mit passenden Autos, fest je Tag', () => {
     const all = upcomingRaces(1, 40);
     const grid = all.filter((r) => r.kind === 'grid');
     expect(grid.length).toBeGreaterThan(10);
-    expect(grid.length).toBeLessThan(30);
+    expect(grid.length).toBeLessThan(36);
     for (const r of grid.slice(0, 6)) {
       expect(r.opponents.length).toBe(5);
       expect(new Set(r.opponents.map((o) => o.name)).size).toBe(5);
@@ -141,5 +144,32 @@ describe('Rallye und Driftwettbewerb', () => {
     for (let d = 1; d < 40; d++) if (d % 3 && weatherOf(d) === 'rain') { wet = d; break; }
     const r = raceForDay(wet)!;
     expect(raceTargets(r).gold).toBeGreaterThan(raceTargets({ course: r.course, cls: r.cls }).gold);
+  });
+});
+
+describe('Schwierigkeitsgrade bei Rennen gegen Gegner', () => {
+  it('Gegner fahren je Stufe langsamer bzw. schneller; Preisgeld halb, voll, zweieinhalbfach', async () => {
+    const { opponentFor, opponentSpec, racePrize, DIFFICULTIES } = await import('./races');
+    let day = 5;
+    let r = raceForDay(day);
+    while (!r || r.kind !== 'grid') r = raceForDay(++day);
+    const best = (d: (typeof DIFFICULTIES)[number]) => Math.min(...r!.opponents.map((o) => { const oo = opponentFor(o, d); return aiTime(opponentSpec(r!.cls, oo, d), courseOf(r!.course), undefined, true, oo.skill); }));
+    const [easy, medium, hard] = DIFFICULTIES.map(best);
+    expect(Number.isFinite(hard)).toBe(true);
+    expect(easy).toBeGreaterThan(medium * 1.04);
+    expect(medium).toBeGreaterThan(hard * 1.01);
+    // Schwer: schneller als die Goldzeit eines Zeitrennens auf derselben Strecke und Klasse
+    expect(hard).toBeLessThan(raceTargets({ course: r.course, cls: r.cls }).gold);
+    expect(racePrize(r, 'easy').gold).toBe(Math.round((r.prize.gold * 0.5) / 50) * 50);
+    expect(racePrize(r, 'hard').gold).toBe(Math.round((r.prize.gold * 2.5) / 50) * 50);
+    // Platz 1 auf Schwer zahlt das Zweieinhalbfache, auf Leicht danach nur die Differenz (nichts, wenn schon mehr gezahlt)
+    expect(payoutFor(r, 100, 0, 1, undefined, 'hard').payout).toBe(racePrize(r, 'hard').gold);
+    expect(payoutFor(r, 100, racePrize(r, 'hard').gold, 1, undefined, 'easy').payout).toBe(0);
+  });
+
+  it('Rennen gegen Gegner sind häufiger als Zeitrennen', () => {
+    const days = Array.from({ length: 300 }, (_, i) => raceForDay(i + 4)).filter((r) => r && (r.kind === 'grid' || r.kind === 'time'));
+    const grid = days.filter((r) => r!.kind === 'grid').length;
+    expect(grid / days.length).toBeGreaterThan(0.65);
   });
 });

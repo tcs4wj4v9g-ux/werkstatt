@@ -153,10 +153,37 @@ function modelsFor(cls: RaceClass) {
   return list;
 }
 
-/** Physik eines Gegners: Referenzauto der Klasse mit seiner Motorleistung. */
-export function opponentSpec(cls: RaceClass, o: Opponent): VehicleSpec {
+/**
+ * Schwierigkeitsgrad eines Rennens gegen Gegner: Faktoren auf Leistung, Kurventempo (lat), Bremsmut, Grundtempo
+ * und Reifenhaftung der Gegner – und auf das Preisgeld. Mittel ist etwas strenger als früher (zu leicht verdientes Geld),
+ * Schwer verlangt ein stark getuntes Auto und eine saubere Linie.
+ */
+export type Difficulty = 'easy' | 'medium' | 'hard';
+export const DIFFICULTY: Record<Difficulty, { name: string; prize: number; power: number; lat: number; brake: number; pace: number; grip: number }> = {
+  easy: { name: 'Leicht', prize: 0.5, power: 0.94, lat: 0.92, brake: 0.9, pace: -0.04, grip: 0.97 },
+  medium: { name: 'Mittel', prize: 1, power: 1.0, lat: 1.04, brake: 1.05, pace: 0.02, grip: 1 },
+  hard: { name: 'Schwer', prize: 2.5, power: 1.1, lat: 1.14, brake: 1.2, pace: 0.06, grip: 1.06 },
+};
+export const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
+
+/** Gegner mit Schwierigkeitsgrad: Leistung und Fahrkönnen angepasst. */
+export function opponentFor(o: Opponent, diff: Difficulty = 'medium'): Opponent {
+  const d = DIFFICULTY[diff];
+  return { ...o, power: o.power * d.power, skill: { lat: o.skill.lat * d.lat, brake: o.skill.brake * d.brake, pace: Math.min(1, (o.skill.pace ?? 1) + d.pace) } };
+}
+
+/** Preisgeld eines Rennens bei diesem Schwierigkeitsgrad (nur Rennen gegen Gegner haben Stufen). */
+export function racePrize(race: Pick<Race, 'prize' | 'kind'>, diff: Difficulty = 'medium') {
+  const k = race.kind === 'grid' ? DIFFICULTY[diff].prize : 1;
+  const r = (v: number) => Math.round((v * k) / 50) * 50;
+  return { gold: r(race.prize.gold), silver: r(race.prize.silver), bronze: r(race.prize.bronze) };
+}
+
+/** Physik eines Gegners: Referenzauto der Klasse mit seiner Motorleistung (und Reifen je Schwierigkeitsgrad). */
+export function opponentSpec(cls: RaceClass, o: Opponent, diff: Difficulty = 'medium'): VehicleSpec {
   const ref = referenceSpec(cls);
-  return { ...ref, torque: ref.torque.map((p) => ({ rpm: p.rpm, nm: p.nm * o.power })) };
+  const g = DIFFICULTY[diff].grip;
+  return { ...ref, muFront: ref.muFront * g, muRear: ref.muRear * g, torque: ref.torque.map((p) => ({ rpm: p.rpm, nm: p.nm * o.power })) };
 }
 
 /** Platz → Preisgeld-Stufe (gold/silver/bronze) bei Rennen gegen Gegner. */
@@ -184,8 +211,9 @@ export function raceForDay(day: number): Race | null {
   const pool: RaceClass[] = day < 4 ? ['c150', 'c250'] : ['c150', 'c250', 'c250', 'c400', 'c400', 'open'];
   const cls = pool[Math.floor(r() * pool.length)];
   const c = RACE_CLASSES[cls];
-  // Etwa jedes zweite Rennen gegen Gegner (Preisgeld für die ersten drei, Sieg zahlt etwas mehr als Gold)
-  const kind: Race['kind'] = r() < 0.5 ? 'grid' : 'time';
+  // Meist Rennen gegen Gegner (Preisgeld für die ersten drei, Sieg zahlt etwas mehr als Gold)
+  // Rennen gegen Gegner sind die Regel (drei von vier), Zeitrennen seltener
+  const kind: Race['kind'] = r() < 0.75 ? 'grid' : 'time';
   const base = Math.round((c.gold * courseOf(course).pay) / 50) * 50;
   const gold = kind === 'grid' ? Math.round((base * 1.15) / 50) * 50 : base;
   const share = kind === 'grid' ? [0.45, 0.2] : [0.55, 0.25];
@@ -418,9 +446,9 @@ export function medalFor(race: Race, time: number): Medal {
  * Auszahlung für eine gefahrene Zeit: Preisgeld der erreichten Medaille abzüglich dessen, was für dieses Rennen schon
  * ausgezahlt wurde (Verbesserung zahlt die Differenz, mehrfaches Fahren derselben Medaille nichts).
  */
-export function payoutFor(race: Race, time: number, alreadyPaid: number, place?: number, points?: number) {
+export function payoutFor(race: Race, time: number, alreadyPaid: number, place?: number, points?: number, diff: Difficulty = 'medium') {
   const medal = race.kind === 'grid' ? placeMedal(place ?? 99) : race.kind === 'drift' ? driftMedal(race, points ?? 0) : medalFor(race, time);
-  const prize = medal ? race.prize[medal] : 0;
+  const prize = medal ? racePrize(race, diff)[medal] : 0;
   return { medal, prize, payout: Math.max(0, prize - alreadyPaid) };
 }
 

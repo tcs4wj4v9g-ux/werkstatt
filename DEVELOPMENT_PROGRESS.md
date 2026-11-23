@@ -915,3 +915,13 @@ Recherche (Quellen u. a. Wikipedia „Crossplane“, Slashgear/Jalopnik zu Boxer
 - Ansicht am Computer unter „Rennen“ → „🏆 Bestenliste“, umschaltbar zwischen Zeiten und Driftpunkten, Streckenwahl. Zuerst gezeigt wird die Strecke mit dem jüngsten Eintrag.
 - **Abgleich:** Die Karriere wird im Koop jetzt feldweise abgeglichen, die Bestenliste sogar je Eintrag (Schlüssel „Strecke|Spieler“). Vorher wurde die ganze Karriere als ein Feld abgeglichen. Beendeten zwei Spieler fast gleichzeitig ein Rennen, ging die zweite Änderung verloren (auch Bestzeiten und gewonnene Rennen). Die leere Liste wird beim Öffnen der Werkstatt angelegt. Keine Änderung am Server.
 - Tests: `board.test.ts`, `diff.test.ts` (Einträge zweier Spieler kollidieren nicht), `karriere.cjs` (Ansicht), `koop.cjs` (beide Spieler bei beiden Geräten gleich).
+
+## Rennen gegen Gegner: drei Schwierigkeitsgrade, häufiger
+
+- **Schwierigkeitsgrade** (`races.ts`: `DIFFICULTY`, `opponentFor`, `racePrize`). Die Faktoren wirken auf die Gegner (Leistung, Kurventempo, Bremsmut, Grundtempo, Reifen) und auf das Preisgeld:
+  - Leicht: Gegner 6 % weniger Leistung und vorsichtiger, Preisgeld × 0,5.
+  - Mittel: etwas strenger als bisher (der Schnellste knapp schneller als die Goldzeit eines Zeitrennens), Preisgeld × 1.
+  - Schwer: Gegner +10 % Leistung, nah am Grenzbereich und mit besseren Reifen, das ganze Feld dicht und 4–6 % schneller als Gold. Preisgeld × 2,5.
+- Auswahl am Computer unter „Rennen“, mit dem Siegpreisgeld je Stufe. Die Wahl gilt auch für „Nochmal“. Das Ergebnis nennt die Stufe.
+- Auszahlung wie bisher je Rennen nur einmal: Wer erst „Leicht“ gewinnt und dann „Schwer“, bekommt die Differenz.
+- **Häufigkeit:** Drei von vier normalen Renntagen sind Rennen gegen Gegner, vorher die Hälfte. Zeitrennen sind seltener. Rallye und Drift an jedem dritten Tag bleiben.

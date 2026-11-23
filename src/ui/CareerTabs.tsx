@@ -1,10 +1,10 @@
 import { CarStatsCard } from './CarStatsCard';
 import { CoopRacePanel, Leaderboard, CoopRaceTable } from './CoopRaceUI';
 import { leaveCoopRace } from '../net/coopRace';
-import { courseOf, driftTargets, MEDAL_LABEL, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
+import { courseOf, DIFFICULTIES, DIFFICULTY, driftTargets, MEDAL_LABEL, racePrize, type Difficulty, PLAYER_GRID, raceBlocker, raceClock, raceForDay, raceTargets, upcomingRaces, type Race } from '../game/races';
 import { weatherLabel } from '../game/grip';
 import { duration, todayOf } from '../game/playtime';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ACHIEVEMENTS, collection, isAchieved } from '../game/career';
 import { CAR_MODELS, CLASS_NAMES } from '../game/data/cars';
 import { engineOf } from '../game/data/components';
@@ -221,6 +221,7 @@ export function ContestResultModal() {
 /** Zeitrennen: heutiges Rennen mit Sollzeiten und Startknöpfen je Auto, dazu die nächsten Termine. */
 export function RacesTab() {
   const s = useGame();
+  const [diff, setDiff] = useState<Difficulty>(lastDiffInit());
   const race = raceForDay(s.day);
   const upcoming = upcomingRaces(s.day + 1, 4);
   const best = race ? (s.career.raceBest ?? {})[race.id] : undefined;
@@ -244,7 +245,7 @@ export function RacesTab() {
         <div className="shop-row col" data-testid="race-today">
           <b>Heute: {race.title}</b>
           <div className="meta">{courseOf(race.course).desc} · {((courseOf(race.course).length * 2) / 1000).toFixed(1)} km</div>
-          {race.kind === 'grid' ? <RaceField race={race} /> : race.kind === 'drift' ? <DriftTargets race={race} /> : <RaceTargets race={race} />}
+          {race.kind === 'grid' ? <RaceField race={race} diff={diff} setDiff={setDiff} /> : race.kind === 'drift' ? <DriftTargets race={race} /> : <RaceTargets race={race} />}
           <div className="meta">
             Startgeld {eur(race.fee)} · Wetter: {weatherLabel(s.day)}
             {best !== undefined && <> · {race.kind === 'drift' ? `deine Bestwertung ${best.toLocaleString('de-DE')} Punkte` : `deine Bestzeit ${raceClock(best)}`}</>}
@@ -259,8 +260,11 @@ export function RacesTab() {
                   <b>{CAR_MODELS[car.modelId].name}</b> <span className="meta">– {performance(car).ps} PS</span>
                   {blocker && <div className="meta bad">{blocker}</div>}
                 </div>
-                <button className="btn primary" data-testid={`race-start-${i}`} disabled={!!blocker || s.money < race.fee} onClick={() => s.startRace(i)}>
-                  🏁 Starten ({eur(race.fee)})
+                <button className="btn primary" data-testid={`race-start-${i}`} disabled={!!blocker || s.money < race.fee} onClick={() => {
+                    lastDiff.d = diff;
+                    s.startRace(i, diff);
+                  }}>
+                  🏁 Starten{race.kind === 'grid' ? ` – ${DIFFICULTY[diff].name}` : ''} ({eur(race.fee)})
                 </button>
               </div>
             );
@@ -273,7 +277,7 @@ export function RacesTab() {
           <div>
             <b>Tag {r.day}: {r.title}</b>
             <div className="meta">
-              {weatherLabel(r.day)} · {r.kind === 'grid' ? `Gegen 5 Gegner · Platz 1 ${eur(r.prize.gold)} · Platz 2 ${eur(r.prize.silver)} · Platz 3 ${eur(r.prize.bronze)}` : `Gold ${eur(r.prize.gold)} · Silber ${eur(r.prize.silver)} · Bronze ${eur(r.prize.bronze)}`} · Startgeld {eur(r.fee)}
+              {weatherLabel(r.day)} · {r.kind === 'grid' ? `Gegen 5 Gegner · Sieg ${eur(racePrize(r, 'easy').gold)} (Leicht) bis ${eur(racePrize(r, 'hard').gold)} (Schwer)` : `Gold ${eur(r.prize.gold)} · Silber ${eur(r.prize.silver)} · Bronze ${eur(r.prize.bronze)}`} · Startgeld {eur(r.fee)}
             </div>
           </div>
         </div>
@@ -283,13 +287,28 @@ export function RacesTab() {
 }
 
 /** Rennen gegen Gegner: Preisgeld nach Platz und das Starterfeld. */
-function RaceField({ race }: { race: Race }) {
+const lastDiffInit = () => lastDiff.d;
+/** Zuletzt gewählter Schwierigkeitsgrad (für „Nochmal“ im Ergebnisfenster). */
+const lastDiff: { d: Difficulty } = { d: 'medium' };
+
+function RaceField({ race, diff, setDiff }: { race: Race; diff: Difficulty; setDiff(d: Difficulty): void }) {
+  const p = racePrize(race, diff);
   return (
     <>
+      <div className="row wrap" role="group" data-testid="race-difficulty">
+        {DIFFICULTIES.map((d) => (
+          <button key={d} className={`btn ${diff === d ? 'primary' : ''}`} data-testid={`diff-${d}`} onClick={() => setDiff(d)}>
+            {d === 'easy' ? '🟢' : d === 'medium' ? '🟡' : '🔴'} {DIFFICULTY[d].name} · Sieg {eur(racePrize(race, d).gold)}
+          </button>
+        ))}
+      </div>
+      <div className="meta">
+        {diff === 'easy' ? 'Die Gegner fahren vorsichtig und mit weniger Leistung – halbes Preisgeld.' : diff === 'medium' ? 'Die Gegner fahren sauber und schnell – volles Preisgeld.' : 'Die Gegner fahren am Limit, mit mehr Leistung und besseren Reifen – nur mit stark getuntem Auto und sauberer Linie zu schlagen. Zweieinhalbfaches Preisgeld.'}
+      </div>
       <div className="race-table">
-        <span>🏆 Platz 1 → {eur(race.prize.gold)}</span>
-        <span>🥈 Platz 2 → {eur(race.prize.silver)}</span>
-        <span>🥉 Platz 3 → {eur(race.prize.bronze)}</span>
+        <span>🏆 Platz 1 → {eur(p.gold)}</span>
+        <span>🥈 Platz 2 → {eur(p.silver)}</span>
+        <span>🥉 Platz 3 → {eur(p.bronze)}</span>
       </div>
       <div className="meta" data-testid="race-field">
         Gegner: {race.opponents.map((o) => `${o.name} (${CAR_MODELS[o.modelId].name})`).join(' · ')}. Du startest von Platz {PLAYER_GRID + 1}.
@@ -378,7 +397,7 @@ export function RaceResultModal() {
       </p>
       <div className="row">
         {race && s.race === null && s.cars[s.driveBay] && (
-          <button className="btn primary" data-testid="race-again" disabled={s.money < race.fee} onClick={() => s.startRace(s.driveBay)}>
+          <button className="btn primary" data-testid="race-again" disabled={s.money < race.fee} onClick={() => s.startRace(s.driveBay, lastDiff.d)}>
             Nochmal ({eur(race.fee)})
           </button>
         )}

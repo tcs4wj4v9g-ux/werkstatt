@@ -193,7 +193,12 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   await p.waitForTimeout(400);
   await p.locator('.modal button', { hasText: /^Rennen/ }).first().click(); await p.waitForTimeout(400);
   expect(/Gegner: .+Du startest von Platz 4/.test(await p.getByTestId('race-field').textContent()), 'Starterfeld im Rennen-Reiter: ' + gday.title);
+  // Schwierigkeitsgrad: drei Stufen mit unterschiedlichem Siegpreisgeld; „Schwer“ wählen
+  const diffTxt = await p.getByTestId('race-difficulty').textContent();
+  await p.getByTestId('diff-hard').click(); await p.waitForTimeout(200);
+  expect(/Leicht/.test(diffTxt) && /Mittel/.test(diffTxt) && /Schwer/.test(diffTxt) && /Schwer/.test(await p.getByTestId('race-start-0').textContent()), 'Drei Schwierigkeitsgrade zur Wahl: ' + diffTxt);
   await p.getByTestId('race-start-0').click(); await p.waitForTimeout(1500);
+  expect((await G(() => window.__gk.getState().race.diff)) === 'hard', 'Rennen läuft auf „Schwer“');
   await G(() => { const d = window.__gkDrive; d.sim.autopilot = 26; d.sim.timeScale = 3; });
   await p.waitForTimeout(4000);
   expect(/^P[1-6]\/6$/.test((await p.getByTestId('race-place').textContent()).trim()), 'Platz im Rennen angezeigt: ' + (await p.getByTestId('race-place').textContent()));
@@ -201,6 +206,7 @@ const S = process.env.GK_OUT || __dirname + '/out'; const URL = process.env.GK_U
   const gr = await G(() => window.__gk.getState().raceResult);
   expect(gr && gr.place >= 1 && gr.table && gr.table.length === 6 && gr.table.filter((r) => !r.you).every((r) => r.time > 10), 'Endstand: Platz ' + (gr && gr.place) + ' von 6 – ' + (gr && gr.table.map((r) => r.name + ' ' + r.time).join(', ')));
   expect((gr.place <= 3) === (gr.prize > 0), 'Preisgeld nur für Platz 1–3 (' + gr.prize + ' €)');
+  expect(/Schwer/.test(gr.title || '') || /Schwer/.test(await G(() => window.__gk.getState().raceResult.title)), 'Ergebnis nennt den Schwierigkeitsgrad');
   expect(await p.getByTestId('race-results').isVisible(), 'Ergebnistabelle sichtbar');
   await p.screenshot({ path: S + '/rennen-gegner.png' });
   await G(() => window.__gk.getState().setPanel(null));

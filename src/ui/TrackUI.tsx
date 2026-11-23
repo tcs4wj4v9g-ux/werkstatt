@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { leaveCoopRace } from '../net/coopRace';
 import { CoopDriftLive } from './CoopRaceUI';
-import { courseOf, driftTargets, raceClock, raceForDay, raceTargets, type Race } from '../game/races';
+import { courseOf, DIFFICULTY, driftTargets, raceClock, raceForDay, racePrize, raceTargets, type Race } from '../game/races';
 import { FARMS, LAKE, PAD, WORKSHOP, type DriveWorld } from '../three/driveWorld';
 import { worldFor } from '../three/circuits';
 import { CAMERA_LABEL, DRIVE_MIN, driveInput, useDriveHud, type DriveCamera } from '../game/drive';
@@ -313,6 +313,7 @@ function RaceHud() {
   }
   const race = raceForDay(day);
   if (!race) return null;
+  const diffNow = useGame.getState().race?.diff ?? 'medium';
   const t = raceTargets(race);
   const run = Math.max(0, hud.raceT);
   const medal = run <= t.gold ? 'gold' : run <= t.silver ? 'silver' : run <= t.bronze ? 'bronze' : null;
@@ -339,7 +340,7 @@ function RaceHud() {
             🥇 {raceClock(t.gold)} · 🥈 {raceClock(t.silver)} · 🥉 {raceClock(t.bronze)}
           </div>
         ) : (
-          <div className="race-targets">Sieg: {race.prize.gold.toLocaleString('de-DE')} €</div>
+          <div className="race-targets">Sieg: {racePrize(race, diffNow).gold.toLocaleString('de-DE')} € · {DIFFICULTY[diffNow].name}</div>
         )}
       </div>
     </>
